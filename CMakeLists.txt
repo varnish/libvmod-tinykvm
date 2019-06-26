@@ -6,7 +6,7 @@ set(CMAKE_C_FLAGS "-Wall -Wextra -std=c11 -g -O2")
 option(LTO_ENABLE "Enable LTO builds" ON)
 if (LTO_ENABLE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto=8")
     if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
     endif()
@@ -33,10 +33,12 @@ set (VARNISH_PATH ${CMAKE_SOURCE_DIR}/varnish-cache-plus)
 add_custom_command(
     COMMAND ${PYTHON_EXECUTABLE} ${VARNISH_PATH}/include/generate.py ${VARNISH_PATH} ${VARNISH_PATH}
     WORKING_DIRECTORY ${VARNISH_PATH}/include
-    OUTPUT  ${VARNISH_PATH}/include/vcs_version.h ${VARNISH_PATH}/include/vmod_abi.h
+    OUTPUT  ${VARNISH_PATH}/include/vcs_version.h
+            ${VARNISH_PATH}/include/vmod_abi.h
+    DEPENDS ${VARNISH_PATH}/include/generate.py
     COMMENT "Generating vcs_version.h and vmod_abi.h"
     )
-add_custom_target(includes_generate ALL
+add_custom_target(includes_generate
     DEPENDS ${VARNISH_PATH}/include/vcs_version.h
             ${VARNISH_PATH}/include/vmod_abi.h
     )
@@ -45,9 +47,10 @@ add_custom_command(
     COMMAND ${PYTHON_EXECUTABLE} ${VARNISH_PATH}/lib/libvarnishapi/generate.py
     WORKING_DIRECTORY ${VARNISH_PATH}/lib/libvarnishapi
     OUTPUT  ${VARNISH_PATH}/lib/libvarnishapi/vxp_fixed_token.c
+    DEPENDS ${VARNISH_PATH}/lib/libvarnishapi/generate.py
     COMMENT "Generating vxp_fixed_token.c"
 )
-add_custom_target(varnishapi_generate ALL
+add_custom_target(varnishapi_generate
     DEPENDS ${VARNISH_PATH}/lib/libvarnishapi/vxp_fixed_token.c
             includes_generate
     )
@@ -61,9 +64,10 @@ add_custom_command(
             ${VARNISH_PATH}/include/vcl.h
             ${VARNISH_PATH}/include/tbl/vcc_types.h
             ${VARNISH_PATH}/include/tbl/vrt_stv_var.h
+    DEPENDS ${VARNISH_PATH}/lib/libvcc/generate.py
     COMMENT "Generating "
 )
-add_custom_target(libvcc_generate ALL
+add_custom_target(libvcc_generate
     DEPENDS ${VARNISH_PATH}/lib/libvcc/vcc_fixed_token.c
             ${VARNISH_PATH}/lib/libvcc/vcc_obj.c
             ${VARNISH_PATH}/lib/libvcc/vcc_obj.h
@@ -72,6 +76,8 @@ add_custom_target(libvcc_generate ALL
             ${VARNISH_PATH}/include/tbl/vrt_stv_var.h
             includes_generate
     )
+set_source_files_properties(${VARNISH_PATH}/lib/libvcc/vcc_fixed_token.c
+                            PROPERTIES GENERATED TRUE)
 
 set (VD_PATH ${VARNISH_PATH}/bin/varnishd)
 set(VARNISHD_SOURCES
@@ -247,19 +253,21 @@ set(VSC_SOURCES
 	VSC_mse_store.vsc
 )
 function(build_vsc_file NAME)
+    get_filename_component(VSC_FILE ${NAME} NAME_WE)
     add_custom_command(
-            OUTPUT ${NAME}.c
+            OUTPUT ${VSC_FILE}.c ${VSC_FILE}.h
             COMMAND python3 ${LIBPATH}/libvcc/vsctool.py -ch ${NAME}
             DEPENDS ${NAME}
         )
 endfunction()
 foreach(VSC_FILE ${VSC_SOURCES})
-    set(VSC_FP ${VD_PATH}/${VSC_FILE})
-    build_vsc_file(${VSC_FP})
+    build_vsc_file(${VD_PATH}/${VSC_FILE})
     get_filename_component(VSC_WEFILE ${VSC_FILE} NAME_WE)
     list(APPEND VSC_COMPILED ${CMAKE_CURRENT_BINARY_DIR}/${VSC_WEFILE}.c)
+    list(APPEND VSC_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/${VSC_WEFILE}.h)
 endforeach()
 set_source_files_properties(${VSC_COMPILED} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${VSC_HEADERS} PROPERTIES GENERATED TRUE)
 
 ## HUF DEC generator executable ##
 set(GEN_HUFDEC_SOURCES "${VD_PATH}/hpack/vhp_gen_hufdec.c")
@@ -276,6 +284,19 @@ add_custom_command(
 add_custom_target(vhp_gen_hufdec ALL
         DEPENDS vhp_hufdec.h
 )
+
+## libvarnish library ##
+add_library(varnish ${LIBVARNISH_SOURCES} ${VSC_COMPILED})
+target_include_directories(varnish PUBLIC ${VARNISH_PATH}/bin/varnishd)
+target_include_directories(varnish PUBLIC ${VARNISH_PATH}/include)
+target_include_directories(varnish PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(varnish PUBLIC vcl/)
+target_compile_definitions(varnish PUBLIC _XOPEN_SOURCE=700)
+target_compile_definitions(varnish PUBLIC VARNISH_STATE_DIR="/tmp/varnish")
+target_compile_definitions(varnish PUBLIC VARNISH_VMOD_DIR="/opt/varnish/lib/varnish-plus/vmods")
+target_compile_definitions(varnish PUBLIC VARNISH_VCL_DIR="/opt/varnish/share/varnish-plus/vcl")
+target_compile_definitions(varnish PUBLIC -DNOT_IN_A_VMOD)
+add_dependencies(varnish includes_generate)
 
 ## libvarnish_sslhelper library ##
 set(SSLH_PATH ${LIBPATH}/libvarnish_sslhelper)
@@ -356,19 +377,9 @@ add_library(vcc ${VCC_SOURCES})
 target_include_directories(vcc PRIVATE ${VCC_PATH})
 target_include_directories(vcc PRIVATE ${VARNISH_PATH}/include)
 target_include_directories(vcc PRIVATE vcl/)
+add_dependencies(vcc libvcc_generate)
 
 ## Varnish daemon ##
-add_library(varnish ${LIBVARNISH_SOURCES} ${VSC_COMPILED})
-target_include_directories(varnish PUBLIC ${VARNISH_PATH}/bin/varnishd)
-target_include_directories(varnish PUBLIC ${VARNISH_PATH}/include)
-target_include_directories(varnish PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-#target_include_directories(varnish PUBLIC ${LIBPATH}/libvgz)
-target_include_directories(varnish PUBLIC vcl/)
-target_compile_definitions(varnish PUBLIC VARNISH_STATE_DIR="/tmp/varnish")
-target_compile_definitions(varnish PUBLIC VARNISH_VMOD_DIR="/opt/varnish/lib/varnish-plus/vmods")
-target_compile_definitions(varnish PUBLIC VARNISH_VCL_DIR="/opt/varnish/share/varnish-plus/vcl")
-target_compile_definitions(varnish PUBLIC -DNOT_IN_A_VMOD)
-
 add_executable(varnishd ${VARNISHD_SOURCES})
 add_dependencies(varnishd vhp_gen_hufdec)
 target_link_libraries(varnishd mse vcc sslhelper varnish vgz lmdb m)

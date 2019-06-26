@@ -1,0 +1,5 @@
+Todo list for CMake build system
+===============================
+- Generate config.h using configure_file(...)
+    https://cmake.org/cmake/help/v3.6/command/configure_file.html
+- 
