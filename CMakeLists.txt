@@ -277,6 +277,47 @@ add_custom_target(vhp_gen_hufdec ALL
         DEPENDS vhp_hufdec.h
 )
 
+## libvarnish_sslhelper library ##
+set(SSLH_PATH ${LIBPATH}/libvarnish_sslhelper)
+set(SSLH_SOURCES ${SSLH_PATH}/vsslh.c
+            )
+add_library(sslhelper ${SSLH_SOURCES})
+target_include_directories(sslhelper PRIVATE ${VARNISH_PATH}/include)
+
+## MSE library ##
+set(LMDB_PATH ${LIBPATH}/liblmdb/LMDB_0.9.23)
+set(LMDB_SOURCES ${LMDB_PATH}/mdb.c
+                 ${LMDB_PATH}/mdb_dump.c
+                 ${LMDB_PATH}/mdb_stat.c
+                 ${LMDB_PATH}/mdb_copy.c
+                 ${LMDB_PATH}/mdb_load.c
+                 ${LMDB_PATH}/midl.c
+            )
+add_library(lmdb ${LMDB_SOURCES})
+target_compile_definitions(lmdb PUBLIC _XOPEN_SOURCE=700)
+target_include_directories(lmdb PUBLIC ${LMDB_PATH})
+
+## MSE library ##
+set(MSE_PATH ${LIBPATH}/libmse)
+set(MSE_SOURCES ${MSE_PATH}/journal_test.c
+                ${MSE_PATH}/mse_lib_config_test.c
+                ${MSE_PATH}/mse_lib_dbtest.c
+                ${MSE_PATH}/mse_lib_jrnfile.c
+                ${MSE_PATH}/mse_lib_banlist.c
+                ${MSE_PATH}/mse_lib_db.c
+                ${MSE_PATH}/mse_lib_env.c
+                ${MSE_PATH}/mse_mtq_test.c
+                ${MSE_PATH}/mse_lib_config.c
+                ${MSE_PATH}/mse_lib_dbro.c
+                ${MSE_PATH}/mse_lib_journal.c
+            )
+add_library(mse ${MSE_SOURCES})
+target_include_directories(mse PRIVATE ${MSE_PATH})
+target_include_directories(mse PRIVATE ${LIBPATH}/libvgz)
+target_include_directories(mse PRIVATE ${LIBPATH}/liblmdb/LMDB_0.9.23)
+target_include_directories(mse PRIVATE ${VARNISH_PATH}/include)
+target_include_directories(mse PRIVATE vcl/)
+
 ## VGZ library ##
 set(VGZ_PATH ${LIBPATH}/libvgz)
 set(VGZ_SOURCES ${VGZ_PATH}/adler32.c
@@ -291,7 +332,32 @@ set(VGZ_SOURCES ${VGZ_PATH}/adler32.c
 add_library(vgz ${VGZ_SOURCES})
 target_include_directories(vgz PUBLIC ${VGZ_PATH})
 
+## VCC library ##
+set(VCC_PATH ${LIBPATH}/libvcc)
+set(VCC_SOURCES ${VCC_PATH}/vcc_acl.c
+                ${VCC_PATH}/vcc_backend_util.c
+                ${VCC_PATH}/vcc_fixed_token.c
+                ${VCC_PATH}/vcc_storage.c
+                ${VCC_PATH}/vcc_types.c
+                ${VCC_PATH}/vcc_vmod.c
+                ${VCC_PATH}/vcc_action.c
+                ${VCC_PATH}/vcc_compile.c
+                ${VCC_PATH}/vcc_obj.c
+                ${VCC_PATH}/vcc_symb.c
+                ${VCC_PATH}/vcc_utils.c
+                ${VCC_PATH}/vcc_xref.c
+                ${VCC_PATH}/vcc_backend.c
+                ${VCC_PATH}/vcc_expr.c
+                ${VCC_PATH}/vcc_parse.c
+                ${VCC_PATH}/vcc_token.c
+                ${VCC_PATH}/vcc_var.c
+            )
+add_library(vcc ${VCC_SOURCES})
+target_include_directories(vcc PRIVATE ${VCC_PATH})
+target_include_directories(vcc PRIVATE ${VARNISH_PATH}/include)
+target_include_directories(vcc PRIVATE vcl/)
 
+## Varnish daemon ##
 add_library(varnish ${LIBVARNISH_SOURCES} ${VSC_COMPILED})
 target_include_directories(varnish PUBLIC ${VARNISH_PATH}/bin/varnishd)
 target_include_directories(varnish PUBLIC ${VARNISH_PATH}/include)
@@ -305,5 +371,5 @@ target_compile_definitions(varnish PUBLIC -DNOT_IN_A_VMOD)
 
 add_executable(varnishd ${VARNISHD_SOURCES})
 add_dependencies(varnishd vhp_gen_hufdec)
-target_link_libraries(varnishd varnish vgz)
-target_link_libraries(varnishd pcre pthread crypto ssl dl)
+target_link_libraries(varnishd mse vcc sslhelper varnish vgz lmdb m)
+target_link_libraries(varnishd config pcre pthread crypto ssl dl)
