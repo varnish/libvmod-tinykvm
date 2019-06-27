@@ -27,6 +27,12 @@ if (PGO_ENABLE)
     endif()
 endif()
 
+option(AUTOFDO "Enable AutoFDO profile optimizations" OFF)
+set(PROFILE "../perf.afdo" CACHE STRING "Optimization profile path")
+if (AUTOFDO)
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fauto-profile=${CMAKE_BINARY_DIR}/${PROFILE} -g1")
+endif()
+
 set (VARNISH_PATH ${CMAKE_SOURCE_DIR}/varnish-cache-plus)
 
 # include/vcs_version.h include/vmod_abi.h
