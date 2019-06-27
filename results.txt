@@ -1,23 +1,21 @@
-testing:
-Concurrency Level:      5
-Time taken for tests:   1.688 seconds
-Complete requests:      50000
-Failed requests:        0
-Total transferred:      9941012 bytes
-HTML transferred:       1050000 bytes
-Requests per second:    29616.08 [#/sec] (mean)
-Time per request:       0.169 [ms] (mean)
-Time per request:       0.034 [ms] (mean, across all concurrent requests)
-Transfer rate:          5750.27 [Kbytes/sec] received
+profiling:
+Requests per second:    28384.95 [#/sec] (mean)
+Requests per second:    28569.80 [#/sec] (mean)
+Requests per second:    28337.96 [#/sec] (mean)
+Requests per second:    28739.20 [#/sec] (mean)
+
 
 autofdo:
-Concurrency Level:      5
-Time taken for tests:   1.626 seconds
-Complete requests:      50000
-Failed requests:        0
-Total transferred:      9918253 bytes
-HTML transferred:       1050000 bytes
-Requests per second:    30752.35 [#/sec] (mean)
-Time per request:       0.163 [ms] (mean)
-Time per request:       0.033 [ms] (mean, across all concurrent requests)
-Transfer rate:          5957.22 [Kbytes/sec] received
+Requests per second:    29633.42 [#/sec] (mean)
+Requests per second:    29725.81 [#/sec] (mean)
+Requests per second:    29924.82 [#/sec] (mean)
+Requests per second:    29891.06 [#/sec] (mean)
+
+vanilla:
+Requests per second:    29987.31 [#/sec] (mean)
+Requests per second:    29854.24 [#/sec] (mean)
+Requests per second:    29436.28 [#/sec] (mean)
+Requests per second:    29866.49 [#/sec] (mean)
+
+-rw-------  1 gonzo root  5376864 juni  27 18:02 perf.data
+-rw-r--r--  1 gonzo gonzo    1600 juni  27 18:02 perf.afdo
