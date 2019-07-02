@@ -1,6 +1,6 @@
 #!/bin/bash
 PROF=perf.afdo
-PID=$1
+PID=$(pidof varnishd)
 set -e
 
 OCPERF=$(which ocperf.py)
