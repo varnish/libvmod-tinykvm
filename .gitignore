@@ -1,3 +1,5 @@
 build/
 perf.*
 perf-*.svg
+callgraph.svg
+server/img/**
