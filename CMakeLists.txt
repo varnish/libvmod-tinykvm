@@ -401,6 +401,9 @@ target_include_directories(vcc PRIVATE ${VARNISH_PATH}/include)
 target_include_directories(vcc PRIVATE vcl/)
 add_dependencies(vcc libvcc_generate)
 
+## missing functions ##
+set(VARNISHD_SOURCES ${VARNISHD_SOURCES} missing.c)
+
 ## Varnish daemon ##
 add_executable(varnishd ${VARNISHD_SOURCES})
 add_dependencies(varnishd vhp_gen_hufdec)
