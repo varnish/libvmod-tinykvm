@@ -19,3 +19,16 @@ Requests per second:    29866.49 [#/sec] (mean)
 
 -rw-------  1 gonzo root  5376864 juni  27 18:02 perf.data
 -rw-r--r--  1 gonzo gonzo    1600 juni  27 18:02 perf.afdo
+
+### NATIVE ###
+Optimizations:
+Requests per second:    1530.78 [#/sec] (mean)
+Requests per second:    1528.11 [#/sec] (mean)
+Requests per second:    1525.86 [#/sec] (mean)
+Requests per second:    1515.58 [#/sec] (mean)
+
+No optimizations:
+Requests per second:    1508.20 [#/sec] (mean)
+Requests per second:    1507.94 [#/sec] (mean)
+Requests per second:    1505.61 [#/sec] (mean)
+Requests per second:    1500.76 [#/sec] (mean)
