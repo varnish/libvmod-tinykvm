@@ -81,11 +81,9 @@ add_custom_target(varnishapi_generate
     )
 # libvcc/... and include/*vcc*
 add_custom_command(
-    COMMAND ${PYTHON_EXECUTABLE} ${VARNISH_PATH}/lib/libvcc/generate.py
-    WORKING_DIRECTORY ${VARNISH_PATH}/lib/libvcc
+    COMMAND ${PYTHON_EXECUTABLE} ${VARNISH_PATH}/lib/libvcc/generate.py ${VARNISH_PATH} ${VARNISH_PATH}
     OUTPUT  ${VARNISH_PATH}/lib/libvcc/vcc_fixed_token.c
             ${VARNISH_PATH}/lib/libvcc/vcc_obj.c
-            ${VARNISH_PATH}/lib/libvcc/vcc_obj.h
             ${VARNISH_PATH}/include/vcl.h
             ${VARNISH_PATH}/include/tbl/vcc_types.h
             ${VARNISH_PATH}/include/tbl/vrt_stv_var.h
@@ -95,14 +93,13 @@ add_custom_command(
 add_custom_target(libvcc_generate
     DEPENDS ${VARNISH_PATH}/lib/libvcc/vcc_fixed_token.c
             ${VARNISH_PATH}/lib/libvcc/vcc_obj.c
-            ${VARNISH_PATH}/lib/libvcc/vcc_obj.h
             ${VARNISH_PATH}/include/vcl.h
             ${VARNISH_PATH}/include/tbl/vcc_types.h
             ${VARNISH_PATH}/include/tbl/vrt_stv_var.h
             includes_generate
     )
-set_source_files_properties(${VARNISH_PATH}/lib/libvcc/vcc_fixed_token.c
-                            PROPERTIES GENERATED TRUE)
+#set_source_files_properties(${VARNISH_PATH}/lib/libvcc/vcc_fixed_token.c
+#                            PROPERTIES GENERATED TRUE)
 
 set (VD_PATH ${VARNISH_PATH}/bin/varnishd)
 set(VARNISHD_SOURCES
