@@ -13,6 +13,7 @@ option(PGO_GENERATE "Enable profile-guided optimizations" ON)
 option(AUTOFDO     "Enable AutoFDO profile optimizations" OFF)
 set(PROFILE "../perf.afdo" CACHE STRING "Optimization profile path")
 option(LIBFUZZER   "Enable fuzzing with clang libfuzzer")
+option(SINGLE_PROCESS "Disable fork() and run in single-process mode" ON)
 
 if (LTO_ENABLE)
     if ("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
@@ -41,10 +42,12 @@ if (NATIVE)
 endif()
 
 if (PGO_ENABLE)
+    set(PGO_DIR "${CMAKE_BINARY_DIR}/pgo")
+    set(PGO_FLAGS "-fprofile-correction -fprofile-dir=${PGO_DIR}")
     if (PGO_GENERATE)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-generate -fprofile-dir=pgo")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-generate ${PGO_FLAGS}")
     else()
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-use -fprofile-dir=pgo")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-use ${PGO_FLAGS}")
     endif()
 endif()
 
@@ -418,4 +421,13 @@ if (LIBFUZZER)
     target_compile_definitions(varnish  PRIVATE LIBFUZZER_ENABLED=1)
     target_compile_definitions(varnishd PRIVATE LIBFUZZER_ENABLED=1)
     target_link_libraries(varnishd "-fsanitize=fuzzer")
+endif()
+
+if (SINGLE_PROCESS)
+    set_source_files_properties(
+        ${VD_PATH}/cache/cache_cli.c
+        ${VD_PATH}/cache/cache_vcl.c
+        ${VD_PATH}/mgt/mgt_child.c
+        ${VD_PATH}/mgt/mgt_vcl.c
+    PROPERTIES COMPILE_FLAGS -DSINGLE_PROCESS_MODE)
 endif()
