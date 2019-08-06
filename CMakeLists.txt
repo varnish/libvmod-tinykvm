@@ -417,10 +417,18 @@ target_link_libraries(varnishd mse vcc sslhelper varnish vgz lmdb m)
 target_link_libraries(varnishd config pcre pthread crypto ssl dl)
 
 if (LIBFUZZER)
+    if (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
+        message(FATAL_ERROR "You can only use Clang when libfuzzer is enabled")
+    endif()
     target_compile_options(varnishd PUBLIC "-fsanitize=fuzzer-no-link")
-    target_compile_definitions(varnish  PRIVATE LIBFUZZER_ENABLED=1)
-    target_compile_definitions(varnishd PRIVATE LIBFUZZER_ENABLED=1)
     target_link_libraries(varnishd "-fsanitize=fuzzer")
+    set_source_files_properties(
+        ${VD_PATH}/cache/cache_cli.c
+        ${VD_PATH}/mgt/mgt_child.c
+        ${VD_PATH}/mgt/mgt_main.c
+        ${VD_PATH}/mgt/mgt_vcc.c
+        fuzzer.c
+    PROPERTIES COMPILE_DEFINITIONS LIBFUZZER_ENABLED=1)
 endif()
 
 if (SINGLE_PROCESS)
