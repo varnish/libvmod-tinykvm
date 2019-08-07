@@ -424,6 +424,7 @@ if (LIBFUZZER)
     target_link_libraries(varnishd "-fsanitize=fuzzer")
     set_source_files_properties(
         ${VD_PATH}/cache/cache_cli.c
+        ${VD_PATH}/cache/cache_main.c
         ${VD_PATH}/mgt/mgt_child.c
         ${VD_PATH}/mgt/mgt_main.c
         ${VD_PATH}/mgt/mgt_vcc.c
