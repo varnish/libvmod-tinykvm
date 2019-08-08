@@ -8,6 +8,7 @@ option(LTO_ENABLE  "Enable LTO builds" ON)
 option(MINIMAL     "Minimal build")
 option(GCSECTIONS  "Garbage collect empty sections" ON)
 option(NATIVE      "Enable native performance" ON)
+option(SANITIZE    "Enable asan/ubsan sanitizers" OFF)
 option(PGO_ENABLE  "Enable profile-guided optimizations" OFF)
 option(PGO_GENERATE "Enable profile-guided optimizations" ON)
 option(AUTOFDO     "Enable AutoFDO profile optimizations" OFF)
@@ -39,6 +40,10 @@ endif()
 
 if (NATIVE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
+endif()
+
+if (SANITIZE)
+    set(SANITIZE_FLAGS "-fsanitize=address,undefined")
 endif()
 
 if (PGO_ENABLE)
@@ -300,6 +305,9 @@ add_executable(genhufdec ${GEN_HUFDEC_SOURCES})
 target_include_directories(genhufdec PUBLIC ${VARNISH_PATH}/bin/varnishd)
 target_include_directories(genhufdec PUBLIC ${VARNISH_PATH}/include)
 target_link_libraries(genhufdec varnish)
+if (SANITIZE)
+    target_link_libraries(genhufdec "${SANITIZE_FLAGS}")
+endif()
 
 add_custom_command(
         OUTPUT vhp_hufdec.h
@@ -425,6 +433,7 @@ if (LIBFUZZER)
     set_source_files_properties(
         ${VD_PATH}/cache/cache_cli.c
         ${VD_PATH}/cache/cache_main.c
+        ${VD_PATH}/cache/cache_panic.c
         ${VD_PATH}/mgt/mgt_child.c
         ${VD_PATH}/mgt/mgt_main.c
         ${VD_PATH}/mgt/mgt_vcc.c
@@ -439,4 +448,11 @@ if (SINGLE_PROCESS)
         ${VD_PATH}/mgt/mgt_child.c
         ${VD_PATH}/mgt/mgt_vcl.c
     PROPERTIES COMPILE_FLAGS -DSINGLE_PROCESS_MODE)
+endif()
+
+if (SANITIZE)
+    target_compile_options(vcc PRIVATE     "${SANITIZE_FLAGS}")
+    target_compile_options(varnish PRIVATE "${SANITIZE_FLAGS}")
+    target_compile_options(varnishd PUBLIC "${SANITIZE_FLAGS}")
+    target_link_libraries(varnishd "${SANITIZE_FLAGS}")
 endif()

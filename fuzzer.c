@@ -1,6 +1,8 @@
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
+#include <stdio.h>
+#include <assert.h>
 
 // 1. connect using TCP socket and send requests
 // 2. generate files for ESI parser
@@ -8,9 +10,19 @@
 
 static void http_fuzzer(void* data, size_t len);
 extern int  normal_main(int, const char*[]);
+// varnishd has many many leaks.. can't enable this
+int __lsan_is_turned_off() { return 1; }
 
 int LLVMFuzzerTestOneInput(void* data, size_t len)
 {
+    // always keep last data saved to disk
+    char data_filename[128];
+    snprintf(data_filename, sizeof(data_filename),
+             "/home/gonzo/github/varnish_autoperf/build/fuzzer%d.data", getpid());
+    FILE* f = fopen(data_filename, "w");
+    assert(f != NULL);
+    fwrite(data, 1, len, f);
+    fclose(f);
 
     http_fuzzer(data, len);
     return 0;
@@ -19,7 +31,6 @@ int LLVMFuzzerTestOneInput(void* data, size_t len)
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
@@ -34,17 +45,21 @@ static void varnishd_http()
     snprintf(cs_buffer, sizeof(cs_buffer), "clock_step=99999");
     // timeout idle is modified by mgt_main, make it writable
     char ti_buffer[64];
-    snprintf(ti_buffer, sizeof(ti_buffer), "timeout_idle=0.01");
+    snprintf(ti_buffer, sizeof(ti_buffer), "timeout_idle=0.001");
     // temp folder
     char vd_folder[128];
     snprintf(vd_folder, sizeof(vd_folder), "/tmp/varnish%d", getpid());
-    // portline
-    this_port = 8000 + (getpid() & 0xFFF);
+    // client and cli ports
+    this_port = 20000 + (getpid() & 0xFFF);
     char portline[64];
     snprintf(portline, sizeof(portline), ":%u", this_port);
+    const uint16_t cli_port = 25000 + (getpid() & 0xFFF);
+    char cli_portline[64];
+    snprintf(cli_portline, sizeof(cli_portline), ":%u", cli_port);
     // arguments to varnishd
     const char* args[] = {
         "varnishd", "-a", portline,
+        "-T", cli_portline,
         //"-f", "/home/gonzo/github/varnish_autoperf/esi.vcl",
         "-b", ":8081",
         "-F",
@@ -63,6 +78,8 @@ void http_fuzzer(void* data, size_t len)
         init = true;
         varnishd_http();
     }
+
+
     const struct sockaddr_in sin_addr = {
         .sin_family = AF_INET,
         .sin_port   = htons(this_port),
@@ -85,22 +102,44 @@ void http_fuzzer(void* data, size_t len)
         return;
     }
 
+/*
     const char* req = "GET / HTTP/1.1\r\nHost: ";
     ret = write(cfd, req, strlen(req));
     if (ret < 0) {
         close(cfd);
         return;
     }
-    ret = write(cfd, data, len);
-    if (ret < 0) {
-        close(cfd);
-        return;
+*/
+    const uint8_t* buffer = (uint8_t*) data;
+    static const int STEP = 10;
+    size_t size = len;
+
+    while (size >= STEP)
+    {
+        ret = write(cfd, buffer, STEP);
+        if (ret < 0) {
+            close(cfd);
+            return;
+        }
+        buffer += STEP;
+        size   -= STEP;
+    }
+    if (size > 0)
+    {
+        ret = write(cfd, buffer, size);
+        if (ret < 0) {
+            close(cfd);
+            return;
+        }
     }
 
-    char buffer[2048];
-    ssize_t rlen = read(cfd, buffer, sizeof(buffer));
+    char readbuf[2048];
+    ssize_t rlen = read(cfd, readbuf, sizeof(readbuf));
     if (rlen < 0) {
-        printf("Read failed\n");
+        // Connection reset by peer just means varnishd closed early
+        if (errno != ECONNRESET) {
+            printf("Read failed: %s\n", strerror(errno));
+        }
     }
 
     close(cfd);

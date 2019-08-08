@@ -1,0 +1,24 @@
+Crash from genetic fuzzer:
+REQUEST:
+GET / HTTP/1.1\r\n
+Host: \n\n/\n\n\n
+ForwarX-Forwarded-For: 127.0.0.1
+
+#5  0x00000000006fb279 in HTC_RxPipeline (htc=0x631000606858, p=<optimized out>)
+    at /home/gonzo/github/varnish_autoperf/varnish-cache-plus/bin/varnishd/cache/cache_session.c:236
+236			assert((char*)p < htc->rxbuf_e);
+
+(gdb) print *htc
+$2 = {magic = 1041886673, rfd = 0x615000045944, doclose = SC_NULL, body_status = BS_NONE,
+  ws = 0x631000604958, rxbuf_b = 0x6310006068c8 "GET",
+  rxbuf_e = 0x6310006068eb "\n\n\n/\n\n\nForwarX-Forwarded-For: 127.0.0.1", pipeline_b = 0x0,
+  pipeline_e = 0x0, content_length = 0, priv = 0x0, oper = 0xb85f60 <vto_default>, oper_priv = 0x0,
+  first_byte_timeout = 0, between_bytes_timeout = 0}
+
+(gdb) up
+#6  0x00000000007fecd8 in http1_dissect_hdrs (hp=0x631000604a00,
+    p=0x6310006068ec "\n\n/\n\n\nForwarX-Forwarded-For: 127.0.0.1", htc=0x631000606858, maxhdr=8192)
+    at /home/gonzo/github/varnish_autoperf/varnish-cache-plus/bin/varnishd/http1/cache_http1_proto.c:214
+214		HTC_RxPipeline(htc, p);
+(gdb) print p
+$3 = 0x6310006068ec "\n\n/\n\n\nForwarX-Forwarded-For: 127.0.0.1"

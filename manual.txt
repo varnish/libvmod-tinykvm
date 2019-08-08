@@ -1,0 +1,7 @@
+
+
+One drawback from fuzzing varnish is the inability to detect leaks, as varnish
+allocates a large chunk of memory and then manages that.
+
+It's hard to manage open ports when testing. Not sure what the actual cause is,
+but it seems to not be a problem when running varnish fully separated.
