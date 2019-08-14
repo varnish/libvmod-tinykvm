@@ -236,7 +236,7 @@ set(VARNISHD_SOURCES
 	${VD_PATH}/storage/storage_persistent_silo.c
 	${VD_PATH}/storage/storage_persistent_subr.c
     # nodist
-    ${CMAKE_SOURCE_DIR}/vcl/builtin_vcl.c
+    ${VD_PATH}/builtin_vcl.c
 )
 set (LIBPATH ${VARNISH_PATH}/lib)
 set (LIBVARNISH_SOURCES
@@ -323,7 +323,7 @@ add_library(varnish ${LIBVARNISH_SOURCES} ${VSC_COMPILED})
 target_include_directories(varnish PUBLIC ${VARNISH_PATH}/bin/varnishd)
 target_include_directories(varnish PUBLIC ${VARNISH_PATH}/include)
 target_include_directories(varnish PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(varnish PUBLIC vcl/)
+target_include_directories(varnish PUBLIC include/)
 target_compile_definitions(varnish PUBLIC _XOPEN_SOURCE=700)
 target_compile_definitions(varnish PUBLIC VARNISH_STATE_DIR="/tmp/varnish")
 target_compile_definitions(varnish PUBLIC VARNISH_VMOD_DIR="/opt/varnish/lib/varnish-plus/vmods")
@@ -370,7 +370,7 @@ target_include_directories(mse PRIVATE ${MSE_PATH})
 target_include_directories(mse PRIVATE ${LIBPATH}/libvgz)
 target_include_directories(mse PRIVATE ${LIBPATH}/liblmdb/LMDB_0.9.23)
 target_include_directories(mse PRIVATE ${VARNISH_PATH}/include)
-target_include_directories(mse PRIVATE vcl/)
+target_include_directories(mse PRIVATE include/)
 
 ## VGZ library ##
 set(VGZ_PATH ${LIBPATH}/libvgz)
@@ -409,7 +409,7 @@ set(VCC_SOURCES ${VCC_PATH}/vcc_acl.c
 add_library(vcc ${VCC_SOURCES})
 target_include_directories(vcc PRIVATE ${VCC_PATH})
 target_include_directories(vcc PRIVATE ${VARNISH_PATH}/include)
-target_include_directories(vcc PRIVATE vcl/)
+target_include_directories(vcc PRIVATE include/)
 add_dependencies(vcc libvcc_generate)
 
 ## missing functions ##

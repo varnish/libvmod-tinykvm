@@ -2,5 +2,5 @@
 	path = varnish-cache-plus
 	url = git@github.com:varnish/varnish-cache-plus.git
 [submodule "FlameGraph"]
-	path = FlameGraph
+	path = ext/FlameGraph
 	url = https://github.com/brendangregg/FlameGraph
