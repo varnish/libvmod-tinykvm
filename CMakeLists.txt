@@ -413,11 +413,13 @@ target_include_directories(vcc PRIVATE vcl/)
 add_dependencies(vcc libvcc_generate)
 
 ## missing functions ##
-set(VARNISHD_SOURCES ${VARNISHD_SOURCES} missing.c)
+set(VARNISHD_SOURCES ${VARNISHD_SOURCES}
+    src/missing.c
+)
 if (LIBFUZZER)
     set(VARNISHD_SOURCES ${VARNISHD_SOURCES}
-        fuzz/fuzzer.c
-        fuzz/fuzz_http.c
+        src/fuzz/fuzzer.c
+        src/fuzz/fuzz_http.c
     )
 endif()
 
@@ -440,8 +442,8 @@ if (LIBFUZZER)
         ${VD_PATH}/mgt/mgt_child.c
         ${VD_PATH}/mgt/mgt_main.c
         ${VD_PATH}/mgt/mgt_vcc.c
-        fuzz/fuzzer.c
-        fuzz/fuzz_http.c
+        src/fuzz/fuzzer.c
+        src/fuzz/fuzz_http.c
     PROPERTIES COMPILE_DEFINITIONS LIBFUZZER_ENABLED=1)
 endif()
 
