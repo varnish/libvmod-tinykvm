@@ -415,7 +415,10 @@ add_dependencies(vcc libvcc_generate)
 ## missing functions ##
 set(VARNISHD_SOURCES ${VARNISHD_SOURCES} missing.c)
 if (LIBFUZZER)
-    set(VARNISHD_SOURCES ${VARNISHD_SOURCES} fuzzer.c)
+    set(VARNISHD_SOURCES ${VARNISHD_SOURCES}
+        fuzz/fuzzer.c
+        fuzz/fuzz_http.c
+    )
 endif()
 
 ## Varnish daemon ##
@@ -437,7 +440,8 @@ if (LIBFUZZER)
         ${VD_PATH}/mgt/mgt_child.c
         ${VD_PATH}/mgt/mgt_main.c
         ${VD_PATH}/mgt/mgt_vcc.c
-        fuzzer.c
+        fuzz/fuzzer.c
+        fuzz/fuzz_http.c
     PROPERTIES COMPILE_DEFINITIONS LIBFUZZER_ENABLED=1)
 endif()
 

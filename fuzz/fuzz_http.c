@@ -1,41 +1,15 @@
 #include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <assert.h>
-
-// 1. connect using TCP socket and send requests
-// 2. generate files for ESI parser
-// 3. VCC fuzzing
-
-static void http_fuzzer(void* data, size_t len);
-extern int  normal_main(int, const char*[]);
-// varnishd has many many leaks.. can't enable this
-int __lsan_is_turned_off() { return 1; }
-
-int LLVMFuzzerTestOneInput(void* data, size_t len)
-{
-    // always keep last data saved to disk
-    char data_filename[128];
-    snprintf(data_filename, sizeof(data_filename),
-             "/home/gonzo/github/varnish_autoperf/build/fuzzer%d.data", getpid());
-    FILE* f = fopen(data_filename, "w");
-    assert(f != NULL);
-    fwrite(data, 1, len, f);
-    fclose(f);
-
-    http_fuzzer(data, len);
-    return 0;
-}
+#include <stdlib.h>
 
 #include <errno.h>
 #include <string.h>
-#include <stdlib.h>
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+extern int  normal_main(int, const char*[]);
 static uint16_t this_port;
 
 static void varnishd_http()
@@ -102,14 +76,14 @@ void http_fuzzer(void* data, size_t len)
         return;
     }
 
-/*
+
     const char* req = "GET / HTTP/1.1\r\nHost: ";
     ret = write(cfd, req, strlen(req));
     if (ret < 0) {
         close(cfd);
         return;
     }
-*/
+
     const uint8_t* buffer = (uint8_t*) data;
     static const int STEP = 10;
     size_t size = len;

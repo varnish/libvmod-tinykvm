@@ -1,0 +1,19 @@
+varnishtest ""
+
+server s1 {
+	rxreq
+	txresp
+	rxreq
+	txresp
+} -start
+
+varnish v1 -vcl+backend {
+} -start
+
+client c1 {
+	send "GET / HTTP/1.1\r\nHost: asdf.com\r\nFoo: baar\r\n\r\n\r\n\r\n\r\n"
+	rxresp
+	send "GET / HTTP/1.1\r\nHost: asdf.com\r\nAsdf: b\n \r\n\r\nSj\r"
+	rxresp
+	expect resp.status == 400
+} -run

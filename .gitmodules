@@ -4,6 +4,3 @@
 [submodule "FlameGraph"]
 	path = FlameGraph
 	url = https://github.com/brendangregg/FlameGraph
-[submodule "varnish-cache"]
-	path = varnish-cache
-	url = git@github.com:varnishcache/varnish-cache.git
