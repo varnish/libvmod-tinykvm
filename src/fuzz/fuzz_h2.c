@@ -1,21 +1,22 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
 #include <netinet/in.h>
 
-extern void varnishd_http(const char*);
+extern void varnishd_http();
 extern uint16_t varnishd_client_port;
 
-void http_fuzzer(void* data, size_t len)
+void h2_fuzzer(void* data, size_t len)
 {
     static bool init = false;
     if (init == false) {
         init = true;
-        varnishd_http(NULL);
+        varnishd_http();
     }
 
 
@@ -42,19 +43,38 @@ void http_fuzzer(void* data, size_t len)
     }
 
 
-    const char* req = "GET / HTTP/1.1\r\nHost: ";
+    const char* req = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
     ret = write(cfd, req, strlen(req));
     if (ret < 0) {
         close(cfd);
         return;
     }
+    // settings frame
 
-    ret = write(cfd, data, len);
-    if (ret < 0) {
-        close(cfd);
-        return;
+
+    const uint8_t* buffer = (uint8_t*) data;
+    static const int STEP = 10;
+    size_t size = len;
+
+    while (size >= STEP)
+    {
+        ret = write(cfd, buffer, STEP);
+        if (ret < 0) {
+            close(cfd);
+            return;
+        }
+        buffer += STEP;
+        size   -= STEP;
     }
-    // signalling end of request, increases exec/s by 4x
+    if (size > 0)
+    {
+        ret = write(cfd, buffer, size);
+        if (ret < 0) {
+            close(cfd);
+            return;
+        }
+    }
+    // signalling end of request, increases exec/s by 7x
     shutdown(cfd, SHUT_WR);
 
     char readbuf[2048];

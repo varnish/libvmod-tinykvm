@@ -420,6 +420,10 @@ if (LIBFUZZER)
     set(VARNISHD_SOURCES ${VARNISHD_SOURCES}
         src/fuzz/fuzzer.c
         src/fuzz/fuzz_http.c
+        src/fuzz/fuzz_h2.c
+        src/fuzz/http_server.c
+        src/fuzz/hpack.c
+        src/fuzz/varnish_http.c
     )
 endif()
 
@@ -442,8 +446,6 @@ if (LIBFUZZER)
         ${VD_PATH}/mgt/mgt_child.c
         ${VD_PATH}/mgt/mgt_main.c
         ${VD_PATH}/mgt/mgt_vcc.c
-        src/fuzz/fuzzer.c
-        src/fuzz/fuzz_http.c
     PROPERTIES COMPILE_DEFINITIONS LIBFUZZER_ENABLED=1)
 endif()
 
