@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-extern int  normal_main(int, const char*[]);
+extern int  varnishd_main(int, const char*[]);
 uint16_t varnishd_client_port;
 
 void varnishd_http(const char* vcl_path)
@@ -39,5 +39,5 @@ void varnishd_http(const char* vcl_path)
         args[13] = vcl_path;
     }
     const int argc = sizeof(args) / sizeof(args[0]);
-    normal_main(argc, args);
+    varnishd_main(argc, args);
 }

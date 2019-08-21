@@ -17,8 +17,8 @@ int __lsan_is_turned_off() { return 1; }
 
 int LLVMFuzzerTestOneInput(void* data, size_t len)
 {
-    //http_fuzzer(data, len);
-    http_fuzzer_server(data, len);
+    http_fuzzer(data, len);
+    //http_fuzzer_server(data, len);
     //h2_fuzzer(data, len);
     //hpack_fuzzer(data, len);
     return 0;

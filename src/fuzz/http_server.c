@@ -9,7 +9,6 @@
 
 extern void varnishd_http(const char* vcl_path);
 extern uint16_t varnishd_client_port;
-static const uint16_t BACKEND_PORT = 8081;
 
 void http_fuzzer_server(void* data, size_t len)
 {
@@ -44,61 +43,63 @@ void http_fuzzer_server(void* data, size_t len)
     }
 
 
-    const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
-    ret = write(cfd, req, strlen(req));
+    const int TIMES = 500;
+
+    char fdata[64000];
+    int fdatalen = snprintf(fdata, sizeof(fdata),
+            "<esi:remove %.*s",
+            (int) len, data);
+
+    if (fdatalen <= 0) {
+        close(cfd);
+        return;
+    }
+
+    char fheader[1024];
+    int fhdrlen = snprintf(fheader, sizeof(fheader),
+            "HTTP/1.1 304 OK\r\nContent-length: %d\r\n",
+            fdatalen * TIMES);
+
+    char drit[65536];
+    int dritlen = snprintf(drit, sizeof(drit),
+            "POST / HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-length: %d\r\n\r\n",
+            fhdrlen + fdatalen * TIMES);
+
+    if (dritlen <= 0) {
+        close(cfd);
+        return;
+    }
+
+    ret = write(cfd, drit, dritlen);
     if (ret < 0) {
         close(cfd);
         return;
     }
+
+    ret = write(cfd, fheader, fhdrlen);
+    if (ret < 0) {
+        close(cfd);
+        return;
+    }
+    for (int i = 0; i < TIMES; i++)
+    {
+        ret = write(cfd, fdata, fdatalen);
+        if (ret < 0) {
+            close(cfd);
+            return;
+        }
+    }
     // signalling end of request, increases exec/s by 4x
     shutdown(cfd, SHUT_WR);
 
-    struct sockaddr_in srv_addr;
-    memset(&srv_addr, 0, sizeof(srv_addr));
-    srv_addr.sin_family = AF_INET;
-    srv_addr.sin_port   = htons(BACKEND_PORT);
-    srv_addr.sin_addr.s_addr = INADDR_ANY;
-
-    int server = socket(AF_INET, SOCK_STREAM, 0);
-
-    int enable = 1;
-    setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int));
-
-    ret = bind(server, (struct sockaddr*) &srv_addr, sizeof(srv_addr));
-    if (ret < 0) {
-        fprintf(stderr, "Bind failed: %s\n", strerror(errno));
-        goto fixup;
-    }
-    ret = listen(server, 1);
-    if (ret < 0) {
-        fprintf(stderr, "Listen failed: %s\n", strerror(errno));
-        goto fixup;
+    char readbuf[2048];
+    ssize_t rlen = read(cfd, readbuf, sizeof(readbuf));
+    if (rlen < 0) {
+        // Connection reset by peer just means varnishd closed early
+        if (errno != ECONNRESET) {
+            printf("Read failed: %s\n", strerror(errno));
+        }
     }
 
-    // listen for backend clients
-    struct sockaddr_in cli_addr;
-    socklen_t addrlen = sizeof(cli_addr);
-    int client = accept(server, (struct sockaddr*) &cli_addr, &addrlen);
-    if (client < 0) {
-        fprintf(stderr, "Accept failed: %s\n", strerror(errno));
-        goto fixup;
-    }
-
-    // write bullshit to varnishd
-    const char* resp = "HTTP/1.1 200 OK\r\nETag: ";
-    ret = write(client, resp, strlen(resp));
-    if (ret < 0) {
-        printf("Backend write failed: %s\n", strerror(errno));
-        close(client);
-        goto fixup;
-    }
-    ret = write(client, data, len);
-    if (ret < 0) {
-        printf("Backend write failed: %s\n", strerror(errno));
-    }
-    close(client);
-
-fixup:
-    close(server);
     close(cfd);
 }
