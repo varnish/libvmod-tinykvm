@@ -60,7 +60,8 @@ if (AUTOFDO)
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fauto-profile=${CMAKE_BINARY_DIR}/${PROFILE} -g1")
 endif()
 
-set (VARNISH_PATH ${CMAKE_SOURCE_DIR}/varnish-cache-plus)
+#set (VARNISH_PATH ${CMAKE_SOURCE_DIR}/varnish-cache-plus)
+set (VARNISH_PATH ${CMAKE_SOURCE_DIR}/ext/varnish-cache)
 
 # include/vcs_version.h include/vmod_abi.h
 add_custom_command(
@@ -114,7 +115,6 @@ set(VARNISHD_SOURCES
 	${VD_PATH}/cache/cache_acceptor.c
 	${VD_PATH}/cache/cache_backend.c
 	${VD_PATH}/cache/cache_backend_probe.c
-	${VD_PATH}/cache/cache_backend_ssl.c
 	${VD_PATH}/cache/cache_ban.c
 	${VD_PATH}/cache/cache_ban_build.c
 	${VD_PATH}/cache/cache_ban_lurker.c
@@ -145,19 +145,15 @@ set(VARNISHD_SOURCES
 	${VD_PATH}/cache/cache_session.c
 	${VD_PATH}/cache/cache_shmlog.c
 	${VD_PATH}/cache/cache_tcp_pool.c
-    ${VD_PATH}/cache/cache_tcp_oper.c
 	${VD_PATH}/cache/cache_vary.c
 	${VD_PATH}/cache/cache_vcl.c
-	${VD_PATH}/cache/cache_vcl_vrt.c
 	${VD_PATH}/cache/cache_vrt.c
 	${VD_PATH}/cache/cache_vrt_priv.c
 	${VD_PATH}/cache/cache_vrt_re.c
 	${VD_PATH}/cache/cache_vrt_var.c
 	${VD_PATH}/cache/cache_vrt_vmod.c
-	${VD_PATH}/cache/cache_vrt_ykey.c
 	${VD_PATH}/cache/cache_wrk.c
 	${VD_PATH}/cache/cache_ws.c
-	${VD_PATH}/cache/cache_ykey.c
 	${VD_PATH}/common/common_vsc.c
 	${VD_PATH}/common/common_vsmw.c
 	${VD_PATH}/hash/hash_classic.c
@@ -206,24 +202,6 @@ set(VARNISHD_SOURCES
 	${VD_PATH}/storage/storage_malloc.c
 	${VD_PATH}/storage/storage_simple.c
 	${VD_PATH}/storage/storage_umem.c
-	${VD_PATH}/storage/storage_ykey_mem.c
-	${VD_PATH}/storage/mse_mgt.c
-	${VD_PATH}/storage/mse_cache.c
-	${VD_PATH}/storage/mse_obj.c
-	${VD_PATH}/storage/mse_memcache.c
-	${VD_PATH}/storage/mse_store.c
-	${VD_PATH}/storage/mse_aio.c
-	${VD_PATH}/storage/mse_populate.c
-	${VD_PATH}/storage/mse_varylib.c
-	${VD_PATH}/storage/mse_waterlevel.c
-	${VD_PATH}/storage/mse_hoic.c
-	${VD_PATH}/storage/mse_ykey.c
-	${VD_PATH}/vmod_util/crypto_util.c
-	${VD_PATH}/vmod_util/edgestash_util.c
-	${VD_PATH}/vmod_util/file_util.c
-	${VD_PATH}/vmod_util/synthbackend_util.c
-	${VD_PATH}/vmod_util/vmod_util.c
-	${VD_PATH}/vmod_util/xbody_util.c
 	${VD_PATH}/waiter/cache_waiter.c
 	${VD_PATH}/waiter/cache_waiter_epoll.c
 	${VD_PATH}/waiter/cache_waiter_kqueue.c
@@ -238,6 +216,41 @@ set(VARNISHD_SOURCES
     # nodist
     ${VD_PATH}/builtin_vcl.c
 )
+if (VARNISH_PLUS)
+    set (VARNISHD_SOURCES ${VARNISHD_SOURCES}
+        ${VD_PATH}/cache/cache_backend_ssl.c
+        ${VD_PATH}/cache/cache_tcp_oper.c
+        ${VD_PATH}/cache/cache_vcl_vrt.c
+    	${VD_PATH}/cache/cache_vrt_ykey.c
+    	${VD_PATH}/cache/cache_ykey.c
+        ${VD_PATH}/storage/storage_ykey_mem.c
+        ${VD_PATH}/storage/mse_mgt.c
+    	${VD_PATH}/storage/mse_cache.c
+    	${VD_PATH}/storage/mse_obj.c
+    	${VD_PATH}/storage/mse_memcache.c
+    	${VD_PATH}/storage/mse_store.c
+    	${VD_PATH}/storage/mse_aio.c
+    	${VD_PATH}/storage/mse_populate.c
+    	${VD_PATH}/storage/mse_varylib.c
+    	${VD_PATH}/storage/mse_waterlevel.c
+    	${VD_PATH}/storage/mse_hoic.c
+    	${VD_PATH}/storage/mse_ykey.c
+        ${VD_PATH}/vmod_util/crypto_util.c
+        ${VD_PATH}/vmod_util/edgestash_util.c
+        ${VD_PATH}/vmod_util/file_util.c
+    	${VD_PATH}/vmod_util/synthbackend_util.c
+    	${VD_PATH}/vmod_util/vmod_util.c
+    	${VD_PATH}/vmod_util/xbody_util.c
+    )
+else()
+    set (VARNISHD_SOURCES ${VARNISHD_SOURCES}
+        ${VD_PATH}/cache/cache_vrt_filter.c
+        ${VD_PATH}/cache/cache_vrt_vcl.c
+        ${VD_PATH}/cache/cache_vpi.c
+        ${VD_PATH}/mgt/mgt_symtab.c
+    )
+endif()
+
 set (LIBPATH ${VARNISH_PATH}/lib)
 set (LIBVARNISH_SOURCES
   ${LIBPATH}/libvarnish/binary_heap.c
@@ -267,6 +280,12 @@ set (LIBVARNISH_SOURCES
   ${LIBPATH}/libvarnish/vtim.c
   ${LIBPATH}/libvarnish/vus.c
 )
+if (NOT VARNISH_PLUS)
+    set (LIBVARNISH_SOURCES ${LIBVARNISH_SOURCES}
+        ${LIBPATH}/libvarnish/verrno.c
+        ${LIBPATH}/libvarnish/vte.c
+    )
+endif()
 
 ## VSC generation ##
 set(VSC_SOURCES
@@ -278,10 +297,14 @@ set(VSC_SOURCES
 	VSC_smf.vsc
 	VSC_smu.vsc
 	VSC_vbe.vsc
-	VSC_mse.vsc
-	VSC_mse_book.vsc
-	VSC_mse_store.vsc
 )
+if (VARNISH_PLUS)
+    set(VSC_SOURCES ${VSC_SOURCES}
+        VSC_mse.vsc
+    	VSC_mse_book.vsc
+    	VSC_mse_store.vsc
+    )
+endif()
 function(build_vsc_file NAME)
     get_filename_component(VSC_FILE ${NAME} NAME_WE)
     add_custom_command(
@@ -331,46 +354,48 @@ target_compile_definitions(varnish PUBLIC VARNISH_VCL_DIR="/opt/varnish/share/va
 target_compile_definitions(varnish PUBLIC -DNOT_IN_A_VMOD)
 add_dependencies(varnish includes_generate)
 
-## libvarnish_sslhelper library ##
-set(SSLH_PATH ${LIBPATH}/libvarnish_sslhelper)
-set(SSLH_SOURCES ${SSLH_PATH}/vsslh.c
-            )
-add_library(sslhelper ${SSLH_SOURCES})
-target_include_directories(sslhelper PRIVATE ${VARNISH_PATH}/include)
+if (VARNISH_PLUS)
+    ## libvarnish_sslhelper library ##
+    set(SSLH_PATH ${LIBPATH}/libvarnish_sslhelper)
+    set(SSLH_SOURCES ${SSLH_PATH}/vsslh.c
+                )
+    add_library(sslhelper ${SSLH_SOURCES})
+    target_include_directories(sslhelper PRIVATE ${VARNISH_PATH}/include)
 
-## MSE library ##
-set(LMDB_PATH ${LIBPATH}/liblmdb/LMDB_0.9.23)
-set(LMDB_SOURCES ${LMDB_PATH}/mdb.c
-                 ${LMDB_PATH}/mdb_dump.c
-                 ${LMDB_PATH}/mdb_stat.c
-                 ${LMDB_PATH}/mdb_copy.c
-                 ${LMDB_PATH}/mdb_load.c
-                 ${LMDB_PATH}/midl.c
-            )
-add_library(lmdb ${LMDB_SOURCES})
-target_compile_definitions(lmdb PUBLIC _XOPEN_SOURCE=700)
-target_include_directories(lmdb PUBLIC ${LMDB_PATH})
+    ## LMDB library ##
+    set(LMDB_PATH ${LIBPATH}/liblmdb/LMDB_0.9.23)
+    set(LMDB_SOURCES ${LMDB_PATH}/mdb.c
+                     ${LMDB_PATH}/mdb_dump.c
+                     ${LMDB_PATH}/mdb_stat.c
+                     ${LMDB_PATH}/mdb_copy.c
+                     ${LMDB_PATH}/mdb_load.c
+                     ${LMDB_PATH}/midl.c
+                )
+    add_library(lmdb ${LMDB_SOURCES})
+    target_compile_definitions(lmdb PUBLIC _XOPEN_SOURCE=700)
+    target_include_directories(lmdb PUBLIC ${LMDB_PATH})
 
-## MSE library ##
-set(MSE_PATH ${LIBPATH}/libmse)
-set(MSE_SOURCES ${MSE_PATH}/journal_test.c
-                ${MSE_PATH}/mse_lib_config_test.c
-                ${MSE_PATH}/mse_lib_dbtest.c
-                ${MSE_PATH}/mse_lib_jrnfile.c
-                ${MSE_PATH}/mse_lib_banlist.c
-                ${MSE_PATH}/mse_lib_db.c
-                ${MSE_PATH}/mse_lib_env.c
-                ${MSE_PATH}/mse_mtq_test.c
-                ${MSE_PATH}/mse_lib_config.c
-                ${MSE_PATH}/mse_lib_dbro.c
-                ${MSE_PATH}/mse_lib_journal.c
-            )
-add_library(mse ${MSE_SOURCES})
-target_include_directories(mse PRIVATE ${MSE_PATH})
-target_include_directories(mse PRIVATE ${LIBPATH}/libvgz)
-target_include_directories(mse PRIVATE ${LIBPATH}/liblmdb/LMDB_0.9.23)
-target_include_directories(mse PRIVATE ${VARNISH_PATH}/include)
-target_include_directories(mse PRIVATE include/)
+    ## MSE library ##
+    set(MSE_PATH ${LIBPATH}/libmse)
+    set(MSE_SOURCES ${MSE_PATH}/journal_test.c
+                    ${MSE_PATH}/mse_lib_config_test.c
+                    ${MSE_PATH}/mse_lib_dbtest.c
+                    ${MSE_PATH}/mse_lib_jrnfile.c
+                    ${MSE_PATH}/mse_lib_banlist.c
+                    ${MSE_PATH}/mse_lib_db.c
+                    ${MSE_PATH}/mse_lib_env.c
+                    ${MSE_PATH}/mse_mtq_test.c
+                    ${MSE_PATH}/mse_lib_config.c
+                    ${MSE_PATH}/mse_lib_dbro.c
+                    ${MSE_PATH}/mse_lib_journal.c
+                )
+    add_library(mse ${MSE_SOURCES})
+    target_include_directories(mse PRIVATE ${MSE_PATH})
+    target_include_directories(mse PRIVATE ${LIBPATH}/libvgz)
+    target_include_directories(mse PRIVATE ${LIBPATH}/liblmdb/LMDB_0.9.23)
+    target_include_directories(mse PRIVATE ${VARNISH_PATH}/include)
+    target_include_directories(mse PRIVATE include/)
+endif()
 
 ## VGZ library ##
 set(VGZ_PATH ${LIBPATH}/libvgz)
@@ -430,8 +455,11 @@ endif()
 ## Varnish daemon ##
 add_executable(varnishd ${VARNISHD_SOURCES})
 add_dependencies(varnishd vhp_gen_hufdec)
-target_link_libraries(varnishd mse vcc sslhelper varnish vgz lmdb m)
+target_link_libraries(varnishd vcc varnish vgz m)
 target_link_libraries(varnishd config pcre pthread crypto ssl dl)
+if (VARNISH_PLUS)
+    target_link_libraries(varnishd mse lmdb sslhelper)
+endif()
 
 if (LIBFUZZER)
     if (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
@@ -452,7 +480,7 @@ endif()
 if (SINGLE_PROCESS)
     set_source_files_properties(
         ${VD_PATH}/cache/cache_cli.c
-        ${VD_PATH}/cache/cache_vcl.c
+        #${VD_PATH}/cache/cache_vcl.c
         ${VD_PATH}/mgt/mgt_child.c
         ${VD_PATH}/mgt/mgt_vcl.c
     PROPERTIES COMPILE_FLAGS -DSINGLE_PROCESS_MODE)

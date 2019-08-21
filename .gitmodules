@@ -4,3 +4,6 @@
 [submodule "FlameGraph"]
 	path = ext/FlameGraph
 	url = https://github.com/brendangregg/FlameGraph
+[submodule "ext/varnish-cache"]
+	path = ext/varnish-cache
+	url = git@github.com:fwsGonzo/varnish-cache.git
