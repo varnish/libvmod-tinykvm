@@ -3,6 +3,7 @@ project (varnish C)
 
 set(CMAKE_C_FLAGS "-Wall -Wextra -std=c11 -g -O2")
 
+option(VARNISH_PLUS "Build with the varnish plus repo" OFF)
 option(GPROF       "Enable profiling with gprof" OFF)
 option(LTO_ENABLE  "Enable LTO builds" ON)
 option(MINIMAL     "Minimal build")
@@ -60,8 +61,11 @@ if (AUTOFDO)
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fauto-profile=${CMAKE_BINARY_DIR}/${PROFILE} -g1")
 endif()
 
-#set (VARNISH_PATH ${CMAKE_SOURCE_DIR}/varnish-cache-plus)
-set (VARNISH_PATH ${CMAKE_SOURCE_DIR}/ext/varnish-cache)
+if (VARNISH_PLUS)
+  set (VARNISH_PATH ${CMAKE_SOURCE_DIR}/ext/varnish-cache-plus)
+else()
+  set (VARNISH_PATH ${CMAKE_SOURCE_DIR}/ext/varnish-cache)
+endif()
 
 # include/vcs_version.h include/vmod_abi.h
 add_custom_command(
@@ -218,29 +222,31 @@ set(VARNISHD_SOURCES
 )
 if (VARNISH_PLUS)
     set (VARNISHD_SOURCES ${VARNISHD_SOURCES}
-        ${VD_PATH}/cache/cache_backend_ssl.c
-        ${VD_PATH}/cache/cache_tcp_oper.c
-        ${VD_PATH}/cache/cache_vcl_vrt.c
-    	${VD_PATH}/cache/cache_vrt_ykey.c
-    	${VD_PATH}/cache/cache_ykey.c
-        ${VD_PATH}/storage/storage_ykey_mem.c
-        ${VD_PATH}/storage/mse_mgt.c
-    	${VD_PATH}/storage/mse_cache.c
-    	${VD_PATH}/storage/mse_obj.c
-    	${VD_PATH}/storage/mse_memcache.c
-    	${VD_PATH}/storage/mse_store.c
-    	${VD_PATH}/storage/mse_aio.c
-    	${VD_PATH}/storage/mse_populate.c
-    	${VD_PATH}/storage/mse_varylib.c
-    	${VD_PATH}/storage/mse_waterlevel.c
-    	${VD_PATH}/storage/mse_hoic.c
-    	${VD_PATH}/storage/mse_ykey.c
-        ${VD_PATH}/vmod_util/crypto_util.c
-        ${VD_PATH}/vmod_util/edgestash_util.c
-        ${VD_PATH}/vmod_util/file_util.c
-    	${VD_PATH}/vmod_util/synthbackend_util.c
-    	${VD_PATH}/vmod_util/vmod_util.c
-    	${VD_PATH}/vmod_util/xbody_util.c
+		${VD_PATH}/cache/cache_backend_ssl.c
+		${VD_PATH}/cache/cache_tcp_oper.c
+		${VD_PATH}/cache/cache_vcl_vrt.c
+		${VD_PATH}/cache/cache_vrt_ykey.c
+		${VD_PATH}/cache/cache_vst_access.c
+		${VD_PATH}/cache/cache_ykey.c
+		${VD_PATH}/storage/storage_ykey_mem.c
+		${VD_PATH}/storage/mse_mgt.c
+		${VD_PATH}/storage/mse_cache.c
+		${VD_PATH}/storage/mse_obj.c
+		${VD_PATH}/storage/mse_memcache.c
+		${VD_PATH}/storage/mse_store.c
+		${VD_PATH}/storage/mse_aio.c
+		${VD_PATH}/storage/mse_populate.c
+		${VD_PATH}/storage/mse_varylib.c
+		${VD_PATH}/storage/mse_waterlevel.c
+		${VD_PATH}/storage/mse_hoic.c
+		${VD_PATH}/storage/mse_ykey.c
+		${VD_PATH}/vmod_util/crypto_util.c
+		${VD_PATH}/vmod_util/edgestash_util.c
+		${VD_PATH}/vmod_util/file_util.c
+		${VD_PATH}/vmod_util/synthbackend_util.c
+		${VD_PATH}/vmod_util/vmod_util.c
+		${VD_PATH}/vmod_util/waf_util.c
+		${VD_PATH}/vmod_util/xbody_util.c
     )
 else()
     set (VARNISHD_SOURCES ${VARNISHD_SOURCES}

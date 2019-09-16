@@ -11,6 +11,16 @@
 extern void varnishd_http();
 extern uint16_t varnishd_client_port;
 
+struct h2_frame
+{
+	uint32_t length  : 24;
+	uint32_t type    :  8;
+	uint8_t  flags;
+	uint32_t stream_id;
+	// FMA
+	char payload[0];
+};
+
 void h2_fuzzer(void* data, size_t len)
 {
     static bool init = false;
@@ -50,29 +60,23 @@ void h2_fuzzer(void* data, size_t len)
         return;
     }
     // settings frame
+	const int fakelen = (len / 6) * 6; // settings are of 6-byte multiple length
+	struct h2_frame settings;
+	settings.type   = 0x4;
+	settings.length = __builtin_bswap32(fakelen << 8);
+	settings.flags  = 0;
+	settings.stream_id = 0;
 
-
-    const uint8_t* buffer = (uint8_t*) data;
-    static const int STEP = 10;
-    size_t size = len;
-
-    while (size >= STEP)
-    {
-        ret = write(cfd, buffer, STEP);
-        if (ret < 0) {
-            close(cfd);
-            return;
-        }
-        buffer += STEP;
-        size   -= STEP;
+	ret = write(cfd, &settings, sizeof(settings));
+    if (ret < 0) {
+        close(cfd);
+        return;
     }
-    if (size > 0)
-    {
-        ret = write(cfd, buffer, size);
-        if (ret < 0) {
-            close(cfd);
-            return;
-        }
+
+    ret = write(cfd, data, len);
+    if (ret < 0) {
+        close(cfd);
+        return;
     }
     // signalling end of request, increases exec/s by 7x
     shutdown(cfd, SHUT_WR);

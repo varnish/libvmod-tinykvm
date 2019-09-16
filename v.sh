@@ -6,4 +6,4 @@ cmake .. -DAUTOFDO=OFF
 make -j8
 popd
 
-$BINARY -a :8080 -b :8081 -F -n /tmp/varnish
+$BINARY -a :8080 -f $PWD/vcl/esi.vcl -n /tmp/varnish -F
