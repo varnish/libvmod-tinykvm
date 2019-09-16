@@ -3,9 +3,9 @@ project (varnish C)
 
 set(CMAKE_C_FLAGS "-Wall -Wextra -std=c11 -g -O2")
 
-option(VARNISH_PLUS "Build with the varnish plus repo" OFF)
+option(VARNISH_PLUS "Build with the varnish plus repo" ON)
 option(GPROF       "Enable profiling with gprof" OFF)
-option(LTO_ENABLE  "Enable LTO builds" ON)
+option(LTO_ENABLE  "Enable LTO builds" OFF)
 option(MINIMAL     "Minimal build")
 option(GCSECTIONS  "Garbage collect empty sections" ON)
 option(NATIVE      "Enable native performance" ON)
@@ -15,6 +15,7 @@ option(PGO_GENERATE "Enable profile-guided optimizations" ON)
 option(AUTOFDO     "Enable AutoFDO profile optimizations" OFF)
 set(PROFILE "../perf.afdo" CACHE STRING "Optimization profile path")
 option(LIBFUZZER   "Enable fuzzing with clang libfuzzer")
+option(LIBCPP      "Enable compiling with libc++ and linking with LLD" OFF)
 option(SINGLE_PROCESS "Disable fork() and run in single-process mode" ON)
 
 if (LTO_ENABLE)
@@ -481,6 +482,11 @@ if (LIBFUZZER)
         ${VD_PATH}/mgt/mgt_main.c
         ${VD_PATH}/mgt/mgt_vcc.c
     PROPERTIES COMPILE_DEFINITIONS LIBFUZZER_ENABLED=1)
+endif()
+
+# libfuzzer is a C++ project, so we need the ability to enable libc++ and LLD
+if (LIBCPP)
+    target_link_libraries(varnishd "-stdlib=libc++ -fuse-ld=lld")
 endif()
 
 if (SINGLE_PROCESS)

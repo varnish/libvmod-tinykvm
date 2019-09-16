@@ -11,6 +11,10 @@
 extern void varnishd_http();
 extern uint16_t varnishd_client_port;
 
+#define H2F_HEADERS    0x1
+#define H2F_SETTINGS   0x4
+
+
 struct h2_frame
 {
 	uint32_t length  : 24;
@@ -19,6 +23,12 @@ struct h2_frame
 	uint32_t stream_id;
 	// FMA
 	char payload[0];
+};
+struct h2_headers
+{
+	struct h2_frame frame;
+	uint32_t stream_dep;
+	uint32_t block_frag[0];
 };
 
 void h2_fuzzer(void* data, size_t len)
@@ -59,21 +69,52 @@ void h2_fuzzer(void* data, size_t len)
         close(cfd);
         return;
     }
+
+	const uint8_t* buffer = (uint8_t*) data;
     // settings frame
-	const int fakelen = (len / 6) * 6; // settings are of 6-byte multiple length
+	const int slen = 6; // settings are of 6-byte multiple length
 	struct h2_frame settings;
-	settings.type   = 0x4;
-	settings.length = __builtin_bswap32(fakelen << 8);
-	settings.flags  = 0;
+	settings.type   = H2F_SETTINGS;
+	settings.length = __builtin_bswap32(slen << 8);
+	settings.flags  = buffer[0];
 	settings.stream_id = 0;
-
+	buffer++;
+	len--;
+	// settings frame
 	ret = write(cfd, &settings, sizeof(settings));
-    if (ret < 0) {
-        close(cfd);
-        return;
-    }
+	if (ret < 0) {
+		close(cfd);
+		return;
+	}
 
-    ret = write(cfd, data, len);
+	if (len >= 6 + 2)
+	{
+		// settings payload
+		ret = write(cfd, buffer, slen);
+	    if (ret < 0) {
+	        close(cfd);
+	        return;
+	    }
+		buffer += slen;
+		len    -= slen;
+
+		struct h2_headers hdr;
+		hdr.frame.type   = H2F_HEADERS;
+		hdr.frame.flags  = buffer[0]; // END_HEADERS ?
+		hdr.frame.stream_id = buffer[1];
+		hdr.stream_dep = 0;
+		buffer += 2;
+		len    -= 2;
+		hdr.frame.length = __builtin_bswap32(len << 8);
+
+		ret = write(cfd, &hdr, sizeof(hdr));
+	    if (ret < 0) {
+	        close(cfd);
+	        return;
+	    }
+	}
+
+    ret = write(cfd, buffer, len);
     if (ret < 0) {
         close(cfd);
         return;
