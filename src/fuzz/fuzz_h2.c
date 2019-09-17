@@ -11,9 +11,9 @@
 extern void varnishd_http();
 extern uint16_t varnishd_client_port;
 
+static const int GENERAL_H2_FUZZING = true;
 #define H2F_HEADERS    0x1
 #define H2F_SETTINGS   0x4
-
 
 struct h2_frame
 {
@@ -71,6 +71,9 @@ void h2_fuzzer(void* data, size_t len)
     }
 
 	const uint8_t* buffer = (uint8_t*) data;
+
+if (!GENERAL_H2_FUZZING)
+{
     // settings frame
 	const int slen = 6; // settings are of 6-byte multiple length
 	struct h2_frame settings;
@@ -113,6 +116,7 @@ void h2_fuzzer(void* data, size_t len)
 	        return;
 	    }
 	}
+}
 
     ret = write(cfd, buffer, len);
     if (ret < 0) {
