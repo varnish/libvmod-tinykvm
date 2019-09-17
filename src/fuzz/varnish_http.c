@@ -14,6 +14,12 @@ void varnishd_http(const char* vcl_path)
     // timeout idle is modified by mgt_main, make it writable
     char ti_buffer[64];
     snprintf(ti_buffer, sizeof(ti_buffer), "timeout_idle=0.001");
+	// threadpool min buffer
+    char tpmin_buffer[128];
+    snprintf(tpmin_buffer, sizeof(ti_buffer), "thread_pool_min=32");
+	// threadpool max buffer
+    char tpmax_buffer[128];
+    snprintf(tpmax_buffer, sizeof(ti_buffer), "thread_pool_max=32");
     // temp folder
     char vd_folder[128];
     snprintf(vd_folder, sizeof(vd_folder), "/tmp/varnish%d", getpid());
@@ -32,6 +38,8 @@ void varnishd_http(const char* vcl_path)
         "-n", vd_folder,
         "-p", ti_buffer,
         "-p", cs_buffer, // needed?
+		"-p", tpmin_buffer,
+		"-p", tpmax_buffer,
         "-b", ":8081",
     };
     if (vcl_path != NULL) {
