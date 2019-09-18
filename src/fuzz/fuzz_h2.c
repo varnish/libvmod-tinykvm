@@ -6,10 +6,11 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
-#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 
 extern void varnishd_http();
-extern uint16_t varnishd_client_port;
+extern const char* varnishd_client_path;
 
 static const int GENERAL_H2_FUZZING = true;
 #define H2F_HEADERS    0x1
@@ -36,25 +37,23 @@ void h2_fuzzer(void* data, size_t len)
     static bool init = false;
     if (init == false) {
         init = true;
-        varnishd_http();
+        varnishd_http(NULL);
     }
+	if (len == 0) return;
 
 
-    const struct sockaddr_in sin_addr = {
-        .sin_family = AF_INET,
-        .sin_port   = htons(varnishd_client_port),
-        .sin_addr   = { .s_addr = 0x0100007F }
-    };
-    if (len == 0) return;
+    struct sockaddr_un un_addr;
+	memset(&un_addr, 0, sizeof(un_addr));
+	un_addr.sun_family = AF_UNIX;
+	strncpy(un_addr.sun_path, varnishd_client_path, sizeof(un_addr.sun_path) - 1);
 
-    const int cfd =
-        socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    const int cfd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (cfd < 0) {
         fprintf(stderr, "Could not create socket... going to sleep\n");
         sleep(1);
         return;
     }
-    int ret = connect(cfd, (struct sockaddr*) &sin_addr, sizeof(sin_addr));
+    int ret = connect(cfd, (const struct sockaddr*) &un_addr, sizeof(un_addr));
     if (ret < 0) {
         close(cfd);
         fprintf(stderr, "Fuzzer connect() failed!?\n");
