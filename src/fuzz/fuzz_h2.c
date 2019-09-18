@@ -63,17 +63,17 @@ void h2_fuzzer(void* data, size_t len)
     }
 
 
-    const char* req = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
+	const uint8_t* buffer = (uint8_t*) data;
+
+if (!GENERAL_H2_FUZZING)
+{
+	const char* req = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
     ret = write(cfd, req, strlen(req));
     if (ret < 0) {
         close(cfd);
         return;
     }
 
-	const uint8_t* buffer = (uint8_t*) data;
-
-if (!GENERAL_H2_FUZZING)
-{
     // settings frame
 	const int slen = 6; // settings are of 6-byte multiple length
 	struct h2_frame settings;
