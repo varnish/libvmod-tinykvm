@@ -23,13 +23,23 @@ except socket.error as msg:
 #Start listening on socket
 sock.listen(10)
 
+total = 0
+sent = 0
 #now keep talking with the client
 while 1:
     #wait to accept a connection - blocking call
 	conn, addr = sock.accept()
 	data = conn.recv(4096)
-	payload = data.split("\r\n\r\n", 1)[1]
-	conn.send(payload)
-	conn.close()
+	total += 1
+	try:
+		payload = data.partition("\r\n\r\n")[2]
+		conn.send(payload)
+		sent += 1
+	except Exception, msg:
+		#print "Error: " + str(msg);
+		pass
+	finally:
+		#print "Data sent: " + str(sent) + "/" + str(total)
+		conn.close()
 
 sock.close()
