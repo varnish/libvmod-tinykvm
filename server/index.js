@@ -1,8 +1,9 @@
 var http = require("http"),
     url = require("url"),
     path = require("path"),
-    fs = require("fs")
-    port = process.argv[2] || 8081;
+    fs = require("fs");
+var socket = "server.socket";
+
 
 http.createServer(function(request, response) {
 
@@ -41,6 +42,7 @@ http.createServer(function(request, response) {
       response.end();
     });
   });
-}).listen(parseInt(port, 10));
+}).listen(socket);
 
-console.log("Server running at http://localhost:" + port);
+console.log("Server running at " + socket);
+// fs.unlink(socket)
