@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <assert.h>
+#include <unistd.h>
+#include <string.h>
 
 // 1. connect using TCP socket and send requests
 // 2. generate files for ESI parser
