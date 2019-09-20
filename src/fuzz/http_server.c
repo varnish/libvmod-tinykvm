@@ -40,24 +40,26 @@ void http_fuzzer_server(void* data, size_t len)
         return;
     }
 
-	const char*  preamble = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
-	const size_t preamble_len = strlen(preamble);
 
-    char drit[6000];
+    char drit[1024];
     int dritlen = snprintf(drit, sizeof(drit),
-            "POST / HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-length: %zu\r\n\r\n"
-			"%s%.*s",
-			preamble_len + len, preamble, (int) len, data);
+            "POST / HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-length: %zu\r\n\r\n",
+            len);
     if (dritlen <= 0) {
         close(cfd);
         return;
     }
+
     ret = write(cfd, drit, dritlen);
     if (ret < 0) {
         close(cfd);
         return;
     }
-
+    ret = write(cfd, data, len);
+    if (ret < 0) {
+        close(cfd);
+        return;
+    }
     // signalling end of request, increases exec/s by 4x
     shutdown(cfd, SHUT_WR);
 

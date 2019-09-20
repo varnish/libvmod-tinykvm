@@ -7,11 +7,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
-#include <sys/un.h>
 
 extern void varnishd_http();
-extern const char* varnishd_client_path;
+extern int  open_varnishd_connection();
 
+#define static_assert _Static_assert
 static const int GENERAL_H2_FUZZING = true;
 #define H2F_HEADERS    0x1
 #define H2F_SETTINGS   0x4
@@ -24,12 +24,19 @@ struct h2_frame
 	uint32_t stream_id;
 	// FMA
 	char payload[0];
-};
+} __attribute__((packed));
+static_assert(sizeof(struct h2_frame) == 9, "");
+
 struct h2_headers
 {
 	struct h2_frame frame;
 	uint32_t stream_dep;
 	uint32_t block_frag[0];
+};
+struct h2_settings
+{
+	struct h2_frame frame;
+	char payload[0];
 };
 
 void h2_fuzzer(void* data, size_t len)
@@ -41,59 +48,62 @@ void h2_fuzzer(void* data, size_t len)
     }
 	if (len == 0) return;
 
-
-    struct sockaddr_un un_addr;
-	memset(&un_addr, 0, sizeof(un_addr));
-	un_addr.sun_family = AF_UNIX;
-	strncpy(un_addr.sun_path, varnishd_client_path, sizeof(un_addr.sun_path) - 1);
-
-    const int cfd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (cfd < 0) {
-        fprintf(stderr, "Could not create socket... going to sleep\n");
-        sleep(1);
-        return;
-    }
-    int ret = connect(cfd, (const struct sockaddr*) &un_addr, sizeof(un_addr));
-    if (ret < 0) {
-        close(cfd);
-        fprintf(stderr, "Fuzzer connect() failed!?\n");
-        sleep(1);
-        return;
-    }
-
-
+	static int cfd = -1;
+	while (cfd < 0) {
+		cfd = open_varnishd_connection();
+	}
 	const uint8_t* buffer = (uint8_t*) data;
 
-if (!GENERAL_H2_FUZZING)
-{
+/*
 	const char* req = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
     ret = write(cfd, req, strlen(req));
     if (ret < 0) {
         close(cfd);
         return;
     }
-
+*/
     // settings frame
 	const int slen = 6; // settings are of 6-byte multiple length
 	struct h2_frame settings;
+/*
 	settings.type   = H2F_SETTINGS;
 	settings.length = __builtin_bswap32(slen << 8);
-	settings.flags  = buffer[0];
 	settings.stream_id = 0;
-	buffer++;
-	len--;
-	// settings frame
-	ret = write(cfd, &settings, sizeof(settings));
-	if (ret < 0) {
-		close(cfd);
-		return;
+
+	char settings_buffer[sizeof(settings) + slen];
+	memcpy(&settings_buffer[0], &settings, sizeof(settings));
+	if (len >= slen)
+	{
+		memcpy(&settings_buffer[sizeof(settings)], data, slen);
+		data += slen;
+		len  -= slen;
 	}
 
+	for (int i = 0; i < 0; i++)
+	{
+		// settings frame
+		if (len > 0) {
+			settings.flags  = buffer[0];
+			buffer++;
+			len--;
+			memcpy(&settings_buffer[0], &settings, sizeof(settings));
+		}
+
+		ret = write(cfd, settings_buffer, sizeof(settings_buffer));
+		if (ret < 0) {
+			close(cfd);
+			return;
+		}
+	}
+*/
+
+if (!GENERAL_H2_FUZZING)
+{
 	if (len >= 6 + 2)
 	{
 		// settings payload
-		ret = write(cfd, buffer, slen);
-	    if (ret < 0) {
+		ssize_t bytes = write(cfd, buffer, slen);
+	    if (bytes < 0) {
 	        close(cfd);
 	        return;
 	    }
@@ -109,17 +119,18 @@ if (!GENERAL_H2_FUZZING)
 		len    -= 2;
 		hdr.frame.length = __builtin_bswap32(len << 8);
 
-		ret = write(cfd, &hdr, sizeof(hdr));
-	    if (ret < 0) {
+		bytes = write(cfd, &hdr, sizeof(hdr));
+	    if (bytes < 0) {
 	        close(cfd);
 	        return;
 	    }
 	}
 }
 
-    ret = write(cfd, buffer, len);
-    if (ret < 0) {
+    ssize_t bytes = write(cfd, buffer, len);
+    if (bytes < 0) {
         close(cfd);
+		cfd = -1;
         return;
     }
     // signalling end of request, increases exec/s by 7x
@@ -132,7 +143,8 @@ if (!GENERAL_H2_FUZZING)
         if (errno != ECONNRESET) {
             printf("Read failed: %s\n", strerror(errno));
         }
+		close(cfd);
+		cfd = -1;
     }
 
-    close(cfd);
 }
