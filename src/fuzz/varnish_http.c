@@ -28,6 +28,9 @@ void varnishd_http(const char* vcl_path)
     // temp folder
     char vd_folder[128];
     snprintf(vd_folder, sizeof(vd_folder), "/tmp/varnishd_%d", getpid());
+	// feature http2
+	char feature_http2[128];
+	snprintf(feature_http2, sizeof(feature_http2), "feature=+http2");
     // client and cli ports
     char portline[128];
     snprintf(portline, sizeof(portline), "%s", varnishd_client_path);
@@ -40,6 +43,7 @@ void varnishd_http(const char* vcl_path)
         "-T", cli_portline,
         "-F",
         "-n", vd_folder,
+		"-p", feature_http2,
         "-p", ti_buffer,
         "-p", cs_buffer, // needed?
 		"-p", tpmin_buffer,

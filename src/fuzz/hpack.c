@@ -21,4 +21,5 @@ void hpack_fuzzer(void* data, size_t len)
     char out[65536];
     size_t outlen = 0;
     VHD_Decode(&dec, &vht, data, len, &inlen, out, sizeof(out), &outlen);
+	VHT_Fini(&vht);
 }
