@@ -10,3 +10,7 @@ SUMMARY: UndefinedBehaviorSanitizer: undefined-behavior varnish-cache-plus/bin/v
 
 last function:
 NEW_FUNC[1/1]: 0x7fdcf0 in vrg_range_fini (/home/alf/git/varnish_autoperf/build/varnishd+0x7fdcf0)
+
+
+TODO: replace all LIBFUZZER_ENABLED exits with SINGLE_PROCESS so that
+we can see if PGO is affected by all the extra normal exits
