@@ -45,7 +45,7 @@ if (NATIVE)
 endif()
 
 if (SANITIZE)
-    set(SANITIZE_FLAGS -fsanitize=thread,undefined -fsanitize-recover=memory)
+    set(SANITIZE_FLAGS -fsanitize=address,undefined)
 endif()
 
 if (PGO_ENABLE)
@@ -485,9 +485,6 @@ if (LIBFUZZER)
     target_compile_options(varnishd PUBLIC "-fsanitize=fuzzer-no-link")
     target_link_libraries(varnishd "-fsanitize=fuzzer")
     set_source_files_properties(
-        ${VD_PATH}/cache/cache_cli.c
-        ${VD_PATH}/cache/cache_main.c
-        ${VD_PATH}/cache/cache_panic.c
         ${VD_PATH}/mgt/mgt_child.c
         ${VD_PATH}/mgt/mgt_main.c
         ${VD_PATH}/mgt/mgt_vcc.c
@@ -499,12 +496,9 @@ if (LIBCPP)
     target_link_libraries(varnishd "-stdlib=libc++ -fuse-ld=lld")
 endif()
 
-if (SINGLE_PROCESS)
+if (SINGLE_PROCESS OR LIBFUZZER)
     set_source_files_properties(
-        ${VD_PATH}/cache/cache_cli.c
-        #${VD_PATH}/cache/cache_vcl.c
         ${VD_PATH}/mgt/mgt_child.c
-        ${VD_PATH}/mgt/mgt_vcl.c
     PROPERTIES COMPILE_FLAGS -DSINGLE_PROCESS_MODE)
 endif()
 
