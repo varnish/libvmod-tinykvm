@@ -1,0 +1,30 @@
+#
+# Copyright YOU (c) 1900.
+#
+# (vmodtool requires this format.)
+#
+
+$Module example 3 Example VMOD
+
+DESCRIPTION
+===========
+
+This is the embedded documentation for the example VMOD. It should
+mention what the vmod is intended to do.
+
+It can span multiple lines and is written in RST format.
+You can even have links and lists in here:
+
+* https://github.com/varnish/libvmod-example/
+* https://www.varnish-cache.org/
+
+$Event event_function
+$Function STRING info()
+
+Returns a string set by the last VCL event, demonstrating the use of
+event functions.
+
+$Function STRING hello(STRING)
+
+The different functions provided by the VMOD should also have their own
+embedded documentation. This section is for the hello() function.

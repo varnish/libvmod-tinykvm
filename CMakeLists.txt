@@ -39,10 +39,6 @@ endif()
 if (MINIMAL)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Os")
 endif()
-if (GCSECTIONS)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffunction-sections -fdata-sections")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-gc-sections")
-endif()
 
 if (NATIVE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
@@ -116,7 +112,7 @@ add_custom_command(
             ${VARNISH_PATH}/include/tbl/vcc_types.h
             ${VARNISH_PATH}/include/tbl/vrt_stv_var.h
     DEPENDS ${VARNISH_PATH}/lib/libvcc/generate.py
-    COMMENT "Generating "
+    COMMENT "Generating VCL compiler headers and sources"
 )
 add_custom_target(libvcc_generate
     DEPENDS ${VARNISH_PATH}/lib/libvcc/vcc_fixed_token.c
@@ -490,6 +486,11 @@ target_link_libraries(varnishd vcc varnish vgz m)
 target_link_libraries(varnishd config pcre pthread crypto ssl dl)
 if (VARNISH_PLUS)
     target_link_libraries(varnishd mse lmdb sslhelper)
+endif()
+
+if (GCSECTIONS)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffunction-sections -fdata-sections")
+	target_link_libraries(varnishd "-Wl,-gc-sections")
 endif()
 
 if (LIBFUZZER)
