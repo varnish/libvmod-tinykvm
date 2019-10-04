@@ -18,6 +18,10 @@ option(LIBFUZZER   "Enable fuzzing with clang libfuzzer")
 option(LIBCPP      "Enable compiling with libc++ and linking with LLD" OFF)
 option(SINGLE_PROCESS "Disable fork() and run in single-process mode" ON)
 
+set(VSTATE_DIR "/tmp/varnish" CACHE STRING "Default state directory")
+set(VMOD_DIR   "/opt/varnish/lib/varnish-plus/vmods" CACHE STRING "Default VMOD directory")
+set(VCL_DIR    "/opt/varnish/share/varnish-plus/vcl" CACHE STRING "Default VCL directory")
+
 if (LTO_ENABLE)
     if ("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=thin")
@@ -229,7 +233,7 @@ set(VARNISHD_SOURCES
 	${VD_PATH}/storage/storage_persistent_silo.c
 	${VD_PATH}/storage/storage_persistent_subr.c
     # nodist
-    ${VD_PATH}/builtin_vcl.c
+    builtin_vcl.c
 )
 if (VARNISH_PLUS)
     set (VARNISHD_SOURCES ${VARNISHD_SOURCES}
@@ -358,6 +362,16 @@ add_custom_target(vhp_gen_hufdec ALL
         DEPENDS vhp_hufdec.h
 )
 
+## Generate the built-in VCL C-file ##
+add_custom_command(
+        OUTPUT builtin_vcl.c
+        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/cmake/builtin_vcl.py ${VD_PATH}/builtin.vcl builtin_vcl.c
+        DEPENDS ${VD_PATH}/builtin.vcl
+    )
+add_custom_target(generate_builtin_vcl
+        DEPENDS builtin_vcl.c
+)
+
 ## libvarnish library ##
 add_library(varnish ${LIBVARNISH_SOURCES} ${VSC_COMPILED})
 target_include_directories(varnish PUBLIC ${VARNISH_PATH}/bin/varnishd)
@@ -365,9 +379,9 @@ target_include_directories(varnish PUBLIC ${VARNISH_PATH}/include)
 target_include_directories(varnish PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(varnish PUBLIC include/)
 target_compile_definitions(varnish PUBLIC _XOPEN_SOURCE=700)
-target_compile_definitions(varnish PUBLIC VARNISH_STATE_DIR="/tmp/varnish")
-target_compile_definitions(varnish PUBLIC VARNISH_VMOD_DIR="/opt/varnish/lib/varnish-plus/vmods")
-target_compile_definitions(varnish PUBLIC VARNISH_VCL_DIR="/opt/varnish/share/varnish-plus/vcl")
+target_compile_definitions(varnish PUBLIC VARNISH_STATE_DIR="${VSTATE_DIR}")
+target_compile_definitions(varnish PUBLIC VARNISH_VMOD_DIR="${VMOD_DIR}")
+target_compile_definitions(varnish PUBLIC VARNISH_VCL_DIR="${VCL_DIR}")
 target_compile_definitions(varnish PUBLIC -DNOT_IN_A_VMOD)
 add_dependencies(varnish includes_generate)
 
@@ -471,7 +485,7 @@ endif()
 
 ## Varnish daemon ##
 add_executable(varnishd ${VARNISHD_SOURCES})
-add_dependencies(varnishd vhp_gen_hufdec)
+add_dependencies(varnishd vhp_gen_hufdec generate_builtin_vcl)
 target_link_libraries(varnishd vcc varnish vgz m)
 target_link_libraries(varnishd config pcre pthread crypto ssl dl)
 if (VARNISH_PLUS)
