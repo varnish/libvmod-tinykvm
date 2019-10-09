@@ -7,7 +7,7 @@ f = open(input_vcl, "r")
 builtin_vcl = ""
 for line in f:
 	# add "" around lines and end with \
-	builtin_vcl += "\t\"" + line.rstrip().replace("\"", "\\\"") + "\"\n"
+	builtin_vcl += "\t\"" + line.rstrip().replace("\"", "\\\"") + "\\n\"\n"
 f.close()
 
 f = open(output_file, "w")

@@ -229,7 +229,7 @@ set(VARNISHD_SOURCES
 	${VD_PATH}/storage/storage_persistent_silo.c
 	${VD_PATH}/storage/storage_persistent_subr.c
     # nodist
-    builtin_vcl.c
+	builtin_vcl.c
 )
 if (VARNISH_PLUS)
     set (VARNISHD_SOURCES ${VARNISHD_SOURCES}
@@ -502,7 +502,6 @@ if (LIBFUZZER)
     set_source_files_properties(
         ${VD_PATH}/mgt/mgt_child.c
         ${VD_PATH}/mgt/mgt_main.c
-        ${VD_PATH}/mgt/mgt_vcc.c
     PROPERTIES COMPILE_DEFINITIONS LIBFUZZER_ENABLED=1)
 endif()
 
@@ -513,7 +512,8 @@ endif()
 
 if (SINGLE_PROCESS OR LIBFUZZER)
     set_source_files_properties(
-        ${VD_PATH}/mgt/mgt_child.c
+		${VD_PATH}/mgt/mgt_child.c
+        ${VD_PATH}/mgt/mgt_vcc.c
     PROPERTIES COMPILE_FLAGS -DSINGLE_PROCESS_MODE)
 endif()
 

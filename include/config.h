@@ -125,7 +125,7 @@
 /* #undef HAVE_NCURSESW */
 
 /* Define to 1 if you have the <ncursesw/curses.h> header file. */
-/* #undef HAVE_NCURSESW_CURSES_H */
+#define HAVE_NCURSESW_CURSES_H 1
 
 /* Define to 1 if you have the <ncursesw.h> header file. */
 /* #undef HAVE_NCURSESW_H */
@@ -245,7 +245,7 @@
 #define PACKAGE_NAME "Varnish Plus"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "Varnish Plus 6.0.3r5"
+#define PACKAGE_STRING "Varnish Plus 6.0.4r3"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "varnish-plus"
@@ -254,7 +254,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "6.0.3r5"
+#define PACKAGE_VERSION "6.0.4r3"
 
 /* Define to necessary symbol if this constant uses a non-standard name on
    your system. */
@@ -307,7 +307,7 @@
 #define VCC_CC "exec gcc-8 -g -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -shared -Wl,-x -o %o %s"
 
 /* Version number of package */
-#define VERSION "6.0.3r5"
+#define VERSION "6.0.4r3"
 
 /* Define to 1 to build the deprecated peristent storage. */
 /* #undef WITH_PERSISTENT_STORAGE */
