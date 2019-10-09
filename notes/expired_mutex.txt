@@ -1,0 +1,43 @@
+WARNING: ThreadSanitizer: data race (pid=3749)
+  Write of size 1 at 0x000001009400 by thread T78 (mutexes: write M314542874815796328):
+    #0 Pool_Sumstat /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/cache/cache_pool.c:55 (varnishd+0x67c27c)
+    #1 ban_lurker /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/cache/cache_ban_lurker.c:442:4 (varnishd+0x546447)
+    #2 wrk_bgthread /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/cache/cache_wrk.c:99:8 (varnishd+0x773acb)
+
+  Previous write of size 1 at 0x000001009400 by thread T26 (mutexes: write M24623648803724248):
+    #0 Pool_Sumstat /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/cache/cache_pool.c:55 (varnishd+0x67c27c)
+    #1 exp_thread /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/cache/cache_expire.c:420:4 (varnishd+0x5a9911)
+    #2 wrk_bgthread /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/cache/cache_wrk.c:99:8 (varnishd+0x773acb)
+
+  Location is global '__TMC_END__' at 0x000001002310 (varnishd+0x000001009400)
+
+  Mutex M314542874815796328 is already destroyed.
+
+  Mutex M24623648803724248 is already destroyed.
+
+  Thread T78 'ban-lurker' (tid=3842, running) created by main thread at:
+    #0 pthread_create <null> (varnishd+0x464585)
+    #1 WRK_BgThread /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/cache/cache_wrk.c:115:2 (varnishd+0x7735f3)
+    #2 BAN_Release /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/cache/cache_ban.c:203:2 (varnishd+0x51fbb1)
+    #3 BAN_Compile /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/cache/cache_ban.c:1011:2 (varnishd+0x53a6ca)
+    #4 child_main /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/cache/cache_main.c:453:2 (varnishd+0x64a92d)
+    #5 mgt_launch_child /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/mgt/mgt_child.c:381:3 (varnishd+0x856c19)
+    #6 MCH_Start_Child /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/mgt/mgt_child.c:672:2 (varnishd+0x856640)
+    #7 varnishd_main /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/mgt/mgt_main.c:905:7 (varnishd+0x86c2a9)
+    #8 varnishd_http /home/gonzo/github/varnish_autoperf/src/fuzz/varnish_http.c:64:5 (varnishd+0xac7b2d)
+    #9 h2_fuzzer /home/gonzo/github/varnish_autoperf/src/fuzz/fuzz_h2.c:47:9 (varnishd+0xac6e67)
+    #10 LLVMFuzzerTestOneInput /home/gonzo/github/varnish_autoperf/src/fuzz/fuzzer.c:24:5 (varnishd+0xac667f)
+    #11 fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) <null> (varnishd+0x4448ea)
+
+  Thread T26 'cache-exp' (tid=3789, running) created by main thread at:
+    #0 pthread_create <null> (varnishd+0x464585)
+    #1 WRK_BgThread /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/cache/cache_wrk.c:115:2 (varnishd+0x7735f3)
+    #2 EXP_Init /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/cache/cache_expire.c:450:2 (varnishd+0x5a8be9)
+    #3 child_main /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/cache/cache_main.c:441:2 (varnishd+0x64a8cf)
+    #4 mgt_launch_child /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/mgt/mgt_child.c:381:3 (varnishd+0x856c19)
+    #5 MCH_Start_Child /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/mgt/mgt_child.c:672:2 (varnishd+0x856640)
+    #6 varnishd_main /home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/bin/varnishd/mgt/mgt_main.c:905:7 (varnishd+0x86c2a9)
+    #7 varnishd_http /home/gonzo/github/varnish_autoperf/src/fuzz/varnish_http.c:64:5 (varnishd+0xac7b2d)
+    #8 h2_fuzzer /home/gonzo/github/varnish_autoperf/src/fuzz/fuzz_h2.c:47:9 (varnishd+0xac6e67)
+    #9 LLVMFuzzerTestOneInput /home/gonzo/github/varnish_autoperf/src/fuzz/fuzzer.c:24:5 (varnishd+0xac667f)
+    #10 fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) <null> (varnishd+0x4448ea)
