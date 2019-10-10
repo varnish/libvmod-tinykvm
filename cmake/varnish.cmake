@@ -12,7 +12,7 @@ function(add_vmod LIBNAME VCCNAME comment)
 	target_include_directories(${LIBNAME} PUBLIC ${VARNISH_INCLUDE_DIRS})
 	target_include_directories(${LIBNAME} PUBLIC ${CMAKE_BINARY_DIR})
 	target_link_libraries(${LIBNAME} ${VARNISH_LIBRARIES})
-	target_compile_definitions(${LIBNAME} PRIVATE VMOD=1)
+	target_compile_definitions(${LIBNAME} PRIVATE VMOD=1 HAVE_CONFIG_H)
 
 	vmod_add_vcl(${LIBNAME} ${VCCNAME})
 endfunction()
@@ -21,7 +21,7 @@ function(vmod_add_vcl LIBNAME)
 	get_filename_component(BASENAME ${ARGN} NAME_WE)
 	set(OUTFILES ${BASENAME}_if.c ${BASENAME}_if.h)
 	add_custom_command(
-		COMMAND ${PYTHON_EXECUTABLE} ${VMODTOOL} -o ${BASENAME}_if ${CMAKE_SOURCE_DIR}/${ARGN}
+		COMMAND ${PYTHON_EXECUTABLE} ${VMODTOOL} --strict --boilerplate -o ${BASENAME}_if ${CMAKE_SOURCE_DIR}/${ARGN}
 		DEPENDS ${INFILE}
 		OUTPUT  ${OUTFILES}
 	)
@@ -33,8 +33,9 @@ function(vmod_add_vcl LIBNAME)
 endfunction()
 
 function(vmod_add_tests LIBNAME)
+	set(LIBPATH "${CMAKE_BINARY_DIR}/lib${LIBNAME}.so")
 	add_test(NAME tests
-		COMMAND varnishtest ${ARGN}
+		COMMAND varnishtest -D${LIBNAME}="${LIBNAME} from \"${LIBPATH}\"" ${ARGN}
 		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 	)
 endfunction()
