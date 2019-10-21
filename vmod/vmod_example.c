@@ -18,7 +18,12 @@ char	     *info;
  */
 
 int v_matchproto_(vmod_event_f)
-event_function(VRT_CTX, struct vmod_priv *priv, enum vcl_event_e e)
+#ifdef VARNISH_PLUS
+event_function
+#else
+vmod_event_function
+#endif
+(VRT_CTX, struct vmod_priv *priv, enum vcl_event_e e)
 {
 	char	   ts[VTIM_FORMAT_SIZE];
 	const char *event = NULL;
