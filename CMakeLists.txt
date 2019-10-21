@@ -18,7 +18,7 @@ option(LIBFUZZER   "Enable fuzzing with clang libfuzzer")
 option(LIBCPP      "Enable compiling with libc++ and linking with LLD" OFF)
 option(SINGLE_PROCESS "Disable fork() and run in single-process mode" ON)
 
-set(VSTATE_DIR "/tmp/varnish" CACHE STRING "Default state directory")
+set(VSTATE_DIR "/tmp/varnishd" CACHE STRING "Default state directory")
 set(VMOD_DIR   "/opt/varnish/lib/varnish-plus/vmods" CACHE STRING "Default VMOD directory")
 set(VCL_DIR    "/opt/varnish/share/varnish-plus/vcl" CACHE STRING "Default VCL directory")
 

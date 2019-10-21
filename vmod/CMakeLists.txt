@@ -5,6 +5,7 @@ include(../cmake/varnish.cmake vmod)
 add_vmod(vmod_example vmod_example.vcc "Example VMOD"
 	vmod_example.c
 )
-vmod_add_tests(vmod_example
-	tests/vtc01.vtc
+# VCL import name is "example"
+vmod_add_tests(vmod_example example
+	tests/test01.vtc
 )

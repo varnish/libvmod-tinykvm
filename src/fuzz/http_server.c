@@ -16,7 +16,7 @@ void http_fuzzer_server(void* data, size_t len)
     static bool init = false;
     if (init == false) {
         init = true;
-        varnishd_http("/home/gonzo/github/varnish_autoperf/vcl/pass.vcl");
+        varnishd_http("/home/gonzo/github/varnish_autoperf/vcl/response.vcl");
     }
     if (len == 0) return;
 
