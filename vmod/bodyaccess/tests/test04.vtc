@@ -12,8 +12,8 @@ server s1 {
 varnish v1 -cli "param.set vsl_mask +Hash"
 
 varnish v1 -vcl+backend {
-	import bodyaccess from "${vmod_builddir}/.libs/libvmod_bodyaccess.so";
 	import std;
+	import bodyaccess from ${VMOD_SO};
 
 	# On cache things that look like model api calls
 	sub vcl_recv {

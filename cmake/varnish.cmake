@@ -53,8 +53,8 @@ endfunction()
 
 function(vmod_add_tests LIBNAME IMPORT_NAME)
 	set(LIBPATH "${CMAKE_BINARY_DIR}/lib${LIBNAME}.so")
-	add_test(NAME tests
-		COMMAND varnishtest "-D${LIBNAME}=${IMPORT_NAME} from \"${LIBPATH}\"" ${ARGN}
-		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+	add_test(NAME ${LIBNAME}_tests
+		COMMAND varnishtest "-DVMOD_SO=\"${LIBPATH}\"" ${ARGN}
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	)
 endfunction()

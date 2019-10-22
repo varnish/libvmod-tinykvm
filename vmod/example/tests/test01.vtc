@@ -7,7 +7,7 @@ server s1 {
 
 varnish v1 -vcl+backend {
 	import std;
-	import ${vmod_example};
+	import example from ${VMOD_SO};
 
 	sub vcl_init {
 		std.log(example.info());

@@ -3,4 +3,7 @@ project (all_vmods C)
 
 #set(VARNISH_VMOD_LIBRARY_MODE TRUE)
 add_subdirectory(bodyaccess)
+add_subdirectory(cookie)
 add_subdirectory(example)
+
+enable_testing()

@@ -10,8 +10,8 @@ server s1 {
 } -start
 
 varnish v1 -vcl+backend {
-	import bodyaccess from "${vmod_builddir}/.libs/libvmod_bodyaccess.so";
 	import std;
+	import bodyaccess from ${VMOD_SO};
 
 	sub vcl_recv {
 		std.cache_req_body(110B);
