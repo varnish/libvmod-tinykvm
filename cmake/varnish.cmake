@@ -2,24 +2,24 @@
 option(VARNISH_PLUS "Build with Varnish plus" OFF)
 set(VARNISH_DIR "/opt/varnish" CACHE STRING "Varnish installation")
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBVARNISH REQUIRED IMPORTED_TARGET varnishapi)
+find_program(VARNISHD    "varnishd")
+find_program(VARNISHTEST "varnishtest")
+
 # compiler flags
 set(CMAKE_C_FLAGS "-Wall -Wextra -std=c11 -g -O2")
 
 if (VARNISH_PLUS)
 	set(VMODTOOL "${VARNISH_DIR}/share/varnish-plus/vmodtool.py")
 	set(VINCLUDE "${VARNISH_DIR}/include/varnish-plus")
-	set(VLIBAPI  "${VARNISH_DIR}/lib/libvarnishapi.so")
 else()
 	set(VMODTOOL "${VARNISH_DIR}/share/varnish/vmodtool.py")
 	set(VINCLUDE "${VARNISH_DIR}/include/varnish")
-	set(VLIBAPI  "${VARNISH_DIR}/lib/libvarnishapi.so")
 endif()
 
 # enable make test
 enable_testing()
-
-add_library(varnishapi SHARED IMPORTED)
-set_target_properties(varnishapi PROPERTIES IMPORTED_LOCATION "${VLIBAPI}")
 
 function(add_vmod LIBNAME VCCNAME comment)
 	# write empty config.h for autocrap
@@ -37,11 +37,13 @@ function(add_vmod LIBNAME VCCNAME comment)
 	)
 	# create VMOD shared object
 	add_library(${LIBNAME} SHARED ${ARGN} ${OUTFILES})
-	message(STATUS "Varnish include dir: ${VARNISH_INCLUDE_DIRS}")
-	target_include_directories(${LIBNAME} PUBLIC ${VINCLUDE})
+	#target_include_directories(${LIBNAME} PUBLIC ${VINCLUDE})
 	target_include_directories(${LIBNAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-	target_link_libraries(${LIBNAME} varnishapi)
+	target_link_libraries(${LIBNAME} PkgConfig::LIBVARNISH)
 	target_compile_definitions(${LIBNAME} PRIVATE VMOD=1 HAVE_CONFIG_H)
+	if (VARNISH_PLUS)
+		target_compile_definitions(${LIBNAME} PRIVATE VARNISH_PLUS)
+	endif()
 	# this will build the final .so files in the top build directory
 	# you don't always want this, so it can probably be an option,
 	# but in most cases this will be the right thing to do
@@ -54,7 +56,7 @@ endfunction()
 function(vmod_add_tests LIBNAME IMPORT_NAME)
 	set(LIBPATH "${CMAKE_BINARY_DIR}/lib${LIBNAME}.so")
 	add_test(NAME ${LIBNAME}_tests
-		COMMAND varnishtest "-DVMOD_SO=\"${LIBPATH}\"" ${ARGN}
+		COMMAND ${VARNISHTEST} "-DVMOD_SO=\"${LIBPATH}\"" "-Dvarnishd=${VARNISHD}" ${ARGN}
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	)
 endfunction()

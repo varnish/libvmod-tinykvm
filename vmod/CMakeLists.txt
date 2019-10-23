@@ -1,9 +1,12 @@
 cmake_minimum_required (VERSION 3.0.2)
 project (all_vmods C)
 
-#set(VARNISH_VMOD_LIBRARY_MODE TRUE)
-add_subdirectory(bodyaccess)
+if (NOT VARNISH_PLUS)
+	add_subdirectory(bodyaccess)
+endif()
 add_subdirectory(cookie)
 add_subdirectory(example)
+add_subdirectory(header)
+
 
 enable_testing()
