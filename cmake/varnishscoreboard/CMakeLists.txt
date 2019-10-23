@@ -10,7 +10,7 @@ target_include_directories(varnishscoreboard PUBLIC ${PATH})
 target_include_directories(varnishscoreboard PUBLIC ${VARNISH_PATH}/include)
 target_include_directories(varnishscoreboard PUBLIC ${CONFIG_PATH})
 target_compile_definitions(varnishscoreboard PUBLIC _XOPEN_SOURCE=700)
-target_link_libraries(varnishscoreboard varnishapi)
+target_link_libraries(varnishscoreboard vapi_static)
 # build varnishscoreboard into the top binary folder
 set_target_properties(varnishscoreboard
 	PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"

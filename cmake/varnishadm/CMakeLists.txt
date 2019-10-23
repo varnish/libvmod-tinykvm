@@ -10,7 +10,7 @@ target_include_directories(varnishadm PUBLIC ${PATH})
 target_include_directories(varnishadm PUBLIC ${VARNISH_PATH}/include)
 target_include_directories(varnishadm PUBLIC ${CONFIG_PATH})
 target_compile_definitions(varnishadm PUBLIC _XOPEN_SOURCE=700)
-target_link_libraries(varnishadm varnishapi edit)
+target_link_libraries(varnishadm vapi_static edit)
 # build varnishadm into the top binary folder
 set_target_properties(varnishadm
 	PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"

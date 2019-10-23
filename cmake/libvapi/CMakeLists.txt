@@ -17,12 +17,10 @@ add_custom_target(varnishapi_generate
 set (SOURCES
 	${PATH}/daemon.c
 	${PATH}/vsc.c
-	${PATH}/vsl2rst.c
 	${PATH}/vsl_arg.c
 	${PATH}/vsl.c
 	${PATH}/vsl_cursor.c
 	${PATH}/vsl_dispatch.c
-	${PATH}/vsl_glob_test.c
 	${PATH}/vsl_query.c
 	${PATH}/vsm.c
 	${PATH}/vut.c
@@ -30,7 +28,9 @@ set (SOURCES
 	${PATH}/vxp_fixed_token.c
 	${PATH}/vxp_lexer.c
 	${PATH}/vxp_parse.c
-	${PATH}/vxp_test.c
+	#${PATH}/vsl2rst.c
+	#${PATH}/vsl_glob_test.c
+	#${PATH}/vxp_test.c
 )
 if (VARNISH_PLUS)
 	set (SOURCES ${SOURCES}
@@ -43,14 +43,23 @@ else()
 endif()
 
 ## libvarnishapi library ##
-add_library(varnishapi ${SOURCES})
-target_include_directories(varnishapi PUBLIC ${VARNISH_PATH}/include)
-target_include_directories(varnishapi PUBLIC ${CONFIG_PATH})
-target_compile_definitions(varnishapi PUBLIC _XOPEN_SOURCE=700)
-target_compile_definitions(varnishapi PUBLIC -DNOT_IN_A_VMOD)
-add_dependencies(varnishapi varnishapi_generate)
-target_link_libraries(varnishapi varnish)
+add_library(vapi_obj OBJECT ${SOURCES})
+target_include_directories(vapi_obj PUBLIC ${VARNISH_PATH}/include)
+target_include_directories(vapi_obj PUBLIC ${CONFIG_PATH})
+target_compile_definitions(vapi_obj PUBLIC _XOPEN_SOURCE=700)
+target_compile_definitions(vapi_obj PUBLIC -DNOT_IN_A_VMOD)
+set_property(TARGET vapi_obj PROPERTY POSITION_INDEPENDENT_CODE 1)
+add_dependencies(vapi_obj varnishapi_generate)
 
 if (SANITIZE)
-	target_compile_options(varnishapi PRIVATE "${SANITIZE_FLAGS}")
+	target_compile_options(vapi_obj PRIVATE "${SANITIZE_FLAGS}")
 endif()
+
+add_library(vapi_static STATIC $<TARGET_OBJECTS:vapi_obj>)
+target_link_libraries(vapi_static varnish)
+
+add_library(varnishapi  SHARED $<TARGET_OBJECTS:vapi_obj>)
+# build libvarnishapi.so into the top binary folder
+set_target_properties(varnishapi
+	PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+)
