@@ -20,7 +20,7 @@ add_custom_target(includes_generate
     )
 
 ## libvarnish library ##
-set (LIBVARNISH_SOURCES
+set (SOURCES
   ${LIBPATH}/libvarnish/binary_heap.c
   ${LIBPATH}/libvarnish/vas.c
   ${LIBPATH}/libvarnish/vav.c
@@ -49,13 +49,13 @@ set (LIBVARNISH_SOURCES
   ${LIBPATH}/libvarnish/vus.c
 )
 if (NOT VARNISH_PLUS)
-    set (LIBVARNISH_SOURCES ${LIBVARNISH_SOURCES}
+    set (SOURCES ${SOURCES}
         ${LIBPATH}/libvarnish/verrno.c
         ${LIBPATH}/libvarnish/vte.c
     )
 endif()
 
-## VSC generation (used by livarnish) ##
+## VSC generation (used by libvarnish) ##
 set(VSC_SOURCES
 	VSC_lck.vsc
 	VSC_main.vsc
@@ -91,10 +91,9 @@ set_source_files_properties(${VSC_COMPILED} PROPERTIES GENERATED TRUE)
 set_source_files_properties(${VSC_HEADERS} PROPERTIES GENERATED TRUE)
 
 ## libvarnish library ##
-add_library(varnish ${LIBVARNISH_SOURCES} ${VSC_COMPILED})
-target_include_directories(varnish PUBLIC ${VARNISH_PATH}/bin/varnishd)
+add_library(varnish ${SOURCES} ${VSC_COMPILED})
+target_include_directories(varnish PUBLIC ${VARNISHD_PATH})
 target_include_directories(varnish PUBLIC ${VARNISH_PATH}/include)
-target_include_directories(varnish PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(varnish PUBLIC ${CONFIG_PATH})
 target_compile_definitions(varnish PUBLIC _XOPEN_SOURCE=700)
 target_compile_definitions(varnish PUBLIC VARNISH_STATE_DIR="${VSTATE_DIR}")
