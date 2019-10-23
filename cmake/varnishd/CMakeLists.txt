@@ -238,6 +238,8 @@ if (VARNISH_PLUS)
     target_include_directories(mse PRIVATE ${LIBPATH}/liblmdb/LMDB_0.9.23)
     target_include_directories(mse PRIVATE ${VARNISH_PATH}/include)
     target_include_directories(mse PRIVATE ${CONFIG_PATH})
+	# we need to link with libconfig
+	target_link_libraries(mse config)
 endif()
 
 ## VCC library ##
