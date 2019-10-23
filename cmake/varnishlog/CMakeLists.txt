@@ -1,6 +1,3 @@
-cmake_minimum_required (VERSION 3.0.2)
-project(varnishlog C)
-
 set (PATH ${VARNISH_PATH}/bin/varnishlog)
 set(SOURCES
 		${PATH}/varnishlog.c

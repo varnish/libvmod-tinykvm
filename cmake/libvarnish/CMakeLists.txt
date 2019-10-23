@@ -105,4 +105,5 @@ target_link_libraries(varnish pcre m)
 
 if (SANITIZE)
 	target_compile_options(varnish PRIVATE "${SANITIZE_FLAGS}")
+	target_link_libraries(varnish "${SANITIZE_FLAGS}")
 endif()

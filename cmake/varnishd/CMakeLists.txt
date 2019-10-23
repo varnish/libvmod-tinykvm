@@ -130,7 +130,7 @@ set(VARNISHD_SOURCES
 	builtin_vcl.c
 )
 if (VARNISH_PLUS)
-    set (VARNISHD_SOURCES ${VARNISHD_SOURCES}
+    list (APPEND VARNISHD_SOURCES
 		${VD_PATH}/cache/cache_backend_ssl.c
 		${VD_PATH}/cache/cache_tcp_oper.c
 		${VD_PATH}/cache/cache_vcl_vrt.c
@@ -158,7 +158,7 @@ if (VARNISH_PLUS)
 		${VD_PATH}/vmod_util/xbody_util.c
     )
 else()
-    set (VARNISHD_SOURCES ${VARNISHD_SOURCES}
+	list (APPEND VARNISHD_SOURCES
         ${VD_PATH}/cache/cache_vrt_filter.c
         ${VD_PATH}/cache/cache_vrt_vcl.c
         ${VD_PATH}/cache/cache_vpi.c
@@ -273,7 +273,7 @@ set(VARNISHD_SOURCES ${VARNISHD_SOURCES}
     missing.c
 )
 if (LIBFUZZER)
-    set(VARNISHD_SOURCES ${VARNISHD_SOURCES}
+	list (APPEND VARNISHD_SOURCES
         fuzz/fuzzer.c
         fuzz/fuzz_http.c
         fuzz/fuzz_h2.c
@@ -323,5 +323,4 @@ endif()
 if (SANITIZE)
     target_compile_options(vcc PRIVATE     "${SANITIZE_FLAGS}")
     target_compile_options(varnishd PUBLIC "${SANITIZE_FLAGS}")
-    target_link_libraries(varnishd "${SANITIZE_FLAGS}")
 endif()

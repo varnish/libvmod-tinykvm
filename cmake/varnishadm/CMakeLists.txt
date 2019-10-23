@@ -1,6 +1,3 @@
-cmake_minimum_required (VERSION 3.0.2)
-project(varnishadm C)
-
 set (PATH ${VARNISH_PATH}/bin/varnishadm)
 set(SOURCES
 		${PATH}/varnishadm.c

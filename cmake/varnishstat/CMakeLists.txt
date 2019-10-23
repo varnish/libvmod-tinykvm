@@ -19,5 +19,4 @@ set_target_properties(varnishstat
 
 if (SANITIZE)
 	target_compile_options(varnishstat PUBLIC "${SANITIZE_FLAGS}")
-	target_link_libraries(varnishstat "${SANITIZE_FLAGS}")
 endif()
