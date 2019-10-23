@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.0.2)
 project (vmod C)
-include(../../cmake/varnish.cmake vmod)
+include(../../cmake/vmod.cmake vmod)
 
 add_vmod(vmod_cookie vmod_cookie.vcc "Cookie VMOD"
 	vmod_cookie.c

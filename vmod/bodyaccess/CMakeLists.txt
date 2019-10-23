@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.0.2)
 project (vmod C)
-include(../../cmake/varnish.cmake vmod)
+include(../../cmake/vmod.cmake vmod)
 
 add_vmod(vmod_bodyaccess vmod_bodyaccess.vcc "Body Access VMOD"
 	vmod_bodyaccess.c
