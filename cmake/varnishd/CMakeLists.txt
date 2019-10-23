@@ -1,96 +1,6 @@
 cmake_minimum_required (VERSION 3.0.2)
 project (varnish C)
 
-set(CMAKE_C_FLAGS "-Wall -Wextra -std=c11 -g -O2")
-
-option(VARNISH_PLUS "Build with the varnish plus repo" ON)
-option(GPROF       "Enable profiling with gprof" OFF)
-option(LTO_ENABLE  "Enable LTO builds" OFF)
-option(MINIMAL     "Minimal build")
-option(GCSECTIONS  "Garbage collect empty sections" ON)
-option(NATIVE      "Enable native performance" ON)
-option(SANITIZE    "Enable asan/ubsan sanitizers" OFF)
-option(PGO_ENABLE  "Enable profile-guided optimizations" OFF)
-option(PGO_GENERATE "Enable profile-guided optimizations" ON)
-option(AUTOFDO     "Enable AutoFDO profile optimizations" OFF)
-set(PROFILE "../perf.afdo" CACHE STRING "Optimization profile path")
-option(LIBFUZZER   "Enable fuzzing with clang libfuzzer")
-option(LIBCPP      "Enable compiling with libc++ and linking with LLD" OFF)
-option(SINGLE_PROCESS "Disable fork() and run in single-process mode" ON)
-
-set(VSTATE_DIR "/tmp/varnishd" CACHE STRING "Default state directory")
-set(VMOD_DIR   "/opt/varnish/lib/varnish-plus/vmods" CACHE STRING "Default VMOD directory")
-set(VCL_DIR    "/opt/varnish/share/varnish-plus/vcl" CACHE STRING "Default VCL directory")
-
-if (LTO_ENABLE)
-    if ("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=thin")
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto=thin -fuse-ld=lld")
-    else()
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto")
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto=8")
-    endif()
-endif()
-
-if (GPROF)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pg")
-endif()
-
-if (MINIMAL)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Os")
-endif()
-
-if (NATIVE)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
-endif()
-
-if (SANITIZE)
-    set(SANITIZE_FLAGS -fsanitize=address,undefined)
-endif()
-
-if (PGO_ENABLE)
-    set(PGO_DIR "${CMAKE_BINARY_DIR}/pgo")
-	if ("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
-    	set(PGO_FLAGS "-fprofile-correction -fprofile-dir=${PGO_DIR}")
-		if (PGO_GENERATE)
-	        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-generate ${PGO_FLAGS}")
-	    else()
-	        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-use ${PGO_FLAGS}")
-	    endif()
-	elseif ("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
-		# With clang we will have to merge the profdata using llvm-profdata merge
-		# before we can use the profdata generated from profile-generate
-		if (PGO_GENERATE)
-	        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-generate=${PGO_DIR}")
-	    else()
-	        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-use=default.profdata")
-	    endif()
-	endif()
-endif()
-
-if (AUTOFDO)
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fauto-profile=${CMAKE_BINARY_DIR}/${PROFILE} -g1")
-endif()
-
-if (VARNISH_PLUS)
-  set (VARNISH_PATH ${CMAKE_SOURCE_DIR}/ext/varnish-cache-plus)
-else()
-  set (VARNISH_PATH ${CMAKE_SOURCE_DIR}/ext/varnish-cache)
-endif()
-
-# include/vcs_version.h include/vmod_abi.h
-add_custom_command(
-    COMMAND ${PYTHON_EXECUTABLE} ${VARNISH_PATH}/include/generate.py ${VARNISH_PATH} ${VARNISH_PATH}
-    WORKING_DIRECTORY ${VARNISH_PATH}/include
-    OUTPUT  ${VARNISH_PATH}/include/vcs_version.h
-            ${VARNISH_PATH}/include/vmod_abi.h
-    DEPENDS ${VARNISH_PATH}/include/generate.py
-    COMMENT "Generating vcs_version.h and vmod_abi.h"
-    )
-add_custom_target(includes_generate
-    DEPENDS ${VARNISH_PATH}/include/vcs_version.h
-            ${VARNISH_PATH}/include/vmod_abi.h
-    )
 # libvarnishapi/vxp_fixed_token.c
 add_custom_command(
     COMMAND ${PYTHON_EXECUTABLE} ${VARNISH_PATH}/lib/libvarnishapi/generate.py
@@ -269,75 +179,6 @@ else()
 endif()
 
 set (LIBPATH ${VARNISH_PATH}/lib)
-set (LIBVARNISH_SOURCES
-  ${LIBPATH}/libvarnish/binary_heap.c
-  ${LIBPATH}/libvarnish/vas.c
-  ${LIBPATH}/libvarnish/vav.c
-  ${LIBPATH}/libvarnish/vcli_proto.c
-  ${LIBPATH}/libvarnish/vcli_serve.c
-  ${LIBPATH}/libvarnish/vct.c
-  ${LIBPATH}/libvarnish/version.c
-  ${LIBPATH}/libvarnish/vev.c
-  ${LIBPATH}/libvarnish/vfil.c
-  ${LIBPATH}/libvarnish/vfl.c
-  ${LIBPATH}/libvarnish/vin.c
-  ${LIBPATH}/libvarnish/vjsn.c
-  ${LIBPATH}/libvarnish/vlu.c
-  ${LIBPATH}/libvarnish/vmb.c
-  ${LIBPATH}/libvarnish/vnum.c
-  ${LIBPATH}/libvarnish/vpf.c
-  ${LIBPATH}/libvarnish/vre.c
-  ${LIBPATH}/libvarnish/vrnd.c
-  ${LIBPATH}/libvarnish/vsa.c
-  ${LIBPATH}/libvarnish/vsb.c
-  ${LIBPATH}/libvarnish/vsha256.c
-  ${LIBPATH}/libvarnish/vss.c
-  ${LIBPATH}/libvarnish/vsub.c
-  ${LIBPATH}/libvarnish/vtcp.c
-  ${LIBPATH}/libvarnish/vtim.c
-  ${LIBPATH}/libvarnish/vus.c
-)
-if (NOT VARNISH_PLUS)
-    set (LIBVARNISH_SOURCES ${LIBVARNISH_SOURCES}
-        ${LIBPATH}/libvarnish/verrno.c
-        ${LIBPATH}/libvarnish/vte.c
-    )
-endif()
-
-## VSC generation ##
-set(VSC_SOURCES
-	VSC_lck.vsc
-	VSC_main.vsc
-	VSC_mempool.vsc
-	VSC_mgt.vsc
-	VSC_sma.vsc
-	VSC_smf.vsc
-	VSC_smu.vsc
-	VSC_vbe.vsc
-)
-if (VARNISH_PLUS)
-    set(VSC_SOURCES ${VSC_SOURCES}
-        VSC_mse.vsc
-    	VSC_mse_book.vsc
-    	VSC_mse_store.vsc
-    )
-endif()
-function(build_vsc_file NAME)
-    get_filename_component(VSC_FILE ${NAME} NAME_WE)
-    add_custom_command(
-            OUTPUT ${VSC_FILE}.c ${VSC_FILE}.h
-            COMMAND python3 ${LIBPATH}/libvcc/vsctool.py -ch ${NAME}
-            DEPENDS ${NAME}
-        )
-endfunction()
-foreach(VSC_FILE ${VSC_SOURCES})
-    build_vsc_file(${VD_PATH}/${VSC_FILE})
-    get_filename_component(VSC_WEFILE ${VSC_FILE} NAME_WE)
-    list(APPEND VSC_COMPILED ${CMAKE_CURRENT_BINARY_DIR}/${VSC_WEFILE}.c)
-    list(APPEND VSC_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/${VSC_WEFILE}.h)
-endforeach()
-set_source_files_properties(${VSC_COMPILED} PROPERTIES GENERATED TRUE)
-set_source_files_properties(${VSC_HEADERS} PROPERTIES GENERATED TRUE)
 
 ## HUF DEC generator executable ##
 set(GEN_HUFDEC_SOURCES "${VD_PATH}/hpack/vhp_gen_hufdec.c")
@@ -361,25 +202,12 @@ add_custom_target(vhp_gen_hufdec ALL
 ## Generate the built-in VCL C-file ##
 add_custom_command(
         OUTPUT builtin_vcl.c
-        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/cmake/builtin_vcl.py ${VD_PATH}/builtin.vcl builtin_vcl.c
+        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/builtin_vcl.py ${VD_PATH}/builtin.vcl builtin_vcl.c
         DEPENDS ${VD_PATH}/builtin.vcl
     )
 add_custom_target(generate_builtin_vcl
         DEPENDS builtin_vcl.c
 )
-
-## libvarnish library ##
-add_library(varnish ${LIBVARNISH_SOURCES} ${VSC_COMPILED})
-target_include_directories(varnish PUBLIC ${VARNISH_PATH}/bin/varnishd)
-target_include_directories(varnish PUBLIC ${VARNISH_PATH}/include)
-target_include_directories(varnish PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(varnish PUBLIC include/)
-target_compile_definitions(varnish PUBLIC _XOPEN_SOURCE=700)
-target_compile_definitions(varnish PUBLIC VARNISH_STATE_DIR="${VSTATE_DIR}")
-target_compile_definitions(varnish PUBLIC VARNISH_VMOD_DIR="${VMOD_DIR}")
-target_compile_definitions(varnish PUBLIC VARNISH_VCL_DIR="${VCL_DIR}")
-target_compile_definitions(varnish PUBLIC -DNOT_IN_A_VMOD)
-add_dependencies(varnish includes_generate)
 
 if (VARNISH_PLUS)
     ## libvarnish_sslhelper library ##
@@ -421,22 +249,8 @@ if (VARNISH_PLUS)
     target_include_directories(mse PRIVATE ${LIBPATH}/libvgz)
     target_include_directories(mse PRIVATE ${LIBPATH}/liblmdb/LMDB_0.9.23)
     target_include_directories(mse PRIVATE ${VARNISH_PATH}/include)
-    target_include_directories(mse PRIVATE include/)
+    target_include_directories(mse PRIVATE ${CONFIG_PATH})
 endif()
-
-## VGZ library ##
-set(VGZ_PATH ${LIBPATH}/libvgz)
-set(VGZ_SOURCES ${VGZ_PATH}/adler32.c
-                ${VGZ_PATH}/crc32.c
-                ${VGZ_PATH}/deflate.c
-                ${VGZ_PATH}/inffast.c
-                ${VGZ_PATH}/inflate.c
-                ${VGZ_PATH}/inftrees.c
-                ${VGZ_PATH}/trees.c
-                ${VGZ_PATH}/zutil.c
-            )
-add_library(vgz ${VGZ_SOURCES})
-target_include_directories(vgz PUBLIC ${VGZ_PATH})
 
 ## VCC library ##
 set(VCC_PATH ${LIBPATH}/libvcc)
@@ -461,21 +275,21 @@ set(VCC_SOURCES ${VCC_PATH}/vcc_acl.c
 add_library(vcc ${VCC_SOURCES})
 target_include_directories(vcc PRIVATE ${VCC_PATH})
 target_include_directories(vcc PRIVATE ${VARNISH_PATH}/include)
-target_include_directories(vcc PRIVATE include/)
+target_include_directories(vcc PRIVATE ${CONFIG_PATH})
 add_dependencies(vcc libvcc_generate)
 
 ## missing functions ##
 set(VARNISHD_SOURCES ${VARNISHD_SOURCES}
-    src/missing.c
+    missing.c
 )
 if (LIBFUZZER)
     set(VARNISHD_SOURCES ${VARNISHD_SOURCES}
-        src/fuzz/fuzzer.c
-        src/fuzz/fuzz_http.c
-        src/fuzz/fuzz_h2.c
-        src/fuzz/http_server.c
-        src/fuzz/hpack.c
-        src/fuzz/varnish_http.c
+        fuzz/fuzzer.c
+        fuzz/fuzz_http.c
+        fuzz/fuzz_h2.c
+        fuzz/http_server.c
+        fuzz/hpack.c
+        fuzz/varnish_http.c
     )
 endif()
 
@@ -487,11 +301,10 @@ target_link_libraries(varnishd config pcre pthread crypto ssl dl)
 if (VARNISH_PLUS)
     target_link_libraries(varnishd mse lmdb sslhelper)
 endif()
-
-if (GCSECTIONS)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffunction-sections -fdata-sections")
-	target_link_libraries(varnishd "-Wl,-gc-sections")
-endif()
+# build varnishd into the top binary folder
+set_target_properties(varnishd
+	PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+)
 
 if (LIBFUZZER)
     if (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
@@ -519,7 +332,6 @@ endif()
 
 if (SANITIZE)
     target_compile_options(vcc PRIVATE     "${SANITIZE_FLAGS}")
-    target_compile_options(varnish PRIVATE "${SANITIZE_FLAGS}")
     target_compile_options(varnishd PUBLIC "${SANITIZE_FLAGS}")
     target_link_libraries(varnishd "${SANITIZE_FLAGS}")
 endif()
