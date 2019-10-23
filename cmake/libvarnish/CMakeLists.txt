@@ -102,6 +102,7 @@ target_compile_definitions(varnish PUBLIC VARNISH_VMOD_DIR="${VMOD_DIR}")
 target_compile_definitions(varnish PUBLIC VARNISH_VCL_DIR="${VCL_DIR}")
 target_compile_definitions(varnish PUBLIC -DNOT_IN_A_VMOD)
 add_dependencies(varnish includes_generate)
+target_link_libraries(varnish pcre m)
 
 if (SANITIZE)
 	target_compile_options(varnish PRIVATE "${SANITIZE_FLAGS}")

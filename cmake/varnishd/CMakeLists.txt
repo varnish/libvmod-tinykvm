@@ -1,18 +1,6 @@
 cmake_minimum_required (VERSION 3.0.2)
 project (varnish C)
 
-# libvarnishapi/vxp_fixed_token.c
-add_custom_command(
-    COMMAND ${PYTHON_EXECUTABLE} ${VARNISH_PATH}/lib/libvarnishapi/generate.py
-    WORKING_DIRECTORY ${VARNISH_PATH}/lib/libvarnishapi
-    OUTPUT  ${VARNISH_PATH}/lib/libvarnishapi/vxp_fixed_token.c
-    DEPENDS ${VARNISH_PATH}/lib/libvarnishapi/generate.py
-    COMMENT "Generating vxp_fixed_token.c"
-)
-add_custom_target(varnishapi_generate
-    DEPENDS ${VARNISH_PATH}/lib/libvarnishapi/vxp_fixed_token.c
-            includes_generate
-    )
 # libvcc/... and include/*vcc*
 add_custom_command(
     COMMAND ${PYTHON_EXECUTABLE} ${VARNISH_PATH}/lib/libvcc/generate.py ${VARNISH_PATH} ${VARNISH_PATH}
