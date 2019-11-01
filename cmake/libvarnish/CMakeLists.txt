@@ -67,7 +67,7 @@ set(VSC_SOURCES
 	VSC_vbe.vsc
 )
 if (VARNISH_PLUS)
-    set(VSC_SOURCES ${VSC_SOURCES}
+    list(APPEND VSC_SOURCES
         VSC_mse.vsc
     	VSC_mse_book.vsc
     	VSC_mse_store.vsc
@@ -84,11 +84,12 @@ endfunction()
 foreach(VSC_FILE ${VSC_SOURCES})
     build_vsc_file(${VARNISHD_PATH}/${VSC_FILE})
     get_filename_component(VSC_WEFILE ${VSC_FILE} NAME_WE)
-    list(APPEND VSC_COMPILED ${CMAKE_CURRENT_BINARY_DIR}/${VSC_WEFILE}.c)
-    list(APPEND VSC_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/${VSC_WEFILE}.h)
+    list(APPEND VSC_COMPILED
+		${CMAKE_CURRENT_BINARY_DIR}/${VSC_WEFILE}.c
+		${CMAKE_CURRENT_BINARY_DIR}/${VSC_WEFILE}.h
+	)
 endforeach()
 set_source_files_properties(${VSC_COMPILED} PROPERTIES GENERATED TRUE)
-set_source_files_properties(${VSC_HEADERS} PROPERTIES GENERATED TRUE)
 
 ## libvarnish library ##
 add_library(varnish ${SOURCES} ${VSC_COMPILED})

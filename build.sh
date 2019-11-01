@@ -2,7 +2,7 @@
 pushd cmake
 mkdir -p build
 pushd build
-cmake ..
-make -j8
+cmake .. -G Ninja
+ninja
 popd
 popd
