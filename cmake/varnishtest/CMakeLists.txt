@@ -32,7 +32,13 @@ add_executable(varnishtest ${SOURCES})
 target_include_directories(varnishtest PUBLIC ${VARNISH_PATH}/include)
 target_include_directories(varnishtest PUBLIC ${CONFIG_PATH})
 target_compile_definitions(varnishtest PUBLIC _XOPEN_SOURCE=700)
-target_link_libraries(varnishtest varnish pthread pcre vgz m)
+target_compile_definitions(varnishtest PUBLIC VTEST_WITH_VTC_VARNISH=1)
+target_compile_definitions(varnishtest PUBLIC VTEST_WITH_VTC_LOGEXPECT=1)
+
+target_link_libraries(varnishtest varnishapi varnish pthread pcre vgz m)
+if (VARNISH_PLUS)
+	target_link_libraries(varnishtest mse)
+endif()
 # build varnishtest into the top binary folder
 set_target_properties(varnishtest
 	PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"

@@ -100,3 +100,6 @@ add_subdirectory(varnishstat build_varnishstat)
 if (VARNISH_PLUS)
 	add_subdirectory(varnishscoreboard build_scoreboard)
 endif()
+
+enable_testing()
+add_subdirectory(tests)
