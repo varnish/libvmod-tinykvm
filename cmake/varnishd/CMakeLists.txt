@@ -282,6 +282,7 @@ endif()
 ## Varnish daemon ##
 add_executable(varnishd ${VARNISHD_SOURCES})
 target_include_directories(varnishd PRIVATE ${CMAKE_BINARY_DIR}/libvarnish)
+target_include_directories(varnishd PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 add_dependencies(varnishd vhp_gen_hufdec generate_builtin_vcl)
 target_link_libraries(varnishd vcc varnish vgz m)
 target_link_libraries(varnishd config pcre pthread crypto ssl dl)
