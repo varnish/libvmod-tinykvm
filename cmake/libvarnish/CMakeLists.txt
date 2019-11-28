@@ -47,6 +47,8 @@ set (SOURCES
   ${LIBPATH}/libvarnish/vtcp.c
   ${LIBPATH}/libvarnish/vtim.c
   ${LIBPATH}/libvarnish/vus.c
+  ## missing functions ##
+  missing.c
 )
 if (NOT VARNISH_PLUS)
     set (SOURCES ${SOURCES}

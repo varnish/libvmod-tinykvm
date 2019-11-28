@@ -268,10 +268,6 @@ target_include_directories(vcc PRIVATE ${VARNISH_PATH}/include)
 target_include_directories(vcc PRIVATE ${CONFIG_PATH})
 add_dependencies(vcc libvcc_generate)
 
-## missing functions ##
-set(VARNISHD_SOURCES ${VARNISHD_SOURCES}
-    missing.c
-)
 if (LIBFUZZER)
 	list (APPEND VARNISHD_SOURCES
         fuzz/fuzzer.c
