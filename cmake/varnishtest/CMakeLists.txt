@@ -2,6 +2,17 @@ cmake_minimum_required (VERSION 3.0.2)
 project(varnishtest C)
 
 set (PATH ${VARNISH_PATH}/bin/varnishtest)
+
+add_custom_command(
+    COMMAND awk -f ${PATH}/gensequences ${PATH}/sequences > ${PATH}/teken_state.h
+    OUTPUT  ${PATH}/teken_state.h
+    DEPENDS ${PATH}/sequences ${PATH}/gensequences
+    COMMENT "Generating header for varnishtest"
+)
+add_custom_target(teken_generate
+    DEPENDS ${PATH}/teken_state.h
+)
+
 set(SOURCES
 		${PATH}/teken.c
 		${PATH}/vtc_client.c
@@ -29,6 +40,7 @@ if (NOT VARNISH_PLUS)
 	)
 endif()
 add_executable(varnishtest ${SOURCES})
+add_dependencies(varnishtest teken_generate)
 target_include_directories(varnishtest PUBLIC ${VARNISH_PATH}/include)
 target_include_directories(varnishtest PUBLIC ${CONFIG_PATH})
 target_compile_definitions(varnishtest PUBLIC _XOPEN_SOURCE=700)
