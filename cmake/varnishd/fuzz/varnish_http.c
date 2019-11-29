@@ -48,6 +48,7 @@ void varnishd_http(const char* vcl_path)
         "-p", cs_buffer, // needed?
 		"-p", tpmin_buffer,
 		"-p", tpmax_buffer,
+		// -b must be last (see below)
         "-b", ":8081",
     };
 

@@ -5,10 +5,12 @@
 # 3. checkout latest branch
 # 4. ninja build
 # 5. start new fuzzer
+#
 VCP="ON"
 BUILD_FOLDER="./build"
 CMAKE_FOLDER="$HOME/github/varnish_autoperf/cmake"
 GIT_BRANCH="varnish/6.0-plus"
+GIT_LOCAL_BRANCH="fuzzy"
 
 set -x
 set -e
@@ -29,7 +31,8 @@ function start_fuzzer
 function update_repository
 {
 	pushd ../ext/varnish-cache-plus
-	git checkout $GIT_BRANCH -b fuzzy
+	git branch -d $GIT_LOCAL_BRANCH
+	git checkout $GIT_BRANCH -b $GIT_LOCAL_BRANCH
 	git pull --rebase=true
 	popd
 }
@@ -53,3 +56,4 @@ echo ">>> Building new fuzzer..."
 build_fuzzer
 echo ">>> Starting fuzzer..."
 start_fuzzer
+echo "Exit code: $?"
