@@ -9,7 +9,7 @@
 VCP="ON"
 BUILD_FOLDER="./build"
 CMAKE_FOLDER="$HOME/github/varnish_autoperf/cmake"
-GIT_BRANCH="varnish/6.0-plus"
+GIT_BRANCH="6.0-plus"
 GIT_LOCAL_BRANCH="fuzzy"
 
 set -x
@@ -31,9 +31,10 @@ function start_fuzzer
 function update_repository
 {
 	pushd ../ext/varnish-cache-plus
-	git branch -d $GIT_LOCAL_BRANCH || true
-	git checkout $GIT_BRANCH -b $GIT_LOCAL_BRANCH
-	git pull --rebase=true
+	#git checkout $GIT_BRANCH
+	#git branch -d $GIT_LOCAL_BRANCH || true
+	#git checkout $GIT_BRANCH -b $GIT_LOCAL_BRANCH
+	git pull origin $GIT_BRANCH
 	popd
 }
 
