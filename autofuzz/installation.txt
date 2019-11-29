@@ -55,22 +55,22 @@ HostName github.com
 IdentityFile /home/alf/.ssh/sec_rsa
 User alf
 
-# Now we can clone varnish_autoperf
-git clone git@github-work:varnish/varnish_autoperf.git
-# And get submodules
-git submodule update --recursive --init
 
+# Now we can clone varnish_autoperf
+git clone git@github-work:varnish/varnish_autoperf.git --recursive
 
 # Building the actual fuzzer
+pushd varnish_autoperf
 # Prerequisites:
 sudo yum install python3 openssl-devel libconfig-devel libedit-devel
-# Instructions:
-pushd varnish_autoperf
 # Some varnish generators depend on the Makefile, so we have to run configure:
 sudo yum install automake libtool libcurl-devel libmhash-devel geoip-devel \
 				libmemcached-devel libmaxminddb-devel python-docutils python-sphinx
+pushd ext/varnish-cache-plus
+./autogen.des
+popd
 
-# start fuzzer?
-pushd /autofuzz
-mkdir -p build && pushd build
-
+# Now we can build the fuzzer
+pushd autofuzz
+./fuzzer.sh
+popd
