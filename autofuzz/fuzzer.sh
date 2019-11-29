@@ -34,7 +34,8 @@ function update_repository
 	#git checkout $GIT_BRANCH
 	#git branch -d $GIT_LOCAL_BRANCH || true
 	#git checkout $GIT_BRANCH -b $GIT_LOCAL_BRANCH
-	git pull origin $GIT_BRANCH
+	git fetch origin
+	git reset --hard origin/$GIT_BRANCH
 	popd
 }
 
