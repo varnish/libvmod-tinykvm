@@ -8,7 +8,7 @@
 #
 VCP="ON"
 BUILD_FOLDER="./build"
-CMAKE_FOLDER="$HOME/github/varnish_autoperf/cmake"
+CMAKE_FOLDER="$PWD/../cmake"
 GIT_BRANCH="6.0-plus"
 GIT_LOCAL_BRANCH="fuzzy"
 
