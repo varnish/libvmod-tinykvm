@@ -11,6 +11,7 @@ mv fuzz-*.log files/ || true
 mv crash-*    files/ || true
 sudo journalctl -xb -1 > files/journal.txt
 coredumpctl dump --output files/core.dump > files/coredump.txt || true
+cp build/varnishd files/
 # 2. mail body
 echo "The fuzzer has stopped" > /tmp/mailbody.txt
 # 3. archive crashes and logs
