@@ -106,6 +106,13 @@ target_compile_definitions(varnish PUBLIC -DNOT_IN_A_VMOD)
 add_dependencies(varnish includes_generate)
 target_link_libraries(varnish pcre m)
 
+if (LIBFUZZER)
+    if (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
+        message(FATAL_ERROR "You can only use Clang when libfuzzer is enabled")
+    endif()
+    target_compile_options(varnish PUBLIC ${FUZZER_CFLAGS})
+endif()
+
 if (SANITIZE)
 	target_compile_options(varnish PRIVATE "${SANITIZE_FLAGS}")
 	target_link_libraries(varnish "${SANITIZE_FLAGS}")

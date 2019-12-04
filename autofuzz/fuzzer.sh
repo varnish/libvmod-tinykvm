@@ -7,10 +7,10 @@
 # 5. start new fuzzer
 #
 VCP="ON"
-BUILD_FOLDER="./build"
-CMAKE_FOLDER="$PWD/../cmake"
+REPO_FOLDER="$PWD/.."
+BUILD_FOLDER="$REPO_FOLDER/autofuzz/build"
+CMAKE_FOLDER="$REPO_FOLDER/cmake"
 GIT_BRANCH="6.0-plus"
-GIT_LOCAL_BRANCH="fuzzy"
 
 set -x
 set -e
@@ -24,16 +24,14 @@ function stop_fuzzer
 
 function start_fuzzer
 {
-	LD_LIBRARY_PATH=$HOME/llvm/install/lib $BUILD_FOLDER/varnishd
+	# HTTP parser fuzzing
+	LD_LIBRARY_PATH=$HOME/llvm/install/lib $BUILD_FOLDER/varnishd -fork=6 -use_value_profile=1 -only_ascii=1
 	return $?
 }
 
 function update_repository
 {
 	pushd ../ext/varnish-cache-plus
-	#git checkout $GIT_BRANCH
-	#git branch -d $GIT_LOCAL_BRANCH || true
-	#git checkout $GIT_BRANCH -b $GIT_LOCAL_BRANCH
 	git fetch origin
 	git reset --hard origin/$GIT_BRANCH
 	popd

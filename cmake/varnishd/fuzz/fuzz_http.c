@@ -26,7 +26,7 @@ void http_fuzzer(void* data, size_t len)
         return;
     }
 
-    const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1";
+    const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n";
     int ret = write(cfd, req, strlen(req));
     if (ret < 0) {
         //printf("Writing the request failed\n");
@@ -39,18 +39,15 @@ void http_fuzzer(void* data, size_t len)
 	// do everything in at least two writes
 	if (len > 0)
 	{
-		const uint8_t prelen = buffer[0];
-		buffer ++;
-		len --;
-		if (len >= prelen) {
-			ssize_t bytes = write(cfd, buffer, prelen);
-		    if (bytes < 0) {
-		        close(cfd);
-		        return;
-		    }
-			buffer += bytes;
-			len    -= bytes;
-		}
+		ssize_t bytes = write(cfd, buffer, len);
+	    if (bytes < 0) {
+	        close(cfd);
+	        return;
+	    }
+		buffer += bytes;
+		len    -= bytes;
+		
+		write(cfd, "\r\n\r\n", 4);
 	}
 
     // signalling end of request, increases exec/s by 4x

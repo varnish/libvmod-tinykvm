@@ -294,12 +294,17 @@ set_target_properties(varnishd
 	PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
 
+if (SANITIZE)
+    target_compile_options(vcc PRIVATE     "${SANITIZE_FLAGS}")
+    target_compile_options(varnishd PUBLIC "${SANITIZE_FLAGS}")
+endif()
+
 if (LIBFUZZER)
     if (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
         message(FATAL_ERROR "You can only use Clang when libfuzzer is enabled")
     endif()
-    target_compile_options(varnishd PUBLIC "-fsanitize=fuzzer-no-link")
-    target_link_libraries(varnishd "-fsanitize=fuzzer")
+    target_compile_options(varnishd PUBLIC ${FUZZER_CFLAGS})
+	target_link_libraries(varnishd ${FUZZER_LFLAGS})
     set_source_files_properties(
         ${VD_PATH}/mgt/mgt_child.c
         ${VD_PATH}/mgt/mgt_main.c
@@ -316,9 +321,4 @@ if (SINGLE_PROCESS OR LIBFUZZER)
 		${VD_PATH}/mgt/mgt_child.c
         ${VD_PATH}/mgt/mgt_vcc.c
     PROPERTIES COMPILE_FLAGS -DSINGLE_PROCESS_MODE)
-endif()
-
-if (SANITIZE)
-    target_compile_options(vcc PRIVATE     "${SANITIZE_FLAGS}")
-    target_compile_options(varnishd PUBLIC "${SANITIZE_FLAGS}")
 endif()
