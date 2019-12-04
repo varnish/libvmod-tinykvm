@@ -24,14 +24,15 @@ function stop_fuzzer
 
 function start_fuzzer
 {
+	ulimit -c unlimited
 	# HTTP parser fuzzing
-	LD_LIBRARY_PATH=$HOME/llvm/install/lib $BUILD_FOLDER/varnishd -fork=6 -use_value_profile=1 -only_ascii=1
+	LD_LIBRARY_PATH=$HOME/llvm/install/lib $BUILD_FOLDER/varnishd -fork=6 -use_value_profile=1 -only_ascii=1 > fuzz-0.log
 	return $?
 }
 
 function update_repository
 {
-	pushd ../ext/varnish-cache-plus
+	pushd $REPO_FOLDER/ext/varnish-cache-plus
 	git fetch origin
 	git reset --hard origin/$GIT_BRANCH
 	popd

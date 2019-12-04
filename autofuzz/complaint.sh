@@ -9,6 +9,8 @@ mkdir -p files
 rm files/* || true
 mv fuzz-*.log files/ || true
 mv crash-*    files/ || true
+sudo journalctl -xb -1 > files/journal.txt
+coredumpctl dump --output files/core.dump > files/coredump.txt || true
 # 2. mail body
 echo "The fuzzer has stopped" > /tmp/mailbody.txt
 # 3. archive crashes and logs
