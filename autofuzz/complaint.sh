@@ -15,6 +15,7 @@ fuzzer_gather()
 	rm files/* || true
 	mv fuzz-*.log files/ || true
 	mv crash-*    files/ || true
+	sudo journalctl -u fuzzer > files/fuzzer.log
 	sudo journalctl -xb -1 > files/journal.txt
 	coredumpctl dump --output files/core.dump > files/coredump.txt || true
 	cp build/varnishd files/
