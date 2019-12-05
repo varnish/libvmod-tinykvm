@@ -1,4 +1,5 @@
 build/
+**/files/
 perf.*
 perf-*.svg
 callgraph.svg
