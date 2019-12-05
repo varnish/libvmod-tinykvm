@@ -48,4 +48,8 @@ filebin_upload
 # 3. send mail to tech@varnish-software.com
 logger "Sending mail to $EMAIL"
 echo "The fuzzer has stopped. See the filebin logs here: $FILEBIN/$BIN" > /tmp/mailbody.txt
+echo "You will probably need to load the coredump from an equivalent system
+" >> /tmp/mailbody.txt
+lsb_release -a >> /tmp/mailbody.txt
+uname -a >> /tmp/mailbody.txt
 cat /tmp/mailbody.txt | sudo mail -s "Fuzzer stopped" $EMAIL
