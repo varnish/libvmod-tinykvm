@@ -6,7 +6,7 @@ FILEBIN="https://filebin.varnish-software.com"
 ID="$(hostname)-$(date +'%Y-%m-%d')"
 FILENAME="autofuzz.${ID}.tar.gz"
 
-#cd /home/alf/git/varnish_autoperf/autofuzz
+cd /home/alf/git/varnish_autoperf/autofuzz
 
 # Gather logs, binaries and core dump
 fuzzer_gather()
@@ -31,7 +31,7 @@ filebin_upload()
 		--write-out '%{http_code}')
 	if [ ! "$CURLSTATUS" -eq "201" ]
 	then
-		echo "Failed to upload $TGZ to $FILEBIN, http status code: $CURLSTATUS"
+		echo "Failed to upload $FILENAME to $FILEBIN, http status code: $CURLSTATUS"
 		return 1
 	fi
 	echo "==============================================================================="
