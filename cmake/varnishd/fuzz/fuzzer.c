@@ -18,6 +18,12 @@ extern void hpack_fuzzer(void* data, size_t len);
 // varnishd has many many leaks.. can't enable this
 int __lsan_is_turned_off() { return 1; }
 
+#include <sys/prctl.h>
+__attribute__((constructor))
+void make_dumpable() {
+	prctl(PR_SET_DUMPABLE, 1);
+}
+
 int LLVMFuzzerTestOneInput(void* data, size_t len)
 {
     http_fuzzer(data, len);
