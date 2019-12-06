@@ -1,12 +1,12 @@
 #!/bin/bash
 logger "Creating a fuzzer complaint package"
-EMAIL=alf@varnish-software.com
+EMAIL=tech@varnish-software.com
 FILEBIN="https://filebin.varnish-software.com"
 # Generate BIN postfix
 ID="$(hostname)-$(date +'%Y-%m-%d')"
 FILENAME="autofuzz.${ID}.tar.gz"
 
-cd /home/alf/git/varnish_autoperf/autofuzz
+cd $HOME/git/varnish_autoperf/autofuzz
 
 # Gather logs, binaries and core dump
 fuzzer_gather()
@@ -49,9 +49,11 @@ tar -czvf $FILENAME files/
 filebin_upload
 # 3. send mail to tech@varnish-software.com
 logger "Sending mail to $EMAIL"
+MAILFILE=/tmp/mailbody.txt
 echo "The fuzzer has stopped. See the filebin logs here: $FILEBIN/$BIN" > /tmp/mailbody.txt
 echo "You will probably need to load the coredump from an equivalent system
-" >> /tmp/mailbody.txt
-lsb_release -a >> /tmp/mailbody.txt
-uname -a >> /tmp/mailbody.txt
-cat /tmp/mailbody.txt | sudo mail -s "Fuzzer stopped" $EMAIL
+" >> $MAILFILE
+lsb_release -a >> $MAILFILE
+uname -a >> $MAILFILE
+cat $MAILFILE | sudo mail -s "Fuzzer stopped" $EMAIL
+rm -f $MAILFILE
