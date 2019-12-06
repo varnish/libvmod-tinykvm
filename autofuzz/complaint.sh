@@ -55,5 +55,6 @@ echo "You will probably need to load the coredump from an equivalent system
 " >> $MAILFILE
 lsb_release -a >> $MAILFILE
 uname -a >> $MAILFILE
+cat files/fuzzer.log | sed -e 's/ERROR:\(.*\)ABORTING/\1/' >> $MAILFILE || true
 cat $MAILFILE | sudo mail -s "Fuzzer stopped" $EMAIL
 rm -f $MAILFILE

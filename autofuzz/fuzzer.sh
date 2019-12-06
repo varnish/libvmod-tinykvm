@@ -15,6 +15,7 @@ GIT_BRANCH="6.0-plus"
 set -x
 set -e
 export ASAN_OPTIONS=disable_coredump=0::unmap_shadow_on_exit=1
+export ASAN_SYMBOLIZER_PATH=$HOME/llvm/install/bin/llvm-symbolizer
 # set coredump location to a known place
 mkdir -p /tmp/crash
 echo '/tmp/crash/core_%e.%p' | sudo tee /proc/sys/kernel/core_pattern
