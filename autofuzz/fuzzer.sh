@@ -14,6 +14,7 @@ GIT_BRANCH="6.0-plus"
 
 set -x
 set -e
+export ASAN_OPTIONS=disable_coredump=0::unmap_shadow_on_exit=1
 
 function stop_fuzzer
 {
@@ -24,7 +25,6 @@ function stop_fuzzer
 
 function start_fuzzer
 {
-	ulimit -c unlimited
 	# HTTP parser fuzzing
 	LD_LIBRARY_PATH=$HOME/llvm/install/lib $BUILD_FOLDER/varnishd -fork=6 -use_value_profile=1 -only_ascii=1 > fuzz-0.log
 	return $?
