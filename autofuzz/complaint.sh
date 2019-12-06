@@ -56,8 +56,10 @@ echo "You will probably need to load the coredump from an equivalent system
 lsb_release -a >> $MAILFILE
 uname -a >> $MAILFILE
 
-start=$(cat files/fuzzer.log  | grep -n "==ERROR" | awk -F: '{print $1}')
+start=$(cat files/fuzzer.log  | grep -n "==ERROR" | awk -F: '{print $1}') 
 stop=$(cat files/fuzzer.log  | grep -n "==ABORTING" | awk -F: '{print $1}')
+start=$(echo $start | tr ' ' '/' | xargs basename)
+stop=$(echo $stop | tr ' ' '/' | xargs basename)
 sed -n ${start},${stop}p files/fuzzer.log >> $MAILFILE
 
 cat $MAILFILE | sudo mail -s "Fuzzer stopped" $EMAIL
