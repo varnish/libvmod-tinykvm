@@ -6,9 +6,12 @@
 # 4. ninja build
 # 5. start new fuzzer
 #
+# $1 = Fuzzing mode (HTTP, HTTP2, etc.)
+# $2 = Build folder
+#
 VCP="ON"
 REPO_FOLDER="$PWD/.."
-BUILD_FOLDER="$REPO_FOLDER/autofuzz/build"
+BUILD_FOLDER="$REPO_FOLDER/autofuzz/${2:-build}"
 CMAKE_FOLDER="$REPO_FOLDER/cmake"
 GIT_BRANCH="6.0-plus"
 
