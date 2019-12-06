@@ -17,7 +17,8 @@ fuzzer_gather()
 	mv crash-*    files/ || true
 	sudo journalctl -u fuzzer > files/fuzzer.log
 	sudo journalctl -xb -1 > files/journal.txt
-	coredumpctl dump --output files/core.dump > files/coredump.txt || true
+	#coredumpctl dump --output files/core.dump > files/coredump.txt || true
+	mv /tmp/crash/* files/ || true
 	cp build/varnishd files/
 }
 
