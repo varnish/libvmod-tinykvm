@@ -34,8 +34,9 @@ function stop_fuzzer
 
 function start_fuzzer
 {
+	LOGID=$(head /dev/urandom | tr -dc a-z0-9 | head -c8)
 	# HTTP parser fuzzing
-	LD_LIBRARY_PATH=$HOME/llvm/install/lib $BUILD_FOLDER/varnishd -fork=6 -use_value_profile=1 -only_ascii=1 > fuzz-0.log
+	LD_LIBRARY_PATH=$HOME/llvm/install/lib $BUILD_FOLDER/varnishd -fork=2 > fuzz-$LOGID.log
 	return $?
 }
 
