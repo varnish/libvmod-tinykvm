@@ -14,6 +14,8 @@ REPO_FOLDER="$PWD/.."
 BUILD_FOLDER="$REPO_FOLDER/autofuzz/${2:-build}"
 CMAKE_FOLDER="$REPO_FOLDER/cmake"
 GIT_BRANCH="6.0-plus"
+export CC=$HOME/llvm/install/bin/clang-10
+export CXX=$HOME/llvm/install/bin/clang++-10
 
 set -x
 set -e
