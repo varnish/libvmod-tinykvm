@@ -45,10 +45,11 @@ function update_repository
 function build_fuzzer
 {
 	local OPTIONS="-DSINGLE_PROCESS=ON -DVARNISH_PLUS=$VCP -DLIBFUZZER=ON -DSANITIZE=ON"
+	local FUZZTYPE="-DFUZZER=$1"
 	mkdir -p $BUILD_FOLDER
 	pushd $BUILD_FOLDER
 	# Note: Remove -G Ninja to use regular make
-	cmake $CMAKE_FOLDER -G Ninja $OPTIONS
+	cmake $CMAKE_FOLDER -G Ninja $OPTIONS $FUZZTYPE
 	ninja
 	popd
 }
@@ -57,8 +58,8 @@ echo ">>> Stopping fuzzer..."
 stop_fuzzer
 echo ">>> Retrieving repository changes..."
 update_repository
-echo ">>> Building new fuzzer..."
-build_fuzzer
+echo ">>> Building new fuzzer of type $1..."
+build_fuzzer $1
 echo ">>> Starting fuzzer..."
 start_fuzzer
 echo "Exit code: $?"

@@ -269,7 +269,7 @@ target_include_directories(vcc PRIVATE ${CONFIG_PATH})
 add_dependencies(vcc libvcc_generate)
 
 if (LIBFUZZER)
-	list (APPEND VARNISHD_SOURCES
+	set (LIBFUZZER_SOURCES
         fuzz/fuzzer.c
         fuzz/fuzz_http.c
         fuzz/fuzz_h2.c
@@ -277,6 +277,14 @@ if (LIBFUZZER)
         fuzz/hpack.c
         fuzz/varnish_http.c
     )
+	if (NOT FUZZER)
+		set (FUZZER "HTTP")
+	endif()
+	set_source_files_properties(
+		${LIBFUZZER_SOURCES}
+	PROPERTIES COMPILE_FLAGS -DFUZZER_${FUZZER}=1)
+
+	list (APPEND VARNISHD_SOURCES ${LIBFUZZER_SOURCES})
 endif()
 
 ## Varnish daemon ##

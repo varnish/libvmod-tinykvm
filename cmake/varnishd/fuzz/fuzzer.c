@@ -26,10 +26,17 @@ void make_dumpable() {
 
 int LLVMFuzzerTestOneInput(void* data, size_t len)
 {
+#ifdef FUZZER_HTTP
     http_fuzzer(data, len);
-    //http_fuzzer_server(data, len);
-    //h2_fuzzer(data, len);
-    //hpack_fuzzer(data, len);
+#elif defined(FUZZER_HTTP_SERVER)
+    http_fuzzer_server(data, len);
+#elif defined(FUZZER_HTTP2)
+    h2_fuzzer(data, len);
+#elif defined(FUZZER_HPACK)
+    hpack_fuzzer(data, len);
+#elseif defined(FUZZER_)
+	static_assert(false, "The fuzzer type was not defined before building!");
+#endif
     return 0;
 }
 
