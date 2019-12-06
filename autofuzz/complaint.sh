@@ -19,7 +19,7 @@ fuzzer_gather()
 	sudo journalctl -xb -1 > files/journal.txt
 	#coredumpctl dump --output files/core.dump > files/coredump.txt || true
 	mv /tmp/crash/* files/ || true
-	cp build/varnishd files/
+	cp `find build* -maxdepth 1 -name varnishd` files/
 }
 
 # Upload fuzzer logs to filebin using curl
