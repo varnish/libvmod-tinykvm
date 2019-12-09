@@ -1,10 +1,17 @@
-#!/bin/bash
-logger "Creating a fuzzer complaint package"
+#!/usr/bin/env bash
 EMAIL=tech@varnish-software.com
 FILEBIN="https://filebin.varnish-software.com"
 # Generate BIN postfix
 ID="$(hostname)-$(date +'%Y-%m-%d')"
 FILENAME="autofuzz.${ID}.tar.gz"
+
+# if the service succeeds, we don't need to report an error
+if [[ "$1" = "success" ]]; then
+	echo "Fuzzer stopped successfully"
+	exit 0
+fi
+echo "Fuzzer stopped due to a failure"
+logger "Creating a fuzzer complaint package"
 
 cd $HOME/git/varnish_autoperf/autofuzz
 

@@ -27,8 +27,8 @@ echo '/tmp/crash/core_%e.%p' | sudo tee /proc/sys/kernel/core_pattern
 
 function stop_fuzzer
 {
-	# might kill someone else?
-	if pgrep "varnishd"; then pkill "varnishd"; fi
+	# can't do this, it will kill other services running fuzzers
+	#if pgrep "varnishd"; then pkill "varnishd"; fi
 	return $?
 }
 
