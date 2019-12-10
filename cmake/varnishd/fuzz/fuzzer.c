@@ -13,6 +13,7 @@
 extern void http_fuzzer(void* data, size_t len);
 extern void http_fuzzer_server(void* data, size_t len);
 extern void h2_fuzzer(void* data, size_t len);
+extern void proxy_fuzzer(void* data, size_t len, int version);
 extern void hpack_fuzzer(void* data, size_t len);
 
 // varnishd has many many leaks.. can't enable this
@@ -32,6 +33,10 @@ int LLVMFuzzerTestOneInput(void* data, size_t len)
     http_fuzzer_server(data, len);
 #elif defined(FUZZER_HTTP2)
     h2_fuzzer(data, len);
+#elif defined(FUZZER_PROXY)
+	proxy_fuzzer(data, len, 1);
+#elif defined(FUZZER_PROXY2)
+	proxy_fuzzer(data, len, 2);
 #elif defined(FUZZER_HPACK)
     hpack_fuzzer(data, len);
 #elseif defined(FUZZER_)

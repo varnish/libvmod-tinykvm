@@ -270,12 +270,13 @@ add_dependencies(vcc libvcc_generate)
 
 if (LIBFUZZER)
 	set (LIBFUZZER_SOURCES
-        fuzz/fuzzer.c
-        fuzz/fuzz_http.c
-        fuzz/fuzz_h2.c
-        fuzz/http_server.c
-        fuzz/hpack.c
-        fuzz/varnish_http.c
+		fuzz/fuzzer.c
+		fuzz/fuzz_http.c
+		fuzz/fuzz_h2.c
+		fuzz/fuzz_proxy.c
+		fuzz/http_server.c
+		fuzz/hpack.c
+		fuzz/varnish_http.c
     )
 	if (NOT FUZZER)
 		set (FUZZER "HTTP")
@@ -283,6 +284,12 @@ if (LIBFUZZER)
 	set_source_files_properties(
 		${LIBFUZZER_SOURCES}
 	PROPERTIES COMPILE_FLAGS -DFUZZER_${FUZZER}=1)
+	# define VARNISH_PLUS for fuzzer sources, when enabled
+	if (VARNISH_PLUS)
+		set_source_files_properties(
+			${LIBFUZZER_SOURCES}
+		PROPERTIES COMPILE_FLAGS -DVARNISH_PLUS)
+	endif()
 
 	list (APPEND VARNISHD_SOURCES ${LIBFUZZER_SOURCES})
 endif()

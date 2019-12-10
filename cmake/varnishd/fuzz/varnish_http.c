@@ -2,13 +2,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <unistd.h>
 
 extern int  varnishd_main(int, const char*[]);
 uint16_t varnishd_client_port;
 const char* varnishd_client_path = NULL;
+bool varnishd_proxy_mode = false;
 
-void varnishd_http(const char* vcl_path)
+void varnishd_initialize(const char* vcl_path)
 {
+	// if proxy is enabled, add ,proxy to the -a option:
+	const char* portopts = 
+		(varnishd_proxy_mode) ? "%s,proxy" : "%s";
+	
 	// create unix-domain socket for listener port
 	char* client_path = malloc(128);
 	snprintf(client_path, 128, "/tmp/varnishd_%u.sock", getpid());
@@ -33,23 +39,23 @@ void varnishd_http(const char* vcl_path)
 	snprintf(feature_http2, sizeof(feature_http2), "feature=+http2");
     // client and cli ports
     char portline[128];
-    snprintf(portline, sizeof(portline), "%s", varnishd_client_path);
-    const uint16_t cli_port = 25000 + (getpid() & 0xFFF);
+    snprintf(portline, sizeof(portline), portopts, varnishd_client_path);
+    const uint16_t cli_port = 25000 + (getpid() & 0x3FFF);
     char cli_portline[64];
     snprintf(cli_portline, sizeof(cli_portline), ":%u", cli_port);
     // arguments to varnishd
     const char* args[] = {
-        "varnishd", "-a", portline,
-        "-T", cli_portline,
-        "-F",
-        "-n", vd_folder,
+		"varnishd", "-a", portline,
+		"-T", cli_portline,
+		"-F",
+		"-n", vd_folder,
 		"-p", feature_http2,
-        "-p", ti_buffer,
-        "-p", cs_buffer, // needed?
+		"-p", ti_buffer,
+		"-p", cs_buffer, // needed?
 		"-p", tpmin_buffer,
 		"-p", tpmax_buffer,
 		// -b must be last (see below)
-        "-b", ":8081",
+		"-b", ":8081",
     };
 
 	const int argc = sizeof(args) / sizeof(args[0]);

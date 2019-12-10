@@ -9,12 +9,19 @@
 #include <netinet/in.h>
 
 extern void varnishd_initialize(const char*);
+extern bool varnishd_proxy_mode;
 
-void http_fuzzer(void* data, size_t len)
+static const char proxy1_preamble[] = "PROXY ";
+static const char proxy2_preamble[] = {
+	0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A
+};
+
+void proxy_fuzzer(const void* data, size_t len, int version)
 {
     static bool init = false;
     if (init == false) {
         init = true;
+		varnishd_proxy_mode = true;
         varnishd_initialize(NULL);
     }
 	if (len == 0) return;
@@ -26,13 +33,12 @@ void http_fuzzer(void* data, size_t len)
         return;
     }
 
-    const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n";
-    int ret = write(cfd, req, strlen(req));
-    if (ret < 0) {
-        //printf("Writing the request failed\n");
-        close(cfd);
-        return;
-    }
+	if (version == 1) {
+		write(cfd, proxy1_preamble, sizeof(proxy1_preamble));
+	}
+	else if (version == 2) {
+		write(cfd, proxy2_preamble, sizeof(proxy2_preamble));
+	}
 
 	const uint8_t* buffer = (uint8_t*) data;
 
@@ -47,8 +53,15 @@ void http_fuzzer(void* data, size_t len)
 		buffer += bytes;
 		len    -= bytes;
 		
-		write(cfd, "\r\n\r\n", 4);
 	}
+	
+	const char* req = "\r\nGET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
+    int ret = write(cfd, req, strlen(req));
+    if (ret < 0) {
+        //printf("Writing the request failed\n");
+        close(cfd);
+        return;
+    }
 
     // signalling end of request, increases exec/s by 4x
     shutdown(cfd, SHUT_WR);

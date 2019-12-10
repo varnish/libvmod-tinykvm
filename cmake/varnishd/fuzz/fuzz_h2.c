@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 
-extern void varnishd_http();
+extern void varnishd_initialize();
 extern int  open_varnishd_connection();
 
 #define static_assert _Static_assert
@@ -44,7 +44,7 @@ void h2_fuzzer(void* data, size_t len)
     static bool init = false;
     if (init == false) {
         init = true;
-        varnishd_http(NULL);
+        varnishd_initialize(NULL);
     }
 	if (len == 0) return;
 

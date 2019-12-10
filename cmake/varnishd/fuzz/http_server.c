@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-extern void varnishd_http(const char* vcl_path);
+extern void varnishd_initialize(const char* vcl_path);
 extern const char* varnishd_client_path;
 
 void http_fuzzer_server(void* data, size_t len)
@@ -16,7 +16,8 @@ void http_fuzzer_server(void* data, size_t len)
     static bool init = false;
     if (init == false) {
         init = true;
-        varnishd_http("/home/gonzo/github/varnish_autoperf/vcl/response.vcl");
+        varnishd_initialize(
+			"/home/gonzo/github/varnish_autoperf/vcl/response.vcl");
     }
     if (len == 0) return;
 
