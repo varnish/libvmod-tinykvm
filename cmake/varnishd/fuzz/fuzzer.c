@@ -11,7 +11,7 @@
 // 3. VCC fuzzing
 
 extern void http_fuzzer(void* data, size_t len);
-extern void http_fuzzer_server(void* data, size_t len);
+extern void response_fuzzer(void* data, size_t len, int version);
 extern void h2_fuzzer(void* data, size_t len);
 extern void proxy_fuzzer(void* data, size_t len, int version);
 extern void hpack_fuzzer(void* data, size_t len);
@@ -29,18 +29,22 @@ int LLVMFuzzerTestOneInput(void* data, size_t len)
 {
 #ifdef FUZZER_HTTP
     http_fuzzer(data, len);
-#elif defined(FUZZER_HTTP_SERVER)
-    http_fuzzer_server(data, len);
 #elif defined(FUZZER_HTTP2)
     h2_fuzzer(data, len);
+#elif defined(FUZZER_RESPONSE_H1)
+    response_fuzzer(data, len, 1);
+#elif defined(FUZZER_RESPONSE_H2)
+    response_fuzzer(data, len, 2);
+#elif defined(FUZZER_RESPONSE_GZIP)
+    response_fuzzer(data, len, 10);
 #elif defined(FUZZER_PROXY)
 	proxy_fuzzer(data, len, 1);
 #elif defined(FUZZER_PROXY2)
 	proxy_fuzzer(data, len, 2);
 #elif defined(FUZZER_HPACK)
     hpack_fuzzer(data, len);
-#elseif defined(FUZZER_)
-	static_assert(false, "The fuzzer type was not defined before building!");
+#else
+	static_assert(false, "The fuzzer type was not recognized!");
 #endif
     return 0;
 }

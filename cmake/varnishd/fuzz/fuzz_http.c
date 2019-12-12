@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 
 extern void varnishd_initialize(const char*);
+extern int  open_varnishd_connection();
 
 void http_fuzzer(void* data, size_t len)
 {

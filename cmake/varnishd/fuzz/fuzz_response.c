@@ -9,9 +9,10 @@
 #include <sys/un.h>
 
 extern void varnishd_initialize(const char* vcl_path);
+extern int  open_varnishd_connection();
 extern const char* varnishd_client_path;
 
-void http_fuzzer_server(void* data, size_t len)
+void response_fuzzer(void* data, size_t len, int version)
 {
     static bool init = false;
     if (init == false) {
@@ -21,41 +22,48 @@ void http_fuzzer_server(void* data, size_t len)
     }
     if (len == 0) return;
 
-	struct sockaddr_un un_addr;
-	memset(&un_addr, 0, sizeof(un_addr));
-	un_addr.sun_family = AF_UNIX;
-	strncpy(un_addr.sun_path, varnishd_client_path, sizeof(un_addr.sun_path) - 1);
-
-    const int cfd = socket(AF_UNIX, SOCK_STREAM, 0);
+    const int cfd = open_varnishd_connection();
     if (cfd < 0) {
         fprintf(stderr, "Could not create socket... going to sleep\n");
         sleep(1);
         return;
     }
 
-    int ret = connect(cfd, (struct sockaddr*) &un_addr, sizeof(un_addr));
-    if (ret < 0) {
-        close(cfd);
-        fprintf(stderr, "Fuzzer connect() failed!?\n");
-        sleep(1);
-        return;
-    }
-
-
-    char drit[1024];
+	char    gbuffer[1024];
+	ssize_t gbuffer_len = 0;
+	if (version == 10) {
+		gbuffer_len = snprintf(gbuffer, sizeof(gbuffer),
+			"HTTP/1.1 200\r\n"
+			"Connection: close\r\n"
+			"Content-Type: text/html; charset=UTF-8\r\n"
+			"Content-Encoding: gzip\r\n"
+			"\r\n");
+	}
+	
+    char drit[200];
     int dritlen = snprintf(drit, sizeof(drit),
             "POST / HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-length: %zu\r\n\r\n",
-            len);
+            len + gbuffer_len);
     if (dritlen <= 0) {
         close(cfd);
         return;
     }
 
-    ret = write(cfd, drit, dritlen);
+    ssize_t ret = write(cfd, drit, dritlen);
     if (ret < 0) {
         close(cfd);
         return;
     }
+
+	if (gbuffer_len > 0)
+	{
+		ret = write(cfd, data, len);
+    	if (ret < 0) {
+        	close(cfd);
+        	return;
+    	}
+	}
+	
     ret = write(cfd, data, len);
     if (ret < 0) {
         close(cfd);
@@ -64,6 +72,7 @@ void http_fuzzer_server(void* data, size_t len)
     // signalling end of request, increases exec/s by 4x
     shutdown(cfd, SHUT_WR);
 
+	// TODO: do we need this?
     char readbuf[2048];
     ssize_t rlen = read(cfd, readbuf, sizeof(readbuf));
     if (rlen < 0) {

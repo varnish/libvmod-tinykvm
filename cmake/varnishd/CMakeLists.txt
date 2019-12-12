@@ -274,22 +274,22 @@ if (LIBFUZZER)
 		fuzz/fuzz_http.c
 		fuzz/fuzz_h2.c
 		fuzz/fuzz_proxy.c
-		fuzz/http_server.c
+		fuzz/fuzz_response.c
 		fuzz/hpack.c
 		fuzz/varnish_http.c
     )
 	if (NOT FUZZER)
-		set (FUZZER "HTTP")
+		message(FATAL_ERROR "When a fuzzer is enabled, select fuzzing method with -DFUZZER=...")
 	endif()
-	set_source_files_properties(
-		${LIBFUZZER_SOURCES}
-	PROPERTIES COMPILE_FLAGS -DFUZZER_${FUZZER}=1)
 	# define VARNISH_PLUS for fuzzer sources, when enabled
 	if (VARNISH_PLUS)
 		set_source_files_properties(
 			${LIBFUZZER_SOURCES}
-		PROPERTIES COMPILE_FLAGS -DVARNISH_PLUS)
+		PROPERTIES COMPILE_DEFINITIONS VARNISH_PLUS=1)
 	endif()
+	# work-around: need to be done after setting VARNISH_PLUS
+	set_property(SOURCE fuzz/fuzzer.c APPEND
+		PROPERTY COMPILE_DEFINITIONS FUZZER_${FUZZER}=1)
 
 	list (APPEND VARNISHD_SOURCES ${LIBFUZZER_SOURCES})
 endif()

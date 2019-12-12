@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 
 extern void varnishd_initialize(const char*);
+extern int  open_varnishd_connection();
 extern bool varnishd_proxy_mode;
 
 static const char proxy1_preamble[] = "PROXY ";
