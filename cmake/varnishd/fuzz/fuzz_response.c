@@ -37,7 +37,7 @@ void response_fuzzer(void* data, size_t len, int version)
 			"Connection: close\r\n"
 			"Content-Type: text/html; charset=UTF-8\r\n"
 			"Content-Encoding: gzip\r\n"
-			"\r\n");
+			"\r\n\x1f\x8b");
 	}
 	
     char drit[200];

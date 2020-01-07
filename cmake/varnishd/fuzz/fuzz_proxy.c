@@ -22,6 +22,7 @@ void proxy_fuzzer(const void* data, size_t len, int version)
     static bool init = false;
     if (init == false) {
         init = true;
+		fprintf(stderr, "LIBFUZZER: Proxy protocol version %d\n", version);
 		varnishd_proxy_mode = true;
         varnishd_initialize(NULL);
     }
@@ -34,35 +35,37 @@ void proxy_fuzzer(const void* data, size_t len, int version)
         return;
     }
 
+	char request[12000];
+	int  reqlen = 0;
+
 	if (version == 1) {
-		write(cfd, proxy1_preamble, sizeof(proxy1_preamble));
+		reqlen +=
+		snprintf(&request[0], sizeof(request), 
+				"%.*s", (int) sizeof(proxy1_preamble), proxy1_preamble);
 	}
 	else if (version == 2) {
-		write(cfd, proxy2_preamble, sizeof(proxy2_preamble));
+		reqlen +=
+		snprintf(&request[0], sizeof(request), 
+				"%.*s", (int) sizeof(proxy2_preamble), proxy2_preamble);
 	}
 
-	const uint8_t* buffer = (uint8_t*) data;
+	reqlen += snprintf(&request[reqlen], sizeof(request) - reqlen, 
+						"%.*s", (int) len, data);
 
-	// do everything in at least two writes
-	if (len > 0)
+	// some HTTP
+	reqlen += snprintf(&request[reqlen], sizeof(request) - reqlen, 
+						"\r\nGET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
+
+	for (int i = 0; i < 2; i++)
 	{
-		ssize_t bytes = write(cfd, buffer, len);
-	    if (bytes < 0) {
+	    int ret = write(cfd, request, reqlen);
+	    if (ret < 0) {
+	        //printf("Writing the request failed\n");
 	        close(cfd);
 	        return;
 	    }
-		buffer += bytes;
-		len    -= bytes;
-		
+		//usleep(300*1000);
 	}
-	
-	const char* req = "\r\nGET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
-    int ret = write(cfd, req, strlen(req));
-    if (ret < 0) {
-        //printf("Writing the request failed\n");
-        close(cfd);
-        return;
-    }
 
     // signalling end of request, increases exec/s by 4x
     shutdown(cfd, SHUT_WR);

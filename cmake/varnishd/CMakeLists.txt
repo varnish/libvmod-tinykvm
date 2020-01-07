@@ -277,10 +277,10 @@ if (LIBFUZZER)
 		fuzz/fuzz_response.c
 		fuzz/hpack.c
 		fuzz/varnish_http.c
+		${THPOOL_PATH}/thpool.c
     )
-	if (NOT FUZZER)
-		message(FATAL_ERROR "When a fuzzer is enabled, select fuzzing method with -DFUZZER=...")
-	endif()
+	set(FUZZER "HTTP" CACHE STRING "Fuzzer mode (HTTP1, HTTP2, PROXY1, PROXY2, ...)")
+	message(STATUS "Fuzzing mode is set to: ${FUZZER}")
 	# define VARNISH_PLUS for fuzzer sources, when enabled
 	if (VARNISH_PLUS)
 		set_source_files_properties(
@@ -318,6 +318,7 @@ if (LIBFUZZER)
     if (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
         message(FATAL_ERROR "You can only use Clang when libfuzzer is enabled")
     endif()
+	target_include_directories(varnishd PRIVATE ${THPOOL_PATH})
     target_compile_options(varnishd PUBLIC ${FUZZER_CFLAGS})
 	target_link_libraries(varnishd ${FUZZER_LFLAGS})
     set_source_files_properties(

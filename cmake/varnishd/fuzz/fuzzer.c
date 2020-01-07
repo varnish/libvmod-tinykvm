@@ -5,6 +5,8 @@
 #include <assert.h>
 #include <unistd.h>
 #include <string.h>
+#include <malloc.h>
+#define USE_THREADPOOL
 
 // 1. connect using TCP socket and send requests
 // 2. generate files for ESI parser
@@ -25,9 +27,10 @@ void make_dumpable() {
 	prctl(PR_SET_DUMPABLE, 1);
 }
 
-int LLVMFuzzerTestOneInput(void* data, size_t len)
+static inline
+void fuzz_one(void* data, size_t len)
 {
-#ifdef FUZZER_HTTP
+#if defined(FUZZER_HTTP) || defined(FUZZER_HTTP1)
     http_fuzzer(data, len);
 #elif defined(FUZZER_HTTP2)
     h2_fuzzer(data, len);
@@ -45,6 +48,54 @@ int LLVMFuzzerTestOneInput(void* data, size_t len)
     hpack_fuzzer(data, len);
 #else
 	static_assert(false, "The fuzzer type was not recognized!");
+#endif
+}
+
+#ifdef USE_THREADPOOL
+#include <thpool.h>
+#include <stdatomic.h>
+#include <x86intrin.h>
+#define THREADPOOL_SIZE 4
+#define WORK_MAX 6000
+static threadpool tpool;
+static volatile int work_counter;
+struct tpool_work {
+	size_t len;
+	char   data[0];
+};
+static void tpool_fuzz_one(void* arg)
+{
+	struct tpool_work* work = (struct tpool_work*) arg;
+	fuzz_one(work->data, work->len);
+	free(work);
+	__sync_fetch_and_sub(&work_counter, 1);
+}
+#endif
+
+int LLVMFuzzerTestOneInput(void* data, size_t len)
+{
+#ifdef USE_THREADPOOL
+	static bool init = false;
+    if (init == false) {
+        init = true;
+		// make sure varnishd is initialized
+		fuzz_one(NULL, 0);
+		tpool = thpool_init(THREADPOOL_SIZE);
+	}
+	for (int i = 0; i < THREADPOOL_SIZE; i++)
+	{
+		while (work_counter >= WORK_MAX) {
+			_mm_pause();
+		}
+		const size_t total = sizeof(struct tpool_work) + len;
+		struct tpool_work* work = malloc(total);
+		work->len = len;
+		memcpy(work->data, data, len);
+		__sync_fetch_and_add(&work_counter, 1);
+		thpool_add_work(tpool, tpool_fuzz_one, work);
+	}
+#else
+	fuzz_one(data, len);
 #endif
     return 0;
 }

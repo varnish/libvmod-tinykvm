@@ -16,6 +16,7 @@ set(PROFILE "../perf.afdo" CACHE STRING "Optimization profile path")
 option(LIBFUZZER    "Enable fuzzing with clang libfuzzer")
 option(LIBCPP       "Enable compiling with libc++ and linking with LLD" OFF)
 option(SINGLE_PROCESS "Disable fork() and run in single-process mode" ON)
+option(HIDDEN_BRANCH "Hidden open-source branch in the VCP repo" OFF)
 
 set(CMAKE_C_FLAGS "-Wall -Wextra -std=c11 -O2 -g")
 
@@ -81,7 +82,10 @@ if (GCSECTIONS)
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-gc-sections")
 endif()
 
-if (VARNISH_PLUS)
+# C threadpool used by parallell fuzzer
+set (THPOOL_PATH ${CMAKE_SOURCE_DIR}/../ext/C-Thread-Pool)
+
+if (VARNISH_PLUS OR HIDDEN_BRANCH)
   set (VARNISH_PATH ${CMAKE_SOURCE_DIR}/../ext/varnish-cache-plus)
   set (VARNISH_FOLDER "varnish-plus")
 else()

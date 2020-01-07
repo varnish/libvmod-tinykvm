@@ -8,6 +8,7 @@ extern int  varnishd_main(int, const char*[]);
 uint16_t varnishd_client_port;
 const char* varnishd_client_path = NULL;
 bool varnishd_proxy_mode = false;
+int  varnishd_threadpool_size = 8;
 
 void varnishd_initialize(const char* vcl_path)
 {
@@ -27,16 +28,25 @@ void varnishd_initialize(const char* vcl_path)
     snprintf(ti_buffer, sizeof(ti_buffer), "timeout_idle=0.001");
 	// threadpool min buffer
     char tpmin_buffer[128];
-    snprintf(tpmin_buffer, sizeof(ti_buffer), "thread_pool_min=32");
+    snprintf(tpmin_buffer, sizeof(ti_buffer), 
+			"thread_pool_min=%d", varnishd_threadpool_size);
 	// threadpool max buffer
     char tpmax_buffer[128];
-    snprintf(tpmax_buffer, sizeof(ti_buffer), "thread_pool_max=32");
+    snprintf(tpmax_buffer, sizeof(ti_buffer), 
+			"thread_pool_max=%d", varnishd_threadpool_size);
     // temp folder
     char vd_folder[128];
     snprintf(vd_folder, sizeof(vd_folder), "/tmp/varnishd_%d", getpid());
 	// feature http2
 	char feature_http2[128];
 	snprintf(feature_http2, sizeof(feature_http2), "feature=+http2");
+	// debug flag single-process
+	char feature_siproc[128];
+#ifndef VARNISH_PLUS
+	snprintf(feature_siproc, sizeof(feature_siproc), "debug=+execute_mode");
+#else
+	snprintf(feature_siproc, sizeof(feature_siproc), "debug=none");
+#endif
     // client and cli ports
     char portline[128];
     snprintf(portline, sizeof(portline), portopts, varnishd_client_path);
@@ -50,6 +60,7 @@ void varnishd_initialize(const char* vcl_path)
 		"-F",
 		"-n", vd_folder,
 		"-p", feature_http2,
+		"-p", feature_siproc,
 		"-p", ti_buffer,
 		"-p", cs_buffer, // needed?
 		"-p", tpmin_buffer,
