@@ -1,5 +1,6 @@
-sudo yum install centos-release-scl wget svn devtoolset-8
+sudo yum install centos-release-scl
 sudo yum-config-manager --enable rhel-server-rhscl-7-rpms
+sudo yum install wget svn devtoolset-8
 scl enable devtoolset-8 bash
 
 mkdir -p ~/git

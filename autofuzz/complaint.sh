@@ -6,7 +6,7 @@ ID="$(hostname)-$(date +'%Y-%m-%d')"
 FILENAME="autofuzz.${ID}.tar.gz"
 
 # if the service succeeds, we don't need to report an error
-if [[ "$1" = "success" ]]; then
+if [[ "$SERVICE_RESULT" = "success" ]]; then
 	echo "Fuzzer stopped successfully"
 	exit 0
 fi
