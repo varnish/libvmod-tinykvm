@@ -1,4 +1,5 @@
 # settings
+option(LIBFUZZER    "Build for libfuzzer" OFF)
 option(VARNISH_PLUS "Build with Varnish plus" OFF)
 set(VARNISH_DIR "/opt/varnish" CACHE STRING "Varnish installation")
 
@@ -6,9 +7,11 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBVARNISH REQUIRED IMPORTED_TARGET varnishapi)
 find_program(VARNISHD    "varnishd")
 find_program(VARNISHTEST "varnishtest")
+find_package(Threads)
 
 # compiler flags
-set(CMAKE_C_FLAGS "-Wall -Wextra -std=c11 -g -O2")
+# NOTE: varnish uses non-standard features so use GNU
+set(CMAKE_C_FLAGS "-Wall -Wextra -std=gnu11 -g -O2")
 
 if (VARNISH_PLUS)
 	set(VMODTOOL "${VARNISH_DIR}/share/varnish-plus/vmodtool.py")
@@ -40,9 +43,14 @@ function(add_vmod LIBNAME VCCNAME comment)
 	#target_include_directories(${LIBNAME} PUBLIC ${VINCLUDE})
 	target_include_directories(${LIBNAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 	target_link_libraries(${LIBNAME} PkgConfig::LIBVARNISH)
+	target_link_libraries(${LIBNAME} Threads::Threads)
 	target_compile_definitions(${LIBNAME} PRIVATE VMOD=1 HAVE_CONFIG_H)
 	if (VARNISH_PLUS)
 		target_compile_definitions(${LIBNAME} PRIVATE VARNISH_PLUS)
+	endif()
+	if (LIBFUZZER)
+		target_compile_options(${LIBNAME} PRIVATE "-fsanitize=address,fuzzer")
+		target_compile_definitions(${LIBNAME} PRIVATE LIBFUZZER_ENABLED=1)
 	endif()
 	# this will build the final .so files in the top build directory
 	# you don't always want this, so it can probably be an option,
