@@ -40,7 +40,7 @@ function(add_vmod LIBNAME VCCNAME comment)
 	)
 	# create VMOD shared object
 	add_library(${LIBNAME} SHARED ${ARGN} ${OUTFILES})
-	#target_include_directories(${LIBNAME} PUBLIC ${VINCLUDE})
+	target_include_directories(${LIBNAME} PUBLIC ${VINCLUDE})
 	target_include_directories(${LIBNAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 	target_link_libraries(${LIBNAME} PkgConfig::LIBVARNISH)
 	target_link_libraries(${LIBNAME} Threads::Threads)

@@ -275,6 +275,7 @@ if (LIBFUZZER)
 		fuzz/fuzz_h2.c
 		fuzz/fuzz_proxy.c
 		fuzz/fuzz_response.c
+		fuzz/fuzz_vmod.c
 		fuzz/hpack.c
 		fuzz/varnish_http.c
 		${THPOOL_PATH}/thpool.c

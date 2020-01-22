@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <malloc.h>
-#define USE_THREADPOOL
+//#define USE_THREADPOOL
 
 // 1. connect using TCP socket and send requests
 // 2. generate files for ESI parser
@@ -17,6 +17,7 @@ extern void response_fuzzer(void* data, size_t len, int version);
 extern void h2_fuzzer(void* data, size_t len);
 extern void proxy_fuzzer(void* data, size_t len, int version);
 extern void hpack_fuzzer(void* data, size_t len);
+extern void vmod_fuzzer(void* data, size_t len);
 
 // varnishd has many many leaks.. can't enable this
 int __lsan_is_turned_off() { return 1; }
@@ -46,6 +47,8 @@ void fuzz_one(void* data, size_t len)
 	proxy_fuzzer(data, len, 2);
 #elif defined(FUZZER_HPACK)
     hpack_fuzzer(data, len);
+#elif defined(FUZZER_VMOD)
+    vmod_fuzzer(data, len);
 #else
 	static_assert(false, "The fuzzer type was not recognized!");
 #endif
