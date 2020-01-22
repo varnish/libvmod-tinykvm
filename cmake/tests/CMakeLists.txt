@@ -97,7 +97,7 @@ foreach (TEST ${TESTS})
 	get_filename_component(TNAME ${TEST} NAME_WE)
 	add_test(
 		NAME tests_${TNAME}
-		COMMAND ${VARNISHTEST} "-Dvarnishd=${VARNISHD}" ${TEST}
+		COMMAND ${VARNISHTEST} -j8 "-Dvarnishd=${VARNISHD}" ${TEST}
 		WORKING_DIRECTORY ${TESTS_PATH}
 	)
 endforeach()
