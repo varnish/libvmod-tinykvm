@@ -304,7 +304,8 @@
 #define VARNISH_PLUS true
 
 /* C compiler command line for VCL code */
-#define VCC_CC "exec gcc -g -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -shared -Wl,-x -o %o %s"
+/* #define VCC_CC "exec gcc -g -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -shared -Wl,-x -o %o %s" */
+#define VCC_CC "exec clang-10 -g -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -shared -fsanitize=address,fuzzer -Wl,-x -o %o %s"
 
 /* Version number of package */
 #define VERSION "6.0.5r2"

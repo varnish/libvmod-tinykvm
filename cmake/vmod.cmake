@@ -2,6 +2,9 @@
 option(LIBFUZZER    "Build for libfuzzer" OFF)
 option(VARNISH_PLUS "Build with Varnish plus" OFF)
 set(VARNISH_DIR "/opt/varnish" CACHE STRING "Varnish installation")
+# this needs to be set to build the std vmod:
+set(VARNISH_SOURCE_DIR "" CACHE STRING "Varnish source directory")
+
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBVARNISH REQUIRED IMPORTED_TARGET varnishapi)
@@ -42,6 +45,8 @@ function(add_vmod LIBNAME VCCNAME comment)
 	add_library(${LIBNAME} SHARED ${ARGN} ${OUTFILES})
 	target_include_directories(${LIBNAME} PUBLIC ${VINCLUDE})
 	target_include_directories(${LIBNAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+	# only some VMODs need this, like vmod-std
+	target_include_directories(${LIBNAME} PRIVATE ${VARNISH_SOURCE_DIR}/include)
 	target_link_libraries(${LIBNAME} PkgConfig::LIBVARNISH)
 	target_link_libraries(${LIBNAME} Threads::Threads)
 	target_compile_definitions(${LIBNAME} PRIVATE VMOD=1 HAVE_CONFIG_H)

@@ -8,6 +8,8 @@ add_subdirectory(accept)
 add_subdirectory(cookie)
 add_subdirectory(example)
 add_subdirectory(header)
+add_subdirectory(std)
+add_subdirectory(urlplus)
 
 
 enable_testing()

@@ -11,7 +11,10 @@
 extern void varnishd_initialize(const char*);
 extern int  open_varnishd_connection();
 
-void vmod_fuzzer(void* data, size_t len)
+//#define VMOD_COOKIEPLUS
+#define VMOD_URLPLUS
+
+void vmod_fuzzer(uint8_t* data, size_t len)
 {
     static bool init = false;
     if (init == false) {
@@ -29,28 +32,68 @@ void vmod_fuzzer(void* data, size_t len)
         return;
     }
 
-    const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n";
-    int ret = write(cfd, req, strlen(req));
-    if (ret < 0) {
-        //printf("Writing the request failed\n");
-        close(cfd);
-        return;
-    }
-
-	const uint8_t* buffer = (uint8_t*) data;
-
-	// do everything in at least two writes
 	if (len > 0)
 	{
-		ssize_t bytes = write(cfd, buffer, len);
+#ifdef VMOD_COOKIEPLUS
+		const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1";
+		int ret = write(cfd, req, strlen(req));
+		if (ret < 0) {
+			//printf("Writing the request failed\n");
+			close(cfd);
+			return;
+		}
+
+		const char* seq = "\r\nCookie: test=";
+	    int ret = write(cfd, seq, strlen(seq));
+	    if (ret < 0) {
+	        //printf("Writing the request failed\n");
+	        close(cfd);
+	        return;
+	    }
+
+		ssize_t bytes = write(cfd, data, len);
 	    if (bytes < 0) {
 	        close(cfd);
 	        return;
 	    }
-		buffer += bytes;
-		len    -= bytes;
-		
 		write(cfd, "\r\n\r\n", 4);
+#elif defined(VMOD_URLPLUS)
+		const char* req = "GET /";
+		int ret = write(cfd, req, strlen(req));
+		if (ret < 0) {
+			//printf("Writing the request failed\n");
+			close(cfd);
+			return;
+		}
+
+		ret = write(cfd, data, len);
+		if (ret < 0) {
+			close(cfd);
+			return;
+		}
+		
+		req = " HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
+		ret = write(cfd, req, strlen(req));
+		if (ret < 0) {
+			//printf("Writing the request failed\n");
+			close(cfd);
+			return;
+		}
+#else
+		const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nInput: ";
+		int ret = write(cfd, req, strlen(req));
+		if (ret < 0) {
+			//printf("Writing the request failed\n");
+			close(cfd);
+			return;
+		}
+
+		ssize_t bytes = write(cfd, data, len);
+		if (bytes < 0) {
+			close(cfd);
+			return;
+		}
+#endif
 	}
 
     // signalling end of request, increases exec/s by 4x
