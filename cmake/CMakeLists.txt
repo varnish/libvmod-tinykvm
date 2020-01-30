@@ -108,6 +108,7 @@ add_subdirectory(varnishncsa build_varnishncsa)
 add_subdirectory(varnishstat build_varnishstat)
 if (VARNISH_PLUS)
 	add_subdirectory(varnishscoreboard build_scoreboard)
+	add_subdirectory(mkfs.mse build_mkfs.mse)
 endif()
 
 enable_testing()
