@@ -227,10 +227,14 @@ if (VARNISH_PLUS)
                     ${MSE_PATH}/mse_lib_banlist.c
                     ${MSE_PATH}/mse_lib_db.c
                     ${MSE_PATH}/mse_lib_env.c
+					${MSE_PATH}/mse_lib_env_db.c
+					${MSE_PATH}/mse_lib_env_helpers.c
+					${MSE_PATH}/mse_lib_env_halfopen.c
                     ${MSE_PATH}/mse_mtq_test.c
                     ${MSE_PATH}/mse_lib_config.c
                     ${MSE_PATH}/mse_lib_dbro.c
                     ${MSE_PATH}/mse_lib_journal.c
+					${MSE_PATH}/mse_lib_process.c
                 )
     add_library(mse ${MSE_SOURCES})
     target_include_directories(mse PRIVATE ${MSE_PATH})
