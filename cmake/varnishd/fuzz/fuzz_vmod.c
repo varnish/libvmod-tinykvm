@@ -12,7 +12,8 @@ extern void varnishd_initialize(const char*);
 extern int  open_varnishd_connection();
 
 //#define VMOD_COOKIEPLUS
-#define VMOD_URLPLUS
+//#define VMOD_URLPLUS
+#define VMOD_WAF
 
 void vmod_fuzzer(uint8_t* data, size_t len)
 {
@@ -20,7 +21,7 @@ void vmod_fuzzer(uint8_t* data, size_t len)
     if (init == false) {
         init = true;
         varnishd_initialize(
-			"/home/gonzo/github/varnish_autoperf/vcl/vmod_fuzz.vcl"
+			"/home/gonzo/github/varnish_autoperf/vcl/vmod_waf.vcl"
 		);
     }
 	if (len == 0) return;
@@ -76,6 +77,25 @@ void vmod_fuzzer(uint8_t* data, size_t len)
 		ret = write(cfd, req, strlen(req));
 		if (ret < 0) {
 			//printf("Writing the request failed\n");
+			close(cfd);
+			return;
+		}
+#elif defined(VMOD_WAF)
+		char buffer[5000];
+		int L = snprintf(buffer, sizeof(buffer),
+				"GET /%.*s HTTP/1.1\r\nHost: 127.0.0.1\r\n"
+				"Content-Type: text/html\r\n"
+				"Content-Length: %zu\r\n"
+				"\r\n", (int) len, data, len);
+		int ret = write(cfd, buffer, L);
+		if (ret < 0) {
+			//printf("Writing the request failed\n");
+			close(cfd);
+			return;
+		}
+
+		ssize_t bytes = write(cfd, data, len);
+		if (bytes < 0) {
 			close(cfd);
 			return;
 		}

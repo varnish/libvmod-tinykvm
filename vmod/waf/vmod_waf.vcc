@@ -1,0 +1,69 @@
+#
+# Copyright (c) 2019 Varnish Software AS
+# All rights reserved.
+#
+# Author: Guillaume Quintard <guillaume@varnish-software.com>
+#
+
+$Module waf 3 "waf VMOD"
+
+For more information about the Varnish WAF see: http://docs.varnish-software.com/varnish-waf
+The functions below are meant to be used in ``waf.vcl`` and should not deviate from what is
+in ``waf.vcl`` without knowledge of the effect it will cause to the Varnish WAF.
+
+$Function STRING version()
+
+        Return the version of the VMOD and ModSecurity in the format of
+        {VMOD Version}_{ModSecurity Version}
+
+$Function BYTES bytes(STRING b, BYTES fallback)
+
+        A utility to convert a STRING to BYTES.
+
+$Object init()
+
+        Initialize the WAF object
+
+$Method VOID .add_files(STRING path)
+
+        Add a rule file to the WAF.
+
+$Method VOID .add_file_remote(STRING url, STRING key = "")
+
+        Add a remote rule set to the WAF.
+
+$Method VOID .init_transaction()
+
+        Set up a ModSecurity transaction
+
+$Method BOOL .check_req(STRING client_ip = "", INT client_port = 0)
+
+        Check the request headers and body against the rule set.
+        A client IP address and port should be specified here.
+        This invokes phases 1 and 2 of ModSecurity.
+
+$Method BOOL .check_resp()
+
+        Check the response headers and body against the rule set.
+        This invokes phases 3 and 4 of ModSecurity.
+
+$Method VOID .audit_log()
+
+        Log any relevant information to ModSecurity's audit or debug logs.
+        This invokes phase 5 of ModSecurity.
+
+$Method BOOL .disruptive()
+
+        Check if a rule blocked the request.
+
+$Method STRING .disrupt_log()
+
+        Get the log line from the audit log of a disrupted request.
+
+$Method INT .disrupt_status()
+
+        Get the status code of a disrupted request to respond with.
+
+$Method STRING .disrupt_url()
+
+        Get the status code of a disrupted request to set the Location header to.

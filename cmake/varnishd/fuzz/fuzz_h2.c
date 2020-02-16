@@ -6,10 +6,17 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 
 extern void varnishd_initialize();
 extern int  open_varnishd_connection();
+static int cfd = -1;
+static inline void close_varnishd_connection()
+{
+	close(cfd);
+	cfd = -1;
+}
 
 #define static_assert _Static_assert
 static const int FUZZ_H2_HEADERS = true;
@@ -48,7 +55,6 @@ void h2_fuzzer(void* data, size_t len)
     }
 	if (len == 0) return;
 
-	int cfd = -1;
 	while (cfd < 0) {
 		cfd = open_varnishd_connection();
 	}
@@ -57,7 +63,7 @@ void h2_fuzzer(void* data, size_t len)
 	const char* req = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 	ssize_t bytes = write(cfd, req, strlen(req));
 	if (bytes < 0) {
-		close(cfd);
+		close_varnishd_connection();
 		return;
 	}
 
@@ -90,7 +96,7 @@ void h2_fuzzer(void* data, size_t len)
 
 			bytes = write(cfd, &settings, sizeof(settings));
 			if (bytes < 0) {
-				close(cfd);
+				close_varnishd_connection();
 				return;
 			}
 		}
@@ -110,7 +116,7 @@ void h2_fuzzer(void* data, size_t len)
 
 				bytes = write(cfd, &hdr, sizeof(hdr));
 			    if (bytes < 0) {
-			        close(cfd);
+					close_varnishd_connection();
 			        return;
 			    }
 			}
@@ -119,11 +125,25 @@ void h2_fuzzer(void* data, size_t len)
 
     bytes = write(cfd, buffer, len);
     if (bytes < 0) {
-        close(cfd);
+		close_varnishd_connection();
         return;
     }
     // signalling end of request, increases exec/s by 7x
-    shutdown(cfd, SHUT_WR);
+    //shutdown(cfd, SHUT_WR);
+
+	struct timeval timeout = {
+		.tv_sec = 0,
+		.tv_usec = 10000
+	};
+	fd_set set;
+	FD_ZERO(&set);
+	FD_SET(cfd, &set);
+
+	int s = select(cfd + 1, &set, NULL, NULL, &timeout);
+	if (s == -1 || s == 0) {
+		close_varnishd_connection();
+		return;
+	}
 
     char readbuf[2048];
     ssize_t rlen = read(cfd, readbuf, sizeof(readbuf));
@@ -132,6 +152,7 @@ void h2_fuzzer(void* data, size_t len)
         if (errno != ECONNRESET) {
             printf("Read failed: %s\n", strerror(errno));
         }
+		close_varnishd_connection();
     }
-	close(cfd);
+	//close(cfd);
 }

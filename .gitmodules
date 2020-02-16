@@ -13,3 +13,6 @@
 [submodule "ext/C-Thread-Pool"]
 	path = ext/C-Thread-Pool
 	url = https://github.com/Pithikos/C-Thread-Pool.git
+[submodule "vmod/waf/modsec/ModSecurity"]
+	path = vmod/waf/modsec/ModSecurity
+	url = https://github.com/SpiderLabs/ModSecurity.git

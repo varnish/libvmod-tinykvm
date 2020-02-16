@@ -10,6 +10,7 @@ add_subdirectory(example)
 add_subdirectory(header)
 add_subdirectory(std)
 add_subdirectory(urlplus)
+add_subdirectory(waf)
 
 
 enable_testing()

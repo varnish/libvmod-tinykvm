@@ -1,10 +1,11 @@
 vcl 4.1;
 
-import accept from "/home/gonzo/github/varnish_autoperf/vmod/build/libvmod_accept.so";
-import std    from "/home/gonzo/github/varnish_autoperf/vmod/build/libvmod_std.so";
-import urlplus from "/home/gonzo/github/varnish_autoperf/vmod/build/libvmod_urlplus.so";
-import file   from "/home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/lib/libvmod_file/.libs/libvmod_file.so";
-import cookieplus from "/home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/lib/libvmod_cookieplus/.libs/libvmod_cookieplus.so";
+#import accept from "/home/gonzo/github/varnish_autoperf/vmod/build/libvmod_accept.so";
+#import std    from "/home/gonzo/github/varnish_autoperf/vmod/build/libvmod_std.so";
+#import urlplus from "/home/gonzo/github/varnish_autoperf/vmod/build/libvmod_urlplus.so";
+#import file   from "/home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/lib/libvmod_file/.libs/libvmod_file.so";
+#import cookieplus from "/home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/lib/libvmod_cookieplus/.libs/libvmod_cookieplus.so";
+import waf from "/home/gonzo/github/varnish_autoperf/vmod/build/libvmod_waf.so";
 
 backend default {
     .host = "127.0.0.1";
@@ -12,7 +13,7 @@ backend default {
 }
 
 sub vcl_init {
-	new lang = accept.rule("en");
+/*	new lang = accept.rule("en");
 	lang.add("en");
 	lang.add("fr");
 	lang.add("de");
@@ -21,6 +22,7 @@ sub vcl_init {
 	lang.add("pl");
 	new f = file.init("/home/gonzo/github/varnish_autoperf");
 	f.allow("*", "rw");
+*/
 }
 
 sub vcl_recv {
@@ -43,17 +45,17 @@ sub vcl_recv {
 	#cookieplus.write();
 	#set req.http.x-cptest = cookieplus.as_string();
 
-	urlplus.parse(req.url);
+/*	urlplus.parse(req.url);
 	set req.http.x-base = urlplus.get_basename();
 	set req.http.x-file = urlplus.get_filename();
 	set req.http.x-ext = urlplus.get_extension();
 	set req.http.x-dir = urlplus.get_dirname();
 	set req.http.x-url = urlplus.as_string();
 	set req.http.x-query = urlplus.query_get("query");
-	urlplus.write();
+	urlplus.write();*/
 	return (hash);
 }
 
 sub vcl_miss {	
-	return (restart);
+	//return (restart);
 }
