@@ -1,0 +1,8 @@
+1. lag database, lag persisterte objekter
+2. resize MSE env
+3. start varnish - sjekk OK
+	- dette vil sjekke at databasen fortsatt ser konsistent ut
+4. kjør en request mot et persistert objekt
+	- dette vil teste storene
+5. kjør en request som lager et nytt persistert objekt
+	- dette vil teste journaler
