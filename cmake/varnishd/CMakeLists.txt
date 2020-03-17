@@ -131,24 +131,30 @@ set(VARNISHD_SOURCES
 )
 if (VARNISH_PLUS)
     list (APPEND VARNISHD_SOURCES
-		${VD_PATH}/cache/cache_backend_ssl.c
+		${VD_PATH}/cache/cache_governor.c
 		${VD_PATH}/cache/cache_tcp_oper.c
 		${VD_PATH}/cache/cache_vcl_vrt.c
 		${VD_PATH}/cache/cache_vrt_ykey.c
 		${VD_PATH}/cache/cache_vst_access.c
 		${VD_PATH}/cache/cache_ykey.c
+		${VD_PATH}/common/common_vtls_sni.c
 		${VD_PATH}/storage/storage_ykey_mem.c
-		${VD_PATH}/storage/mse_mgt.c
+		${VD_PATH}/storage/mse_book.c
 		${VD_PATH}/storage/mse_cache.c
 		${VD_PATH}/storage/mse_obj.c
 		${VD_PATH}/storage/mse_memcache.c
+		${VD_PATH}/storage/mse_mgt.c
 		${VD_PATH}/storage/mse_store.c
+		${VD_PATH}/storage/mse_transproxy.c
 		${VD_PATH}/storage/mse_aio.c
 		${VD_PATH}/storage/mse_populate.c
 		${VD_PATH}/storage/mse_varylib.c
 		${VD_PATH}/storage/mse_waterlevel.c
 		${VD_PATH}/storage/mse_hoic.c
 		${VD_PATH}/storage/mse_ykey.c
+		${VD_PATH}/tls/cache_backend_ssl.c
+		${VD_PATH}/tls/cache_client_ssl.c
+		${VD_PATH}/tls/cache_tls.c
 		${VD_PATH}/vmod_util/crypto_util.c
 		${VD_PATH}/vmod_util/edgestash_util.c
 		${VD_PATH}/vmod_util/file_util.c
@@ -224,13 +230,13 @@ if (VARNISH_PLUS)
                     ${MSE_PATH}/mse_lib_banlist.c
                     ${MSE_PATH}/mse_lib_db.c
                     ${MSE_PATH}/mse_lib_env.c
-					${MSE_PATH}/mse_lib_env_db.c
-					${MSE_PATH}/mse_lib_env_helpers.c
-					${MSE_PATH}/mse_lib_env_halfopen.c
+					#${MSE_PATH}/mse_lib_env_db.c
+					#${MSE_PATH}/mse_lib_env_helpers.c
+					#${MSE_PATH}/mse_lib_env_halfopen.c
                     ${MSE_PATH}/mse_lib_config.c
                     ${MSE_PATH}/mse_lib_dbro.c
                     ${MSE_PATH}/mse_lib_journal.c
-					${MSE_PATH}/mse_lib_process.c
+					#${MSE_PATH}/mse_lib_process.c
 					#${MSE_PATH}/journal_test.c
                     #${MSE_PATH}/mse_lib_config_test.c
                     #${MSE_PATH}/mse_lib_dbtest.c
@@ -305,7 +311,7 @@ target_include_directories(varnishd PRIVATE ${CMAKE_BINARY_DIR}/libvarnish)
 target_include_directories(varnishd PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 add_dependencies(varnishd vhp_gen_hufdec generate_builtin_vcl)
 target_link_libraries(varnishd vcc varnish vgz m)
-target_link_libraries(varnishd config pcre pthread crypto ssl dl)
+target_link_libraries(varnishd config pcre jemalloc pthread crypto ssl dl)
 if (VARNISH_PLUS)
     target_link_libraries(varnishd mse lmdb sslhelper)
 endif()

@@ -245,7 +245,7 @@
 #define PACKAGE_NAME "Varnish Plus"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "Varnish Plus 6.0.5r3"
+#define PACKAGE_STRING "Varnish Plus 6.0.6r2"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "varnish-plus"
@@ -254,7 +254,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "6.0.5r3"
+#define PACKAGE_VERSION "6.0.6r2"
 
 /* Define to necessary symbol if this constant uses a non-standard name on
    your system. */
@@ -286,29 +286,17 @@
 #ifndef _GNU_SOURCE
 # define _GNU_SOURCE 1
 #endif
-/* Enable threading extensions on Solaris.  */
-#ifndef _POSIX_PTHREAD_SEMANTICS
-# define _POSIX_PTHREAD_SEMANTICS 1
-#endif
-/* Enable extensions on HP NonStop.  */
-#ifndef _TANDEM_SOURCE
-# define _TANDEM_SOURCE 1
-#endif
-/* Enable general extensions on Solaris.  */
-#ifndef __EXTENSIONS__
-# define __EXTENSIONS__ 1
-#endif
 
 
 /* This is a Varnish Plus build */
 #define VARNISH_PLUS true
 
 /* C compiler command line for VCL code */
-/* #define VCC_CC "exec gcc -g -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -shared -Wl,-x -o %o %s" */
-#define VCC_CC "exec clang-10 -g -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -shared -fsanitize=address,fuzzer -Wl,-x -o %o %s"
+#define VCC_CC "exec gcc -g -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -shared -Wl,-x -o %o %s"
+//#define VCC_CC "exec clang-11 -g -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -shared -fsanitize=address,fuzzer -Wl,-x -o %o %s"
 
 /* Version number of package */
-#define VERSION "6.0.5r3"
+#define VERSION "6.0.6r2"
 
 /* Enable large inode numbers on Mac OS X 10.5.  */
 #ifndef _DARWIN_USE_64_BIT_INODE
