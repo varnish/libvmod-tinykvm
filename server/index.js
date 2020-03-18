@@ -16,6 +16,19 @@ http.createServer(function(request, response) {
     '.js':   "text/javascript"
   };
 
+  if (uri == "/") {
+	response.writeHead(503, {"Content-Type": "text/plain"});
+	response.write("Wrong!\n");
+	response.end();
+	return;
+  }
+  if (uri == "/503.html") {
+	response.writeHead(503, {"Content-Type": "text/plain"});
+	response.write("This is correct!\n");
+	response.end();
+	return;
+  }
+
   fs.exists(filename, function(exists) {
     if(!exists) {
       response.writeHead(404, {"Content-Type": "text/plain"});
