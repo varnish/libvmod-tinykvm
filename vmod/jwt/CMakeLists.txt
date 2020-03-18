@@ -15,6 +15,9 @@ add_vmod(vmod_jwt ${PATH}/vmod_jwt.vcc "JWT VMOD"
 	${PATH}/vmod_jwt_reader.c
 	${PATH}/vmod_jwt_writer.c
 )
+
+target_link_libraries(vmod_jwt vjson)
+
 # VCL import name is "jwt"
 vmod_add_tests(vmod_jwt jwt
 )

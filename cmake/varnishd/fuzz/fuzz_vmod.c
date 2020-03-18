@@ -13,7 +13,7 @@ extern int  open_varnishd_connection();
 
 //#define VMOD_COOKIEPLUS
 //#define VMOD_URLPLUS
-#define VMOD_WAF
+//#define VMOD_WAF
 
 void vmod_fuzzer(uint8_t* data, size_t len)
 {
@@ -21,7 +21,7 @@ void vmod_fuzzer(uint8_t* data, size_t len)
     if (init == false) {
         init = true;
         varnishd_initialize(
-			"/home/gonzo/github/varnish_autoperf/vcl/vmod_waf.vcl"
+			"/home/gonzo/github/varnish_autoperf/vcl/vmod_fuzz.vcl"
 		);
     }
 	if (len == 0) return;
