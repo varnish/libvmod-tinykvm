@@ -26,7 +26,7 @@ set (SOURCES
 	${PATH}/jemalloc-builddir/src/util.c
 )
 
-add_library(jemalloc STATIC ${SOURCES})
+add_library(jemalloc SHARED ${SOURCES})
 target_include_directories(jemalloc PUBLIC ${PATH}/jemalloc-builddir/include)
 target_include_directories(jemalloc PRIVATE ${CONFIG_PATH})
 target_compile_definitions(jemalloc PRIVATE _GNU_SOURCE)

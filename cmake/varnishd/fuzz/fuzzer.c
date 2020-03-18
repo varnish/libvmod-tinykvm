@@ -41,7 +41,7 @@ void fuzz_one(void* data, size_t len)
     response_fuzzer(data, len, 2);
 #elif defined(FUZZER_RESPONSE_GZIP)
     response_fuzzer(data, len, 10);
-#elif defined(FUZZER_PROXY)
+#elif defined(FUZZER_PROXY) || defined(FUZZER_PROXY1)
 	proxy_fuzzer(data, len, 1);
 #elif defined(FUZZER_PROXY2)
 	proxy_fuzzer(data, len, 2);
