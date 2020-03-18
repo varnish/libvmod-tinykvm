@@ -1,28 +1,44 @@
 # settings
 option(LIBFUZZER    "Build for libfuzzer" OFF)
-option(VARNISH_PLUS "Build with Varnish plus" OFF)
+option(VARNISH_PLUS "Build with Varnish plus" ON)
+option(LOCAL_VC     "Build with local Varnish" ON)
 set(VARNISH_DIR "/opt/varnish" CACHE STRING "Varnish installation")
 # this needs to be set to build the std vmod:
 set(VARNISH_SOURCE_DIR "" CACHE STRING "Varnish source directory")
-
-
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LIBVARNISH REQUIRED IMPORTED_TARGET varnishapi)
-find_program(VARNISHD    "varnishd")
-find_program(VARNISHTEST "varnishtest")
-find_package(Threads)
 
 # compiler flags
 # NOTE: varnish uses non-standard features so use GNU
 set(CMAKE_C_FLAGS "-Wall -Wextra -std=gnu11 -g -O2")
 
 if (VARNISH_PLUS)
-	set(VMODTOOL "${VARNISH_DIR}/share/varnish-plus/vmodtool.py")
-	set(VINCLUDE "${VARNISH_DIR}/include/varnish-plus")
+	if (LOCAL_VC)
+		set(VMODTOOL "${VARNISH_SOURCE_DIR}/lib/libvcc/vmodtool.py")
+		set(VINCLUDE "${VARNISH_SOURCE_DIR}/include")
+	else()
+		set(VMODTOOL "${VARNISH_SOURCE_DIR}/share/varnish-plus/vmodtool.py")
+		set(VINCLUDE "${VARNISH_DIR}/include/varnish-plus")
+	endif()
 else()
-	set(VMODTOOL "${VARNISH_DIR}/share/varnish/vmodtool.py")
-	set(VINCLUDE "${VARNISH_DIR}/include/varnish")
+	if (LOCAL_VC)
+		set(VMODTOOL "${VARNISH_SOURCE_DIR}/lib/libvcc/vmodtool.py")
+		set(VINCLUDE "${VARNISH_SOURCE_DIR}/include")
+	else()
+		set(VMODTOOL "${VARNISH_DIR}/share/varnish/vmodtool.py")
+		set(VINCLUDE "${VARNISH_DIR}/include/varnish")
+	endif()
 endif()
+
+if (LOCAL_VC)
+	set(VARNISHD ${VARNISH_SOURCE_DIR}/bin/varnishd/varnishd)
+	set(VARNISHTEST ${VARNISH_SOURCE_DIR}/bin/varnishtest/varnishtest)
+else()
+	find_package(PkgConfig REQUIRED)
+	pkg_check_modules(LIBVARNISH REQUIRED IMPORTED_TARGET varnishapi)
+	find_program(VARNISHD    "varnishd")
+	find_program(VARNISHTEST "varnishtest")
+endif()
+
+find_package(Threads)
 
 # enable make test
 enable_testing()
@@ -45,9 +61,12 @@ function(add_vmod LIBNAME VCCNAME comment)
 	add_library(${LIBNAME} SHARED ${ARGN} ${OUTFILES})
 	target_include_directories(${LIBNAME} PUBLIC ${VINCLUDE})
 	target_include_directories(${LIBNAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-	# only some VMODs need this, like vmod-std
-	target_include_directories(${LIBNAME} PRIVATE ${VARNISH_SOURCE_DIR}/include)
-	target_link_libraries(${LIBNAME} PkgConfig::LIBVARNISH)
+	if (LOCAL_VC)
+		target_include_directories(${LIBNAME} PRIVATE ${VARNISH_SOURCE_DIR}/bin/varnishd)
+		target_link_libraries(${LIBNAME} ${VARNISH_SOURCE_DIR}/lib/libvarnishapi/.libs/libvarnishapi.so)
+	else()
+		target_link_libraries(${LIBNAME} PkgConfig::LIBVARNISH)
+	endif()
 	target_link_libraries(${LIBNAME} Threads::Threads)
 	target_compile_definitions(${LIBNAME} PRIVATE VMOD=1 HAVE_CONFIG_H)
 	if (VARNISH_PLUS)
@@ -68,8 +87,11 @@ endfunction()
 
 function(vmod_add_tests LIBNAME IMPORT_NAME)
 	set(LIBPATH "${CMAKE_BINARY_DIR}/lib${LIBNAME}.so")
+	# varnishtest doesn't like to run with no tests
+	if (ARGC GREATER 2) # not sure why 2 though
 	add_test(NAME ${LIBNAME}_tests
 		COMMAND ${VARNISHTEST} -j8 "-DVMOD_SO=\"${LIBPATH}\"" "-Dvarnishd=${VARNISHD}" ${ARGN}
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	)
+	endif()
 endfunction()
