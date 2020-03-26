@@ -120,7 +120,7 @@ if (VARNISH_PLUS)
 endif()
 if (BUILD_VMODS)
 	set(VARNISH_SOURCE_DIR "${VARNISH_PATH}" CACHE STRING "")
-	add_subdirectory(../vmod build_vmods)
+	add_subdirectory(../vmods build_vmods)
 endif()
 
 enable_testing()
