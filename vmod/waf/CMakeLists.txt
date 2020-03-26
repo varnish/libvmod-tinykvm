@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.0.2)
 project (vmod C)
-include(../../cmake/vmod.cmake vmod)
+include(../vmod.cmake vmod)
 
 add_vmod(vmod_waf vmod_waf.vcc "WAF/ModSecurity VMOD"
 	vmod_waf.c
