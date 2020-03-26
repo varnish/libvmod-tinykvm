@@ -6,7 +6,7 @@ add_vmod(vmod_bodyaccess vmod_bodyaccess.vcc "Body Access VMOD"
 	vmod_bodyaccess.c
 )
 # VCL import name is "bodyaccess"
-vmod_add_tests(vmod_bodyaccess bodyaccess
+add_vmod_tests(vmod_bodyaccess bodyaccess
 	tests/test01.vtc
 	tests/test02.vtc
 	tests/test03.vtc

@@ -63,7 +63,7 @@ function(add_vmod LIBNAME VCCNAME comment)
 	endif()
 	set(OUTFILES ${BASENAME}_if.c ${BASENAME}_if.h)
 	add_custom_command(
-		COMMAND ${PYTHON_EXECUTABLE} ${VMODTOOL} --boilerplate -o ${BASENAME}_if ${VCCFILE}
+		COMMAND ${PYTHON_EXECUTABLE} ${VMODTOOL} -o ${BASENAME}_if ${VCCFILE}
 		DEPENDS ${VCCFILE}
 		OUTPUT  ${OUTFILES}
 		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -71,10 +71,13 @@ function(add_vmod LIBNAME VCCNAME comment)
 	# create VMOD shared object
 	add_library(${LIBNAME} SHARED ${ARGN} ${OUTFILES})
 	target_include_directories(${LIBNAME} PUBLIC ${VINCLUDE})
-	target_include_directories(${LIBNAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+	target_include_directories(${LIBNAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 	if (LOCAL_VC)
 		target_include_directories(${LIBNAME} PRIVATE ${VARNISH_SOURCE_DIR}/bin/varnishd)
 		target_link_libraries(${LIBNAME} ${VARNISH_SOURCE_DIR}/lib/libvarnishapi/.libs/libvarnishapi.so)
+		if (TARGET includes_generate)
+			add_dependencies(${LIBNAME} includes_generate)
+		endif()
 	else()
 		target_link_libraries(${LIBNAME} PkgConfig::LIBVARNISH)
 	endif()

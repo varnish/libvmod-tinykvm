@@ -4,7 +4,7 @@ include(../../cmake/vmod.cmake vmod)
 
 set (PATH ${VARNISH_SOURCE_DIR}/lib/libvmod_std)
 
-add_vmod(vmod_std ${PATH}/vmod.vcc "Standard VMOD"
+add_vmod(vmod_std ${PATH}/vmod_std.vcc "Standard VMOD"
 	${PATH}/vmod_std.c
 	${PATH}/vmod_std_conversions.c
 	${PATH}/vmod_std_fileread.c
