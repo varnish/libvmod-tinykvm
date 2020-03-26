@@ -6,18 +6,13 @@ set(VMOD_DIR   "/opt/varnish/lib/varnish-plus/vmods" CACHE STRING "Default VMOD 
 set(VCL_DIR    "/opt/varnish/share/varnish-plus/vcl" CACHE STRING "Default VCL directory")
 
 # include/vcs_version.h include/vmod_abi.h
-add_custom_command(
-    COMMAND ${PYTHON_EXECUTABLE} ${VARNISH_PATH}/include/generate.py ${VARNISH_PATH} ${VARNISH_PATH}
-    WORKING_DIRECTORY ${VARNISH_PATH}/include
-    OUTPUT  ${VARNISH_PATH}/include/vcs_version.h
-            ${VARNISH_PATH}/include/vmod_abi.h
-    DEPENDS ${VARNISH_PATH}/include/generate.py
-    COMMENT "Generating vcs_version.h and vmod_abi.h"
-    )
-add_custom_target(includes_generate
-    DEPENDS ${VARNISH_PATH}/include/vcs_version.h
-            ${VARNISH_PATH}/include/vmod_abi.h
-    )
+add_custom_target(includes_generate)
+execute_process(COMMAND git describe
+				WORKING_DIRECTORY ${VARNISH_PATH}
+				OUTPUT_VARIABLE GIT_REPO_VERSION
+				OUTPUT_STRIP_TRAILING_WHITESPACE)
+configure_file("vcs_version.h.in" "${CMAKE_CURRENT_BINARY_DIR}/vcs_version.h")
+configure_file("vmod_abi.h.in" "${CMAKE_CURRENT_BINARY_DIR}/vmod_abi.h")
 
 ## libvarnish library ##
 set (SOURCES
@@ -98,12 +93,12 @@ add_library(varnish ${SOURCES} ${VSC_COMPILED})
 target_include_directories(varnish PUBLIC ${VARNISHD_PATH})
 target_include_directories(varnish PUBLIC ${VARNISH_PATH}/include)
 target_include_directories(varnish PUBLIC ${CONFIG_PATH})
+target_include_directories(varnish PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_compile_definitions(varnish PUBLIC _XOPEN_SOURCE=700)
 target_compile_definitions(varnish PUBLIC VARNISH_STATE_DIR="${VSTATE_DIR}")
 target_compile_definitions(varnish PUBLIC VARNISH_VMOD_DIR="${VMOD_DIR}")
 target_compile_definitions(varnish PUBLIC VARNISH_VCL_DIR="${VCL_DIR}")
 target_compile_definitions(varnish PUBLIC -DNOT_IN_A_VMOD)
-add_dependencies(varnish includes_generate)
 target_link_libraries(varnish pcre m)
 
 if (LIBFUZZER)

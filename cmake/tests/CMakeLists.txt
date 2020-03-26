@@ -92,20 +92,18 @@ set(TESTS_PATH  ${VARNISH_PATH}/bin/varnishtest/tests)
 set(VARNISHD    ${CMAKE_BINARY_DIR}/varnishd)
 set(VARNISHTEST ${CMAKE_BINARY_DIR}/varnishtest)
 
-file(GLOB children ${VARNISH_PATH}/lib/libvmod_*)
-foreach(child ${children})
-	if(IS_DIRECTORY ${child})
-		#message(STATUS "VMOD: ${child}")
-		set(VMOD_PATHS "${VMOD_PATHS}${child}/.libs:")
-	endif()
-endforeach()
-
 enable_testing()
 foreach (TEST ${TESTS})
+	set(VMOD_PATH "${CMAKE_BINARY_DIR}")
 	get_filename_component(TNAME ${TEST} NAME_WE)
 	add_test(
 		NAME tests_${TNAME}
-		COMMAND ${VARNISHTEST} "-Dvarnishd=${VARNISHD}" -p "vmod_path=\"${VMOD_PATHS}\"" ${TEST}
+		COMMAND ${VARNISHTEST} "-pvmod_path=${VMOD_PATH}" ${TEST}
 		WORKING_DIRECTORY ${TESTS_PATH}
 	)
+	list(APPEND LIST_OF_TESTS tests_${TNAME})
 endforeach()
+set_tests_properties(${LIST_OF_TESTS}
+	PROPERTIES  ENVIRONMENT "PATH=${CMAKE_BINARY_DIR}:$ENV{PATH}"
+				TIMEOUT 30
+)

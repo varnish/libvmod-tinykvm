@@ -276,6 +276,7 @@ add_library(vcc ${VCC_SOURCES})
 target_include_directories(vcc PRIVATE ${VCC_PATH})
 target_include_directories(vcc PRIVATE ${VARNISH_PATH}/include)
 target_include_directories(vcc PRIVATE ${CONFIG_PATH})
+target_link_libraries(vcc varnish) # we need the public API
 add_dependencies(vcc libvcc_generate)
 
 if (LIBFUZZER)

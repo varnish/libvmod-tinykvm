@@ -28,8 +28,11 @@ else()
 	endif()
 endif()
 
-if (LOCAL_VC)
-	set(VARNISHD ${VARNISH_SOURCE_DIR}/bin/varnishd/varnishd)
+if (TARGET varnishd)
+	set(VARNISHD    ${CMAKE_BINARY_DIR}/varnishd)
+	set(VARNISHTEST ${CMAKE_BINARY_DIR}/varnishtest)
+elseif (LOCAL_VC)
+	set(VARNISHD    ${VARNISH_SOURCE_DIR}/bin/varnishd/varnishd)
 	set(VARNISHTEST ${VARNISH_SOURCE_DIR}/bin/varnishtest/varnishtest)
 else()
 	find_package(PkgConfig REQUIRED)
@@ -45,9 +48,6 @@ set(VMODTOOL "${VTOOLDIR}/vmodtool.py")
 set(VSCTOOL  "${VTOOLDIR}/vsctool.py")
 
 find_package(Threads)
-
-# enable make test
-enable_testing()
 
 function(add_vmod LIBNAME VCCNAME comment)
 	# write empty config.h for autocrap
@@ -74,7 +74,11 @@ function(add_vmod LIBNAME VCCNAME comment)
 	target_include_directories(${LIBNAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 	if (LOCAL_VC)
 		target_include_directories(${LIBNAME} PRIVATE ${VARNISH_SOURCE_DIR}/bin/varnishd)
-		target_link_libraries(${LIBNAME} ${VARNISH_SOURCE_DIR}/lib/libvarnishapi/.libs/libvarnishapi.so)
+		if (TARGET varnishapi)
+			target_link_libraries(${LIBNAME} varnishapi)
+		else()
+			target_link_libraries(${LIBNAME} ${VARNISH_SOURCE_DIR}/lib/libvarnishapi/.libs/libvarnishapi.so)
+		endif()
 		if (TARGET includes_generate)
 			add_dependencies(${LIBNAME} includes_generate)
 		endif()
@@ -84,7 +88,7 @@ function(add_vmod LIBNAME VCCNAME comment)
 	target_link_libraries(${LIBNAME} Threads::Threads)
 	target_compile_definitions(${LIBNAME} PRIVATE VMOD=1 HAVE_CONFIG_H)
 	if (VARNISH_PLUS)
-		target_compile_definitions(${LIBNAME} PRIVATE VARNISH_PLUS)
+		target_compile_definitions(${LIBNAME} PRIVATE VARNISH_PLUS=1)
 	endif()
 	if (LIBFUZZER)
 		target_compile_options(${LIBNAME} PRIVATE "-fsanitize=address,fuzzer")
@@ -101,7 +105,7 @@ endfunction()
 function(add_vmod_vsc LIBNAME VSCNAME)
 	# generate VSC .c and .h
 	get_filename_component(BASENAME ${VSCNAME} NAME_WE)
-	if (EXISTS ${VSCNAME})
+	if (EXISTS "${VSCNAME}")
 		set(VSCFILE ${VSCNAME})
 	else() # try relative to source directory
 		set(VSCFILE  ${CMAKE_CURRENT_SOURCE_DIR}/${VSCNAME})
@@ -116,14 +120,20 @@ function(add_vmod_vsc LIBNAME VSCNAME)
 	target_sources(${LIBNAME} PRIVATE ${OUTFILES})
 endfunction()
 
+enable_testing()
 
 function(add_vmod_tests LIBNAME IMPORT_NAME)
 	set(LIBPATH "${CMAKE_BINARY_DIR}/lib${LIBNAME}.so")
+	set(VMOD_PATH "${CMAKE_BINARY_DIR}")
 	# varnishtest doesn't like to run with no tests
-	if (ARGC GREATER 2) # not sure why 2 though
-	add_test(NAME ${LIBNAME}_tests
-		COMMAND ${VARNISHTEST} -j8 "-DVMOD_SO=\"${LIBPATH}\"" "-Dvarnishd=${VARNISHD}" ${ARGN}
+	foreach (TEST ${ARGN})
+	add_test(NAME ${LIBNAME}_${TEST}
+		COMMAND ${VARNISHTEST} "-Dvarnishd=${VARNISHD}" "-DVMOD_SO=\"${LIBPATH}\"" -p "vmod_path=${VMOD_PATH}" ${TEST}
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	)
-	endif()
+	set_tests_properties(${LIBNAME}_${TEST}
+		PROPERTIES  ENVIRONMENT "PATH=${CMAKE_BINARY_DIR}:$ENV{PATH}"
+					TIMEOUT 15
+	)
+	endforeach()
 endfunction()

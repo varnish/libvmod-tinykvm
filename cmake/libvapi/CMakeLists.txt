@@ -9,9 +9,7 @@ add_custom_command(
     COMMENT "Generating vxp_fixed_token.c"
 )
 add_custom_target(varnishapi_generate
-    DEPENDS ${PATH}/vxp_fixed_token.c
-            includes_generate
-    )
+    DEPENDS ${PATH}/vxp_fixed_token.c)
 
 ## libvarnishapi library ##
 set (SOURCES
@@ -59,6 +57,7 @@ add_library(vapi_static STATIC $<TARGET_OBJECTS:vapi_obj>)
 target_link_libraries(vapi_static varnish)
 
 add_library(varnishapi  SHARED $<TARGET_OBJECTS:vapi_obj>)
+target_include_directories(varnishapi PUBLIC ${CMAKE_BINARY_DIR}/libvarnish)
 # build libvarnishapi.so into the top binary folder
 set_target_properties(varnishapi
 	PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
