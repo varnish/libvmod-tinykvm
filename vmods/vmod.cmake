@@ -133,7 +133,8 @@ function(add_vmod_tests LIBNAME IMPORT_NAME)
 	)
 	set_tests_properties(${LIBNAME}_${TEST}
 		PROPERTIES  ENVIRONMENT "PATH=${CMAKE_BINARY_DIR}:$ENV{PATH}"
-					TIMEOUT 15
+					TIMEOUT 30
+					SKIP_RETURN_CODE 77
 	)
 	endforeach()
 endfunction()
