@@ -56,7 +56,7 @@ function(add_vmod LIBNAME VCCNAME comment)
 	)
 	# generate VCC .c and .h
 	get_filename_component(BASENAME ${VCCNAME} NAME_WE)
-	if (EXISTS ${VCCNAME})
+	if (EXISTS "${VCCNAME}")
 		set(VCCFILE ${VCCNAME})
 	else() # try relative to source directory
 		set(VCCFILE  ${CMAKE_CURRENT_SOURCE_DIR}/${VCCNAME})
