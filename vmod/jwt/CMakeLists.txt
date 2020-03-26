@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.0.2)
 project (vmod C)
 include(../../cmake/vmod.cmake vmod)
 
-set (PATH ../../ext/varnish-cache-plus/lib/libvmod_jwt)
+set (PATH ${VARNISH_SOURCE_DIR}/lib/libvmod_jwt)
 
 add_vmod(vmod_jwt ${PATH}/vmod_jwt.vcc "JWT VMOD"
 	${PATH}/jwt_base64.c
@@ -19,5 +19,5 @@ add_vmod(vmod_jwt ${PATH}/vmod_jwt.vcc "JWT VMOD"
 target_link_libraries(vmod_jwt vjson)
 
 # VCL import name is "jwt"
-vmod_add_tests(vmod_jwt jwt
+add_vmod_tests(vmod_jwt jwt
 )

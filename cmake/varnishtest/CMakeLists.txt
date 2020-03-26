@@ -69,3 +69,7 @@ set_target_properties(varnishtest
 
 target_compile_options(varnishtest PUBLIC "${COMMON_FLAGS}")
 target_link_libraries(varnishtest "${COMMON_FLAGS}")
+
+if (SANITIZE)
+	target_compile_options(varnishtest PRIVATE "${SANITIZE_FLAGS}")
+endif()

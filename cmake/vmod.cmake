@@ -12,18 +12,18 @@ set(CMAKE_C_FLAGS "-Wall -Wextra -std=gnu11 -g -O2")
 
 if (VARNISH_PLUS)
 	if (LOCAL_VC)
-		set(VMODTOOL "${VARNISH_SOURCE_DIR}/lib/libvcc/vmodtool.py")
+		set(VTOOLDIR "${VARNISH_SOURCE_DIR}/lib/libvcc")
 		set(VINCLUDE "${VARNISH_SOURCE_DIR}/include")
 	else()
-		set(VMODTOOL "${VARNISH_SOURCE_DIR}/share/varnish-plus/vmodtool.py")
+		set(VTOOLDIR "${VARNISH_SOURCE_DIR}/share/varnish-plus")
 		set(VINCLUDE "${VARNISH_DIR}/include/varnish-plus")
 	endif()
 else()
 	if (LOCAL_VC)
-		set(VMODTOOL "${VARNISH_SOURCE_DIR}/lib/libvcc/vmodtool.py")
+		set(VTOOLDIR "${VARNISH_SOURCE_DIR}/lib/libvcc")
 		set(VINCLUDE "${VARNISH_SOURCE_DIR}/include")
 	else()
-		set(VMODTOOL "${VARNISH_DIR}/share/varnish/vmodtool.py")
+		set(VTOOLDIR "${VARNISH_DIR}/share/varnish")
 		set(VINCLUDE "${VARNISH_DIR}/include/varnish")
 	endif()
 endif()
@@ -37,6 +37,12 @@ else()
 	find_program(VARNISHD    "varnishd")
 	find_program(VARNISHTEST "varnishtest")
 endif()
+# this will fill the PYTHON_EXECUTABLE variable, which is only
+# required when trying to run a python script without the executable bit
+find_package(PythonInterp REQUIRED)
+
+set(VMODTOOL "${VTOOLDIR}/vmodtool.py")
+set(VSCTOOL  "${VTOOLDIR}/vsctool.py")
 
 find_package(Threads)
 
@@ -50,12 +56,17 @@ function(add_vmod LIBNAME VCCNAME comment)
 	)
 	# generate VCC .c and .h
 	get_filename_component(BASENAME ${VCCNAME} NAME_WE)
-	set(VCCFILE  ${CMAKE_CURRENT_SOURCE_DIR}/${VCCNAME})
+	if (EXISTS ${VCCNAME})
+		set(VCCFILE ${VCCNAME})
+	else() # try relative to source directory
+		set(VCCFILE  ${CMAKE_CURRENT_SOURCE_DIR}/${VCCNAME})
+	endif()
 	set(OUTFILES ${BASENAME}_if.c ${BASENAME}_if.h)
 	add_custom_command(
-		COMMAND ${PYTHON_EXECUTABLE} ${VMODTOOL} --strict --boilerplate -o ${BASENAME}_if ${VCCFILE}
+		COMMAND ${PYTHON_EXECUTABLE} ${VMODTOOL} --boilerplate -o ${BASENAME}_if ${VCCFILE}
 		DEPENDS ${VCCFILE}
 		OUTPUT  ${OUTFILES}
+		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 	)
 	# create VMOD shared object
 	add_library(${LIBNAME} SHARED ${ARGN} ${OUTFILES})
@@ -84,8 +95,26 @@ function(add_vmod LIBNAME VCCNAME comment)
 	)
 endfunction()
 
+function(add_vmod_vsc LIBNAME VSCNAME)
+	# generate VSC .c and .h
+	get_filename_component(BASENAME ${VSCNAME} NAME_WE)
+	if (EXISTS ${VSCNAME})
+		set(VSCFILE ${VSCNAME})
+	else() # try relative to source directory
+		set(VSCFILE  ${CMAKE_CURRENT_SOURCE_DIR}/${VSCNAME})
+	endif()
+	set(OUTFILES ${BASENAME}.c ${BASENAME}.h)
+	add_custom_command(
+		COMMAND ${PYTHON_EXECUTABLE} ${VSCTOOL} -ch ${VSCFILE}
+		DEPENDS ${VSCFILE}
+		OUTPUT  ${OUTFILES}
+		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+	)
+	target_sources(${LIBNAME} PRIVATE ${OUTFILES})
+endfunction()
 
-function(vmod_add_tests LIBNAME IMPORT_NAME)
+
+function(add_vmod_tests LIBNAME IMPORT_NAME)
 	set(LIBPATH "${CMAKE_BINARY_DIR}/lib${LIBNAME}.so")
 	# varnishtest doesn't like to run with no tests
 	if (ARGC GREATER 2) # not sure why 2 though

@@ -15,6 +15,7 @@ option(AUTOFDO      "Enable AutoFDO profile optimizations" OFF)
 set(PROFILE "../perf.afdo" CACHE STRING "Optimization profile path")
 option(LIBFUZZER    "Enable fuzzing with clang libfuzzer")
 option(LIBCPP       "Enable compiling with libc++ and linking with LLD" OFF)
+option(USE_LLD      "Always link with LLD" OFF)
 option(SINGLE_PROCESS "Disable fork() and run in single-process mode" ON)
 option(HIDDEN_BRANCH "Hidden open-source branch in the VCP repo" OFF)
 
@@ -80,6 +81,10 @@ endif()
 if (GCSECTIONS)
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffunction-sections -fdata-sections")
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-gc-sections")
+endif()
+
+if (USE_LLD)
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
 endif()
 
 # C threadpool used by parallell fuzzer

@@ -6,7 +6,7 @@ add_vmod(vmod_header vmod_header.vcc "Header VMOD"
 	vmod_header.c
 )
 # VCL import name is "header"
-vmod_add_tests(vmod_header header
+add_vmod_tests(vmod_header header
 	tests/append.vtc
 	tests/copy.vtc
 	tests/get.vtc

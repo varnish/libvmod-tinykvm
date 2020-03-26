@@ -88,17 +88,24 @@ set(TESTS
 	b00040.vtc  c00060.vtc  e00002.vtc  m00029.vtc  p00003.vtc  r00940.vtc  r01504.vtc  r02035.vtc  t00000.vtc
 )
 
-set(TESTS_PATH ${VARNISH_PATH}/bin/varnishtest/tests)
+set(TESTS_PATH  ${VARNISH_PATH}/bin/varnishtest/tests)
 set(VARNISHD    ${CMAKE_BINARY_DIR}/varnishd)
 set(VARNISHTEST ${CMAKE_BINARY_DIR}/varnishtest)
+
+file(GLOB children ${VARNISH_PATH}/lib/libvmod_*)
+foreach(child ${children})
+	if(IS_DIRECTORY ${child})
+		#message(STATUS "VMOD: ${child}")
+		set(VMOD_PATHS "${VMOD_PATHS}${child}/.libs:")
+	endif()
+endforeach()
 
 enable_testing()
 foreach (TEST ${TESTS})
 	get_filename_component(TNAME ${TEST} NAME_WE)
 	add_test(
 		NAME tests_${TNAME}
-		COMMAND ${VARNISHTEST} -j8 "-Dvarnishd=${VARNISHD}" ${TEST}
+		COMMAND ${VARNISHTEST} "-Dvarnishd=${VARNISHD}" -p "vmod_path=\"${VMOD_PATHS}\"" ${TEST}
 		WORKING_DIRECTORY ${TESTS_PATH}
 	)
 endforeach()
-#add_dependencies(varnish_tests varnishd varnishtest)

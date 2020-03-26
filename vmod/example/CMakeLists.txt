@@ -6,6 +6,6 @@ add_vmod(vmod_example vmod_example.vcc "Example VMOD"
 	vmod_example.c
 )
 # VCL import name is "example"
-vmod_add_tests(vmod_example example
+add_vmod_tests(vmod_example example
 	tests/test01.vtc
 )

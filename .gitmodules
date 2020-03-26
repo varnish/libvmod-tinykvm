@@ -16,3 +16,6 @@
 [submodule "vmod/waf/modsec/ModSecurity"]
 	path = vmod/waf/modsec/ModSecurity
 	url = https://github.com/SpiderLabs/ModSecurity.git
+[submodule "cmake/varnishd/fuzz/b64.c"]
+	path = cmake/varnishd/fuzz/b64.c
+	url = https://github.com/littlstar/b64.c.git

@@ -6,7 +6,7 @@ add_vmod(vmod_cookie vmod_cookie.vcc "Cookie VMOD"
 	vmod_cookie.c
 )
 # VCL import name is "cookie"
-vmod_add_tests(vmod_cookie cookie
+add_vmod_tests(vmod_cookie cookie
 	tests/01-set-delete-produce.vtc
 	tests/02-clean.vtc
 	tests/03-null.vtc
