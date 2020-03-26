@@ -1,5 +1,6 @@
 Todo list for CMake build system
 ===============================
-- Generate config.h using configure_file(...)
+- Generate config.h using configure_file(...).
     https://cmake.org/cmake/help/v3.6/command/configure_file.html
-- Fuzz response parsing (generate responses)
+- Fuzz VMODs in a better way. Each VMOD requires its own fuzzing strategy.
+- 
