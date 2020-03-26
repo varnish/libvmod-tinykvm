@@ -281,6 +281,8 @@ add_dependencies(vcc libvcc_generate)
 if (LIBFUZZER)
 	set (LIBFUZZER_SOURCES
 		fuzz/fuzzer.c
+		fuzz/fuzz_base64.c
+		fuzz/fuzz_sha256.c
 		fuzz/fuzz_http.c
 		fuzz/fuzz_h2.c
 		fuzz/fuzz_proxy.c
