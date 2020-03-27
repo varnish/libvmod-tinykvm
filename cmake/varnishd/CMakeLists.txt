@@ -314,9 +314,9 @@ target_include_directories(varnishd PRIVATE ${CMAKE_BINARY_DIR}/libvarnish)
 target_include_directories(varnishd PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 add_dependencies(varnishd vhp_gen_hufdec generate_builtin_vcl)
 target_link_libraries(varnishd vcc varnish vgz m)
-target_link_libraries(varnishd config pcre jemalloc pthread crypto ssl dl)
+target_link_libraries(varnishd config pcre pthread crypto ssl dl)
 if (VARNISH_PLUS)
-    target_link_libraries(varnishd mse lmdb sslhelper)
+    target_link_libraries(varnishd mse lmdb sslhelper jemalloc)
 endif()
 # build varnishd into the top binary folder
 set_target_properties(varnishd
