@@ -42,7 +42,7 @@ else()
 endif()
 # this will fill the PYTHON_EXECUTABLE variable, which is only
 # required when trying to run a python script without the executable bit
-find_package(PythonInterp REQUIRED)
+find_package(Python3 COMPONENTS Interpreter)
 
 set(VMODTOOL "${VTOOLDIR}/vmodtool.py")
 set(VSCTOOL  "${VTOOLDIR}/vsctool.py")
@@ -63,7 +63,7 @@ function(add_vmod LIBNAME VCCNAME comment)
 	endif()
 	set(OUTFILES ${BASENAME}_if.c ${BASENAME}_if.h)
 	add_custom_command(
-		COMMAND ${PYTHON_EXECUTABLE} ${VMODTOOL} -o ${BASENAME}_if ${VCCFILE}
+		COMMAND ${Python3_EXECUTABLE} ${VMODTOOL} -o ${BASENAME}_if ${VCCFILE}
 		DEPENDS ${VCCFILE}
 		OUTPUT  ${OUTFILES}
 		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -112,7 +112,7 @@ function(add_vmod_vsc LIBNAME VSCNAME)
 	endif()
 	set(OUTFILES ${BASENAME}.c ${BASENAME}.h)
 	add_custom_command(
-		COMMAND ${PYTHON_EXECUTABLE} ${VSCTOOL} -ch ${VSCFILE}
+		COMMAND ${Python3_EXECUTABLE} ${VSCTOOL} -ch ${VSCFILE}
 		DEPENDS ${VSCFILE}
 		OUTPUT  ${OUTFILES}
 		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
