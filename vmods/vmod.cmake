@@ -53,10 +53,12 @@ function(add_vmod LIBNAME VCCNAME comment)
 	# write empty config.h for autocrap
 	file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/config.h
 		"#define HAVE_OBJITERATE_F\n"
+		"#define HAVE_GETPEEREID 1\n"
+		"#define HAVE_SETPPRIV 1\n"
 	)
 	# generate VCC .c and .h
 	get_filename_component(BASENAME ${VCCNAME} NAME_WE)
-	if (EXISTS "${VCCNAME}")
+	if (EXISTS "${VCCNAME}" OR EXISTS ${VCCNAME})
 		set(VCCFILE ${VCCNAME})
 	else() # try relative to source directory
 		set(VCCFILE  ${CMAKE_CURRENT_SOURCE_DIR}/${VCCNAME})
@@ -105,7 +107,7 @@ endfunction()
 function(add_vmod_vsc LIBNAME VSCNAME)
 	# generate VSC .c and .h
 	get_filename_component(BASENAME ${VSCNAME} NAME_WE)
-	if (EXISTS "${VSCNAME}")
+	if (EXISTS "${VSCNAME}" OR EXISTS ${VSCNAME})
 		set(VSCFILE ${VSCNAME})
 	else() # try relative to source directory
 		set(VSCFILE  ${CMAKE_CURRENT_SOURCE_DIR}/${VSCNAME})
@@ -126,9 +128,10 @@ function(add_vmod_tests LIBNAME IMPORT_NAME)
 	set(LIBPATH "${CMAKE_BINARY_DIR}/lib${LIBNAME}.so")
 	set(VMOD_PATH "${CMAKE_BINARY_DIR}")
 	# varnishtest doesn't like to run with no tests
-	foreach (TEST ${ARGN})
+	foreach (FILENAME ${ARGN})
+	get_filename_component(TEST ${FILENAME} NAME_WE)
 	add_test(NAME ${LIBNAME}_${TEST}
-		COMMAND ${VARNISHTEST} "-Dvarnishd=${VARNISHD}" "-DVMOD_SO=\"${LIBPATH}\"" -p "vmod_path=${VMOD_PATH}" ${TEST}
+		COMMAND ${VARNISHTEST} "-Dvarnishd=${VARNISHD}" "-DVMOD_SO=\"${LIBPATH}\"" -p "vmod_path=${VMOD_PATH}" ${FILENAME}
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	)
 	set_tests_properties(${LIBNAME}_${TEST}
