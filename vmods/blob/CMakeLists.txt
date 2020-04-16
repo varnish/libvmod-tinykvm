@@ -4,7 +4,7 @@ include(../vmod.cmake vmod)
 
 set (PATH ${VARNISH_SOURCE_DIR}/lib/libvmod_blob)
 
-add_vmod(vmod_blob ${PATH}/vmod_blob.vcc "Blob VMOD"
+add_vmod(vmod_blob "${PATH}/vmod_blob.vcc" "Blob VMOD"
 	${PATH}/base64.c
 	${PATH}/hex.c
 	${PATH}/id.c

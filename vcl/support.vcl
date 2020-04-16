@@ -1,5 +1,5 @@
 vcl 4.1;
-import std from "/home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/lib/libvmod_std/.libs/libvmod_std.so";
+import std;
 
 backend default {
 	.path = "/home/gonzo/github/varnish_autoperf/server/server.socket";

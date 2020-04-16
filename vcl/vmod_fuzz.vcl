@@ -5,7 +5,8 @@ vcl 4.1;
 #import urlplus from "/home/gonzo/github/varnish_autoperf/vmod/build/libvmod_urlplus.so";
 #import file   from "/home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/lib/libvmod_file/.libs/libvmod_file.so";
 #import cookieplus from "/home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/lib/libvmod_cookieplus/.libs/libvmod_cookieplus.so";
-import jwt from "/home/gonzo/github/varnish_autoperf/vmod/build/libvmod_jwt.so";
+import headerplus from "/home/gonzo/github/varnish_autoperf/build/libvmod_headerplus.so";
+import jwt from "/home/gonzo/github/varnish_autoperf/build/libvmod_jwt.so";
 
 backend default {
     .host = "127.0.0.1";
@@ -55,9 +56,15 @@ sub vcl_recv {
 	set req.http.x-query = urlplus.query_get("query");
 	urlplus.write();*/
 
-    set req.http.r1 = jwt_reader.parse(req.http.Input);
-	set req.http.r2 = jwt_reader.set_key("my secret");
-    set req.http.r3 = jwt_reader.verify("HS256");
+	headerplus.init(req);
+	headerplus.attr_get("Input", "max-age");
+	headerplus.attr_set("Input", "val", req.http.Input);
+	headerplus.add("Input", req.http.Input);
+	headerplus.write();
+
+    #set req.http.r1 = jwt_reader.parse(req.http.Input);
+	#set req.http.r2 = jwt_reader.set_key("my secret");
+    #set req.http.r3 = jwt_reader.verify("HS256");
 	return (hash);
 }
 

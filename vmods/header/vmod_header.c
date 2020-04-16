@@ -35,7 +35,7 @@
 #include <cache/cache.h>
 #include "vre.h"
 
-#include "vmod_header_if.h"
+#include "vcc_if.h"
 
 /*
  * This mutex is used to avoid having two threads that initializes the same

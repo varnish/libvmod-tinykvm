@@ -49,6 +49,7 @@ set(VSCTOOL  "${VTOOLDIR}/vsctool.py")
 
 find_package(Threads)
 
+# Example: vmod_debug vmod_debug.vcc
 function(add_vmod LIBNAME VCCNAME comment)
 	# write empty config.h for autocrap
 	file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/config.h
@@ -57,15 +58,14 @@ function(add_vmod LIBNAME VCCNAME comment)
 		"#define HAVE_SETPPRIV 1\n"
 	)
 	# generate VCC .c and .h
-	get_filename_component(BASENAME ${VCCNAME} NAME_WE)
 	if (EXISTS "${VCCNAME}" OR EXISTS ${VCCNAME})
-		set(VCCFILE ${VCCNAME})
+		set(VCCFILE "${VCCNAME}")
 	else() # try relative to source directory
-		set(VCCFILE  ${CMAKE_CURRENT_SOURCE_DIR}/${VCCNAME})
+		set(VCCFILE "${CMAKE_CURRENT_SOURCE_DIR}/${VCCNAME}")
 	endif()
-	set(OUTFILES ${BASENAME}_if.c ${BASENAME}_if.h)
+	set(OUTFILES vcc_if.c vcc_if.h)
 	add_custom_command(
-		COMMAND ${Python3_EXECUTABLE} ${VMODTOOL} -o ${BASENAME}_if ${VCCFILE}
+		COMMAND ${Python3_EXECUTABLE} ${VMODTOOL} -o vcc_if ${VCCFILE}
 		DEPENDS ${VCCFILE}
 		OUTPUT  ${OUTFILES}
 		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -88,6 +88,7 @@ function(add_vmod LIBNAME VCCNAME comment)
 		target_link_libraries(${LIBNAME} PkgConfig::LIBVARNISH)
 	endif()
 	target_link_libraries(${LIBNAME} Threads::Threads)
+	target_compile_options(${LIBNAME} PRIVATE "-fno-lto") # LTO discards too much
 	target_compile_definitions(${LIBNAME} PRIVATE VMOD=1 HAVE_CONFIG_H)
 	if (VARNISH_PLUS)
 		target_compile_definitions(${LIBNAME} PRIVATE VARNISH_PLUS=1)

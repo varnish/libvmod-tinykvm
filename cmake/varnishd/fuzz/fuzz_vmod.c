@@ -55,7 +55,8 @@ extern int  open_varnishd_connection();
 //#define VMOD_COOKIEPLUS
 //#define VMOD_URLPLUS
 //#define VMOD_WAF
-#define VMOD_JWT
+//#define VMOD_JWT
+#define VMOD_HEADERPLUS
 static const size_t JWT_MAX = 9000;
 static const bool do_encode_jwt_token = true;
 
@@ -220,6 +221,27 @@ void vmod_fuzzer(uint8_t* data, size_t len)
 
 	ssize_t bytes = write(cfd, "\r\n\r\n", strlen("\r\n\r\n"));
 	if (bytes < 0) {
+		close(cfd);
+		return;
+	}
+#elif defined(VMOD_HEADERPLUS)
+	const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nInput: ";
+	int ret = write(cfd, req, strlen(req));
+	if (ret < 0) {
+		//printf("Writing the request failed\n");
+		close(cfd);
+		return;
+	}
+
+	ssize_t bytes = write(cfd, data, len);
+	if (bytes < 0) {
+		close(cfd);
+		return;
+	}
+
+	const char* postamble = "\r\n\r\n";
+	ret = write(cfd, postamble, strlen(postamble));
+	if (ret < 0) {
 		close(cfd);
 		return;
 	}
