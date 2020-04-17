@@ -57,6 +57,7 @@ extern int  open_varnishd_connection();
 //#define VMOD_WAF
 //#define VMOD_JWT
 #define VMOD_HEADERPLUS
+#define REMAIN_OPEN
 static const size_t JWT_MAX = 9000;
 static const bool do_encode_jwt_token = true;
 
@@ -107,6 +108,9 @@ size_t jwt_encode(const uint8_t* data, const size_t size,
 	return megalen;
 }
 
+#define CLOSE_IT() { close(cfd); cfd = -1; }
+__thread int cfd = 0;
+
 void vmod_fuzzer(uint8_t* data, size_t len)
 {
     static bool init = false;
@@ -123,19 +127,21 @@ void vmod_fuzzer(uint8_t* data, size_t len)
     }
 	if (len == 0) return;
 
-    int cfd = open_varnishd_connection();
-    if (cfd < 0) {
-        fprintf(stderr, "Could not create socket... going to sleep\n");
-        sleep(1);
-        return;
-    }
+	if (cfd <= 0) {
+    	cfd = open_varnishd_connection();
+	    if (cfd < 0) {
+	        fprintf(stderr, "Could not create socket... going to sleep\n");
+	        sleep(1);
+	        return;
+	    }
+	}
 
 #ifdef VMOD_COOKIEPLUS
 	const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1";
 	int ret = write(cfd, req, strlen(req));
 	if (ret < 0) {
 		//printf("Writing the request failed\n");
-		close(cfd);
+		CLOSE_IT();
 		return;
 	}
 
@@ -143,13 +149,13 @@ void vmod_fuzzer(uint8_t* data, size_t len)
     int ret = write(cfd, seq, strlen(seq));
     if (ret < 0) {
         //printf("Writing the request failed\n");
-        close(cfd);
+		CLOSE_IT();
         return;
     }
 
 	ssize_t bytes = write(cfd, data, len);
     if (bytes < 0) {
-        close(cfd);
+		CLOSE_IT();
         return;
     }
 	write(cfd, "\r\n\r\n", 4);
@@ -157,22 +163,20 @@ void vmod_fuzzer(uint8_t* data, size_t len)
 	const char* req = "GET /";
 	int ret = write(cfd, req, strlen(req));
 	if (ret < 0) {
-		//printf("Writing the request failed\n");
-		close(cfd);
+		CLOSE_IT();
 		return;
 	}
 
 	ret = write(cfd, data, len);
 	if (ret < 0) {
-		close(cfd);
+		CLOSE_IT();
 		return;
 	}
 	
 	req = " HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
 	ret = write(cfd, req, strlen(req));
 	if (ret < 0) {
-		//printf("Writing the request failed\n");
-		close(cfd);
+		CLOSE_IT();
 		return;
 	}
 #elif defined(VMOD_WAF)
@@ -185,13 +189,13 @@ void vmod_fuzzer(uint8_t* data, size_t len)
 	int ret = write(cfd, buffer, L);
 	if (ret < 0) {
 		//printf("Writing the request failed\n");
-		close(cfd);
+		CLOSE_IT();
 		return;
 	}
 
 	ssize_t bytes = write(cfd, data, len);
 	if (bytes < 0) {
-		close(cfd);
+		CLOSE_IT();
 		return;
 	}
 #elif defined(VMOD_JWT)
@@ -199,7 +203,7 @@ void vmod_fuzzer(uint8_t* data, size_t len)
 	int ret = write(cfd, req, strlen(req));
 	if (ret < 0) {
 		//printf("Writing the request failed\n");
-		close(cfd);
+		CLOSE_IT();
 		return;
 	}
 
@@ -208,61 +212,61 @@ void vmod_fuzzer(uint8_t* data, size_t len)
 		size_t megalen = jwt_encode(data, len, "my secret", megabuffer);
 		ssize_t bytes = write(cfd, megabuffer, megalen);
 		if (bytes < 0) {
-			close(cfd);
+			CLOSE_IT();
 			return;
 		}
 	} else {
 		ssize_t bytes = write(cfd, data, len);
 		if (bytes < 0) {
-			close(cfd);
+			CLOSE_IT();
 			return;
 		}
 	}
 
 	ssize_t bytes = write(cfd, "\r\n\r\n", strlen("\r\n\r\n"));
 	if (bytes < 0) {
-		close(cfd);
+		CLOSE_IT();
 		return;
 	}
 #elif defined(VMOD_HEADERPLUS)
 	const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nInput: ";
 	int ret = write(cfd, req, strlen(req));
 	if (ret < 0) {
-		//printf("Writing the request failed\n");
-		close(cfd);
+		CLOSE_IT();
 		return;
 	}
 
 	ssize_t bytes = write(cfd, data, len);
 	if (bytes < 0) {
-		close(cfd);
+		CLOSE_IT();
 		return;
 	}
 
 	const char* postamble = "\r\n\r\n";
 	ret = write(cfd, postamble, strlen(postamble));
 	if (ret < 0) {
-		close(cfd);
+		CLOSE_IT();
 		return;
 	}
 #else
 	const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nInput: ";
 	int ret = write(cfd, req, strlen(req));
 	if (ret < 0) {
-		//printf("Writing the request failed\n");
-		close(cfd);
+		CLOSE_IT();
 		return;
 	}
 
 	ssize_t bytes = write(cfd, data, len);
 	if (bytes < 0) {
-		close(cfd);
+		CLOSE_IT();
 		return;
 	}
 #endif
 
+#ifndef REMAIN_OPEN
     // signalling end of request, increases exec/s by 4x
     shutdown(cfd, SHUT_WR);
+#endif
 
     char readbuf[2048];
     ssize_t rlen = read(cfd, readbuf, sizeof(readbuf));
@@ -271,9 +275,11 @@ void vmod_fuzzer(uint8_t* data, size_t len)
         if (errno != ECONNRESET) {
             printf("Read failed: %s\n", strerror(errno));
         }
-        close(cfd);
+		CLOSE_IT();
         return;
     }
 
-    close(cfd);
+#ifndef REMAIN_OPEN
+	CLOSE_IT();
+#endif
 }

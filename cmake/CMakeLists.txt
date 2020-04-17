@@ -20,7 +20,7 @@ option(USE_LLD      "Always link with LLD" OFF)
 option(SINGLE_PROCESS "Disable fork() and run in single-process mode" ON)
 option(HIDDEN_BRANCH "Hidden open-source branch in the VCP repo" OFF)
 
-set(CMAKE_C_FLAGS "-Wall -Wextra -std=c11 -O2 -g")
+set(CMAKE_C_FLAGS "-Wall -Wextra -std=c11 -O2 -g -fstack-protector-strong")
 
 if (LTO_ENABLE)
     if ("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
@@ -38,7 +38,7 @@ if (GPROF)
 endif()
 
 if (DEBUGGING)
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -ggdb3")
 elseif (MINIMAL)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Os")
 endif()
