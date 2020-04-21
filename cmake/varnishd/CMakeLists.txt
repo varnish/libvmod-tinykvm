@@ -338,6 +338,7 @@ if (LIBFUZZER)
     set_source_files_properties(
         ${VD_PATH}/mgt/mgt_child.c
         ${VD_PATH}/mgt/mgt_main.c
+		${VD_PATH}/mgt/mgt_param_tbl.c
     PROPERTIES COMPILE_DEFINITIONS LIBFUZZER_ENABLED=1)
 endif()
 

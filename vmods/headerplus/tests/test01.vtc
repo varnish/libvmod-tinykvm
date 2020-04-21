@@ -1,0 +1,98 @@
+varnishtest "Test headerplus.add/set()"
+
+server s1 {
+	rxreq
+	txresp
+	expect req.http.h1 == "v1"
+	expect req.http.h2 == "v2"
+
+	rxreq
+	txresp
+	expect req.http.h1 == "v1"
+	expect req.http.h2 == "v2"
+
+	rxreq
+	txresp
+	expect req.http.h1 == "v1"
+	expect req.http.h2 == "v7"
+} -start
+
+varnish v1 -vcl+backend {
+	import headerplus;
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		headerplus.init(bereq);
+		headerplus.set("h1", "v1");
+		headerplus.add("h2", "v2");
+		if (bereq.http.add) {
+			headerplus.add("test", "inside");
+		} else {
+			headerplus.set("test", "inside");
+		}
+		headerplus.write();
+	}
+} -start
+
+logexpect l1 -v v1 -i BereqHeader -i BereqUnset {
+	# Headers coming from client/varnish
+	expect *	1002 	BereqHeader  	"test: a"
+	expect 0	= 	BereqHeader  	"test:b"
+	expect 0	= 	BereqHeader  	"test:ing"
+	expect 0	= 	BereqHeader  	"test: d"
+	expect 0	= 	BereqHeader  	"add: true"
+	expect 0	= 	BereqHeader  	"Host: 127.0.0.1"
+	expect 0	= 	BereqHeader  	"X-Forwarded-For: 127.0.0.1"
+	expect 0	= 	BereqHeader  	"X-Varnish: 1002"
+	# Headerplus headers
+	expect 0	= 	BereqHeader  	"h1: v1"
+	expect 0	= 	BereqHeader  	"h2: v2"
+	expect 0	= 	BereqHeader  	"test: inside"
+
+	# Headers coming from client/varnish
+	expect *	1004 	BereqHeader  	"test: a"
+	expect 0	= 	BereqHeader  	"test:b"
+	expect 0	= 	BereqHeader  	"test:ing"
+	expect 0	= 	BereqHeader  	"test: d"
+	expect 0	= 	BereqHeader  	"Host: 127.0.0.1"
+	expect 0	= 	BereqHeader  	"X-Forwarded-For: 127.0.0.1"
+	expect 0	= 	BereqHeader  	"X-Varnish: 1004"
+	# Headerplus headers
+	expect 0	= 	BereqUnset  	"test: a"
+	expect 0	= 	BereqUnset  	"test:b"
+	expect 0	= 	BereqUnset  	"test:ing"
+	expect 0	= 	BereqUnset  	"test: d"
+	expect 0	= 	BereqHeader  	"h1: v1"
+	expect 0	= 	BereqHeader  	"h2: v2"
+	expect 0	= 	BereqHeader  	"test: inside"
+
+	# Headers coming from client/varnish
+	expect *	1006	BereqHeader  	"h1: v6"
+	expect 0	= 	BereqHeader  	"h2: v7"
+	expect 0	= 	BereqHeader  	"Host: 127.0.0.1"
+	expect 0	= 	BereqHeader  	"X-Forwarded-For: 127.0.0.1"
+	expect 0	= 	BereqHeader  	"X-Varnish: 1006"
+	# Headerplus headers
+	expect 0	= 	BereqUnset  	"h1: v6"
+	expect 0	= 	BereqHeader  	"h1: v1"
+	expect 0	= 	BereqHeader  	"h2: v2"
+	expect 0	= 	BereqHeader  	"test: inside"
+} -start
+
+client c1 {
+	txreq -hdr "test: a" -hdr "test:b " -hdr "test:ing" -hdr "test: d" \
+	-hdr "add: true"
+	rxresp
+
+
+	txreq -hdr "test: a" -hdr "test:b " -hdr "test:ing" -hdr "test: d"
+	rxresp
+
+	txreq -hdr "h1: v6" -hdr "h2: v7"
+	rxresp
+} -run
+
+logexpect l1 -wait

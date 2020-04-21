@@ -1,0 +1,88 @@
+varnishtest "Test headerplus.rename/rename_regex()"
+
+varnish v1 -vcl+backend {
+	import headerplus;
+
+	backend default none;
+
+	sub vcl_recv {
+		return (synth(200));
+	}
+
+	sub vcl_synth {
+		headerplus.init(req);
+		headerplus.add("test", "inside");
+		if (req.http.re) {
+			if (req.http.remove) {
+				headerplus.rename_regex("(te)(st)", "\2\1", remove = true);
+			} else {
+				headerplus.rename_regex("(te)(st)", "\2\1", remove = false);
+			}
+		} else if (req.http.remove) {
+			headerplus.rename("test", "inside", remove = true);
+		} else {
+			headerplus.rename("test", "inside", remove = false);
+		}
+		headerplus.write();
+	}
+
+} -start
+
+logexpect l1 -v v1 {
+	expect *	1001 	VCL_Log  	"headerplus.write()"
+	expect 0	= 	ReqUnset  	"test: a"
+	expect 0	= 	ReqUnset 	"test:b"
+	expect 0	= 	ReqUnset 	"test:ing"
+	expect 0	= 	ReqUnset 	"test: d"
+	expect 0	= 	ReqHeader  	"inside: a"
+	expect 0	= 	ReqHeader 	"inside: b"
+	expect 0	= 	ReqHeader 	"inside: ing"
+	expect 0	= 	ReqHeader 	"inside: d"
+	expect 0	= 	ReqHeader 	"inside: inside"
+
+	expect *	1002	VCL_Log  	"headerplus.write()"
+	expect 0	= 	ReqUnset  	"test: a"
+	expect 0	= 	ReqUnset 	"test:b"
+	expect 0	= 	ReqUnset 	"test:ing"
+	expect 0	= 	ReqUnset 	"test: d"
+	expect 0	= 	ReqHeader  	"stte: a"
+	expect 0	= 	ReqHeader 	"stte: b"
+	expect 0	= 	ReqHeader 	"stte: ing"
+	expect 0	= 	ReqHeader 	"stte: d"
+	expect 0	= 	ReqHeader 	"stte: inside"
+
+	expect *	1003 	VCL_Log  	"headerplus.write()"
+	expect 0	= 	ReqHeader 	"test: inside"
+	expect 0	= 	ReqHeader  	"inside: a"
+	expect 0	= 	ReqHeader 	"inside: b"
+	expect 0	= 	ReqHeader 	"inside: ing"
+	expect 0	= 	ReqHeader 	"inside: d"
+	expect 0	= 	ReqHeader 	"inside: inside"
+
+	expect *	1004	VCL_Log  	"headerplus.write()"
+	expect 0	= 	ReqHeader 	"test: inside"
+	expect 0	= 	ReqHeader  	"stte: a"
+	expect 0	= 	ReqHeader 	"stte: b"
+	expect 0	= 	ReqHeader 	"stte: ing"
+	expect 0	= 	ReqHeader 	"stte: d"
+	expect 0	= 	ReqHeader 	"stte: inside"
+} -start
+
+client c1 {
+	txreq -hdr "test: a" -hdr "test:b " -hdr "test:ing" -hdr "test: d" \
+	-hdr "remove: true"
+	rxresp
+
+	txreq -hdr "test: a" -hdr "test:b " -hdr "test:ing" -hdr "test: d" \
+	-hdr "re: true" -hdr "remove: true"
+	rxresp
+
+	txreq -hdr "test: a" -hdr "test:b " -hdr "test:ing" -hdr "test: d"
+	rxresp
+
+	txreq -hdr "test: a" -hdr "test:b " -hdr "test:ing" -hdr "test: d" \
+	-hdr "re: true"
+	rxresp
+} -run
+
+logexpect l1 -wait

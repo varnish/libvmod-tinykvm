@@ -119,10 +119,7 @@ void vmod_fuzzer(uint8_t* data, size_t len)
         varnishd_initialize(
 			"/home/gonzo/github/varnish_autoperf/vcl/vmod_fuzz.vcl"
 		);
-		/*OPENSSL_init_crypto(OPENSSL_INIT_ADD_ALL_CIPHERS
-			 | OPENSSL_INIT_ADD_ALL_DIGESTS
-			 | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);*/
-		fprintf(stderr, "%s\n", jwt_private_key);
+		//fprintf(stderr, "%s\n", jwt_private_key);
 		init_rsa_key(jwt_private_key);
     }
 	if (len == 0) return;

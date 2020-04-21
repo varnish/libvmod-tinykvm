@@ -23,6 +23,7 @@ extern void vmod_fuzzer(void* data, size_t len);
 int __lsan_is_turned_off() { return 1; }
 // abort on errors ASAP
 void __asan_on_error() {
+	void abort(void) __attribute__((noreturn));
 	abort();
 }
 

@@ -9,6 +9,7 @@ uint16_t varnishd_client_port;
 const char* varnishd_client_path = NULL;
 bool varnishd_proxy_mode = false;
 int  varnishd_threadpool_size = 8;
+int  varnishd_threadpool_stack = 128*1024;
 
 void varnishd_initialize(const char* vcl_path)
 {
@@ -27,12 +28,16 @@ void varnishd_initialize(const char* vcl_path)
     char ti_buffer[64];
     snprintf(ti_buffer, sizeof(ti_buffer), "timeout_idle=0.001");
 	// threadpool min buffer
+    char tpstack_buffer[128];
+    snprintf(tpstack_buffer, sizeof(tpstack_buffer), 
+			"thread_pool_stack=%d", varnishd_threadpool_stack);
+	// threadpool min buffer
     char tpmin_buffer[128];
-    snprintf(tpmin_buffer, sizeof(ti_buffer), 
+    snprintf(tpmin_buffer, sizeof(tpmin_buffer), 
 			"thread_pool_min=%d", varnishd_threadpool_size);
 	// threadpool max buffer
     char tpmax_buffer[128];
-    snprintf(tpmax_buffer, sizeof(ti_buffer), 
+    snprintf(tpmax_buffer, sizeof(tpmax_buffer), 
 			"thread_pool_max=%d", varnishd_threadpool_size);
     // temp folder
     char vd_folder[128];
@@ -63,6 +68,7 @@ void varnishd_initialize(const char* vcl_path)
 		"-p", feature_siproc,
 		"-p", ti_buffer,
 		"-p", cs_buffer, // needed?
+		//"-p", tpstack_buffer,
 		"-p", tpmin_buffer,
 		"-p", tpmax_buffer,
 		// -b must be last (see below)

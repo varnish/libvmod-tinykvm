@@ -1,5 +1,7 @@
 #!/bin/bash
 set -e
+#export CC=clang-9
+#export CXX=clang++-9
 export CC=$HOME/llvm/install/bin/clang-11
 export CXX=$HOME/llvm/install/bin/clang++-11
 FOLDER=build_vmodfuzz

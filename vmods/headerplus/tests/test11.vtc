@@ -1,0 +1,112 @@
+varnishtest "Test headerplus.attr*()"
+
+varnish v1 -arg "-p workspace_client=256k" -vcl+backend {
+	import headerplus;
+
+	backend default none;
+
+	sub vcl_recv {
+		return (synth(200));
+	}
+
+	sub vcl_synth {
+		headerplus.init(req);
+
+		set resp.http.v1 = headerplus.attr_get("Cache-control", "max-age");
+		set resp.http.v2 = headerplus.attr_get("Cache-control", "public");
+		set resp.http.v3 = headerplus.attr_get("Contents", "value3", "; ", "*");
+		set resp.http.v4 = headerplus.attr_get("Contents", "cc", "; ", "*");
+		set resp.http.v5 = headerplus.attr_get("Contents", "value1", "; ", "*");
+		set resp.http.v6 = headerplus.attr_get("Contents", "value2", "; ", "*");
+		set resp.http.v7 = headerplus.attr_get("test", "name2");
+
+		headerplus.attr_set("test", "val", "3");
+		set resp.http.v8 = headerplus.get("test", "v1");
+		set resp.http.v9 = headerplus.get("test", "^name2");
+
+		headerplus.attr_set("test", "val", "66", how = UPDATE);
+
+		set resp.http.v10 = headerplus.get("test", "v1");
+		set resp.http.v11 = headerplus.get("test", "^name2");
+
+	 	headerplus.attr_set("test", "val", "9999", how = ALL);
+
+	 	set resp.http.v12 = headerplus.get("test", "v1");
+	 	set resp.http.v13 = headerplus.get("test", "^name2");
+
+		headerplus.write();
+
+		headerplus.init(req);
+
+		headerplus.attr_delete("contents", "value1", ";");
+		set resp.http.v14 = headerplus.get("contents");
+
+		headerplus.attr_delete("contents", "value5", ";");
+		set resp.http.v15 = headerplus.get("contents");
+
+		headerplus.attr_delete("contents", "value3", ";");
+		set resp.http.v16 = headerplus.get("contents");
+
+		headerplus.attr_delete("contents", "value2", ";");
+		set resp.http.v17 = headerplus.get("contents");
+
+		headerplus.attr_delete("check", "val3", "||");
+		set resp.http.v18 = headerplus.get("check");
+
+		headerplus.attr_delete("check", "val1", "||");
+		set resp.http.v19 = headerplus.get("check");
+
+		headerplus.attr_delete("xxx", "val1", all=true);
+		set resp.http.v20 = headerplus.get("xxx", "val6");
+		set resp.http.v21 = headerplus.get("xxx", "ext");
+		set resp.http.v22 = headerplus.get("xxx", "66");
+
+		headerplus.write();
+	}
+} -start
+
+logexpect l1 -v v1 {
+	expect *	* 	ReqUnset  	"Contents"
+	expect *	* 	ReqUnset  	"xxx: val1=66$"
+} -start
+
+client c1 {
+	txreq -hdr "test: name2" -hdr "Cache-Control: public, max-age=31536000" \
+	-hdr "Contents: value1*1111; value2*23; value5*55; value3*3" \
+	-hdr "xxx: val6=00, val1=99, val3=4" -hdr "test: v1=v2,v3=v4, v5=v6, name2=123" \
+	-hdr "xxx: val1=33, ext=val" -hdr "check: val1=33||val2=32||val3=11" \
+	-hdr "xxx: val1=66"
+	rxresp
+
+	expect resp.http.v1 == "31536000"
+	expect resp.http.v2 == ""
+	expect resp.http.v3 == "3"
+	expect resp.http.v4 == ""
+	expect resp.http.v5 == "1111"
+	expect resp.http.v6 == "23"
+	expect resp.http.v7 == "123"
+	
+	expect resp.http.v8 == "v1=v2,v3=v4, v5=v6, name2=123"
+	expect resp.http.v9 == "name2, val=3"
+
+	expect resp.http.v10 == "v1=v2,v3=v4, v5=v6, name2=123"
+	expect resp.http.v11 == "name2, val=66"
+
+	expect resp.http.v12 == "v1=v2,v3=v4, v5=v6, name2=123, val=9999"
+	expect resp.http.v13 == "name2, val=9999"
+
+	expect resp.http.v14 == "value2*23; value5*55; value3*3"
+	expect resp.http.v15 == "value2*23; value3*3"
+	expect resp.http.v16 == "value2*23"
+	expect resp.http.v17 == ""
+
+	expect resp.http.v18 == "val1=33||val2=32"
+	expect resp.http.v19 == "val2=32"
+
+	expect resp.http.v20 == "val6=00, val3=4"
+	expect resp.http.v21 == "ext=val"
+	expect resp.http.v22 == ""
+	
+} -run
+
+logexpect l1 -wait

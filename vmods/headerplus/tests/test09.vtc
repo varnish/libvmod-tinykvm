@@ -1,0 +1,122 @@
+varnishtest "headerplus from_json"
+
+varnish v1 -vcl {
+	import headerplus;
+
+	backend default none;
+
+	sub vcl_recv {
+		return (synth(200));
+	}
+	sub vcl_synth {
+		headerplus.init(req);
+		if (req.http.overwrite) {
+			headerplus.from_json(req.http.my-header, overwrite = true);
+		} else {
+			headerplus.from_json(req.http.my-header);
+		}
+		headerplus.write();
+	}
+
+} -start
+
+logexpect l1 -v v1 {
+	expect *	1001 	VCL_Log  	"headerplus.write()"
+	expect 0	= 	ReqHeader 	"name: a"
+	expect 0	= 	ReqHeader 	"name: b"
+	expect 0	= 	ReqHeader 	"name: c"
+	expect 0	=	ReqHeader	"value: 1"
+	expect 0	= 	VCL_Log  	"headerplus.reset()"
+
+	expect *	1002 	VCL_Log  	"headerplus.write()"
+	expect 0	= 	ReqHeader 	"value: 1"
+	expect 0	= 	ReqHeader 	"name: a"
+	expect 0	= 	ReqHeader 	"name: b"
+	expect 0	= 	ReqHeader 	"name: c"
+	expect 0	= 	VCL_Log  	"headerplus.reset()"
+
+	expect *	1003 	VCL_Log  	"headerplus.write()"	
+	expect 0	= 	VCL_Log  	"headerplus.reset()"
+
+	expect *	1004 	VCL_Log  	"headerplus.from_json()"	
+	expect 0	= 	VCL_Log  	"bad json"
+
+	expect *	1005 	VCL_Log  	"headerplus.write()"	
+	expect 0	= 	VCL_Log  	"headerplus.reset()"
+
+	expect *	1006 	VCL_Log  	"headerplus.write()"
+	expect 0	= 	ReqHeader 	"name: a"
+	expect 0	= 	ReqHeader 	"name: b"
+	expect 0	= 	ReqHeader 	"name: c"
+	expect 0	= 	ReqHeader 	"name3: x"
+	expect 0	= 	ReqHeader 	"name3: y"
+	expect 0	= 	VCL_Log  	"headerplus.reset()"
+
+	expect *	1007 	VCL_Log  	"headerplus.write()"	
+	expect 0	= 	VCL_Log  	"headerplus.reset()"
+
+	expect *	1008 	VCL_Log  	"headerplus.write()"
+	expect 0	= 	ReqHeader 	"name: value"
+	expect 0	= 	ReqHeader 	"one: 1"
+	expect 0	= 	VCL_Log  	"headerplus.reset()"
+
+	expect *	1009 	VCL_Log  	"headerplus.write()"
+	expect 0	= 	ReqUnset	"name: x"
+	expect 0	= 	ReqUnset	"name: y"
+	expect 0	= 	ReqUnset	"value: 3"
+	expect 0	= 	ReqHeader 	"name: a"
+	expect 0	= 	ReqHeader 	"name: b"
+	expect 0	= 	ReqHeader 	"name: c"
+	expect 0	=	ReqHeader	"value: 1"
+	expect 0	= 	VCL_Log  	"headerplus.reset()"
+
+	expect *	1010 	VCL_Log  	"headerplus.write()"
+	expect 0	= 	ReqUnset	"name: x"
+	expect 0	= 	ReqUnset	"name: y"
+	expect 0	= 	ReqUnset	"value: 3"
+	expect 0	=	ReqHeader	"value: 1"
+	expect 0	= 	ReqHeader 	"name: a"
+	expect 0	= 	ReqHeader 	"name: b"
+	expect 0	= 	ReqHeader 	"name: c"
+	expect 0	= 	VCL_Log  	"headerplus.reset()"
+} -start
+
+
+client c1 {
+	txreq -hdr {My-Header: {"name": ["a", "b", "c", 1], "value": "1"}}
+	rxresp
+
+	txreq -hdr {My-Header: {"value": "1", "name": ["a", "b", "c", 1]}}
+	rxresp
+
+	txreq -hdr {My-Header: {} }
+	rxresp
+
+	txreq -hdr {My-Header: {""} }
+	rxresp
+
+	# Only support strings
+	txreq -hdr {My-Header: {"name": 1} }
+	rxresp
+
+	txreq -hdr {My-Header: {"name": ["a", "b", "c", 1], "name2": [1], "name3": [1, "x", "y"]}}
+	rxresp
+
+	# Not valid
+	txreq -hdr {My-Header: {"name": {"value": "1"}} }
+	rxresp
+
+	txreq -hdr {My-Header: {"name": "value", "one": "1"}}
+	rxresp
+
+	txreq -hdr "overwrite: true" -hdr "name: x" -hdr "name: y" -hdr "value: 3" \
+	      -hdr {My-Header: {"name": ["a", "b", "c", 1], "value": "1"}}
+	rxresp
+
+	txreq -hdr "overwrite: true"  -hdr "name: x" -hdr "name: y" -hdr "value: 3" \
+	      -hdr {My-Header: {"value": "1", "name": ["a", "b", "c", 1]}}
+	rxresp
+
+} -run
+
+logexpect l1 -wait

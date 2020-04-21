@@ -18,4 +18,15 @@ target_link_libraries(vmod_headerplus vjson)
 
 # VCL import name is "headerplus"
 add_vmod_tests(vmod_headerplus headerplus
+	tests/test01.vtc
+	tests/test02.vtc
+	tests/test03.vtc
+	tests/test04.vtc
+	tests/test05.vtc
+	tests/test06.vtc
+	tests/test07.vtc
+	tests/test08.vtc
+	tests/test09.vtc
+	tests/test10.vtc
+	tests/test11.vtc
 )

@@ -126,19 +126,23 @@ endfunction()
 enable_testing()
 
 function(add_vmod_tests LIBNAME IMPORT_NAME)
-	set(LIBPATH "${CMAKE_BINARY_DIR}/lib${LIBNAME}.so")
-	set(VMOD_PATH "${CMAKE_BINARY_DIR}")
-	# varnishtest doesn't like to run with no tests
-	foreach (FILENAME ${ARGN})
-	get_filename_component(TEST ${FILENAME} NAME_WE)
-	add_test(NAME ${LIBNAME}_${TEST}
-		COMMAND ${VARNISHTEST} "-Dvarnishd=${VARNISHD}" "-DVMOD_SO=\"${LIBPATH}\"" -p "vmod_path=${VMOD_PATH}" ${FILENAME}
-		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-	)
-	set_tests_properties(${LIBNAME}_${TEST}
-		PROPERTIES  ENVIRONMENT "PATH=${CMAKE_BINARY_DIR}:$ENV{PATH}"
-					TIMEOUT 30
-					SKIP_RETURN_CODE 77
-	)
-	endforeach()
+	if (NOT SINGLE_PROCESS)
+		set(LIBPATH "${CMAKE_BINARY_DIR}/lib${LIBNAME}.so")
+		set(VMOD_PATH "${CMAKE_BINARY_DIR}")
+		# varnishtest doesn't like to run with no tests
+		foreach (FILENAME ${ARGN})
+		get_filename_component(TEST ${FILENAME} NAME_WE)
+		add_test(NAME ${LIBNAME}_${TEST}
+			COMMAND ${VARNISHTEST} "-Dvarnishd=${VARNISHD}" "-DVMOD_SO=\"${LIBPATH}\"" -p "vmod_path=${VMOD_PATH}" ${FILENAME}
+			WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		)
+		set_tests_properties(${LIBNAME}_${TEST}
+			PROPERTIES  ENVIRONMENT "PATH=${CMAKE_BINARY_DIR}:$ENV{PATH}"
+						TIMEOUT 30
+						SKIP_RETURN_CODE 77
+		)
+		endforeach()
+	else()
+		# warn about SINGLE_PROCESS being incompatible with tests?
+	endif()
 endfunction()
