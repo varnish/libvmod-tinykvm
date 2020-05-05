@@ -94,8 +94,11 @@ function(add_vmod LIBNAME VCCNAME comment)
 		target_compile_definitions(${LIBNAME} PRIVATE VARNISH_PLUS=1)
 	endif()
 	if (LIBFUZZER)
-		target_compile_options(${LIBNAME} PRIVATE "-fsanitize=address,fuzzer")
+		target_compile_options(${LIBNAME} PRIVATE 
+			"-fno-omit-frame-pointer" "-fsanitize=fuzzer-no-link,address,undefined")
 		target_compile_definitions(${LIBNAME} PRIVATE LIBFUZZER_ENABLED=1)
+		target_link_libraries(${LIBNAME} "-fsanitize=fuzzer,address,undefined")
+		message(STATUS "Libfuzzer enabled for VMOD ${LIBNAME}")
 	endif()
 	# this will build the final .so files in the top build directory
 	# you don't always want this, so it can probably be an option,
