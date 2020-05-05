@@ -5,8 +5,9 @@ vcl 4.1;
 #import urlplus from "/home/gonzo/github/varnish_autoperf/vmod/build/libvmod_urlplus.so";
 #import file   from "/home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/lib/libvmod_file/.libs/libvmod_file.so";
 #import cookieplus from "/home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/lib/libvmod_cookieplus/.libs/libvmod_cookieplus.so";
-import headerplus from "/home/gonzo/github/varnish_autoperf/build/libvmod_headerplus.so";
-import jwt from "/home/gonzo/github/varnish_autoperf/build/libvmod_jwt.so";
+import debug from "/home/gonzo/github/varnish_autoperf/build_vmodfuzz/libvmod_debug.so";
+import headerplus from "/home/gonzo/github/varnish_autoperf/build_vmodfuzz/libvmod_headerplus.so";
+#import jwt from "/home/gonzo/github/varnish_autoperf/build/libvmod_jwt.so";
 
 backend default {
     .host = "127.0.0.1";
@@ -23,8 +24,8 @@ sub vcl_init {
 	lang.add("pl");
 	new f = file.init("/home/gonzo/github/varnish_autoperf");
 	f.allow("*", "rw");
-*/
 	new jwt_reader = jwt.reader();
+*/
 }
 
 sub vcl_recv {
@@ -57,9 +58,23 @@ sub vcl_recv {
 	urlplus.write();*/
 
 	headerplus.init(req);
-	headerplus.attr_get("Input", "max-age");
-	headerplus.attr_set("Input", "val", req.http.Input);
-	headerplus.add("Input", req.http.Input);
+	headerplus.attr_set("Input", "max-age", req.http.Input);
+	#headerplus.attr_get("Input", req.http.Input);
+	#headerplus.attr_set("Input", "val", req.http.Input);
+	#headerplus.attr_set("Input", req.http.Input, req.http.Input);
+	#headerplus.attr_set(req.http.Input, "val", req.http.Input);
+	#headerplus.attr_set(req.http.Input, req.http.Input, req.http.Input);
+	#headerplus.add("Input", req.http.Input);
+	#headerplus.add(req.http.Input, req.http.Input);
+	#headerplus.collapse_regex(req.http.Input, req.http.Input, req.http.Input);
+	#headerplus.split(req.http.Input, req.http.Input);
+	headerplus.attr_delete("Input", req.http.Input);
+	headerplus.prefix("Input", req.http.Input);
+	headerplus.suffix("Input", req.http.Input);
+	headerplus.rename("Input", req.http.Input);
+	headerplus.from_json(req.http.Input, 1);
+	headerplus.keep(req.http.Input);
+	headerplus.as_json();
 	headerplus.write();
 
     #set req.http.r1 = jwt_reader.parse(req.http.Input);

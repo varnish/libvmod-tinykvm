@@ -12,6 +12,7 @@
 // 2. generate files for ESI parser
 // 3. VCC fuzzing
 
+extern void random_fuzzer(void* data, size_t len);
 extern void http_fuzzer(void* data, size_t len);
 extern void response_fuzzer(void* data, size_t len, int version);
 extern void h2_fuzzer(void* data, size_t len);
@@ -40,6 +41,8 @@ void fuzz_one(void* data, size_t len)
     http_fuzzer(data, len);
 #elif defined(FUZZER_HTTP2)
     h2_fuzzer(data, len);
+#elif defined(FUZZER_RANDOM)
+    random_fuzzer(data, len);
 #elif defined(FUZZER_RESPONSE_H1)
     response_fuzzer(data, len, 1);
 #elif defined(FUZZER_RESPONSE_H2)

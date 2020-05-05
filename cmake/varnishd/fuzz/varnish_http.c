@@ -45,10 +45,11 @@ void varnishd_initialize(const char* vcl_path)
 	// feature http2
 	char feature_http2[128];
 	snprintf(feature_http2, sizeof(feature_http2), "feature=+http2");
-	// debug flag single-process
+	// debug flag single-process + workspace sanitizers
 	char feature_siproc[128];
 #ifndef VARNISH_PLUS
-	snprintf(feature_siproc, sizeof(feature_siproc), "debug=+execute_mode");
+	snprintf(feature_siproc, sizeof(feature_siproc), 
+		"debug=+single_proc,+wssan");
 #else
 	snprintf(feature_siproc, sizeof(feature_siproc), "debug=none");
 #endif

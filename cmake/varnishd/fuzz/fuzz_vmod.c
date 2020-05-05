@@ -56,7 +56,7 @@ extern int  open_varnishd_connection();
 //#define VMOD_URLPLUS
 //#define VMOD_WAF
 //#define VMOD_JWT
-#define VMOD_HEADERPLUS
+//#define VMOD_HEADERPLUS
 #define REMAIN_OPEN
 static const size_t JWT_MAX = 9000;
 static const bool do_encode_jwt_token = true;
@@ -116,11 +116,13 @@ void vmod_fuzzer(uint8_t* data, size_t len)
     static bool init = false;
     if (init == false) {
         init = true;
-        varnishd_initialize(
-			"/home/gonzo/github/varnish_autoperf/vcl/vmod_fuzz.vcl"
-		);
+#ifdef VARNISH_PLUS
+        varnishd_initialize(FUZZING_DIRECTORY "/../vcl/fuzz_vcp_vmod.vcl");
 		//fprintf(stderr, "%s\n", jwt_private_key);
 		init_rsa_key(jwt_private_key);
+#else
+		varnishd_initialize(FUZZING_DIRECTORY "/../vcl/fuzz_vc_vmod.vcl");
+#endif
     }
 	if (len == 0) return;
 

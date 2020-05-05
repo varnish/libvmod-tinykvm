@@ -287,6 +287,7 @@ if (LIBFUZZER)
 		fuzz/fuzz_http.c
 		fuzz/fuzz_h2.c
 		fuzz/fuzz_proxy.c
+		fuzz/fuzz_random.c
 		fuzz/fuzz_response.c
 		fuzz/fuzz_vmod.c
 		fuzz/hpack.c
@@ -302,9 +303,11 @@ if (LIBFUZZER)
 		PROPERTIES COMPILE_DEFINITIONS VARNISH_PLUS=1)
 	endif()
 	# work-around: need to be done after setting VARNISH_PLUS
-	set_property(SOURCE fuzz/fuzzer.c APPEND
-		PROPERTY COMPILE_DEFINITIONS FUZZER_${FUZZER}=1)
-
+	set_property(SOURCE ${LIBFUZZER_SOURCES} APPEND
+		PROPERTY COMPILE_DEFINITIONS 
+		FUZZER_${FUZZER}=1
+		FUZZING_DIRECTORY="${CMAKE_SOURCE_DIR}"
+	)
 	list (APPEND VARNISHD_SOURCES ${LIBFUZZER_SOURCES})
 endif()
 
@@ -324,8 +327,13 @@ set_target_properties(varnishd
 )
 
 if (SANITIZE)
-    target_compile_options(vcc PRIVATE     "${SANITIZE_FLAGS}")
-    target_compile_options(varnishd PUBLIC "${SANITIZE_FLAGS}")
+    target_compile_options(vcc      PRIVATE "${SANITIZE_FLAGS}")
+    target_compile_options(varnishd PUBLIC  "${SANITIZE_FLAGS}")
+	set(SANITIZER_FRIENDLY_MODE TRUE)
+endif()
+if (SANITIZER_FRIENDLY_MODE)
+	#target_compile_definitions(vcc      PRIVATE SANITIZER_MODE=1)
+	target_compile_definitions(varnishd PUBLIC  SANITIZER_MODE=1)
 endif()
 
 if (LIBFUZZER)
