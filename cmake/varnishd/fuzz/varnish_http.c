@@ -28,9 +28,9 @@ void varnishd_initialize(const char* vcl_path)
     char ti_buffer[64];
     snprintf(ti_buffer, sizeof(ti_buffer), "timeout_idle=0.001");
 	// threadpool min buffer
-    char tpstack_buffer[128];
-    snprintf(tpstack_buffer, sizeof(tpstack_buffer), 
-			"thread_pool_stack=%d", varnishd_threadpool_stack);
+    char ws_buffer[128];
+    snprintf(ws_buffer, sizeof(ws_buffer), 
+			"workspace_session=256");
 	// threadpool min buffer
     char tpmin_buffer[128];
     snprintf(tpmin_buffer, sizeof(tpmin_buffer), 
@@ -69,7 +69,7 @@ void varnishd_initialize(const char* vcl_path)
 		"-p", feature_siproc,
 		"-p", ti_buffer,
 		"-p", cs_buffer, // needed?
-		//"-p", tpstack_buffer,
+		"-p", ws_buffer,
 		"-p", tpmin_buffer,
 		"-p", tpmax_buffer,
 		// -b must be last (see below)

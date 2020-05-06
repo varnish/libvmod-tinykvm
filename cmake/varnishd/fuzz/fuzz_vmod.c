@@ -58,6 +58,7 @@ extern int  open_varnishd_connection();
 //#define VMOD_JWT
 //#define VMOD_HEADERPLUS
 #define REMAIN_OPEN
+#ifdef VARNISH_PLUS
 static const size_t JWT_MAX = 9000;
 static const bool do_encode_jwt_token = true;
 
@@ -107,6 +108,7 @@ size_t jwt_encode(const uint8_t* data, const size_t size,
 
 	return megalen;
 }
+#endif
 
 #define CLOSE_IT() { close(cfd); cfd = -1; }
 __thread int cfd = 0;

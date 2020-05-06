@@ -282,7 +282,6 @@ add_dependencies(vcc libvcc_generate)
 if (LIBFUZZER)
 	set (LIBFUZZER_SOURCES
 		fuzz/fuzzer.c
-		fuzz/fuzz_base64.c
 		fuzz/fuzz_sha256.c
 		fuzz/fuzz_http.c
 		fuzz/fuzz_h2.c
@@ -298,6 +297,9 @@ if (LIBFUZZER)
 	message(STATUS "Fuzzing mode is set to: ${FUZZER}")
 	# define VARNISH_PLUS for fuzzer sources, when enabled
 	if (VARNISH_PLUS)
+		list(APPEND LIBFUZZER_SOURCES
+			fuzz/fuzz_base64.c
+		)
 		set_source_files_properties(
 			${LIBFUZZER_SOURCES}
 		PROPERTIES COMPILE_DEFINITIONS VARNISH_PLUS=1)
