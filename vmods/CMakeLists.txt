@@ -23,6 +23,7 @@ add_subdirectory(purge)
 if (VMOD_USE_LOCAL_VC)
 	# can only be built with VC present
 	add_subdirectory(std)
+	add_subdirectory(wssan)
 endif()
 if (VARNISH_PLUS)
 	add_subdirectory(libvjson)

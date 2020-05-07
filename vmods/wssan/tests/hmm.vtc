@@ -1,0 +1,69 @@
+varnishtest "Test cowsay header"
+
+server s1 {
+   rxreq
+   txresp
+} -start
+
+varnish v1 -vcl+backend {
+import wssan;
+
+sub vcl_recv {
+    if (req.url ~ "/cowsay" || req.url ~ "/bunny") {
+        return(synth(700, "OK"));
+    }
+}
+
+sub vcl_synth {
+	if (resp.status == 700) {
+	    set resp.status = 200;
+	    set resp.http.Content-Type = "text/plain; charset=utf-8";
+	    if (req.url ~ "/cowsay") {
+	        synthetic(wssan.cowsay1("cow", "moo"));
+			synthetic(wssan.cowsay2("cow", "moo"));
+	    }
+	    else if (req.url ~ "/bunny") {
+	        synthetic(wssan.cowsay1("bunny", "Varnish"));
+			synthetic(wssan.cowsay2("bunny", "Varnish"));
+	    }
+	    return (deliver);
+    }
+}
+
+} -start
+
+client c1 {
+        txreq -url "/cowsay"
+        rxresp
+        expect resp.body == {** moo **
+
+ ^__^
+ (oo)\_______
+ (__)\       )\/\
+      ||----w |
+      ||     ||
+** moo **
+
+ ^__^
+ (oo)\_______
+ (__)\       )\/\
+      ||----w |
+      ||     ||
+}
+} -run
+
+client c2 {
+        txreq -url "/bunny"
+        rxresp
+        expect resp.body == {** Varnish **
+
+  (\/)
+  (..)
+ (")(")
+** Varnish **
+
+  (\/)
+  (..)
+ (")(")
+}
+} -run

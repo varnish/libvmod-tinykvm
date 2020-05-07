@@ -27,10 +27,10 @@ void varnishd_initialize(const char* vcl_path)
     // timeout idle is modified by mgt_main, make it writable
     char ti_buffer[64];
     snprintf(ti_buffer, sizeof(ti_buffer), "timeout_idle=0.001");
-	// threadpool min buffer
+	// the tiny workspace used by connections
     char ws_buffer[128];
     snprintf(ws_buffer, sizeof(ws_buffer), 
-			"workspace_session=256");
+			"workspace_session=512");
 	// threadpool min buffer
     char tpmin_buffer[128];
     snprintf(tpmin_buffer, sizeof(tpmin_buffer), 

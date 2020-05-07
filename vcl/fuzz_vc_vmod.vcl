@@ -42,7 +42,13 @@ sub test_vmod_header {
 sub test_vmod_cookie {
 	cookie.parse(req.http.Input);
 	cookie.delete(req.http.Input);
+	cookie.set(req.http.Input, req.http.Input);
 	cookie.keep(req.http.Input);
+	cookie.keep_re(req.http.Input);
+	cookie.filter(req.http.Input);
+	cookie.filter_re(req.http.Input);
+	cookie.get(req.http.Input);
+	cookie.isset(req.http.Input);
 	set req.http.cookie = cookie.get_string();
 	return (hash);
 }
@@ -60,10 +66,10 @@ sub vcl_recv {
 	if (false) {
 		call test_vmod_std;
 		call test_vmod_header;
-		call test_vmod_cookie;
+		call test_vmod_blob;
 	}
 
-	call test_vmod_blob;
+	call test_vmod_cookie;
 
 	return (hash);
 }
