@@ -250,7 +250,7 @@ void vmod_fuzzer(uint8_t* data, size_t len)
 		return;
 	}
 #else
-	const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nInput: ";
+	const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nVary: ";
 	int ret = write(cfd, req, strlen(req));
 	if (ret < 0) {
 		CLOSE_IT();

@@ -4,7 +4,7 @@ include(../vmod.cmake vmod)
 
 set(PATH ${VARNISH_PATH}/lib/libvmod_proxy)
 
-add_vmod(vmod_proxy "${PATH}/vmod_proxy.vcc" "Cookie VMOD"
+add_vmod(vmod_proxy "${PATH}/vmod.vcc" "Cookie VMOD"
 	${PATH}/vmod_proxy.c
 )
 

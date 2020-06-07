@@ -9,9 +9,11 @@ file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/config.h
 
 set(SOURCES
 	${PATH}/ves_json.c
-	${PATH}/ves_json_nav.c
 	${PATH}/ves_json_util.c
 )
+if (NOT VARNISH_PLUS)
+	list(APPEND SOURCES ${PATH}/ves_json_nav.c)
+endif()
 
 add_library(vjson SHARED ${SOURCES})
 target_include_directories(vjson PRIVATE ${CMAKE_CURRENT_BINARY_DIR})

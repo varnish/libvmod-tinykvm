@@ -4,7 +4,7 @@ include(../vmod.cmake vmod)
 
 set(PATH ${VARNISH_PATH}/lib/libvmod_vtc)
 
-add_vmod(vmod_vtc "${PATH}/vmod_vtc.vcc" "Varnish Test-Case VMOD"
+add_vmod(vmod_vtc "${PATH}/vmod.vcc" "Varnish Test-Case VMOD"
 	${PATH}/vmod_vtc.c
 )
 

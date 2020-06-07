@@ -20,6 +20,7 @@ option(USE_LLD      "Always link with LLD" OFF)
 option(SINGLE_PROCESS "Disable fork() and run in single-process mode" OFF)
 
 set(CMAKE_C_FLAGS "-Wall -Wextra -std=c11 -O2 -g -fstack-protector-strong")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fdiagnostics-color")
 
 if (LTO_ENABLE)
     if ("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")

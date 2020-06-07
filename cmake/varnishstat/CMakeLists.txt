@@ -31,7 +31,9 @@ target_include_directories(varnishstat PUBLIC ${VARNISH_PATH}/include)
 target_include_directories(varnishstat PUBLIC ${CONFIG_PATH})
 target_compile_definitions(varnishstat PUBLIC _XOPEN_SOURCE=700)
 target_link_libraries(varnishstat vapi_static ncurses)
-add_dependencies(varnishstat vstat_generate)
+if (NOT VARNISH_PLUS)
+	add_dependencies(varnishstat vstat_generate)
+endif()
 # build varnishstat into the top binary folder
 set_target_properties(varnishstat
 	PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"

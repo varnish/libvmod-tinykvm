@@ -90,6 +90,7 @@ function(add_vmod LIBNAME VCCNAME comment)
 	target_link_libraries(${LIBNAME} Threads::Threads)
 	#target_compile_options(${LIBNAME} PRIVATE "-fno-lto") # LTO discards too much
 	target_compile_definitions(${LIBNAME} PRIVATE VMOD=1 HAVE_CONFIG_H _GNU_SOURCE)
+	target_compile_options(${LIBNAME} PRIVATE "-fdiagnostics-color")
 	if (VARNISH_PLUS)
 		target_compile_definitions(${LIBNAME} PRIVATE VARNISH_PLUS=1)
 	endif()

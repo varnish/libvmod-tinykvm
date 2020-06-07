@@ -4,7 +4,7 @@ include(../vmod.cmake vmod)
 
 set (PATH ${VARNISH_SOURCE_DIR}/lib/libvmod_directors)
 
-add_vmod(vmod_directors "${PATH}/vmod_directors.vcc" "directors VMOD"
+add_vmod(vmod_directors "${PATH}/vmod.vcc" "directors VMOD"
 	${PATH}/fall_back.c
 	${PATH}/hash.c
 	${PATH}/random.c

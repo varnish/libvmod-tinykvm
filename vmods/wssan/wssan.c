@@ -70,7 +70,7 @@ static const char *bunny =
 VCL_STRING
 vmod_cowsay1(VRT_CTX, VCL_STRING animal, VCL_STRING talk)
 {
-	const char* ret = NULL;
+	const char *ret = NULL;
 
 	if (!strcmp(animal, "cow")) {
 		ret = WS_Printf(ctx->ws, "** %s **\n%s", talk, cow);
@@ -86,16 +86,18 @@ vmod_cowsay1(VRT_CTX, VCL_STRING animal, VCL_STRING talk)
 VCL_STRING
 vmod_cowsay2(VRT_CTX, VCL_STRING animal, VCL_STRING talk)
 {
-	const char* ret = NULL;
-	//WS_VSB_new(vsb, ctx->ws);
+	const char *ret = NULL;
+	struct vsb vsb;
+	WS_VSB_new(&vsb, ctx->ws);
 
 	if (!strcmp(animal, "cow")) {
-		ret = WS_Printf(ctx->ws, "** %s **\n%s", talk, cow);
+		VSB_printf(&vsb, "** %s **\n%s", talk, cow);
 	}
 	else if (!strcmp(animal, "bunny")) {
-		ret = WS_Printf(ctx->ws, "** %s **\n%s", talk, bunny);
+		VSB_printf(&vsb, "** %s **\n%s", talk, bunny);
 	}
 
-	/* WS_Printf can overflow the workspace and return NULL */
+	ret = WS_VSB_finish(&vsb, ctx->ws, NULL);
+	/* Workspace overflows return NULL */
 	return ((ret) ? ret : "");
 }
