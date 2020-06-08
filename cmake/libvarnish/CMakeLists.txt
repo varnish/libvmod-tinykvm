@@ -7,7 +7,7 @@ set(VCL_DIR    "/opt/varnish/share/varnish-plus/vcl" CACHE STRING "Default VCL d
 
 # include/vcs_version.h include/vmod_abi.h
 add_custom_target(includes_generate)
-execute_process(COMMAND git describe
+execute_process(COMMAND git rev-parse HEAD
 				WORKING_DIRECTORY ${VARNISH_PATH}
 				OUTPUT_VARIABLE GIT_REPO_VERSION
 				OUTPUT_STRIP_TRAILING_WHITESPACE)
