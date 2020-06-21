@@ -7,7 +7,7 @@
 
 typedef void (*set_header_t) (struct http*, const char*);
 extern const char*
-execute(set_header_t, void*, const char* binary, size_t len, uint64_t instr_max);
+execute_riscv(set_header_t, void*, const char* binary, size_t len, uint64_t instr_max);
 #include "vmod_util.h"
 
 VCL_STRING
@@ -20,10 +20,18 @@ vmod_exec(VRT_CTX, VCL_HTTP hp, VCL_INT instr_max, VCL_STRING elf)
 		return NULL;
 	const size_t len = __builtin_strlen(elf);
 
-	const char* output = execute(
+	const char* output = execute_riscv(
 		http_SetHeader, hp, elf, len, instr_max);
 
 	return output; /* leak */
+}
+
+VCL_BACKEND vmod_init_from_body(VRT_CTX, struct vmod_riscv_init *rvb)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(rvb, RISCV_BACKEND_MAGIC);
+
+	return (&rvb->dir);
 }
 
 void v_matchproto_(vdi_panic_f)
@@ -49,10 +57,8 @@ pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 	AN(p);
 	AN(lp);
 
-	ssize_t len = vfe->priv2;
+	ssize_t len = (vfe->priv2 > *lp) ? *lp : vfe->priv2;
 	assert(len == 0 || vfe->priv1);
-	if (len > *lp)
-		len = *lp;
 	memcpy(p, vfe->priv1, len);
 	*lp = len;
 	vfe->priv1 = (char *)vfe->priv1 + len;
@@ -84,17 +90,35 @@ vfp_init(struct busyobj *bo)
 }
 
 
+static int
+aggregate_body(void *priv, int flush, int last, const void *ptr, ssize_t len)
+{
+	struct vsb *vsb = (struct vsb *)priv;
+
+	(void)flush;
+	(void)last;
+
+	CAST_OBJ_NOTNULL(vsb, priv, VSB_MAGIC);
+
+	VSB_bcat(vsb, ptr, len);
+	return (0);
+}
+
+static void v_matchproto_(vmod_priv_free_f)
+destroy_vsb(void *priv)
+{
+	struct vsb *vsb;
+
+	AN(priv);
+	CAST_OBJ_NOTNULL(vsb, priv, VSB_MAGIC);
+
+	VSB_destroy(&vsb);
+}
 
 int v_matchproto_(vdi_gethdrs_f)
 riscvbe_gethdrs(const struct director *dir,
 	struct worker *wrk, struct busyobj *bo)
 {
-	struct vmod_priv *priv = vmod_util_get_priv_task(NULL, bo, dir);
-	AN(priv->priv);
-
-	const char *result_string = priv->priv;
-	const size_t result_len = __builtin_strlen(result_string);
-
 	(void)wrk;
 	CHECK_OBJ_NOTNULL(dir, DIRECTOR_MAGIC);
 	CHECK_OBJ_NOTNULL(bo, BUSYOBJ_MAGIC);
@@ -102,30 +126,57 @@ riscvbe_gethdrs(const struct director *dir,
 	CHECK_OBJ_NOTNULL(bo->beresp, HTTP_MAGIC);
 	AZ(bo->htc);
 
+	/* Put request BODY into vsb */
+	struct vsb *vsb = VSB_new_auto();
+	AN(vsb);
+	if (bo->req)
+		VRB_Iterate(bo->req, aggregate_body, vsb);
+	else if (bo->bereq_body)
+		ObjIterate(bo->wrk, bo->bereq_body, vsb, aggregate_body,
+		    0, 0, -1);
+	VSB_finish(vsb);
+
+	/* cleanup for vsb */
+	struct vmod_priv *priv = vmod_util_get_priv_task(NULL, bo, dir);
+	priv->priv = vsb;
+	priv->free = destroy_vsb;
+
+	/* execute the data as ELF */
+	const char *result_string = VSB_data(vsb);
+	const size_t result_len = VSB_len(vsb);
+
+	struct vmod_riscv_init *rvb;
+	CAST_OBJ_NOTNULL(rvb, dir->priv, RISCV_BACKEND_MAGIC);
+
+	struct http *http = bo->bereq;
+	if (http == NULL) http = bo->req->http;
+
+	/* finish the backend request */
 	bo->htc = WS_Alloc(bo->ws, sizeof *bo->htc);
 	if (bo->htc == NULL)
 		return (-1);
 	INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
 
-	bo->htc->priv = (void*) result_string;
-	bo->htc->content_length = result_len;
+	/* simulate some RISC-V */
+	const char* output = execute_riscv(
+		http_SetHeader, http,
+		result_string, result_len, rvb->max_instructions);
+
+	/* store the output in workspace and free result */
+	bo->htc->content_length = __builtin_strlen(output);
+	bo->htc->priv = WS_Copy(bo->ws, output, bo->htc->content_length);
 	bo->htc->body_status = BS_LENGTH;
+	free(output);
 
 	http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
 	http_PrintfHeader(bo->beresp, "Content-Length: %jd", result_len);
 
-	static int id;
-	struct vmod_priv *betask = vmod_util_get_priv_task(NULL, bo, &id);
-	betask->priv = vfp_init;
+	/* We need to call this function specifically, otherwise
+	   nobody will call our VFP functions */
+	typedef void sbe_vfp_init_cb_f(struct busyobj *bo);
+	extern void sbe_util_set_vfp_cb(struct busyobj *, sbe_vfp_init_cb_f *);
+	sbe_util_set_vfp_cb(bo, vfp_init);
 	return (0);
-}
-
-VCL_BACKEND vmod_init_backend(VRT_CTX, struct vmod_riscv_init *rvb)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	CHECK_OBJ_NOTNULL(rvb, RISCV_BACKEND_MAGIC);
-
-	return &rvb->dir;
 }
 
 VCL_VOID

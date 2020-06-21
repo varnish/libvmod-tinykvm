@@ -5,9 +5,7 @@
 #include <include/threads.hpp>
 #include <linux.hpp>
 
-// avoid endless loops, code that takes too long and excessive memory usage
-static const uint64_t MAX_BINARY       = 16'000'000;
-//static const uint64_t MAX_INSTRUCTIONS = 2'000'000;
+// avoid endless loops and excessive memory usage
 static const uint32_t MAX_MEMORY       = 32 * 1024 * 1024;
 static const uint32_t BENCH_SAMPLES    = 100;
 
@@ -20,7 +18,7 @@ static inline uint64_t monotonic_micros_now();
 using set_header_t = void (*) (void*, const char*);
 
 extern "C" const char*
-execute(set_header_t set_header, void* header,
+execute_riscv(set_header_t set_header, void* header,
 	const char* binary, size_t len, uint64_t instr_max)
 {
 	const std::vector<uint8_t> vbin(binary, binary + len);
@@ -95,7 +93,7 @@ execute(set_header_t set_header, void* header,
 
 			try {
 				machine.simulate(instr_max);
-				if (machine.cpu.instruction_counter() == instr_max) {
+				if (machine.cpu.instruction_counter() >= instr_max) {
 					set_header(header, "X-Exception: Maximum instructions reached");
 					break;
 				}
@@ -136,7 +134,7 @@ execute(set_header_t set_header, void* header,
 		set_header(header, "X-Exception: Could not enter main()");
 		set_header(header, ("X-Instruction-Count: " + std::to_string(instr_max)).c_str());
 	}
-	return nullptr;
+	return "";
 }
 
 #include <sys/time.h>

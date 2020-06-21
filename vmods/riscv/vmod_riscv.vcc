@@ -19,4 +19,4 @@ Execute the given ELF binary, running its main function to completion or runs ou
 
 $Object init(INT max_instructions = 2000000, STRANDS arguments = 0)
 
-$Method BACKEND .backend()
+$Method BACKEND .from_body()

@@ -1,3 +1,5 @@
+set solib-search-path /tmp/varnishd:/tmp/varnishd/vmod_cache
+
 define lsof
     shell rm -f pidfile
     set logging file pidfile
@@ -8,5 +10,5 @@ define lsof
 end
 
 define varnish
-    run -a :8080 -b :8081 -F
+    run -a :8080 -b :8081 -F -n /tmp/varnishd
 end
