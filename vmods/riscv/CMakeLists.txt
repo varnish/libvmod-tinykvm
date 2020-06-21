@@ -1,0 +1,26 @@
+cmake_minimum_required (VERSION 3.0.2)
+project (vmod C CXX)
+include(../vmod.cmake vmod)
+
+add_vmod(vmod_riscv vmod_riscv.vcc "RISC-V machine emulation VMOD"
+	src/vmod_riscv.c
+	src/interface.cpp
+	libriscv/emulator/src/linux.cpp
+	libriscv/emulator/syscalls/src/syscalls.cpp
+	libriscv/emulator/syscalls/src/threads.cpp
+	libriscv/emulator/syscalls/src/posix_threads.cpp
+)
+
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+set_target_properties(vmod_riscv PROPERTIES CXX_STANDARD 17)
+target_include_directories(vmod_riscv PRIVATE libriscv/emulator/syscalls)
+target_include_directories(vmod_riscv PRIVATE libriscv/emulator/src)
+
+add_subdirectory(libriscv/lib)
+target_link_libraries(vmod_riscv riscv)
+
+# VCL import name is "riscv"
+add_vmod_tests(vmod_riscv riscv
+	tests/startup.vtc
+)

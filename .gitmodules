@@ -19,3 +19,6 @@
 [submodule "ext/openssl-cmake"]
 	path = ext/openssl-cmake
 	url = https://github.com/fwsGonzo/openssl-cmake.git
+[submodule "vmods/riscv/libriscv"]
+	path = vmods/riscv/libriscv
+	url = git@github.com:fwsGonzo/libriscv.git

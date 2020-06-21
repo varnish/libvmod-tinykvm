@@ -1,0 +1,36 @@
+varnishtest "no-op test"
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import bodyaccess;
+	import riscv;
+	import std;
+
+	backend default none;
+
+	sub vcl_init {
+		new riscv_backend = riscv.init(max_instructions = 2000000);
+	}
+
+	sub vcl_recv {
+		if (req.url ~ "/exec") {
+			set req.backend_hint = riscv_backend.backend();
+			std.cache_req_body(15MB);
+			return (hash);
+		}
+	}
+
+	sub vcl_hash {
+		bodyaccess.hash_req_body();
+	}
+
+	sub vcl_backend_response {
+		set bereq.method = "POST";
+	}
+} -start
+
+client c1 {
+	txreq -url "/exec" -body "mirror"
+	rxresp
+	expect resp.body == "mirror"
+} -run

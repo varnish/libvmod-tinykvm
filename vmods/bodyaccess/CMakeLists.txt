@@ -2,8 +2,10 @@ cmake_minimum_required (VERSION 3.0.2)
 project (vmod C)
 include(../vmod.cmake vmod)
 
-add_vmod(vmod_bodyaccess vmod_bodyaccess.vcc "Body Access VMOD"
-	vmod_bodyaccess.c
+set (PATH ${VARNISH_SOURCE_DIR}/lib/varnish-modules)
+
+add_vmod(vmod_bodyaccess ${PATH}/vmod_bodyaccess.vcc "Body Access VMOD"
+	${PATH}/vmod_bodyaccess.c
 )
 # VCL import name is "bodyaccess"
 add_vmod_tests(vmod_bodyaccess bodyaccess

@@ -10,6 +10,11 @@ set(VARNISH_SOURCE_DIR "" CACHE STRING "Varnish source directory")
 # NOTE: varnish uses non-standard features so use GNU
 set(CMAKE_C_FLAGS "-Wall -Wextra -std=gnu11 -g -O2")
 
+# complete the source path if it wasn't absolute
+if (NOT IS_ABSOLUTE ${VARNISH_SOURCE_DIR})
+	set(VARNISH_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${VARNISH_SOURCE_DIR})
+endif()
+
 if (VARNISH_PLUS)
 	if (VMOD_USE_LOCAL_VC)
 		set(VTOOLDIR "${VARNISH_SOURCE_DIR}/lib/libvcc")
