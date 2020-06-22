@@ -7,23 +7,22 @@
 
 typedef void (*set_header_t) (struct http*, const char*);
 extern const char*
-execute_riscv(set_header_t, void*, const char* binary, size_t len, uint64_t instr_max);
+execute_riscv(set_header_t, void*, const uint8_t* binary, size_t len, uint64_t instr_max);
 #include "vmod_util.h"
 
 VCL_STRING
-vmod_exec(VRT_CTX, VCL_HTTP hp, VCL_INT instr_max, VCL_STRING elf)
+vmod_exec(VRT_CTX, VCL_HTTP hp, VCL_INT instr_max, VCL_BLOB elf)
 {
 	CHECK_OBJ_NOTNULL(hp, HTTP_MAGIC);
 	(void) ctx;
 
 	if (elf == NULL)
 		return NULL;
-	const size_t len = __builtin_strlen(elf);
 
 	const char* output = execute_riscv(
-		http_SetHeader, hp, elf, len, instr_max);
+		http_SetHeader, hp, elf->priv, elf->len, instr_max);
 
-	return output; /* leak */
+	return (output); /* leak */
 }
 
 VCL_BACKEND vmod_init_from_body(VRT_CTX, struct vmod_riscv_init *rvb)
@@ -142,14 +141,15 @@ riscvbe_gethdrs(const struct director *dir,
 	priv->free = destroy_vsb;
 
 	/* execute the data as ELF */
-	const char *result_string = VSB_data(vsb);
-	const size_t result_len = VSB_len(vsb);
+	const uint8_t *result_data = (const uint8_t *) VSB_data(vsb);
+	const size_t   result_len = VSB_len(vsb);
 
 	struct vmod_riscv_init *rvb;
 	CAST_OBJ_NOTNULL(rvb, dir->priv, RISCV_BACKEND_MAGIC);
 
-	struct http *http = bo->bereq;
-	if (http == NULL) http = bo->req->http;
+	struct http *http = bo->beresp;
+	if (http == NULL)
+		return (-1);
 
 	/* finish the backend request */
 	bo->htc = WS_Alloc(bo->ws, sizeof *bo->htc);
@@ -160,16 +160,20 @@ riscvbe_gethdrs(const struct director *dir,
 	/* simulate some RISC-V */
 	const char* output = execute_riscv(
 		http_SetHeader, http,
-		result_string, result_len, rvb->max_instructions);
+		result_data, result_len, rvb->max_instructions);
+
+	const size_t output_len = __builtin_strlen(output);
+	http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
+	http_PrintfHeader(bo->beresp, "Content-Length: %jd", output_len);
 
 	/* store the output in workspace and free result */
-	bo->htc->content_length = __builtin_strlen(output);
-	bo->htc->priv = WS_Copy(bo->ws, output, bo->htc->content_length);
+	bo->htc->content_length = output_len;
+	bo->htc->priv = WS_Copy(bo->ws, output, output_len);
 	bo->htc->body_status = BS_LENGTH;
-	free(output);
-
-	http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
-	http_PrintfHeader(bo->beresp, "Content-Length: %jd", result_len);
+	if (output != NULL && output[0] != 0)
+		free((void*) output);
+	if (bo->htc->priv == NULL)
+		return (-1);
 
 	/* We need to call this function specifically, otherwise
 	   nobody will call our VFP functions */

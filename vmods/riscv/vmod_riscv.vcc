@@ -8,7 +8,7 @@ vmod_riscv allows executing 32-bit RISC-V binaries and returns their output.
 API
 ===
 
-$Function STRING exec(HTTP req, INT max_instructions, STRING elf)
+$Function STRING exec(HTTP req, INT max_instructions, BLOB elf)
 
 Execute the given ELF binary, running its main function to completion or runs out of instructions limited by max_instructions. This will also initialize the machine, and may call destructors before exiting.
 

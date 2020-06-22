@@ -19,8 +19,13 @@ using set_header_t = void (*) (void*, const char*);
 
 extern "C" const char*
 execute_riscv(set_header_t set_header, void* header,
-	const char* binary, size_t len, uint64_t instr_max)
+	const uint8_t* binary, size_t len, uint64_t instr_max)
 {
+	if (len < 64) {
+		set_header(header, "X-Exception: Not an ELF binary");
+		return "";
+	}
+
 	const std::vector<uint8_t> vbin(binary, binary + len);
 	State<4> state;
 	// go-time: create machine, execute code
