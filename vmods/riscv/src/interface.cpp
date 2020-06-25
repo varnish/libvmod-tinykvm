@@ -4,13 +4,18 @@
 #include <include/syscall_helpers.hpp>
 #include <include/threads.hpp>
 #include <linux.hpp>
+__attribute__((format(printf, 2, 3)))
+extern "C" const char* WS_Printf(void *ws, const char *fmt, ...);
 
 // avoid endless loops and excessive memory usage
-static const uint32_t MAX_MEMORY       = 32 * 1024 * 1024;
-static const uint32_t BENCH_SAMPLES    = 100;
+static const uint32_t MAX_MEMORY     = 32 * 1024 * 1024;
+static const uint32_t BENCH_SAMPLES  = 0;
 
 static const std::vector<std::string> env = {
 	"LC_CTYPE=C", "LC_ALL=C", "USER=groot"
+};
+static std::vector<std::string> args = {
+	"hello_world", "test!"
 };
 
 static inline uint64_t micros_now();
@@ -18,7 +23,7 @@ static inline uint64_t monotonic_micros_now();
 using set_header_t = void (*) (void*, const char*);
 
 extern "C" const char*
-execute_riscv(set_header_t set_header, void* header,
+execute_riscv(void* workspace, set_header_t set_header, void* header,
 	const uint8_t* binary, size_t len, uint64_t instr_max)
 {
 	if (len < 64) {
@@ -31,7 +36,7 @@ execute_riscv(set_header_t set_header, void* header,
 	// go-time: create machine, execute code
 	riscv::Machine<riscv::RISCV32> machine { vbin, MAX_MEMORY };
 
-	prepare_linux<riscv::RISCV32>(machine, {"program"}, env);
+	prepare_linux<riscv::RISCV32>(machine, args, env);
 	setup_linux_syscalls(state, machine);
 	setup_multithreading(state, machine);
 
@@ -52,7 +57,7 @@ execute_riscv(set_header_t set_header, void* header,
 			set_header(header, "X-Exception: The address of main() was not found");
 		}
 	} catch (std::exception& e) {
-		set_header(header, std::string(std::string("X-Exception: ") + e.what()).c_str());
+		set_header(header, WS_Printf(workspace, "X-Exception: %s", e.what()));
 	}
 	if (main_address != 0x0)
 	{
@@ -69,14 +74,14 @@ execute_riscv(set_header_t set_header, void* header,
 					break;
 			}
 		} catch (std::exception& e) {
-			set_header(header, std::string(std::string("X-Exception: ") + e.what()).c_str());
+			set_header(header, WS_Printf(workspace, "X-Exception: %s", e.what()));
 		}
 		asm("" : : : "memory");
 		const uint64_t st1 = micros_now();
 		asm("" : : : "memory");
-		set_header(header, ("X-Startup-Time: " + std::to_string(st1 - st0)).c_str());
-		const auto instructions = machine.cpu.instruction_counter();
-		set_header(header, ("X-Startup-Instructions: " + std::to_string(instructions)).c_str());
+		set_header(header, WS_Printf(workspace, "X-Startup-Time: %ld", st1 - st0));
+		set_header(header, WS_Printf(workspace, "X-Startup-Instructions: %lu",
+			machine.cpu.instruction_counter()));
 		// cache for 10 seconds (it's only the output of a program)
 		set_header(header, "Cache-Control: max-age=10");
 	}
@@ -84,60 +89,39 @@ execute_riscv(set_header_t set_header, void* header,
 	{
 		// reset PC here for benchmarking
 		machine.cpu.reset_instruction_counter();
-		// take a snapshot of the machine
-		std::vector<uint8_t> program_state;
-		machine.serialize_to(program_state);
-		eastl::fixed_vector<uint64_t, BENCH_SAMPLES> samples;
-		// begin benchmarking 1 + N samples
-		for (int i = 0; i < 1 + BENCH_SAMPLES; i++)
-		{
-			machine.deserialize_from(program_state);
-			state.output.clear();
-			const uint64_t t0 = micros_now();
-			asm("" : : : "memory");
+		// continue executing main()
+		const uint64_t t0 = micros_now();
+		asm("" : : : "memory");
 
-			try {
-				machine.simulate(instr_max);
-				if (machine.cpu.instruction_counter() >= instr_max) {
-					set_header(header, "X-Exception: Maximum instructions reached");
-					break;
-				}
-			} catch (std::exception& e) {
-				set_header(header, std::string(std::string("X-Exception: ") + e.what()).c_str());
-				break;
+		try {
+			machine.simulate(instr_max);
+			if (machine.cpu.instruction_counter() >= instr_max) {
+				set_header(header, "X-Exception: Maximum instructions reached");
 			}
-
-			asm("" : : : "memory");
-			const uint64_t t1 = micros_now();
-			asm("" : : : "memory");
-			if (i != 0)
-				samples.push_back(t1 - t0);
+		} catch (std::exception& e) {
+			set_header(header, WS_Printf(workspace, "X-Exception: %s", e.what()));
 		}
 
-		set_header(header, ("X-Exit-Code: " + std::to_string(state.exit_code)).c_str());
-		if (!samples.empty()) {
-			std::sort(samples.begin(), samples.end());
-			const uint64_t lowest = samples[0];
-			const uint64_t median = samples[samples.size() / 2];
-			const uint64_t highest = samples[samples.size()-1];
-			set_header(header, ("X-Runtime-Lowest: " + std::to_string(lowest)).c_str());
-			set_header(header, ("X-Runtime-Median: " + std::to_string(median)).c_str());
-			set_header(header, ("X-Runtime-Highest: " + std::to_string(highest)).c_str());
-		}
-		const auto instructions = std::to_string(machine.cpu.instruction_counter());
-		set_header(header, ("X-Instruction-Count: " + instructions).c_str());
-		set_header(header, ("X-Binary-Size: " + std::to_string(len)).c_str());
+		asm("" : : : "memory");
+		const uint64_t t1 = micros_now();
+		asm("" : : : "memory");
+
+		set_header(header, WS_Printf(workspace, "X-Exit-Code: %d", state.exit_code));
+		set_header(header, WS_Printf(workspace, "X-Runtime: %lu", t1 - t0));
+		set_header(header, WS_Printf(workspace, "X-Instruction-Count: %lu",
+			machine.cpu.instruction_counter()));
+		set_header(header, WS_Printf(workspace, "X-Binary-Size: %zu", len));
 		const size_t active_mem = machine.memory.pages_active() * 4096;
-		set_header(header, ("X-Memory-Usage: " + std::to_string(active_mem)).c_str());
+		set_header(header, WS_Printf(workspace, "X-Memory-Usage: %zu", active_mem));
 		const size_t highest_mem = machine.memory.pages_highest_active() * 4096;
-		set_header(header, ("X-Memory-Highest: " + std::to_string(highest_mem)).c_str());
+		set_header(header, WS_Printf(workspace, "X-Memory-Highest: %zu", highest_mem));
 		const size_t max_mem = machine.memory.pages_total() * 4096;
-		set_header(header, ("X-Memory-Max: " + std::to_string(highest_mem)).c_str());
-		return strdup(state.output.c_str());
+		set_header(header, WS_Printf(workspace, "X-Memory-Max: %zu", highest_mem));
+		return WS_Printf(workspace, "%s", state.output.c_str());
 	}
 	else {
 		set_header(header, "X-Exception: Could not enter main()");
-		set_header(header, ("X-Instruction-Count: " + std::to_string(instr_max)).c_str());
+		set_header(header, WS_Printf(workspace, "X-Instruction-Count: %lu", instr_max));
 	}
 	return "";
 }

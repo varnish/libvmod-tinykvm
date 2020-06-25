@@ -6,8 +6,8 @@
 #include "vcc_if.h"
 
 typedef void (*set_header_t) (struct http*, const char*);
-extern const char*
-execute_riscv(set_header_t, void*, const uint8_t* binary, size_t len, uint64_t instr_max);
+extern const char* execute_riscv(void* workspace, set_header_t, void* http,
+	const uint8_t* binary, size_t len, uint64_t instr_max);
 #include "vmod_util.h"
 
 VCL_STRING
@@ -19,7 +19,7 @@ vmod_exec(VRT_CTX, VCL_HTTP hp, VCL_INT instr_max, VCL_BLOB elf)
 	if (elf == NULL)
 		return NULL;
 
-	const char* output = execute_riscv(
+	const char* output = execute_riscv(ctx->ws,
 		http_SetHeader, hp, elf->priv, elf->len, instr_max);
 
 	return (output); /* leak */
@@ -159,7 +159,7 @@ riscvbe_gethdrs(const struct director *dir,
 
 	/* simulate some RISC-V */
 	const char* output = execute_riscv(
-		http_SetHeader, http,
+		bo->ws, http_SetHeader, http,
 		result_data, result_len, rvb->max_instructions);
 
 	const size_t output_len = __builtin_strlen(output);
