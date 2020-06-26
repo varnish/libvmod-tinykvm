@@ -31,6 +31,7 @@ target_include_directories(jemalloc PUBLIC ${PATH}/jemalloc-builddir/include)
 target_include_directories(jemalloc PRIVATE ${CONFIG_PATH})
 target_compile_definitions(jemalloc PRIVATE _GNU_SOURCE)
 target_compile_options(jemalloc PRIVATE "-std=gnu11")
+target_link_libraries(jemalloc pthread)
 
 if (SANITIZE)
 	target_compile_options(jemalloc PRIVATE "${SANITIZE_FLAGS}")
