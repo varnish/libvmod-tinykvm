@@ -1,13 +1,16 @@
 vcl 4.1;
 
-#import accept from "/home/gonzo/github/varnish_autoperf/vmod/build/libvmod_accept.so";
-#import std    from "/home/gonzo/github/varnish_autoperf/vmod/build/libvmod_std.so";
-#import urlplus from "/home/gonzo/github/varnish_autoperf/vmod/build/libvmod_urlplus.so";
-#import file   from "/home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/lib/libvmod_file/.libs/libvmod_file.so";
-#import cookieplus from "/home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/lib/libvmod_cookieplus/.libs/libvmod_cookieplus.so";
-import debug from "/home/gonzo/github/varnish_autoperf/build_vmodfuzz/libvmod_debug.so";
-import headerplus from "/home/gonzo/github/varnish_autoperf/build_vmodfuzz/libvmod_headerplus.so";
-#import jwt from "/home/gonzo/github/varnish_autoperf/build/libvmod_jwt.so";
+import accept;
+//import file;
+//import cookieplus;
+import debug;
+import headerplus;
+//import jwt;
+import std;
+import str;
+import synthbackend;
+//import urlplus;
+
 
 backend default {
     .host = "127.0.0.1";
@@ -28,10 +31,33 @@ sub vcl_init {
 */
 }
 
+sub test_headerplus {
+	headerplus.init(req);
+	headerplus.attr_set("Input", "max-age", req.http.Input);
+	headerplus.attr_get("Input", req.http.Input);
+	headerplus.attr_set("Input", "val", req.http.Input);
+	headerplus.attr_set("Input", req.http.Input, req.http.Input);
+	headerplus.attr_set(req.http.Input, "val", req.http.Input);
+	headerplus.attr_set(req.http.Input, req.http.Input, req.http.Input);
+	headerplus.add("Input", req.http.Input);
+	headerplus.add(req.http.Input, req.http.Input);
+	headerplus.collapse_regex(req.http.Input, req.http.Input, req.http.Input);
+	headerplus.split(req.http.Input, req.http.Input);
+	headerplus.attr_delete("Input", req.http.Input);
+	headerplus.prefix("Input", req.http.Input);
+	headerplus.suffix("Input", req.http.Input);
+	headerplus.rename("Input", req.http.Input);
+	headerplus.from_json(req.http.Input, 1);
+	headerplus.keep(req.http.Input);
+	headerplus.as_json();
+	headerplus.write();
+	return (hash);
+}
+
 sub vcl_recv {
 	#f.write("crash.bin", req.http.Input);
 	# x/64bs 0x6310002328d8
-	
+
 	#set req.http.x-accept-language = lang.filter(req.http.Input);
 	#set req.http.x-duration = std.duration(req.http.Input, 10d);
 	#std.syslog(0, req.http.Input);
@@ -57,25 +83,12 @@ sub vcl_recv {
 	set req.http.x-query = urlplus.query_get("query");
 	urlplus.write();*/
 
-	headerplus.init(req);
-	headerplus.attr_set("Input", "max-age", req.http.Input);
-	#headerplus.attr_get("Input", req.http.Input);
-	#headerplus.attr_set("Input", "val", req.http.Input);
-	#headerplus.attr_set("Input", req.http.Input, req.http.Input);
-	#headerplus.attr_set(req.http.Input, "val", req.http.Input);
-	#headerplus.attr_set(req.http.Input, req.http.Input, req.http.Input);
-	#headerplus.add("Input", req.http.Input);
-	#headerplus.add(req.http.Input, req.http.Input);
-	#headerplus.collapse_regex(req.http.Input, req.http.Input, req.http.Input);
-	#headerplus.split(req.http.Input, req.http.Input);
-	headerplus.attr_delete("Input", req.http.Input);
-	headerplus.prefix("Input", req.http.Input);
-	headerplus.suffix("Input", req.http.Input);
-	headerplus.rename("Input", req.http.Input);
-	headerplus.from_json(req.http.Input, 1);
-	headerplus.keep(req.http.Input);
-	headerplus.as_json();
-	headerplus.write();
+	if (false) {
+		call test_headerplus;
+	}
+	set req.http.str1 = str.split(req.http.Input, 2, ", ");
+	set req.http.str2 = str.split(req.http.Input, 2, req.http.Input);
+	set req.http.str3 = str.substr(req.http.Input, 20);
 
     #set req.http.r1 = jwt_reader.parse(req.http.Input);
 	#set req.http.r2 = jwt_reader.set_key("my secret");
@@ -83,6 +96,6 @@ sub vcl_recv {
 	return (hash);
 }
 
-sub vcl_miss {	
+sub vcl_miss {
 	//return (restart);
 }

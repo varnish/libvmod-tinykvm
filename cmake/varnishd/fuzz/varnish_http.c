@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,7 +17,7 @@ void varnishd_initialize(const char* vcl_path)
 	// if proxy is enabled, add ,proxy to the -a option:
 	const char* portopts = 
 		(varnishd_proxy_mode) ? "%s,proxy" : "%s";
-	
+
 	// create unix-domain socket for listener port
 	char* client_path = malloc(128);
 	snprintf(client_path, 128, "/tmp/varnishd_%u.sock", getpid());
@@ -39,6 +40,10 @@ void varnishd_initialize(const char* vcl_path)
     char tpmax_buffer[128];
     snprintf(tpmax_buffer, sizeof(tpmax_buffer), 
 			"thread_pool_max=%d", varnishd_threadpool_size);
+	// vmod path
+    char vmod_folder[512];
+    snprintf(vmod_folder, sizeof(vmod_folder),
+		"vmod_path=%s", get_current_dir_name());
     // temp folder
     char vd_folder[128];
     snprintf(vd_folder, sizeof(vd_folder), "/tmp/varnishd_%d", getpid());
@@ -65,6 +70,7 @@ void varnishd_initialize(const char* vcl_path)
 		"-T", cli_portline,
 		"-F",
 		"-n", vd_folder,
+		"-p", vmod_folder,
 		"-p", feature_http2,
 		"-p", feature_siproc,
 		"-p", ti_buffer,
