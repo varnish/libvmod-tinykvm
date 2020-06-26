@@ -41,9 +41,10 @@ riscvbe_panic(const struct director *dir, struct vsb *vsb)
 }
 
 void v_matchproto_(vdi_finish_f)
-riscvbe_finish(const struct director *dir, struct worker *, struct busyobj *bo)
+riscvbe_finish(const struct director *dir, struct worker *wrk, struct busyobj *bo)
 {
-	(void)dir;
+	(void) dir;
+	(void) wrk;
 	/* */
 	bo->htc = NULL;
 }
@@ -185,10 +186,10 @@ riscvbe_gethdrs(const struct director *dir,
 
 VCL_VOID
 vmod_init__init(VRT_CTX, struct vmod_riscv_init **init,
-	const char *, VCL_INT max_instr, VCL_STRANDS args)
+	const char *vcl_name, VCL_INT max_instr, VCL_STRANDS args)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	(void) ctx;
+	(void) vcl_name;
 
 	struct vmod_riscv_init *rvb;
 	ALLOC_OBJ(rvb, RISCV_BACKEND_MAGIC);
