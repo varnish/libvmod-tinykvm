@@ -1,8 +1,6 @@
 #!/bin/bash
-pushd cmake
 mkdir -p build
 pushd build
-cmake .. -G Ninja
+cmake ../cmake -G Ninja
 ninja
-popd
 popd
