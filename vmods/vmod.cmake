@@ -69,8 +69,14 @@ function(add_vmod LIBNAME VCCNAME comment)
 		set(VCCFILE "${CMAKE_CURRENT_SOURCE_DIR}/${VCCNAME}")
 	endif()
 	set(OUTFILES vcc_if.c vcc_if.h)
+	# for compatibility with automake naming
+	# NOTE: this will *NOT* work on Windows
+	string(REPLACE "vmod_" "" SILLY_NAME ${LIBNAME})
+	set(SILLY_NAME "vcc_${SILLY_NAME}_if")
 	add_custom_command(
 		COMMAND ${Python3_EXECUTABLE} ${VMODTOOL} -o vcc_if ${VCCFILE}
+		COMMAND ${CMAKE_COMMAND} -E create_symlink vcc_if.c ${SILLY_NAME}.c
+		COMMAND ${CMAKE_COMMAND} -E create_symlink vcc_if.h ${SILLY_NAME}.h
 		DEPENDS ${VCCFILE}
 		OUTPUT  ${OUTFILES}
 		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
