@@ -16,37 +16,35 @@ configure_file("vmod_abi.h.in" "${CMAKE_CURRENT_BINARY_DIR}/vmod_abi.h")
 
 ## libvarnish library ##
 set (SOURCES
-  ${LIBPATH}/libvarnish/binary_heap.c
-  ${LIBPATH}/libvarnish/vas.c
-  ${LIBPATH}/libvarnish/vav.c
-  ${LIBPATH}/libvarnish/vcli_proto.c
-  ${LIBPATH}/libvarnish/vcli_serve.c
-  ${LIBPATH}/libvarnish/vct.c
-  ${LIBPATH}/libvarnish/version.c
-  ${LIBPATH}/libvarnish/vev.c
-  ${LIBPATH}/libvarnish/vfil.c
-  ${LIBPATH}/libvarnish/vfl.c
-  ${LIBPATH}/libvarnish/vin.c
-  ${LIBPATH}/libvarnish/vjsn.c
-  ${LIBPATH}/libvarnish/vlu.c
-  ${LIBPATH}/libvarnish/vmb.c
-  ${LIBPATH}/libvarnish/vnum.c
-  ${LIBPATH}/libvarnish/vpf.c
-  ${LIBPATH}/libvarnish/vre.c
-  ${LIBPATH}/libvarnish/vrnd.c
-  ${LIBPATH}/libvarnish/vsa.c
-  ${LIBPATH}/libvarnish/vsb.c
-  ${LIBPATH}/libvarnish/vsha256.c
-  ${LIBPATH}/libvarnish/vss.c
-  ${LIBPATH}/libvarnish/vsub.c
-  ${LIBPATH}/libvarnish/vtcp.c
-  ${LIBPATH}/libvarnish/vtim.c
-  ${LIBPATH}/libvarnish/vus.c
-  ## missing functions ##
-  missing.c
+	${LIBPATH}/libvarnish/binary_heap.c
+	${LIBPATH}/libvarnish/vas.c
+	${LIBPATH}/libvarnish/vav.c
+	${LIBPATH}/libvarnish/vcli_proto.c
+	${LIBPATH}/libvarnish/vcli_serve.c
+	${LIBPATH}/libvarnish/vct.c
+	${LIBPATH}/libvarnish/version.c
+	${LIBPATH}/libvarnish/vev.c
+	${LIBPATH}/libvarnish/vfil.c
+	${LIBPATH}/libvarnish/vfl.c
+	${LIBPATH}/libvarnish/vin.c
+	${LIBPATH}/libvarnish/vjsn.c
+	${LIBPATH}/libvarnish/vlu.c
+	${LIBPATH}/libvarnish/vmb.c
+	${LIBPATH}/libvarnish/vnum.c
+	${LIBPATH}/libvarnish/vpf.c
+	${LIBPATH}/libvarnish/vre.c
+	${LIBPATH}/libvarnish/vrnd.c
+	${LIBPATH}/libvarnish/vsa.c
+	${LIBPATH}/libvarnish/vsb.c
+	${LIBPATH}/libvarnish/vsha256.c
+	${LIBPATH}/libvarnish/vss.c
+	${LIBPATH}/libvarnish/vsub.c
+	${LIBPATH}/libvarnish/vtcp.c
+	${LIBPATH}/libvarnish/vtim.c
+	${LIBPATH}/libvarnish/vus.c
 )
 if (NOT VARNISH_PLUS)
-    set (SOURCES ${SOURCES}
+	list (APPEND SOURCES
         ${LIBPATH}/libvarnish/verrno.c
         ${LIBPATH}/libvarnish/vte.c
     )
