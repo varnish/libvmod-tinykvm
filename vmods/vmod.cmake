@@ -6,9 +6,11 @@ set(VARNISH_DIR "/opt/varnish" CACHE STRING "Varnish installation")
 # this needs to be set to build the std vmod:
 set(VARNISH_SOURCE_DIR "" CACHE STRING "Varnish source directory")
 
-# compiler flags
-# NOTE: varnish uses non-standard features so use GNU
-set(CMAKE_C_FLAGS "-Wall -Wextra -std=gnu11 -g -O2")
+# compiler flags only when building alone
+if (NOT TARGET varnishd)
+	# NOTE: varnish uses non-standard features so use GNU
+	set(CMAKE_C_FLAGS "-Wall -Wextra -std=gnu11 -g -O2")
+endif()
 
 # complete the source path if it wasn't absolute
 if (NOT IS_ABSOLUTE ${VARNISH_SOURCE_DIR})
@@ -84,10 +86,8 @@ function(add_vmod LIBNAME VCCNAME comment)
 	# create VMOD shared object
 	add_library(${LIBNAME} SHARED ${ARGN} ${OUTFILES})
 	if (VMOD_USE_LOCAL_VC)
-		if (TARGET includes_generate)
-			add_dependencies(${LIBNAME} includes_generate)
-		endif()
 		if (TARGET varnishapi)
+			add_dependencies(${LIBNAME} includes_generate)
 			target_link_libraries(${LIBNAME} varnishapi)
 		else()
 			target_link_libraries(${LIBNAME} ${VARNISH_SOURCE_DIR}/lib/libvarnishapi/.libs/libvarnishapi.so)

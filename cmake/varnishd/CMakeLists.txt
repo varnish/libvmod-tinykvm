@@ -363,3 +363,10 @@ if (SINGLE_PROCESS OR LIBFUZZER)
         ${VD_PATH}/mgt/mgt_vcc.c
     PROPERTIES COMPILE_FLAGS -DSINGLE_PROCESS_MODE)
 endif()
+
+find_library(LIBUNWIND unwind)
+
+if (LIBUNWIND)
+	target_link_libraries(varnishd ${LIBUNWIND})
+	target_compile_definitions(varnishd PRIVATE USE_LIBUNWIND=1)
+endif()

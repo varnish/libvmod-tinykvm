@@ -1,19 +1,40 @@
 # Varnish Autoperf
 =============================
 
-# LTO
+This repository contains a full CMake build system for Varnish Cache, VMODs and other Varnish related projects that are written in C/C++.
+
+Avoid running `./autogen.des` in the repo folder, as the build system will generate sources in the repo itself, which will affect the CMake build system.
+
+If building vmods is enabled, they will be built into the root build folder with everything else. If you pass `-p vmod_path=$PWD` to Varnish you will be able to import vmods directly like normal: `import std;`, otherwise you will have to import them using an absolute path: `import std from "/abs/path/libvmod_std.so";`.
+
+Dependencies for this build system is:
+```
+ccache cmake ninja-build libunwind-dev python3
+```
+
+## Blazing fast compilation
 =============================
-- Enabled by default, but has no known performance benefits at this time.
+- Install ccache
+- export CC="ccache clang-11"
+- export CXX="ccache clang++-11"
+- ./build.sh
+
+The build program used is `ninja`, which can be installed with `sudo apt install ninja-build`.
+
+## LTO
+=============================
+- Not enabled by default, and has no known performance benefits at this time.
 - It's usually the case that the more sharing that happens in the kernel the
 	more performant the system is. A big benefit of using shared libraries.
 
 ## PGO
 =============================
-- Requires the ability to build varnish in a non-forking mode
+- Requires building varnish in single-process mode
 
 ## gprof callgraphs
 =============================
-- Requires the ability to build varnish in a non-forking mode
+- Requires building varnish in single-process mode
+- See `./callgraph.sh`.
 
 ## AutoFDO
 =============================

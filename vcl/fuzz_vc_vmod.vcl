@@ -1,11 +1,11 @@
 vcl 4.1;
 
-#import accept from "/home/gonzo/github/varnish_autoperf/vmod/build/libvmod_accept.so";
-import std    from "/home/gonzo/github/varnish_autoperf/build_vc/libvmod_std.so";
-import blob   from "/home/gonzo/github/varnish_autoperf/build_vc/libvmod_blob.so";
-import cookie from "/home/gonzo/github/varnish_autoperf/build_vc/libvmod_cookie.so";
-import debug  from "/home/gonzo/github/varnish_autoperf/build_vc/libvmod_debug.so";
-import header from "/home/gonzo/github/varnish_autoperf/build_vc/libvmod_header.so";
+import accept;
+import std;
+import blob;
+import cookie;
+import debug;
+import header;
 
 backend default {
     .host = "127.0.0.1";
@@ -74,7 +74,7 @@ sub vcl_recv {
 	return (hash);
 }
 
-sub vcl_miss {	
+sub vcl_miss {
 	//return (restart);
 }
 

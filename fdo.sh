@@ -15,6 +15,6 @@ sudo chown gonzo perf.data
 
 exit 0
 pushd build
-cmake .. -DAUTOFDO=ON -DPROFILE=../$PROF
-make -j8
+cmake -G Ninja ../cmake -DAUTOFDO=ON -DPROFILE=../$PROF
+ninja
 popd
