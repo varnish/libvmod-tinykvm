@@ -3,8 +3,13 @@ project (vmod C)
 include(../vmod.cmake vmod)
 
 set (PATH ${VARNISH_SOURCE_DIR}/lib/libvmod_blob)
+if (VARNISH_PLUS)
+	set (VMOD_VCC "${PATH}/vmod.vcc")
+else()
+	set (VMOD_VCC "${PATH}/vmod_blob.vcc")
+endif()
 
-add_vmod(vmod_blob "${PATH}/vmod.vcc" "Blob VMOD"
+add_vmod(vmod_blob ${VMOD_VCC} "Blob VMOD"
 	${PATH}/base64.c
 	${PATH}/hex.c
 	${PATH}/id.c
@@ -15,5 +20,4 @@ add_vmod(vmod_blob "${PATH}/vmod.vcc" "Blob VMOD"
 
 # VCL import name is "blob"
 add_vmod_tests(vmod_blob blob
-	
 )

@@ -3,8 +3,13 @@ project (vmod C)
 include(../vmod.cmake vmod)
 
 set(PATH ${VARNISH_PATH}/lib/libvmod_proxy)
+if (VARNISH_PLUS)
+	set (VMOD_VCC "${PATH}/vmod.vcc")
+else()
+	set (VMOD_VCC "${PATH}/vmod_proxy.vcc")
+endif()
 
-add_vmod(vmod_proxy "${PATH}/vmod.vcc" "Cookie VMOD"
+add_vmod(vmod_proxy ${VMOD_VCC} "Cookie VMOD"
 	${PATH}/vmod_proxy.c
 )
 

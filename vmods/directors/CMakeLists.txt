@@ -3,8 +3,13 @@ project (vmod C)
 include(../vmod.cmake vmod)
 
 set (PATH ${VARNISH_SOURCE_DIR}/lib/libvmod_directors)
+if (VARNISH_PLUS)
+	set (VMOD_VCC "${PATH}/vmod.vcc")
+else()
+	set (VMOD_VCC "${PATH}/vmod_directors.vcc")
+endif()
 
-add_vmod(vmod_directors "${PATH}/vmod.vcc" "directors VMOD"
+add_vmod(vmod_directors ${VMOD_VCC} "directors VMOD"
 	${PATH}/fall_back.c
 	${PATH}/hash.c
 	${PATH}/random.c
@@ -12,11 +17,10 @@ add_vmod(vmod_directors "${PATH}/vmod.vcc" "directors VMOD"
 	${PATH}/shard_cfg.c
 	${PATH}/shard_dir.c
 	${PATH}/vdir.c
-	${PATH}/vmod_shard.c	
+	${PATH}/vmod_shard.c
 )
 #add_vmod_vsc(vmod_directors ...)
 
 # VCL import name is "directors"
 add_vmod_tests(vmod_directors directors
-	
 )
