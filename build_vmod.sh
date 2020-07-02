@@ -4,6 +4,6 @@ export CXX="ccache clang++-11"
 
 mkdir -p build_vmod
 pushd build_vmod
-cmake ../cmake -G Ninja -DBUILD_VMODS=ON
+cmake ../cmake -G Ninja -DUSE_LLD=ON -DBUILD_VMODS=ON -DSYSTEM_OPENSSL=ON
 ninja
 popd

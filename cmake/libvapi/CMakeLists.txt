@@ -31,11 +31,11 @@ set (SOURCES
 	#${PATH}/vxp_test.c
 )
 if (VARNISH_PLUS)
-	set (SOURCES ${SOURCES}
+	list (APPEND SOURCES
 		${PATH}/vst.c
     )
 else()
-    set (SOURCES ${SOURCES}
+	list (APPEND SOURCES
 		${PATH}/vsig.c
     )
 endif()

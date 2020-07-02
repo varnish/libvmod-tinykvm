@@ -5,12 +5,12 @@ set (PATH ${VARNISH_PATH}/bin/varnishtest)
 
 add_custom_command(
     COMMAND awk -f ${PATH}/gensequences ${PATH}/sequences > ${PATH}/teken_state.h
-    OUTPUT  ${PATH}/teken_state.h
+    OUTPUT  teken_state.h
     DEPENDS ${PATH}/sequences ${PATH}/gensequences
     COMMENT "Generating teken_state header for varnishtest"
 )
 add_custom_target(teken_generate
-    DEPENDS ${PATH}/teken_state.h
+    DEPENDS teken_state.h
 )
 
 add_custom_command(
@@ -51,13 +51,11 @@ if (NOT VARNISH_PLUS)
 endif()
 add_executable(varnishtest ${SOURCES})
 add_dependencies(varnishtest teken_generate vtc_h2_dectbl_generate)
-#target_include_directories(varnishtest PUBLIC ${CONFIG_PATH})
 target_include_directories(varnishtest PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_compile_definitions(varnishtest PUBLIC _XOPEN_SOURCE=700)
 target_compile_definitions(varnishtest PUBLIC VTEST_WITH_VTC_VARNISH=1)
 target_compile_definitions(varnishtest PUBLIC VTEST_WITH_VTC_LOGEXPECT=1)
 
-target_link_libraries(varnishtest varnishapi varnish pthread pcre vgz m)
+target_link_libraries(varnishtest varnishapi varnish pthread vgz)
 if (VARNISH_PLUS)
 	target_link_libraries(varnishtest mse)
 endif()

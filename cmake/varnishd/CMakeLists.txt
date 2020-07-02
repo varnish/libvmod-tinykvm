@@ -1,5 +1,3 @@
-cmake_minimum_required (VERSION 3.0.2)
-project (varnish C)
 
 # libvcc/... and include/*vcc*
 add_custom_command(
@@ -318,8 +316,8 @@ add_executable(varnishd ${VARNISHD_SOURCES})
 target_include_directories(varnishd PRIVATE ${CMAKE_BINARY_DIR}/libvarnish)
 target_include_directories(varnishd PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 add_dependencies(varnishd vhp_gen_hufdec generate_builtin_vcl)
-target_link_libraries(varnishd vcc varnish vgz m)
-target_link_libraries(varnishd config pcre pthread ssl crypto dl)
+target_link_libraries(varnishd vcc varnish vgz)
+target_link_libraries(varnishd config pthread ssl crypto dl)
 if (VARNISH_PLUS)
     target_link_libraries(varnishd mse lmdb sslhelper jemalloc)
 endif()
