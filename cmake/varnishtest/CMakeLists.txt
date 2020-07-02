@@ -4,7 +4,7 @@ project(varnishtest C)
 set (PATH ${VARNISH_PATH}/bin/varnishtest)
 
 add_custom_command(
-    COMMAND awk -f ${PATH}/gensequences ${PATH}/sequences > ${PATH}/teken_state.h
+    COMMAND awk -f ${PATH}/gensequences ${PATH}/sequences > teken_state.h
     OUTPUT  teken_state.h
     DEPENDS ${PATH}/sequences ${PATH}/gensequences
     COMMENT "Generating teken_state header for varnishtest"
