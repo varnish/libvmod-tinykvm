@@ -62,3 +62,4 @@ target_include_directories(varnishapi PUBLIC ${CMAKE_BINARY_DIR}/libvarnish)
 set_target_properties(varnishapi
 	PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
+#target_link_libraries(varnishapi varnish)

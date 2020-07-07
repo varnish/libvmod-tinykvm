@@ -98,6 +98,7 @@ target_compile_definitions(varnish PUBLIC VARNISH_VMOD_DIR="${VMOD_DIR}")
 target_compile_definitions(varnish PUBLIC VARNISH_VCL_DIR="${VCL_DIR}")
 target_compile_definitions(varnish PUBLIC -DNOT_IN_A_VMOD)
 target_link_libraries(varnish pcre m)
+#set_property(TARGET varnish PROPERTY POSITION_INDEPENDENT_CODE 1)
 
 if (LIBFUZZER)
     if (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
