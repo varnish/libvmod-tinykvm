@@ -1,5 +1,6 @@
 cmake_minimum_required (VERSION 3.0.2)
 project (varnish C)
+#set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(VARNISH_PLUS "Build with the varnish plus repo" ON)
 option(BUILD_VMODS  "Build most VMODs in varnish lib" ON)
@@ -106,11 +107,12 @@ endif()
 # TODO: generate this folder and config.h instead
 set (CONFIG_PATH ${CMAKE_SOURCE_DIR}/include)
 
-add_subdirectory(libvarnish  libvarnish)
-add_subdirectory(libvapi     libvarnishapi)
-add_subdirectory(libvgz      libvgz)
+add_subdirectory(libvarnish)
+add_subdirectory(libvapi)
+add_subdirectory(libvgz)
 if (VARNISH_PLUS)
-	add_subdirectory(jemalloc    jemalloc)
+	add_subdirectory(libvcc)
+	add_subdirectory(jemalloc)
 	set(OPENSSL_BUILD_VERSION "1.1.1e" CACHE STRING "")
 	add_subdirectory(${CMAKE_SOURCE_DIR}/../ext/openssl-cmake build_openssl)
 endif()

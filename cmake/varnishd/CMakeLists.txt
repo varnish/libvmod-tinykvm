@@ -1,27 +1,5 @@
-
-# libvcc/... and include/*vcc*
-add_custom_command(
-    COMMAND ${PYTHON_EXECUTABLE} ${VARNISH_PATH}/lib/libvcc/generate.py ${VARNISH_PATH} ${VARNISH_PATH}
-    OUTPUT  ${VARNISH_PATH}/lib/libvcc/vcc_fixed_token.c
-            ${VARNISH_PATH}/lib/libvcc/vcc_obj.c
-            ${VARNISH_PATH}/include/vcl.h
-            ${VARNISH_PATH}/include/tbl/vcc_types.h
-            ${VARNISH_PATH}/include/tbl/vrt_stv_var.h
-    DEPENDS ${VARNISH_PATH}/lib/libvcc/generate.py
-    COMMENT "Generating VCL compiler headers and sources"
-)
-add_custom_target(libvcc_generate
-    DEPENDS ${VARNISH_PATH}/lib/libvcc/vcc_fixed_token.c
-            ${VARNISH_PATH}/lib/libvcc/vcc_obj.c
-            ${VARNISH_PATH}/include/vcl.h
-            ${VARNISH_PATH}/include/tbl/vcc_types.h
-            ${VARNISH_PATH}/include/tbl/vrt_stv_var.h
-            includes_generate
-    )
-#set_source_files_properties(${VARNISH_PATH}/lib/libvcc/vcc_fixed_token.c
-#                            PROPERTIES GENERATED TRUE)
-
 set (VD_PATH ${VARNISH_PATH}/bin/varnishd)
+
 set(VARNISHD_SOURCES
 	${VD_PATH}/cache/cache_acceptor.c
 	${VD_PATH}/cache/cache_backend.c
@@ -221,6 +199,9 @@ if (VARNISH_PLUS)
     add_library(lmdb ${LMDB_SOURCES})
     target_compile_definitions(lmdb PUBLIC _XOPEN_SOURCE=700)
     target_include_directories(lmdb PUBLIC ${LMDB_PATH})
+	if (SANITIZE)
+		target_compile_options(lmdb PRIVATE "${SANITIZE_FLAGS}")
+	endif()
 
     ## MSE library ##
     set(MSE_PATH ${LIBPATH}/libmse)
@@ -248,34 +229,10 @@ if (VARNISH_PLUS)
     target_include_directories(mse PRIVATE ${CONFIG_PATH})
 	# we need to link with libconfig
 	target_link_libraries(mse config)
+	if (SANITIZE)
+		target_compile_options(mse PRIVATE "${SANITIZE_FLAGS}")
+	endif()
 endif()
-
-## VCC library ##
-set(VCC_PATH ${LIBPATH}/libvcc)
-set(VCC_SOURCES ${VCC_PATH}/vcc_acl.c
-                ${VCC_PATH}/vcc_backend_util.c
-                ${VCC_PATH}/vcc_fixed_token.c
-                ${VCC_PATH}/vcc_storage.c
-                ${VCC_PATH}/vcc_types.c
-                ${VCC_PATH}/vcc_vmod.c
-                ${VCC_PATH}/vcc_action.c
-                ${VCC_PATH}/vcc_compile.c
-                ${VCC_PATH}/vcc_obj.c
-                ${VCC_PATH}/vcc_symb.c
-                ${VCC_PATH}/vcc_utils.c
-                ${VCC_PATH}/vcc_xref.c
-                ${VCC_PATH}/vcc_backend.c
-                ${VCC_PATH}/vcc_expr.c
-                ${VCC_PATH}/vcc_parse.c
-                ${VCC_PATH}/vcc_token.c
-                ${VCC_PATH}/vcc_var.c
-            )
-add_library(vcc ${VCC_SOURCES})
-target_include_directories(vcc PRIVATE ${VCC_PATH})
-target_include_directories(vcc PRIVATE ${VARNISH_PATH}/include)
-target_include_directories(vcc PRIVATE ${CONFIG_PATH})
-target_link_libraries(vcc varnish) # we need the public API
-add_dependencies(vcc libvcc_generate)
 
 if (LIBFUZZER)
 	set (LIBFUZZER_SOURCES

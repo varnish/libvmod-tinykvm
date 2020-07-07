@@ -107,6 +107,7 @@ if (LIBFUZZER)
 endif()
 
 if (SANITIZE)
-	target_compile_options(varnish PRIVATE "${SANITIZE_FLAGS}")
+	target_compile_definitions(varnish PUBLIC SANITIZERS_ENABLED=1)
+	target_compile_options(varnish PUBLIC "${SANITIZE_FLAGS}")
 	target_link_libraries(varnish "${SANITIZE_FLAGS}")
 endif()
