@@ -4,8 +4,8 @@
 #include <include/syscall_helpers.hpp>
 #include <include/threads.hpp>
 #include <linux.hpp>
-__attribute__((format(printf, 2, 3)))
-extern "C" const char* WS_Printf(void *ws, const char *fmt, ...);
+extern "C" __attribute__((format(printf, 2, 3)))
+const char* WS_Printf(void *ws, const char *fmt, ...);
 
 // avoid endless loops and excessive memory usage
 static const uint32_t MAX_MEMORY     = 32 * 1024 * 1024;
