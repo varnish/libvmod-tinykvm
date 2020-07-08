@@ -4,7 +4,7 @@ include(../vmod.cmake vmod)
 
 set(PATH ${VARNISH_PATH}/lib/libvmod_unix)
 
-add_vmod(vmod_unix "${PATH}/vmod_unix.vcc" "Unix VMOD"
+add_vmod(vmod_unix "${PATH}/vmod.vcc" "Unix VMOD"
 	${PATH}/vmod_unix.c
 )
 

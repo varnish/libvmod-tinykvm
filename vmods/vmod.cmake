@@ -63,6 +63,7 @@ function(add_vmod LIBNAME VCCNAME comment)
 		"#define HAVE_OBJITERATE_F\n"
 		"#define HAVE_GETPEEREID 1\n"
 		"#define HAVE_SETPPRIV 1\n"
+		"#define HAVE_CACHE_CACHE_VARNISHD_H 1\n"
 	)
 	# generate VCC .c and .h
 	if (EXISTS "${VCCNAME}" OR IS_ABSOLUTE "${VCCNAME}")

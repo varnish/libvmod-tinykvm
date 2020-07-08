@@ -38,16 +38,17 @@ varnish v1 -arg "-p workspace_client=256k" -vcl+backend {
 
 		headerplus.init(resp);
 		# Only count headers from the backend
+		# Via is also removed because case insesitivity
 		set resp.http.v15 = headerplus.count_regex("^[^v]");
 		headerplus.keep_regex("resp\d");
 		headerplus.keep_regex("X-test");
 		headerplus.delete_regex("X-test\d", true);
 		headerplus.keep("R");
 		headerplus.keep("R5");
-		set resp.http.v16 = headerplus.count_regex("R");
+		set resp.http.v16 = headerplus.count_regex("^R\d?$");
 		headerplus.delete("resp2", true);
 		set resp.http.v17 = headerplus.count_regex(".");
-		headerplus.keep_regex("v");
+		headerplus.keep_regex("v\d");
 		set resp.http.v18 = headerplus.count("X");
 		set resp.http.v19 = headerplus.count_regex("X");
 		headerplus.delete_regex("X", false);
@@ -76,7 +77,7 @@ client c1 {
 	expect resp.http.v12 == 2
 	expect resp.http.v13 == 0
 	expect resp.http.v14 == 2
-	expect resp.http.v15 == 14
+	expect resp.http.v15 == 13
 	expect resp.http.v16 == 2
 	expect resp.http.v17 == 4
 	expect resp.http.v18 == 0

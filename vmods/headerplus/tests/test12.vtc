@@ -1,0 +1,136 @@
+varnishtest "Test headerplus.as_list()"
+
+varnish v1 -vcl+backend {
+	import headerplus;
+	backend default none;
+	sub vcl_recv {
+		return (synth(200));
+	}
+	sub vcl_synth {
+		headerplus.init(req);
+
+		if (req.url == "/delete") {
+			headerplus.delete_regex(".");
+		}
+
+		if (req.url == "/keep") {
+			headerplus.keep("");
+		}
+
+		set resp.http.v1 = headerplus.as_list(NAME, "; ", "=");
+		set resp.http.v2 = headerplus.as_list(NAME);
+		set resp.http.v3 = headerplus.as_list(NAME, sort = false);
+
+		set resp.http.u1 = headerplus.as_list(NAME, name_case = LOWER);
+		set resp.http.u2 = headerplus.as_list(NAME, name_case = UPPER);
+
+		set resp.http.v4 = headerplus.as_list(VALUE, "###", "---");
+		set resp.http.v5 = headerplus.as_list(VALUE);
+		set resp.http.v6 = headerplus.as_list(VALUE, sort = false);
+
+		set resp.http.u3 = headerplus.as_list(VALUE, name_case = LOWER);
+		set resp.http.u4 = headerplus.as_list(VALUE, name_case = UPPER);
+
+		set resp.http.v7 = headerplus.as_list(BOTH, "&&", "*");
+		set resp.http.v8 = headerplus.as_list(BOTH, "###", "---");
+		set resp.http.v9 = headerplus.as_list(BOTH, "; ", "=");
+		set resp.http.v10 = headerplus.as_list(BOTH);
+		set resp.http.v11 = headerplus.as_list(BOTH, sort = false);
+
+		set resp.http.u5 = headerplus.as_list(BOTH, name_case = LOWER);
+		set resp.http.u6 = headerplus.as_list(BOTH, name_case = UPPER);
+	}
+} -start
+
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.http.v1 == "Host; X-Forwarded-For"
+	expect resp.http.v2 == "Host, X-Forwarded-For"
+	expect resp.http.v3 == "Host, X-Forwarded-For"
+
+	expect resp.http.u1 == "host, x-forwarded-for"
+	expect resp.http.u2 == "HOST, X-FORWARDED-FOR"
+
+	expect resp.http.v4 == "127.0.0.1###127.0.0.1"
+	expect resp.http.v5 == "127.0.0.1, 127.0.0.1"
+	expect resp.http.v6 == "127.0.0.1, 127.0.0.1"
+
+	expect resp.http.u3 == resp.http.v5
+	expect resp.http.u4 == resp.http.v5
+
+	expect resp.http.v7 == "Host*127.0.0.1&&X-Forwarded-For*127.0.0.1"
+	expect resp.http.v8 == "Host---127.0.0.1###X-Forwarded-For---127.0.0.1"
+	expect resp.http.v9 == "Host=127.0.0.1; X-Forwarded-For=127.0.0.1"
+	expect resp.http.v10 == "Host: 127.0.0.1, X-Forwarded-For: 127.0.0.1"
+	expect resp.http.v11 == resp.http.v10
+
+	expect resp.http.u5 == "host: 127.0.0.1, x-forwarded-for: 127.0.0.1"
+	expect resp.http.u6 == "HOST: 127.0.0.1, X-FORWARDED-FOR: 127.0.0.1"
+
+	txreq -url /delete
+	rxresp
+	expect resp.http.v1 == ""
+	expect resp.http.v2 == ""
+	expect resp.http.v3 == ""
+	expect resp.http.v4 == ""
+	expect resp.http.v5 == ""
+	expect resp.http.v6 == ""
+	expect resp.http.v7 == ""
+	expect resp.http.v8 == ""
+	expect resp.http.v9 == ""
+	expect resp.http.v10 == ""
+	expect resp.http.v11 == ""
+	expect resp.http.u1 == ""
+	expect resp.http.u2 == ""
+	expect resp.http.u3 == ""
+	expect resp.http.u4 == ""
+	expect resp.http.u5 == ""
+	expect resp.http.u6 == ""
+
+	txreq -url /keep
+	rxresp
+	expect resp.http.v1 == ""
+	expect resp.http.v2 == ""
+	expect resp.http.v3 == ""
+	expect resp.http.v4 == ""
+	expect resp.http.v5 == ""
+	expect resp.http.v6 == ""
+	expect resp.http.v7 == ""
+	expect resp.http.v8 == ""
+	expect resp.http.v9 == ""
+	expect resp.http.v10 == ""
+	expect resp.http.v11 == ""
+	expect resp.http.u1 == ""
+	expect resp.http.u2 == ""
+	expect resp.http.u3 == ""
+	expect resp.http.u4 == ""
+	expect resp.http.u5 == ""
+	expect resp.http.u6 == ""
+
+	txreq -hdr "name: value"  -hdr "two: 2" -hdr "name: value2" -hdr "one: 1"
+	rxresp
+	expect resp.http.v1 == "Host; X-Forwarded-For; name; name; one; two"
+	expect resp.http.v2 == "Host, X-Forwarded-For, name, name, one, two"
+	expect resp.http.v3 == "name, two, name, one, Host, X-Forwarded-For"
+
+	expect resp.http.u1 == "host, x-forwarded-for, name, name, one, two"
+	expect resp.http.u2 == "HOST, X-FORWARDED-FOR, NAME, NAME, ONE, TWO"
+	
+	expect resp.http.v4 == "1###127.0.0.1###127.0.0.1###2###value###value2"
+	expect resp.http.v5 == "1, 127.0.0.1, 127.0.0.1, 2, value, value2"
+	expect resp.http.v6 == "value, 2, value2, 1, 127.0.0.1, 127.0.0.1"
+
+	expect resp.http.u3 == resp.http.v5
+	expect resp.http.u4 == resp.http.v5
+
+	expect resp.http.v7 == "Host*127.0.0.1&&X-Forwarded-For*127.0.0.1&&name*value&&name*value2&&one*1&&two*2"
+	expect resp.http.v8 == "Host---127.0.0.1###X-Forwarded-For---127.0.0.1###name---value###name---value2###one---1###two---2"
+	expect resp.http.v9 == "Host=127.0.0.1; X-Forwarded-For=127.0.0.1; name=value; name=value2; one=1; two=2"
+	expect resp.http.v10 == "Host: 127.0.0.1, X-Forwarded-For: 127.0.0.1, name: value, name: value2, one: 1, two: 2"
+	expect resp.http.v11 == "name: value, two: 2, name: value2, one: 1, Host: 127.0.0.1, X-Forwarded-For: 127.0.0.1"
+
+	expect resp.http.u5 == "host: 127.0.0.1, x-forwarded-for: 127.0.0.1, name: value, name: value2, one: 1, two: 2"
+	expect resp.http.u6 == "HOST: 127.0.0.1, X-FORWARDED-FOR: 127.0.0.1, NAME: value, NAME: value2, ONE: 1, TWO: 2"
+} -run

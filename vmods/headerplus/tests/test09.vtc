@@ -21,64 +21,45 @@ varnish v1 -vcl {
 } -start
 
 logexpect l1 -v v1 {
-	expect *	1001 	VCL_Log  	"headerplus.write()"
-	expect 0	= 	ReqHeader 	"name: a"
+	expect *	1001  	ReqHeader 	"name: a"
 	expect 0	= 	ReqHeader 	"name: b"
 	expect 0	= 	ReqHeader 	"name: c"
 	expect 0	=	ReqHeader	"value: 1"
-	expect 0	= 	VCL_Log  	"headerplus.reset()"
 
-	expect *	1002 	VCL_Log  	"headerplus.write()"
-	expect 0	= 	ReqHeader 	"value: 1"
+	expect *	1002 	ReqHeader 	"value: 1"
 	expect 0	= 	ReqHeader 	"name: a"
 	expect 0	= 	ReqHeader 	"name: b"
 	expect 0	= 	ReqHeader 	"name: c"
-	expect 0	= 	VCL_Log  	"headerplus.reset()"
 
-	expect *	1003 	VCL_Log  	"headerplus.write()"	
-	expect 0	= 	VCL_Log  	"headerplus.reset()"
+	expect *	1004 	VCL_Log  	"bad json"
 
-	expect *	1004 	VCL_Log  	"headerplus.from_json()"	
-	expect 0	= 	VCL_Log  	"bad json"
-
-	expect *	1005 	VCL_Log  	"headerplus.write()"	
-	expect 0	= 	VCL_Log  	"headerplus.reset()"
-
-	expect *	1006 	VCL_Log  	"headerplus.write()"
-	expect 0	= 	ReqHeader 	"name: a"
+	expect *	1006 	ReqHeader 	"name: a"
 	expect 0	= 	ReqHeader 	"name: b"
 	expect 0	= 	ReqHeader 	"name: c"
 	expect 0	= 	ReqHeader 	"name3: x"
 	expect 0	= 	ReqHeader 	"name3: y"
-	expect 0	= 	VCL_Log  	"headerplus.reset()"
 
-	expect *	1007 	VCL_Log  	"headerplus.write()"	
-	expect 0	= 	VCL_Log  	"headerplus.reset()"
-
-	expect *	1008 	VCL_Log  	"headerplus.write()"
-	expect 0	= 	ReqHeader 	"name: value"
+	expect *	1008	ReqHeader 	"name: value"
 	expect 0	= 	ReqHeader 	"one: 1"
-	expect 0	= 	VCL_Log  	"headerplus.reset()"
 
-	expect *	1009 	VCL_Log  	"headerplus.write()"
-	expect 0	= 	ReqUnset	"name: x"
+	expect *	1009 	ReqUnset	"name: x"
 	expect 0	= 	ReqUnset	"name: y"
 	expect 0	= 	ReqUnset	"value: 3"
 	expect 0	= 	ReqHeader 	"name: a"
 	expect 0	= 	ReqHeader 	"name: b"
 	expect 0	= 	ReqHeader 	"name: c"
 	expect 0	=	ReqHeader	"value: 1"
-	expect 0	= 	VCL_Log  	"headerplus.reset()"
 
-	expect *	1010 	VCL_Log  	"headerplus.write()"
-	expect 0	= 	ReqUnset	"name: x"
+	expect *	1010 	ReqUnset	"name: x"
 	expect 0	= 	ReqUnset	"name: y"
 	expect 0	= 	ReqUnset	"value: 3"
 	expect 0	=	ReqHeader	"value: 1"
 	expect 0	= 	ReqHeader 	"name: a"
 	expect 0	= 	ReqHeader 	"name: b"
 	expect 0	= 	ReqHeader 	"name: c"
-	expect 0	= 	VCL_Log  	"headerplus.reset()"
+
+	expect *	1011	ReqHeader 	"name: value"
+	expect 0	= 	ReqHeader 	"one: 1"
 } -start
 
 
@@ -117,6 +98,8 @@ client c1 {
 	      -hdr {My-Header: {"value": "1", "name": ["a", "b", "c", 1]}}
 	rxresp
 
+	txreq -hdr {My-Header: {"name": ["value"], "one": ["1"]}}
+	rxresp
 } -run
 
 logexpect l1 -wait

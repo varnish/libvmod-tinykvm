@@ -1,0 +1,44 @@
+varnishtest "Test headerplus.regsub_value()"
+
+varnish v1 -vcl+backend {
+	import headerplus;
+	backend default none;
+	sub vcl_recv {
+		return (synth(200));
+	}
+	sub vcl_synth {
+		headerplus.init(req);
+		headerplus.regsub_value("notfound", ".*", "");
+		headerplus.regsub_value("name", "(val)(.*)", "\2\1");
+		headerplus.regsub_value("test", "xxx", "");
+		headerplus.regsub_value("test", "(red|green|blue)", "yellow");
+		headerplus.regsub_value("test2", "(red|green|blue)", "yellow", all = true);
+		headerplus.write();
+	}
+} -start
+
+logexpect l1 -v v1 {
+	expect *	1001 	ReqUnset  	"name: value"
+	expect 0	= 	ReqUnset 	"name: value2"
+	expect 0	= 	ReqUnset 	"test: red"
+	expect 0	= 	ReqUnset 	"test: bluered"
+	expect 0	= 	ReqUnset 	"test: greengreen"
+	expect 0	= 	ReqUnset 	"test2: greengreen"
+
+
+	expect 0	= 	ReqHeader  	"name: ueval"
+	expect 0	= 	ReqHeader 	"name: ue2val"
+	expect 0	= 	ReqHeader 	"test: yellow"
+	expect 0	= 	ReqHeader 	"test: yellowred"
+	expect 0	= 	ReqHeader 	"test: yellowgreen"
+	expect 0	= 	ReqHeader 	"test2: yellowyellow"
+
+} -start
+
+client c1 {
+	txreq -hdr "name: value" -hdr "name: value2" -hdr "test: red" -hdr "test: bluered" \
+	      -hdr "test: greengreen"  -hdr "test2: greengreen"
+	rxresp
+} -run
+
+logexpect l1 -wait

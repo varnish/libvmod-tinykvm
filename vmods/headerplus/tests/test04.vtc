@@ -30,8 +30,7 @@ varnish v1 -vcl+backend {
 } -start
 
 logexpect l1 -v v1 {
-	expect *	1001 	VCL_Log  	"headerplus.write()"
-	expect 0	= 	ReqUnset  	"test: a"
+	expect *	1001 	ReqUnset  	"test: a"
 	expect 0	= 	ReqUnset 	"test:b"
 	expect 0	= 	ReqUnset 	"test:ing"
 	expect 0	= 	ReqUnset 	"test: d"
@@ -41,16 +40,14 @@ logexpect l1 -v v1 {
 	expect 0	= 	ReqHeader 	"test-new: d"
 	expect 0	= 	ReqHeader 	"test-new: inside"
 
-	expect *	1002 	VCL_Log  	"headerplus.write()"
-	expect 0	=	ReqHeader	"test: inside"
+	expect *	1002	ReqHeader	"test: inside"
 	expect 0	= 	ReqHeader  	"test-new: a"
 	expect 0	= 	ReqHeader 	"test-new: b"
 	expect 0	= 	ReqHeader 	"test-new: ing"
 	expect 0	= 	ReqHeader 	"test-new: d"
 	expect 0	= 	ReqHeader 	"test-new: inside"
 
-	expect *	1003 	VCL_Log  	"headerplus.write()"
-	expect 0	= 	ReqUnset  	"test: a"
+	expect *	1003 	ReqUnset  	"test: a"
 	expect 0	= 	ReqUnset 	"test:b"
 	expect 0	= 	ReqUnset 	"test:ing"
 	expect 0	= 	ReqUnset 	"test: d"
@@ -60,8 +57,7 @@ logexpect l1 -v v1 {
 	expect 0	= 	ReqHeader 	"X-test: d"
 	expect 0	= 	ReqHeader 	"X-test: inside"
 
-	expect *	1004 	VCL_Log  	"headerplus.write()"
-	expect 0	=	ReqHeader	"test: inside"
+	expect *	1004	ReqHeader	"test: inside"
 	expect 0	= 	ReqHeader  	"X-test: a"
 	expect 0	= 	ReqHeader 	"X-test: b"
 	expect 0	= 	ReqHeader 	"X-test: ing"

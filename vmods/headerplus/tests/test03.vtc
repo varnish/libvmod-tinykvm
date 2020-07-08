@@ -1,4 +1,4 @@
-varnishtest "Test headerplus.rename/rename_regex()"
+varnishtest "Test headerplus.rename/regsub_name()"
 
 varnish v1 -vcl+backend {
 	import headerplus;
@@ -14,9 +14,9 @@ varnish v1 -vcl+backend {
 		headerplus.add("test", "inside");
 		if (req.http.re) {
 			if (req.http.remove) {
-				headerplus.rename_regex("(te)(st)", "\2\1", remove = true);
+				headerplus.regsub_name("(te)(st)", "\2\1", remove = true);
 			} else {
-				headerplus.rename_regex("(te)(st)", "\2\1", remove = false);
+				headerplus.regsub_name("(te)(st)", "\2\1", remove = false);
 			}
 		} else if (req.http.remove) {
 			headerplus.rename("test", "inside", remove = true);
@@ -29,8 +29,7 @@ varnish v1 -vcl+backend {
 } -start
 
 logexpect l1 -v v1 {
-	expect *	1001 	VCL_Log  	"headerplus.write()"
-	expect 0	= 	ReqUnset  	"test: a"
+	expect *	1001 	ReqUnset  	"test: a"
 	expect 0	= 	ReqUnset 	"test:b"
 	expect 0	= 	ReqUnset 	"test:ing"
 	expect 0	= 	ReqUnset 	"test: d"
@@ -40,8 +39,7 @@ logexpect l1 -v v1 {
 	expect 0	= 	ReqHeader 	"inside: d"
 	expect 0	= 	ReqHeader 	"inside: inside"
 
-	expect *	1002	VCL_Log  	"headerplus.write()"
-	expect 0	= 	ReqUnset  	"test: a"
+	expect *	1002 	ReqUnset  	"test: a"
 	expect 0	= 	ReqUnset 	"test:b"
 	expect 0	= 	ReqUnset 	"test:ing"
 	expect 0	= 	ReqUnset 	"test: d"
@@ -51,16 +49,14 @@ logexpect l1 -v v1 {
 	expect 0	= 	ReqHeader 	"stte: d"
 	expect 0	= 	ReqHeader 	"stte: inside"
 
-	expect *	1003 	VCL_Log  	"headerplus.write()"
-	expect 0	= 	ReqHeader 	"test: inside"
+	expect *	1003 	ReqHeader 	"test: inside"
 	expect 0	= 	ReqHeader  	"inside: a"
 	expect 0	= 	ReqHeader 	"inside: b"
 	expect 0	= 	ReqHeader 	"inside: ing"
 	expect 0	= 	ReqHeader 	"inside: d"
 	expect 0	= 	ReqHeader 	"inside: inside"
 
-	expect *	1004	VCL_Log  	"headerplus.write()"
-	expect 0	= 	ReqHeader 	"test: inside"
+	expect *	1004 	ReqHeader 	"test: inside"
 	expect 0	= 	ReqHeader  	"stte: a"
 	expect 0	= 	ReqHeader 	"stte: b"
 	expect 0	= 	ReqHeader 	"stte: ing"
