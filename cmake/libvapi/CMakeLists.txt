@@ -49,7 +49,10 @@ target_compile_definitions(vapi_obj PUBLIC -DNOT_IN_A_VMOD)
 set_property(TARGET vapi_obj PROPERTY POSITION_INDEPENDENT_CODE 1)
 add_dependencies(vapi_obj varnishapi_generate)
 
-if (SANITIZE)
+if (LIBFUZZER)
+	target_compile_definitions(vapi_obj PUBLIC LIBFUZZER_ENABLED=1)
+	target_compile_options(vapi_obj PRIVATE "${FUZZER_CFLAGS}")
+elseif (SANITIZE)
 	target_compile_options(vapi_obj PRIVATE "${SANITIZE_FLAGS}")
 endif()
 
@@ -62,4 +65,6 @@ target_include_directories(varnishapi PUBLIC ${CMAKE_BINARY_DIR}/libvarnish)
 set_target_properties(varnishapi
 	PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
-#target_link_libraries(varnishapi varnish)
+if (LIBFUZZER)
+	target_link_libraries(varnishapi PUBLIC "${FUZZER_LFLAGS}")
+endif()

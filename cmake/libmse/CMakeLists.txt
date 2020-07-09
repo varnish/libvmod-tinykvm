@@ -19,6 +19,7 @@ set(MSE_SOURCES
 	#${MSE_PATH}/mse_lib_dbtest.c
 	#${MSE_PATH}/mse_mtq_test.c
 )
+
 add_library(mse ${MSE_SOURCES})
 target_include_directories(mse PRIVATE ${MSE_PATH})
 target_include_directories(mse PRIVATE ${LIBPATH}/libvgz)
@@ -27,6 +28,10 @@ target_include_directories(mse PRIVATE ${VARNISH_PATH}/include)
 target_include_directories(mse PRIVATE ${CONFIG_PATH})
 # we need to link with libconfig
 target_link_libraries(mse config)
-if (SANITIZE)
+
+if (LIBFUZZER)
+	target_compile_definitions(mse PRIVATE LIBFUZZER_ENABLED=1)
+	target_compile_options(mse PRIVATE "${FUZZER_CFLAGS}")
+elseif (SANITIZE)
 	target_compile_options(mse PRIVATE "${SANITIZE_FLAGS}")
 endif()

@@ -276,6 +276,7 @@ if (LIBFUZZER)
         ${VD_PATH}/mgt/mgt_main.c
 		${VD_PATH}/mgt/mgt_param_tbl.c
     PROPERTIES COMPILE_DEFINITIONS LIBFUZZER_ENABLED=1)
+	target_compile_definitions(varnishd PRIVATE DONT_DLCLOSE_VMODS=1)
 endif()
 
 # libfuzzer is a C++ project, so we need the ability to enable libc++ and LLD

@@ -55,7 +55,7 @@ target_include_directories(varnishtest PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_compile_definitions(varnishtest PUBLIC VTEST_WITH_VTC_VARNISH=1)
 target_compile_definitions(varnishtest PUBLIC VTEST_WITH_VTC_LOGEXPECT=1)
 
-target_link_libraries(varnishtest varnishapi varnish pthread vgz)
+target_link_libraries(varnishtest vapi_static varnish pthread vgz)
 if (VARNISH_PLUS)
 	target_link_libraries(varnishtest mse)
 endif()
