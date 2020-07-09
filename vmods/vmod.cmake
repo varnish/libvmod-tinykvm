@@ -114,7 +114,7 @@ function(add_vmod LIBNAME VCCNAME comment)
 		message(STATUS "Libfuzzer enabled for VMOD ${LIBNAME}")
 	elseif (SANITIZE)
 		target_compile_options(${LIBNAME} PRIVATE
-			"-fno-omit-frame-pointer" "-fsanitize=address,undefined")
+			"-fno-omit-frame-pointer" "-fsanitize=address,undefined" "-fno-sanitize=function,vptr")
 		target_compile_definitions(${LIBNAME} PRIVATE SANITIZERS_ENABLED=1)
 		target_link_libraries(${LIBNAME} "-fsanitize=address,undefined")
 	endif()
