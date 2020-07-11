@@ -8,6 +8,9 @@
 typedef void (*set_header_t) (struct http*, const char*);
 extern const char* execute_riscv(void* workspace, set_header_t, void* http,
 	const uint8_t* binary, size_t len, uint64_t instr_max);
+extern struct vmod_riscv_machine* riscv_create(const char* file, VRT_CTX, uint64_t insn);
+extern int riscv_forkcall(VRT_CTX, struct vmod_riscv_machine*, const char* func);
+extern int riscv_free(struct vmod_riscv_machine*);
 #include "vmod_util.h"
 
 VCL_STRING
@@ -25,7 +28,7 @@ vmod_exec(VRT_CTX, VCL_HTTP hp, VCL_INT instr_max, VCL_BLOB elf)
 	return (output); /* leak */
 }
 
-VCL_BACKEND vmod_init_from_body(VRT_CTX, struct vmod_riscv_init *rvb)
+VCL_BACKEND vmod_backend_from_body(VRT_CTX, struct vmod_riscv_backend *rvb)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	CHECK_OBJ_NOTNULL(rvb, RISCV_BACKEND_MAGIC);
@@ -145,7 +148,7 @@ riscvbe_gethdrs(const struct director *dir,
 	const uint8_t *result_data = (const uint8_t *) VSB_data(vsb);
 	const size_t   result_len = VSB_len(vsb);
 
-	struct vmod_riscv_init *rvb;
+	struct vmod_riscv_backend *rvb;
 	CAST_OBJ_NOTNULL(rvb, dir->priv, RISCV_BACKEND_MAGIC);
 
 	struct http *http = bo->beresp;
@@ -171,6 +174,7 @@ riscvbe_gethdrs(const struct director *dir,
 	bo->htc->content_length = output_len;
 	bo->htc->priv = WS_Copy(bo->ws, output, output_len);
 	bo->htc->body_status = BS_LENGTH;
+	/* The zero-length string that can be returned is .rodata */
 	if (output != NULL && output[0] != 0)
 		free((void*) output);
 	if (bo->htc->priv == NULL)
@@ -185,13 +189,13 @@ riscvbe_gethdrs(const struct director *dir,
 }
 
 VCL_VOID
-vmod_init__init(VRT_CTX, struct vmod_riscv_init **init,
+vmod_backend__init(VRT_CTX, struct vmod_riscv_backend **init,
 	const char *vcl_name, VCL_INT max_instr, VCL_STRANDS args)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	(void) vcl_name;
 
-	struct vmod_riscv_init *rvb;
+	struct vmod_riscv_backend *rvb;
 	ALLOC_OBJ(rvb, RISCV_BACKEND_MAGIC);
 	AN(rvb);
 
@@ -203,17 +207,42 @@ vmod_init__init(VRT_CTX, struct vmod_riscv_init **init,
 	rvb->dir.finish  = riscvbe_finish;
 	rvb->dir.panic   = riscvbe_panic;
 
-	/* TODO: initialize max_instructions */
 	rvb->max_instructions = max_instr;
 
 	*init = rvb; /* check this */
 }
 
 VCL_VOID
-vmod_init__fini(struct vmod_riscv_init **priv)
+vmod_backend__fini(struct vmod_riscv_backend **priv)
 {
-	struct vmod_riscv_init *rvb;
+	struct vmod_riscv_backend *rvb;
 
 	TAKE_OBJ_NOTNULL(rvb, priv, RISCV_BACKEND_MAGIC);
 	FREE_OBJ(rvb);
+}
+
+
+VCL_VOID
+vmod_machine__init(VRT_CTX, struct vmod_riscv_machine **init,
+	const char *vcl_name, VCL_INT max_instr, VCL_STRING elf, VCL_STRANDS args)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	(void) vcl_name;
+
+	*init = riscv_create(elf, ctx, max_instr);
+}
+
+VCL_VOID
+vmod_machine__fini(struct vmod_riscv_machine **priv)
+{
+	riscv_free(*priv);
+	*priv = NULL;
+}
+
+VCL_INT vmod_machine_call(VRT_CTX,
+	struct vmod_riscv_machine *rvm, VCL_STRING function)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	return riscv_forkcall(ctx, rvm, function);
 }

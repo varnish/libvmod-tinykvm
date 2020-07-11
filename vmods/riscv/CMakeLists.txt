@@ -4,11 +4,20 @@ include(../vmod.cmake vmod)
 
 add_vmod(vmod_riscv vmod_riscv.vcc "RISC-V machine emulation VMOD"
 	src/vmod_riscv.c
-	src/interface.cpp
+	src/linux.cpp
+	src/sandbox.cpp
+	src/script.cpp
+	src/script_functions.cpp
 	libriscv/emulator/src/linux.cpp
 	libriscv/emulator/syscalls/src/syscalls.cpp
 	libriscv/emulator/syscalls/src/threads.cpp
 	libriscv/emulator/syscalls/src/posix_threads.cpp
+	libriscv/emulator/syscalls/src/native_libc.cpp
+	libriscv/emulator/syscalls/src/native_threads.cpp
+)
+target_compile_definitions(vmod_riscv PRIVATE
+	NATIVE_SYSCALLS_BASE=80
+	#THREADS_SYSCALL_BASE=90
 )
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -18,6 +27,10 @@ target_include_directories(vmod_riscv PRIVATE libriscv/emulator/syscalls)
 target_include_directories(vmod_riscv PRIVATE libriscv/emulator/src)
 
 add_subdirectory(libriscv/lib)
+target_compile_definitions(riscv PUBLIC
+	RISCV_EXEC_TRAPS_ENABLED=1
+	RISCV_THROW_UNIMPLEMENTED=1
+	RISCV_EBREAK_MEANS_STOP=1)
 target_link_libraries(vmod_riscv riscv)
 
 # VCL import name is "riscv"

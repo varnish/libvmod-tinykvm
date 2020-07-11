@@ -9,7 +9,7 @@
 
 #define RISCV_BACKEND_MAGIC 0x1f87a42d58b7426e
 
-struct vmod_riscv_init
+struct vmod_riscv_backend
 {
 	uint64_t magic;
 
@@ -17,3 +17,6 @@ struct vmod_riscv_init
 
 	struct director dir;
 };
+
+
+struct vmod_riscv_machine;

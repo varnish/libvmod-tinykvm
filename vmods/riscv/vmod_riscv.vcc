@@ -17,6 +17,18 @@ Execute the given ELF binary, running its main function to completion or runs ou
 - If an error occurs the return value is null (empty).
 - On success the machine output is returned.
 
-$Object init(INT max_instructions = 2000000, STRANDS arguments = 0)
+$Object backend(INT max_instructions = 2000000, STRANDS arguments = 0)
 
 $Method BACKEND .from_body()
+
+
+$Object machine(INT max_instructions = 2000000, STRING filename, STRANDS args = 0)
+
+- Create machine that is initialized immediately
+- Arguments are passed into the main() function
+
+$Method INT     .call(STRING function)
+
+- Call into a new virtual machine cloned from the previously
+  prepared machine, using copy-on-write mechanics.
+
