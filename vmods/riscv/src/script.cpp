@@ -18,12 +18,15 @@ void Script::init()
 }
 
 Script::Script(
-	const riscv::Machine<riscv::RISCV32>& smach, const vrt_ctx* ctx,
+	const riscv::Machine<riscv::RISCV32>& source, const vrt_ctx* ctx,
 	uint64_t insn, uint64_t mem, uint64_t heap)
-	: m_source_machine(smach), m_ctx(ctx), m_max_instructions(insn),
+	: m_machine(source.memory.binary(), {
+		.memory_max = mem,  .owning_machine = &source
+	  }),
+	  m_ctx(ctx), m_max_instructions(insn),
 	  m_max_memory(mem), m_max_heap(heap)
 {
-	this->reset();
+	this->m_crashed = !this->machine_initialize();
 }
 
 Script::~Script()
@@ -31,27 +34,6 @@ Script::~Script()
 	// free any unfreed regex pointers
 	for (auto& entry : m_regex_cache)
 		if (entry.re) VRE_free(&entry.re);
-}
-
-bool Script::reset()
-{
-	try {
-		riscv::MachineOptions<riscv::RISCV32> options {
-			.memory_max = m_max_memory,
-			.owning_machine = &this->m_source_machine
-		};
-		m_machine.reset(new riscv::Machine<riscv::RISCV32> (
-			m_source_machine.memory.binary(), options));
-
-	} catch (std::exception& e) {
-		printf(">>> Exception: %s\n", e.what());
-		return false;
-	}
-	if (this->machine_initialize()) {
-		this->m_crashed = false;
-		return true;
-	}
-	return false;
 }
 
 void Script::setup_virtual_memory()

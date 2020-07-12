@@ -3,17 +3,20 @@
 extern "C" {
 # include "vdef.h"
 # include "vrt.h"
+	void *WS_Alloc(struct ws *ws, unsigned bytes);
 }
 
 struct vmod_riscv_machine {
 	vmod_riscv_machine(std::vector<uint8_t> elf, VRT_CTX,
 		uint64_t insn, uint64_t mem, uint64_t heap)
 		: binary{std::move(elf)}, machine{binary},
-		  script{machine, ctx, insn, mem, heap} {}
+		  max_instructions(insn), max_memory(mem), max_heap(heap) {}
 
 	const std::vector<uint8_t> binary;
 	riscv::Machine<riscv::RISCV32> machine;
-	Script script;
+	uint64_t max_instructions;
+	uint64_t max_heap;
+	uint64_t max_memory;
 };
 static std::vector<uint8_t> load_file(const std::string& filename);
 
@@ -27,8 +30,20 @@ vmod_riscv_machine* riscv_create(const char* file, VRT_CTX, uint64_t insn)
 extern "C"
 int riscv_forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 {
-	vrm->script.set_ctx(ctx);
-	return vrm->script.call(func);
+	/* Allocate Script on workspace, and construct it in-place */
+	auto* script = (Script*) WS_Alloc(ctx->ws, sizeof(Script));
+	try {
+		new (script) Script{vrm->machine, ctx,
+			vrm->max_instructions, vrm->max_memory, vrm->max_heap};
+
+	} catch (std::exception& e) {
+		printf(">>> Exception: %s\n", e.what());
+		return -1;
+	}
+	/* Call into the virtual machine */
+	int ret = script->call(func);
+	script->~Script(); /* call destructor */
+	return ret;
 }
 
 extern "C"

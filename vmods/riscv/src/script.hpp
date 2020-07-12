@@ -19,8 +19,8 @@ public:
 	template <typename... Args>
 	inline long preempt(uint32_t addr, Args&&...);
 
-	auto& machine() { return *m_machine; }
-	const auto& machine() const { return *m_machine; }
+	auto& machine() { return m_machine; }
+	const auto& machine() const { return m_machine; }
 
 	void set_ctx(const vrt_ctx* ctx) { m_ctx = ctx; }
 	const auto* ctx() const noexcept { return m_ctx; }
@@ -56,8 +56,7 @@ private:
 	void setup_syscall_interface(riscv::Machine<riscv::RISCV32>&);
 	static riscv::Page g_hidden_stack; // page used by the internal APIs
 
-	std::unique_ptr<riscv::Machine<riscv::RISCV32>> m_machine = nullptr;
-	const riscv::Machine<riscv::RISCV32>& m_source_machine;
+	riscv::Machine<riscv::RISCV32> m_machine;
 	const vrt_ctx* m_ctx = nullptr;
 	uint64_t    m_max_instructions = 0;
 	uint64_t    m_max_heap = 0;
