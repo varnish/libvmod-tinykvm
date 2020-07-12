@@ -29,8 +29,8 @@ Script::Script(
 Script::~Script()
 {
 	// free any unfreed regex pointers
-	for (auto* ptr : m_regex)
-		if (ptr) VRE_free(&ptr);
+	for (auto& entry : m_regex_cache)
+		if (entry.re) VRE_free(&entry.re);
 }
 
 bool Script::reset()
@@ -175,12 +175,19 @@ std::string Script::symbol_name(uint32_t address) const
 	return callsite.name;
 }
 
-size_t Script::regex_manage(struct vre* ptr)
+int Script::regex_find(uint32_t hash) const
 {
-	m_regex.push_back(ptr);
-	return m_regex.size() - 1;
+	for (unsigned idx = 0; idx < m_regex_cache.size(); idx++) {
+		if (m_regex_cache[idx].hash == hash) return idx;
+	}
+	return -1;
 }
-void   Script::regex_free(size_t idx)
+size_t Script::regex_manage(struct vre* ptr, uint32_t hash)
 {
-	m_regex.at(idx) = nullptr;
+	m_regex_cache.push_back({ptr, hash});
+	return m_regex_cache.size() - 1;
+}
+void Script::regex_free(size_t idx)
+{
+	m_regex_cache.at(idx) = { nullptr, 0 };
 }

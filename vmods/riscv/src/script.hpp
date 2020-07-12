@@ -2,6 +2,7 @@
 #include <cassert>
 #include <functional>
 #include <libriscv/machine.hpp>
+#include <EASTL/fixed_vector.h>
 struct vrt_ctx;
 
 class Script {
@@ -26,9 +27,10 @@ public:
 
 	auto& shm_address() { return m_shm_address; }
 
-	size_t regex_manage(struct vre*);
+	int    regex_find(uint32_t hash) const;
+	size_t regex_manage(struct vre*, uint32_t hash);
 	void   regex_free(size_t);
-	struct vre* regex_get(size_t idx) { return m_regex.at(idx); }
+	struct vre* regex_get(size_t idx) { return m_regex_cache.at(idx).re; }
 
 	std::string symbol_name(uint32_t address) const;
 	uint32_t resolve_address(const std::string& name) const;
@@ -64,7 +66,11 @@ private:
 	int         m_budget_overruns = 0;
 
 	uint32_t    m_shm_address = 0x10000;
-	std::vector<struct vre*> m_regex;
+	struct RegexCache {
+		struct vre* re   = nullptr;
+		uint32_t    hash = 0;
+	};
+	eastl::fixed_vector<RegexCache, 16> m_regex_cache;
 };
 
 template <typename... Args>

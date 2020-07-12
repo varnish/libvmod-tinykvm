@@ -1,5 +1,6 @@
 #include "script_functions.hpp"
 #include "machine/include_api.hpp"
+#include "crc32.hpp"
 #include "shm.hpp"
 using gaddr_t = uint32_t;
 
@@ -252,6 +253,12 @@ APICALL(regex_compile)
 {
 	auto [pattern] = machine.sysargs<std::string> ();
 
+	const uint32_t hash = crc32(pattern.c_str(), pattern.size());
+	const int idx = get_script(machine).regex_find(hash);
+	if (idx >= 0)
+		return idx;
+
+	/* Compile new regex pattern */
 	const char* error = "";
 	int         error_offset = 0;
 	auto* re = VRE_compile(pattern.c_str(), 0, &error, &error_offset);
@@ -260,7 +267,8 @@ APICALL(regex_compile)
 		printf("Regex compile error: %s\n", error);
 		throw std::runtime_error("The regex pattern did not compile: " + pattern);
 	}
-	return get_script(machine).regex_manage(re);
+
+	return get_script(machine).regex_manage(re, hash);
 }
 APICALL(regex_match)
 {
