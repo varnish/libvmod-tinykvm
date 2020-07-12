@@ -12,6 +12,7 @@ extern "C" {
 	int  http_UnsetIdx(struct http *hp, unsigned idx);
 	void *WS_Copy(struct ws *ws, const void *str, int len);
 	void *WS_Alloc(struct ws *ws, unsigned bytes);
+	char *WS_Printf(struct ws *ws, const char *fmt, ...);
 	typedef struct {
 		const char* begin;
 		const char* end;
@@ -22,6 +23,12 @@ extern "C" {
 		txt*           field_array;
 		unsigned char* field_flags;
 		uint16_t       field_count;
+		int some_shit;
+		void*          vsl;
+		void*          ws;
+		uint16_t       status;
+		uint8_t        protover;
+		uint8_t        conds;
 	};
 }
 typedef struct {
@@ -36,12 +43,19 @@ inline bool is_valid_index(const http* hp, unsigned idx) {
 	return idx >= 1 && idx < hp->field_count;
 }
 
-inline std::tuple<http*, txt&>
-get_field(VRT_CTX, int where, uint32_t index)
+inline http*
+get_http(VRT_CTX, int where)
 {
 	auto* hp = VRT_selecthttp(ctx, (gethdr_e) where);
 	if (hp == nullptr)
 		throw std::runtime_error("Selected HTTP not available at this time");
+
+	return hp;
+}
+inline std::tuple<http*, txt&>
+get_field(VRT_CTX, int where, uint32_t index)
+{
+	auto* hp = get_http(ctx, (gethdr_e) where);
 
 	if (is_valid_index(hp, index))
 	{
@@ -130,6 +144,22 @@ APICALL(foreach_header_field)
 
 	return 0;
 }
+APICALL(http_set_status)
+{
+	const auto [where, status] = machine.sysargs<int, int> ();
+
+	auto* ctx = get_ctx(machine);
+	auto [hp, field] = get_field(ctx, where, 3);
+	/* Getter does not want to set status */
+	if (status < 0)
+		return hp->status;
+	hp->status = status;
+	/* We have to overwrite the header field too */
+	field.begin = WS_Printf(ctx->ws, "%u", status);
+	field.end = field.begin + strlen(field.begin);
+	return status;
+}
+
 
 APICALL(header_field_get_length)
 {
@@ -270,6 +300,11 @@ void Script::setup_syscall_interface(machine_t& machine)
 		{ECALL_ASSERT_FAIL, assertion_failed},
 		{ECALL_PRINT,       print},
 
+		{ECALL_REGEX_COMPILE, regex_compile},
+		{ECALL_REGEX_MATCH,   regex_match},
+		{ECALL_REGEX_SUBST,   regex_subst},
+		{ECALL_REGEX_FREE,    regex_delete},
+
 		{ECALL_FOREACH_FIELD, foreach_header_field},
 		{ECALL_FIELD_GET_L,   header_field_get_length},
 		{ECALL_FIELD_GET,     header_field_get},
@@ -277,9 +312,6 @@ void Script::setup_syscall_interface(machine_t& machine)
 		{ECALL_FIELD_SET,     header_field_set},
 		{ECALL_FIELD_UNSET,   header_field_unset},
 
-		{ECALL_REGEX_COMPILE, regex_compile},
-		{ECALL_REGEX_MATCH,   regex_match},
-		{ECALL_REGEX_SUBST,   regex_subst},
-		{ECALL_REGEX_FREE,    regex_delete},
+		{ECALL_HTTP_SET_STATUS, http_set_status},
 	});
 }
