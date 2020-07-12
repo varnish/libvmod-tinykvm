@@ -5,7 +5,10 @@
 #include "machine/include_api.hpp"
 
 extern "C" {
+# include <vdef.h>
 # include <vre.h>
+# include <vrt.h>
+	void *WS_Alloc(struct ws *ws, unsigned bytes);
 }
 
 static const bool TRUSTED_CALLS = true;
@@ -18,22 +21,42 @@ void Script::init()
 }
 
 Script::Script(
-	const riscv::Machine<riscv::RISCV32>& source, const vrt_ctx* ctx,
+	const Script& source, const vrt_ctx* ctx,
 	uint64_t insn, uint64_t mem, uint64_t heap)
-	: m_machine(source.memory.binary(), {
-		.memory_max = mem,  .owning_machine = &source
+	: m_machine(source.machine().memory.binary(), {
+		.memory_max = mem,  .owning_machine = &source.machine()
 	  }),
 	  m_ctx(ctx), m_max_instructions(insn),
 	  m_max_memory(mem), m_max_heap(heap)
 {
-	this->m_crashed = !this->machine_initialize();
+	/* No initialization */
+	this->machine_initialize(false);
+	machine().memory.set_exit_address(source.machine().memory.exit_address());
+	/* Transfer data from the old arena, to fully replicate heap */
+	arena_transfer((sas_alloc::Arena*) source.m_arena, (sas_alloc::Arena*) m_arena);
+	/* Load the compiled regexes of the source */
+	for (auto& regex : source.m_regex_cache) {
+		m_regex_cache.push_back(regex);
+		m_regex_cache.back().non_owned = true;
+	}
+}
+
+Script::Script(
+	const std::vector<uint8_t>& binary, const vrt_ctx* ctx,
+	uint64_t insn, uint64_t mem, uint64_t heap)
+	: m_machine(binary, { .memory_max = mem }),
+	  m_ctx(ctx), m_max_instructions(insn),
+	  m_max_memory(mem), m_max_heap(heap)
+{
+	this->machine_initialize(true);
 }
 
 Script::~Script()
 {
 	// free any unfreed regex pointers
 	for (auto& entry : m_regex_cache)
-		if (entry.re) VRE_free(&entry.re);
+		if (entry.re && !entry.non_owned)
+			VRE_free(&entry.re);
 }
 
 void Script::setup_virtual_memory()
@@ -48,43 +71,49 @@ void Script::setup_virtual_memory()
 	mem.install_shared_page(HIDDEN_AREA >> riscv::Page::SHIFT, g_hidden_stack);
 }
 
-bool Script::machine_initialize()
+bool Script::machine_initialize(bool init)
 {
 	// setup system calls and traps
-	this->machine_setup(machine());
+	this->machine_setup(machine(), init);
 	// run through the initialization
-	try {
-		machine().simulate(m_max_instructions);
+	if (init) {
+		try {
+			machine().simulate(m_max_instructions);
 
-		if (UNLIKELY(machine().cpu.instruction_counter() >= m_max_instructions)) {
-			printf(">>> Exception: Ran out of instructions\n");
+			if (UNLIKELY(machine().cpu.instruction_counter() >= m_max_instructions)) {
+				printf(">>> Exception: Ran out of instructions\n");
+				return false;
+			}
+		} catch (riscv::MachineException& me) {
+			printf(">>> Machine exception %d: %s (data: %d)\n",
+					me.type(), me.what(), me.data());
+#ifdef RISCV_DEBUG
+			machine().print_and_pause();
+#endif
+			return false;
+		} catch (std::exception& e) {
+			printf(">>> Exception: %s\n", e.what());
 			return false;
 		}
-	} catch (riscv::MachineException& me) {
-		printf(">>> Machine exception %d: %s (data: %d)\n",
-				me.type(), me.what(), me.data());
-#ifdef RISCV_DEBUG
-		machine().print_and_pause();
-#endif
-		return false;
-	} catch (std::exception& e) {
-		printf(">>> Exception: %s\n", e.what());
-		return false;
 	}
     return true;
 }
-void Script::machine_setup(riscv::Machine<riscv::RISCV32>& machine)
+void Script::machine_setup(riscv::Machine<riscv::RISCV32>& machine, bool init)
 {
 	machine.set_userdata<Script>(this);
-	const uint32_t exit_addr = machine.address_of("exit");
-	if (exit_addr)
-		machine.memory.set_exit_address(exit_addr);
-	else
-		throw std::runtime_error("The binary is missing a public exit function!");
+
+	if (init)
+	{
+		const uint32_t exit_addr = machine.address_of("exit");
+		if (exit_addr)
+			machine.memory.set_exit_address(exit_addr);
+		else
+			throw std::runtime_error("The binary is missing a public exit function!");
+	}
 	// page protections and "hidden" stacks
 	this->setup_virtual_memory();
 	// add system call interface
-	auto* arena = setup_native_heap_syscalls<4>(machine, m_max_heap);
+	this->m_arena = setup_native_heap_syscalls<4>(machine, m_max_heap);
 	setup_native_memory_syscalls<4>(machine, TRUSTED_CALLS);
     setup_syscall_interface(machine);
 	machine.on_unhandled_syscall(
@@ -92,9 +121,20 @@ void Script::machine_setup(riscv::Machine<riscv::RISCV32>& machine)
 			printf("Unhandled system call: %d\n", number);
 		});
 
+	machine.memory.set_page_fault_handler(
+		[this] (auto& mem, size_t page) -> riscv::Page& {
+			/* Pages are allocated from workspace */
+			auto* data =
+				(riscv::PageData*) WS_Alloc(m_ctx->ws, riscv::Page::size());
+			if (data != nullptr) {
+				return mem.allocate_page(page,
+					riscv::PageAttributes{ .user_defined = 1 }, data);
+			}
+			throw std::runtime_error("Out of memory");
+		});
 	// create execute trapping syscall page
 	// this is the last page in the 32-bit address space
-	auto& page = machine.memory.create_page(0xFFFFF);
+	auto& page = machine.memory.install_shared_page(0xFFFFF, m_syscall_page);
 	// create an execution trap on the page
 	page.set_trap(
 		[&machine] (riscv::Page&, uint32_t sysn, int, int64_t) -> int64_t {
