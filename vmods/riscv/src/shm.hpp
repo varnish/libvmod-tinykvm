@@ -33,12 +33,23 @@ struct SharedMemoryArea
 		machine.memory.memcpy(dst, &data, sizeof(T));
 		return dst;
 	}
+	template <typename T>
+	uint32_t write(const T& data) {
+		static_assert(std::is_standard_layout_v<T>, "Must be a POD type");
+		static_assert(!std::is_pointer_v<T>, "Should not be a pointer");
+		auto ret = dst;
+		machine.memory.memcpy(dst, &data, sizeof(T));
+		dst += sizeof(T);
+		return ret;
+	}
+
+	uint32_t address() const noexcept { return dst; }
+	void     set(uint32_t addr) { dst = addr; }
 
 	SharedMemoryArea(Script& script)
-		: machine(script.machine()), dst(script.shm_address())
-	{
-		stored_dst = dst;
-	}
+		: machine(script.machine()), dst(script.shm_address()), stored_dst(dst) {}
+	SharedMemoryArea(Script& script, uint32_t& addr)
+		: machine(script.machine()), dst(addr), stored_dst(addr) {}
 	/* When this gets destroyed, we restore the stack to its original value */
 	~SharedMemoryArea() {
 		dst = stored_dst;

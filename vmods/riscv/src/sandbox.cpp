@@ -105,11 +105,7 @@ std::vector<uint8_t> load_file(const std::string& filename)
 timespec time_now()
 {
 	timespec t;
-#ifdef __linux__
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t);
-#else
-	clock_gettime(CLOCK_MONOTONIC, &t);
-#endif
 	return t;
 }
 long nanodiff(timespec start_time, timespec end_time)

@@ -98,15 +98,6 @@ APICALL(print)
 	return len_g;
 }
 
-inline uint32_t push_field(SharedMemoryArea& shm,
-	const txt& field, int where, uint32_t idx)
-{
-	const uint32_t len = field_length(field);
-	const uint32_t sh_data = shm.push(field.begin, len + 1);
-	return shm.push<guest_header_field>(
-		{where, idx, sh_data, sh_data + len});
-}
-
 APICALL(foreach_header_field)
 {
 	auto [where, func, data] = machine.sysargs<int, gaddr_t, gaddr_t> ();
@@ -116,34 +107,57 @@ APICALL(foreach_header_field)
 	if (hp == nullptr)
 		throw std::runtime_error("Selected HTTP not available at this time");
 
+	auto& script = get_script(machine);
+	/* Push the field struct as well as the string on hidden stack */
+	SharedMemoryArea shm {script};
+
+	/* Make room for worst case number of fields */
+	const size_t  pcount = hp->field_count - 6;
+	gaddr_t data_addr = shm.address() - pcount * sizeof(guest_header_field);
+	gaddr_t field_addr = data_addr;
+
+	const gaddr_t first = field_addr;
+	SharedMemoryArea shm_fields {script, field_addr};
+	SharedMemoryArea shm_data   {script, data_addr};
+	int acount = 0;
+
 	/* Iterate each header field */
-	for (unsigned i = 6; i < hp->field_count; i++) {
-		const auto& field = hp->field_array[i];
+	for (unsigned idx = 6; idx < hp->field_count; idx++) {
+		const auto& field = hp->field_array[idx];
 		const uint32_t len = field_length(field);
 		/* Ignore empty fields (?) */
 		if (len == 0)
 			continue;
 
-		auto& script = get_script(machine);
-		/* Push the field struct as well as the string on hidden stack */
-		SharedMemoryArea shm {script};
-		auto sh_hdr = push_field(shm, field, where, i);
-		/* Call into the machine using pre-emption */
-		script.preempt((gaddr_t) func, (gaddr_t) data, (gaddr_t) sh_hdr);
-		/* Stop iterating if it crashed during the callback */
-		if (script.crashed())
-			return -1;
-		const bool deleted =
-			machine.memory.read<uint8_t> (sh_hdr + offsetof(guest_header_field, deleted));
+		const uint32_t sh_data = shm_data.push(field.begin, len + 1);
+		shm_fields.write<guest_header_field>(
+			{(gethdr_e) where, idx, sh_data, sh_data + len});
+		acount ++; /* Actual */
+	}
+
+	/* This will prevent other pushes to interfere with this */
+	shm.set(shm_data.address());
+
+	/* Call into the machine using pre-emption */
+	script.preempt((gaddr_t) func, (gaddr_t) data, (gaddr_t) first, (int) acount);
+
+	/* Check if any were deleted */
+	int dcount = 0;
+	for (int i = 0; i < acount; i++)
+	{
+		const gaddr_t addr = first + i*sizeof(guest_header_field);
+		const bool deleted = machine.memory.read<uint8_t>
+			(addr + offsetof(guest_header_field, deleted));
 		/* Deleted entries moves everything back */
 		if (deleted) {
-			if (http_UnsetIdx(hp, i) < 0)
-				throw std::runtime_error("Unable to unset entry at " + std::to_string(i));
-			i --;
+			const int idx = machine.memory.read<uint32_t>
+				(addr + offsetof(guest_header_field, index));
+			if (http_UnsetIdx(hp, idx - dcount++) < 0)
+				throw std::runtime_error("Unable to unset entry at " + std::to_string(idx));
 		}
 	}
 
-	return 0;
+	return acount;
 }
 APICALL(http_set_status)
 {
