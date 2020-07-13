@@ -9,7 +9,8 @@ typedef void (*set_header_t) (struct http*, const char*);
 extern const char* execute_riscv(void* workspace, set_header_t, void* http,
 	const uint8_t* binary, size_t len, uint64_t instr_max);
 extern struct vmod_riscv_machine* riscv_create(const char* file, VRT_CTX, uint64_t insn);
-extern int riscv_forkcall(VRT_CTX, struct vmod_riscv_machine*, const char* func);
+extern int riscv_forkcall(VRT_CTX, struct vmod_riscv_machine*, const char*);
+extern int riscv_forkcall_idx(VRT_CTX, struct vmod_riscv_machine*, int idx);
 extern int riscv_free(struct vmod_riscv_machine*);
 #include "vmod_util.h"
 
@@ -245,4 +246,12 @@ VCL_INT vmod_machine_call(VRT_CTX,
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
 	return riscv_forkcall(ctx, rvm, function);
+}
+
+VCL_INT vmod_machine_call_known(VRT_CTX,
+	struct vmod_riscv_machine *rvm, VCL_INT idx)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	return riscv_forkcall_idx(ctx, rvm, idx);
 }

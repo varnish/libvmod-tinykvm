@@ -37,7 +37,6 @@ public:
 
 	void print_backtrace(const uint32_t addr);
 
-	static auto& hidden_area() noexcept { return g_hidden_stack; }
 	bool crashed() const noexcept { return m_crashed; }
 	bool reset(); // true if the reset was successful
 
@@ -46,7 +45,6 @@ public:
 	Script(const std::vector<uint8_t>& bin, const vrt_ctx*,
 		uint64_t insn, uint64_t mem, uint64_t heap);
 	~Script();
-	static void init();
 
 private:
 	void setup_virtual_memory();
@@ -56,7 +54,6 @@ private:
 	bool machine_initialize(bool init);
 	void machine_setup(riscv::Machine<riscv::RISCV32>&, bool init);
 	void setup_syscall_interface(riscv::Machine<riscv::RISCV32>&);
-	static riscv::Page g_hidden_stack; // page used by the internal APIs
 
 	riscv::Machine<riscv::RISCV32> m_machine;
 	const vrt_ctx* m_ctx = nullptr;
@@ -69,7 +66,7 @@ private:
 	/* An empty page used to syscall execution trap */
 	riscv::Page m_syscall_page {{ .read = false, .write = false }, nullptr};
 
-	uint32_t    m_shm_address = 0x10000;
+	uint32_t    m_shm_address = HIDDEN_AREA + 0x1000;
 	struct RegexCache {
 		struct vre* re   = nullptr;
 		uint32_t    hash = 0;

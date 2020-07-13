@@ -32,3 +32,8 @@ $Method INT     .call(STRING function)
 - Call into a new virtual machine cloned from the previously
   prepared machine, using copy-on-write mechanics.
 
+$Method INT     .call_known(INT idx)
+
+- Call a known function (on_client_request etc.) in a new virtual machine
+  cloned from the previously prepared machine, using copy-on-write mechanics.
+

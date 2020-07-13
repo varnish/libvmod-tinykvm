@@ -20,14 +20,22 @@ struct vmod_riscv_machine {
 	uint64_t max_instructions;
 	uint64_t max_memory;
 	uint64_t max_heap;
+	eastl::fixed_vector<uint32_t, 8> lookup;
+	inline void lookup_add(const std::string& name) {
+		lookup.push_back(script.resolve_address(name));
+	}
 };
 
 extern "C"
 vmod_riscv_machine* riscv_create(const char* file, VRT_CTX, uint64_t insn)
 {
 	auto* vrm = (vmod_riscv_machine*) WS_Alloc(ctx->ws, sizeof(vmod_riscv_machine));
-	return new (vrm) vmod_riscv_machine(load_file(file), ctx,
+	new (vrm) vmod_riscv_machine(load_file(file), ctx,
 		/* Max instr: */ insn, /* Mem: */ 8*1024*1024, /* Heap: */ 6*1024*1024);
+	vrm->lookup_add("on_client_request");
+	vrm->lookup_add("on_synth");
+	vrm->lookup_add("on_backend_response");
+	return vrm;
 }
 
 //#define ENABLE_TIMING
@@ -36,8 +44,7 @@ vmod_riscv_machine* riscv_create(const char* file, VRT_CTX, uint64_t insn)
 	auto x = time_now();  \
 	asm("" ::: "memory");
 
-extern "C"
-int riscv_forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
+inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, uint32_t addr)
 {
 	/* Allocate Script on workspace, and construct it in-place */
 #ifdef ENABLE_TIMING
@@ -54,24 +61,35 @@ int riscv_forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 	}
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t1);
-	printf("Time spent in initialization: %ld ns\n", nanodiff(t0, t1));
 #endif
 
 	/* Call into the virtual machine */
-	int ret = script->call(func);
+	int ret = script->call(addr);
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t2);
-	printf("Time spent in forkcall(): %ld ns\n", nanodiff(t1, t2));
 #endif
 
 	script->~Script(); /* call destructor */
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t3);
+	printf("Time spent in initialization: %ld ns\n", nanodiff(t0, t1));
+	printf("Time spent in forkcall(): %ld ns\n", nanodiff(t1, t2));
 	printf("Time spent in destructor: %ld ns\n", nanodiff(t2, t3));
 	printf("Time spent total: %ld ns\n", nanodiff(t0, t3));
 #endif
 
 	return ret;
+}
+
+extern "C"
+int riscv_forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
+{
+	return forkcall(ctx, vrm, vrm->script.resolve_address(func));
+}
+extern "C"
+int riscv_forkcall_idx(VRT_CTX, vmod_riscv_machine* vrm, int idx)
+{
+	return forkcall(ctx, vrm, vrm->lookup.at(idx));
 }
 
 extern "C"
@@ -110,5 +128,6 @@ timespec time_now()
 }
 long nanodiff(timespec start_time, timespec end_time)
 {
-	return (end_time.tv_sec - start_time.tv_sec) * (long)1e9 + (end_time.tv_nsec - start_time.tv_nsec);
+	assert(end_time.tv_sec == 0); /* We should never use seconds */
+	return end_time.tv_nsec - start_time.tv_nsec;
 }

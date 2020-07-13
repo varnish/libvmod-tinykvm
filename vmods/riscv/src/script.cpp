@@ -12,13 +12,6 @@ extern "C" {
 }
 
 static const bool TRUSTED_CALLS = true;
-riscv::Page Script::g_hidden_stack;
-
-void Script::init()
-{
-	// the hidden area is read-only for the guest
-	g_hidden_stack.attr.write  = false;
-}
 
 Script::Script(
 	const Script& source, const vrt_ctx* ctx,
@@ -67,8 +60,6 @@ void Script::setup_virtual_memory()
 	mem.set_stack_initial((uint32_t) stack_pageno << riscv::Page::SHIFT);
 	// this separates heap and stack
 	mem.install_shared_page(stack_pageno, riscv::Page::guard_page());
-	// install a hidden area that the internal APIs use
-	mem.install_shared_page(HIDDEN_AREA >> riscv::Page::SHIFT, g_hidden_stack);
 }
 
 bool Script::machine_initialize(bool init)

@@ -265,7 +265,7 @@ APICALL(header_field_unset)
 
 APICALL(regex_compile)
 {
-	auto [pattern] = machine.sysargs<std::string> ();
+	auto [pattern] = machine.sysargs<riscv::String> ();
 
 	const uint32_t hash = crc32(pattern.c_str(), pattern.size());
 	const int idx = get_script(machine).regex_find(hash);
@@ -279,14 +279,15 @@ APICALL(regex_compile)
 	/* TODO: log errors here */
 	if (re == nullptr) {
 		printf("Regex compile error: %s\n", error);
-		throw std::runtime_error("The regex pattern did not compile: " + pattern);
+		throw std::runtime_error(
+			"The regex pattern did not compile: " + pattern.to_string());
 	}
 
 	return get_script(machine).regex_manage(re, hash);
 }
 APICALL(regex_match)
 {
-	auto [index, subject] = machine.sysargs<uint32_t, std::string> ();
+	auto [index, subject] = machine.sysargs<uint32_t, riscv::String> ();
 	auto* vre = get_script(machine).regex_get(index);
 	/* VRE_exec(const vre_t *code, const char *subject, int length,
 	    int startoffset, int options, int *ovector, int ovecsize,
@@ -297,7 +298,7 @@ APICALL(regex_match)
 APICALL(regex_subst)
 {
 	auto [index, all, subject, subst, dst, maxlen]
-		= machine.sysargs<uint32_t, int, std::string, std::string, gaddr_t, uint32_t> ();
+		= machine.sysargs<uint32_t, int, riscv::String, std::string, gaddr_t, uint32_t> ();
 	auto* re = get_script(machine).regex_get(index);
 
 	auto* result =
