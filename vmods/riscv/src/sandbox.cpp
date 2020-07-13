@@ -46,38 +46,49 @@ vmod_riscv_machine* riscv_create(const char* file, VRT_CTX, uint64_t insn)
 
 inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, uint32_t addr)
 {
-	/* Allocate Script on workspace, and construct it in-place */
-#ifdef ENABLE_TIMING
-	TIMING_LOCATION(t0);
-#endif
-	auto* script = (Script*) WS_Alloc(ctx->ws, sizeof(Script));
-	try {
-		new (script) Script{vrm->script, ctx,
-			vrm->max_instructions, vrm->max_memory, vrm->max_heap};
+	auto* priv_task = VRT_priv_task(ctx, ctx);
+	if (!priv_task->priv)
+	{
+		/* Allocate Script on workspace, and construct it in-place */
+	#ifdef ENABLE_TIMING
+		TIMING_LOCATION(t0);
+	#endif
+		auto* script = (Script*) WS_Alloc(ctx->ws, sizeof(Script));
+		try {
+			new (script) Script{vrm->script, ctx,
+				vrm->max_instructions, vrm->max_memory, vrm->max_heap};
 
-	} catch (std::exception& e) {
-		printf(">>> Exception: %s\n", e.what());
-		return -1;
+		} catch (std::exception& e) {
+			printf(">>> Exception: %s\n", e.what());
+			return -1;
+		}
+	#ifdef ENABLE_TIMING
+		TIMING_LOCATION(t1);
+		printf("Time spent in initialization: %ld ns\n", nanodiff(t0, t1));
+	#endif
+		priv_task->priv = script;
+		priv_task->free = [] (void* script) {
+		#ifdef ENABLE_TIMING
+			TIMING_LOCATION(t2);
+		#endif
+			((Script*) script)->~Script(); /* call destructor */
+		#ifdef ENABLE_TIMING
+			TIMING_LOCATION(t3);
+			printf("Time spent in destructor: %ld ns\n", nanodiff(t2, t3));
+		#endif
+			};
 	}
+	auto* script = (Script*) priv_task->priv;
+
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t1);
 #endif
-
 	/* Call into the virtual machine */
 	int ret = script->call(addr);
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t2);
-#endif
-
-	script->~Script(); /* call destructor */
-#ifdef ENABLE_TIMING
-	TIMING_LOCATION(t3);
-	printf("Time spent in initialization: %ld ns\n", nanodiff(t0, t1));
 	printf("Time spent in forkcall(): %ld ns\n", nanodiff(t1, t2));
-	printf("Time spent in destructor: %ld ns\n", nanodiff(t2, t3));
-	printf("Time spent total: %ld ns\n", nanodiff(t0, t3));
 #endif
-
 	return ret;
 }
 
