@@ -175,6 +175,26 @@ APICALL(http_set_status)
 	return status;
 }
 
+APICALL(http_unset_re)
+{
+	const auto [where, index] = machine.sysargs<int, int> ();
+	auto* vre = get_script(machine).regex_get(index);
+
+	auto* ctx = get_ctx(machine);
+	auto* hp = get_http(ctx, (gethdr_e) where);
+
+	size_t mcount = 0;
+	for (int i = hp->field_count-1; i >= 6; i--)
+	{
+		auto& field = hp->field_array[i];
+		if ( VRE_exec(vre, field.begin, field.end - field.begin,
+			0, 0, nullptr, 0, nullptr) >= 0 ) {
+			http_UnsetIdx(hp, i);
+			mcount ++;
+		}
+	}
+	return mcount;
+}
 
 APICALL(header_field_get_length)
 {
@@ -293,19 +313,21 @@ APICALL(regex_match)
 	    int startoffset, int options, int *ovector, int ovecsize,
 	    const volatile struct vre_limits *lim) */
 	return VRE_exec(vre, subject.c_str(), subject.size(), 0,
-		0, nullptr, 0, nullptr);
+		0, nullptr, 0, nullptr) >= 0;
 }
 APICALL(regex_subst)
 {
-	auto [index, all, subject, subst, dst, maxlen]
-		= machine.sysargs<uint32_t, int, riscv::String, std::string, gaddr_t, uint32_t> ();
+	auto [index, subject, subst, dst, maxlen]
+		= machine.sysargs<uint32_t, riscv::String, riscv::String, gaddr_t, uint32_t> ();
 	auto* re = get_script(machine).regex_get(index);
 
-	auto* result =
+	const bool all = (maxlen & 0x80000000);
+	auto * result =
 		VRT_regsub(get_ctx(machine), all, subject.c_str(), re, subst.c_str());
 	if (result == nullptr)
 		return -1;
-	const size_t len = std::min((size_t) maxlen, __builtin_strlen(result)+1);
+	const size_t len =
+		std::min((size_t) maxlen & 0x7FFFFFFF, __builtin_strlen(result)+1);
 	machine.copy_to_guest((gaddr_t) dst, result, len);
 	return len-1; /* The last byte is the zero, not reporting that */
 }
@@ -336,5 +358,6 @@ void Script::setup_syscall_interface(machine_t& machine)
 		{ECALL_FIELD_UNSET,   header_field_unset},
 
 		{ECALL_HTTP_SET_STATUS, http_set_status},
+		{ECALL_HTTP_UNSET_RE,   http_unset_re},
 	});
 }

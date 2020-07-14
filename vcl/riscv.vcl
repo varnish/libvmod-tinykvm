@@ -9,6 +9,8 @@ sub vcl_init {
 }
 
 sub vcl_recv {
+	//set req.url = regsub(req.url, "\?.*$", "");
+
 	if (machine.call("on_client_request")) {
 		return (synth(700, "Looks OK to me"));
 	}
@@ -16,6 +18,7 @@ sub vcl_recv {
 }
 
 sub vcl_synth {
+	set resp.status = 200;
 	machine.call("on_synth");
 }
 
