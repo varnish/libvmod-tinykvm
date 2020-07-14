@@ -33,6 +33,9 @@ target_compile_definitions(riscv PUBLIC
 	RISCV_EBREAK_MEANS_STOP=1)
 target_link_libraries(vmod_riscv riscv)
 
+# WARNING: everything!
+target_compile_options(riscv PUBLIC -march=native -Ofast -flto)
+
 # VCL import name is "riscv"
 add_vmod_tests(vmod_riscv riscv
 	tests/startup.vtc

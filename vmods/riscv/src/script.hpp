@@ -11,7 +11,7 @@ public:
 
 	// call any script function, with any parameters
 	template <typename... Args>
-	inline long call(const std::string& name, Args&&...);
+	inline long call(const char* name, Args&&...);
 
 	template <typename... Args>
 	inline long call(uint32_t addr, Args&&...);
@@ -33,7 +33,7 @@ public:
 	struct vre* regex_get(size_t idx) { return m_regex_cache.at(idx).re; }
 
 	std::string symbol_name(uint32_t address) const;
-	uint32_t resolve_address(const std::string& name) const;
+	uint32_t resolve_address(const char* name) const;
 
 	void print_backtrace(const uint32_t addr);
 
@@ -97,11 +97,11 @@ inline long Script::call(uint32_t address, Args&&... args)
 	return -1;
 }
 template <typename... Args>
-inline long Script::call(const std::string& func, Args&&... args)
+inline long Script::call(const char* func, Args&&... args)
 {
-	const auto address = machine().address_of(func.c_str());
+	const auto address = machine().address_of(func);
 	if (UNLIKELY(address == 0)) {
-		fprintf(stderr, "Script::call could not find: %s!\n", func.c_str());
+		fprintf(stderr, "Script::call could not find: %s!\n", func);
 		return -1;
 	}
 	return call(address, std::forward<Args>(args)...);

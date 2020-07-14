@@ -21,7 +21,7 @@ struct vmod_riscv_machine {
 	uint64_t max_memory;
 	uint64_t max_heap;
 	eastl::fixed_vector<uint32_t, 8> lookup;
-	inline void lookup_add(const std::string& name) {
+	inline void lookup_add(const char* name) {
 		lookup.push_back(script.resolve_address(name));
 	}
 };
