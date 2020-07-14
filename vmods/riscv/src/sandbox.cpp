@@ -4,7 +4,10 @@ extern "C" {
 # include "vdef.h"
 # include "vrt.h"
 	void *WS_Alloc(struct ws *ws, unsigned bytes);
+	void VSLb(struct vsl_log *, int tag, const char *fmt, ...);
 }
+#define SLT_Debug 1
+#define SLT_Error 2
 inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
 static std::vector<uint8_t> load_file(const std::string& filename);
@@ -30,6 +33,9 @@ extern "C"
 vmod_riscv_machine* riscv_create(const char* file, VRT_CTX, uint64_t insn)
 {
 	auto* vrm = (vmod_riscv_machine*) WS_Alloc(ctx->ws, sizeof(vmod_riscv_machine));
+	if (UNLIKELY(vrm == nullptr))
+		VRT_fail(ctx, "Out of workspace");
+
 	new (vrm) vmod_riscv_machine(load_file(file), ctx,
 		/* Max instr: */ insn, /* Mem: */ 8*1024*1024, /* Heap: */ 6*1024*1024);
 	vrm->lookup_add("on_client_request");
@@ -54,6 +60,9 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, uint32_t addr)
 		TIMING_LOCATION(t0);
 	#endif
 		auto* script = (Script*) WS_Alloc(ctx->ws, sizeof(Script));
+		if (UNLIKELY(script == nullptr))
+			VRT_fail(ctx, "Out of workspace");
+
 		try {
 			new (script) Script{vrm->script, ctx,
 				vrm->max_instructions, vrm->max_memory, vrm->max_heap};
@@ -66,6 +75,7 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, uint32_t addr)
 		TIMING_LOCATION(t1);
 		printf("Time spent in initialization: %ld ns\n", nanodiff(t0, t1));
 	#endif
+
 		priv_task->priv = script;
 		priv_task->free = [] (void* script) {
 		#ifdef ENABLE_TIMING
@@ -95,7 +105,13 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, uint32_t addr)
 extern "C"
 int riscv_forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 {
-	return forkcall(ctx, vrm, vrm->script.resolve_address(func));
+	int ret = forkcall(ctx, vrm, vrm->script.resolve_address(func));
+	if (UNLIKELY(ret < 0)) {
+		VSLb(ctx->vsl, SLT_Error, "VM call '%s' failed. Return value: %d",
+			func, ret);
+		VRT_fail(ctx, "VM call failed (negative result)");
+	}
+	return ret;
 }
 extern "C"
 int riscv_forkcall_idx(VRT_CTX, vmod_riscv_machine* vrm, int idx)

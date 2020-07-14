@@ -85,17 +85,9 @@ APICALL(assertion_failed)
 }
 APICALL(print)
 {
-	auto [address, len] = machine.sysargs<gaddr_t, uint32_t> ();
-	const uint32_t len_g = std::min(1024u, (uint32_t) len);
-	machine.memory.memview(address, len_g,
-		[&machine] (const uint8_t* data, size_t len) {
-			if (data == nullptr) {
-				printf(">>> Program attempted an illegal write\n");
-				return;
-			}
-			printf(">>> Program says: %.*s", (int) len, data);
-		});
-	return len_g;
+	auto [string] = machine.sysargs<riscv::String> ();
+	printf(">>> Program says: %.*s", (int) string.size(), string.c_str());
+	return string.size();
 }
 
 APICALL(foreach_header_field)
@@ -131,7 +123,7 @@ APICALL(foreach_header_field)
 
 		const uint32_t sh_data = shm_data.push(field.begin, len + 1);
 		shm_fields.write<guest_header_field>(
-			{(gethdr_e) where, idx, sh_data, sh_data + len});
+			{(gethdr_e) where, idx, sh_data, sh_data + len, false});
 		acount ++; /* Actual */
 	}
 
@@ -215,7 +207,7 @@ APICALL(header_field_get)
 	if (len >= sdatalen || field.begin == nullptr)
 		return -1;
 
-	const guest_header_field hf {where, index, sdata, sdata + len};
+	const guest_header_field hf {where, index, sdata, sdata + len, false};
 	machine.copy_to_guest(fdata, &hf, sizeof(hf));
 	machine.copy_to_guest(sdata, field.begin, len+1);
 	return len;
