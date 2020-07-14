@@ -6,12 +6,6 @@ set(VARNISH_DIR "/opt/varnish" CACHE STRING "Varnish installation")
 # this needs to be set to build the std vmod:
 set(VARNISH_SOURCE_DIR "" CACHE STRING "Varnish source directory")
 
-# compiler flags only when building alone
-if (NOT TARGET varnishd)
-	# NOTE: varnish uses non-standard features so use GNU
-	set(CMAKE_C_FLAGS "-Wall -Wextra -std=gnu11 -g -O2")
-endif()
-
 # complete the source path if it wasn't absolute
 if (NOT IS_ABSOLUTE ${VARNISH_SOURCE_DIR})
 	set(VARNISH_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${VARNISH_SOURCE_DIR})
@@ -102,7 +96,13 @@ function(add_vmod LIBNAME VCCNAME comment)
 	target_link_libraries(${LIBNAME} Threads::Threads)
 	#target_compile_options(${LIBNAME} PRIVATE "-fno-lto") # LTO discards too much
 	target_compile_definitions(${LIBNAME} PRIVATE VMOD=1 HAVE_CONFIG_H _GNU_SOURCE)
-	target_compile_options(${LIBNAME} PRIVATE "-fdiagnostics-color")
+	target_compile_options(${LIBNAME} PRIVATE -Wall -Wextra -std=gnu11 -g -O2 -fdiagnostics-color)
+	if (NATIVE)
+		target_compile_options(${LIBNAME} PRIVATE -march=native -Ofast)
+	endif()
+	if (ENABLE_LTO)
+		target_compile_options(${LIBNAME} PRIVATE -flto -fuse-ld=lld)
+	endif()
 	if (VARNISH_PLUS)
 		target_compile_definitions(${LIBNAME} PRIVATE VARNISH_PLUS=1)
 	endif()
