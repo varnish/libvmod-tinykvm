@@ -3,13 +3,7 @@
 #include "crc32.hpp"
 #include <include/syscall_helpers.hpp>
 #include "machine/include_api.hpp"
-
-extern "C" {
-# include <vdef.h>
-# include <vre.h>
-# include <vrt.h>
-	void *WS_Alloc(struct ws *ws, unsigned bytes);
-}
+#include "varnish.hpp"
 
 static const bool TRUSTED_CALLS = true;
 
@@ -108,9 +102,11 @@ void Script::machine_setup(riscv::Machine<riscv::RISCV32>& machine, bool init)
 	this->m_arena = setup_native_heap_syscalls<4>(machine, m_max_heap);
 	setup_native_memory_syscalls<4>(machine, TRUSTED_CALLS);
     setup_syscall_interface(machine);
+
 	machine.on_unhandled_syscall(
-		[] (int number) {
-			printf("Unhandled system call: %d\n", number);
+		[this] (int number) {
+			VSLb(m_ctx->vsl, SLT_Debug,
+				"VM unhandled system call: %d\n", number);
 		});
 
 	machine.memory.set_page_fault_handler(
@@ -124,19 +120,6 @@ void Script::machine_setup(riscv::Machine<riscv::RISCV32>& machine, bool init)
 			}
 			throw riscv::MachineException(
 				riscv::OUT_OF_MEMORY, "Out of memory", mem.pages_total());
-		});
-	// create execute trapping syscall page
-	// this is the last page in the 32-bit address space
-	auto& page = machine.memory.install_shared_page(0xFFFFF, m_syscall_page);
-	// create an execution trap on the page
-	page.set_trap(
-		[&machine] (riscv::Page&, uint32_t sysn, int, int64_t) -> int64_t {
-			// invoke a system call
-			machine.system_call(1024 - sysn / 4);
-			// return to caller
-			const auto retaddr = machine.cpu.reg(riscv::RISCV::REG_RA);
-			machine.cpu.jump(retaddr);
-			return 0;
 		});
 }
 void Script::handle_exception(uint32_t address)

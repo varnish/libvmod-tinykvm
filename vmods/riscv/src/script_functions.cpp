@@ -2,18 +2,13 @@
 #include "machine/include_api.hpp"
 #include "crc32.hpp"
 #include "shm.hpp"
+#include "varnish.hpp"
 using gaddr_t = uint32_t;
 
 extern "C" {
-# include <vdef.h>
-# include <vrt.h>
-# include <vre.h>
 	void http_SetHeader(struct http *to, const char *hdr);
 	void http_SetH(struct http *to, unsigned n, const char *fm);
 	int  http_UnsetIdx(struct http *hp, unsigned idx);
-	void *WS_Copy(struct ws *ws, const void *str, int len);
-	void *WS_Alloc(struct ws *ws, unsigned bytes);
-	char *WS_Printf(struct ws *ws, const char *fmt, ...);
 	typedef struct {
 		const char* begin;
 		const char* end;
@@ -88,6 +83,13 @@ APICALL(print)
 	auto [string] = machine.sysargs<riscv::String> ();
 	printf(">>> Program says: %.*s", (int) string.size(), string.c_str());
 	return string.size();
+}
+APICALL(shm_log)
+{
+	auto [string] = machine.sysargs<riscv::String> ();
+	const auto* ctx = get_ctx(machine);
+	VSLb(ctx->vsl, SLT_VCL_Log, string.c_str());
+	return 0;
 }
 
 APICALL(foreach_header_field)
@@ -336,6 +338,7 @@ void Script::setup_syscall_interface(machine_t& machine)
 		{ECALL_SELF_TEST,   self_test},
 		{ECALL_ASSERT_FAIL, assertion_failed},
 		{ECALL_PRINT,       print},
+		{ECALL_LOG,         shm_log},
 
 		{ECALL_REGEX_COMPILE, regex_compile},
 		{ECALL_REGEX_MATCH,   regex_match},

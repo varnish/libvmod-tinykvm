@@ -1,13 +1,6 @@
 #include "script.hpp"
+#include "varnish.hpp"
 
-extern "C" {
-# include "vdef.h"
-# include "vrt.h"
-	void *WS_Alloc(struct ws *ws, unsigned bytes);
-	void VSLb(struct vsl_log *, int tag, const char *fmt, ...);
-}
-#define SLT_Debug 1
-#define SLT_Error 2
 inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
 static std::vector<uint8_t> load_file(const std::string& filename);
