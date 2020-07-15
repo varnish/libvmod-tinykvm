@@ -4,24 +4,23 @@ import riscv;
 backend default none;
 
 sub vcl_init {
-	new machine = riscv.machine(max_instructions = 2000000,
+	new ypizza = riscv.machine(
+		name = "ypizza.com",
 		filename = "/home/gonzo/github/rvscript/programs/test");
 }
 
 sub vcl_recv {
-	//set req.url = regsub(req.url, "\?.*$", "");
+	ypizza.call("on_client_request");
 
-	if (machine.call("on_client_request")) {
-		return (synth(700, "Looks OK to me"));
+	if (riscv.want_result() == "synth") {
+		return (synth(riscv.want_status()));
 	}
-	return (synth(400, "Verboten"));
+
+	return (synth(403, "Verboten"));
 }
 
 sub vcl_synth {
-	set resp.status = 200;
-	machine.call("on_synth");
-}
-
-sub vcl_backend_response {
-	machine.call("on_backend_response");
+	if (riscv.machine_present()) {
+		riscv.call("on_synth");
+	}
 }

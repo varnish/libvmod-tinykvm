@@ -1,6 +1,8 @@
 #pragma once
-#include <type_traits>
 #include "script.hpp"
+
+#include <type_traits>
+#include "crc32.hpp"
 #include "shm.hpp"
 
 using machine_t = riscv::Machine<4>;

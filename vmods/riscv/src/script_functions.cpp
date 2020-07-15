@@ -1,18 +1,15 @@
 #include "script_functions.hpp"
 #include "machine/include_api.hpp"
-#include "crc32.hpp"
-#include "shm.hpp"
 #include "varnish.hpp"
 using gaddr_t = uint32_t;
 
 extern "C" {
-	void http_SetHeader(struct http *to, const char *hdr);
-	void http_SetH(struct http *to, unsigned n, const char *fm);
-	int  http_UnsetIdx(struct http *hp, unsigned idx);
-	typedef struct {
+	void http_SetHeaderFixed(struct http *to, unsigned n, const char *, size_t);
+	void http_UnsetIdx(struct http *hp, unsigned idx);
+	struct txt {
 		const char* begin;
 		const char* end;
-	} txt;
+	};
 	struct http {
 		unsigned       magic;
 		uint16_t       fields_max;
@@ -20,20 +17,20 @@ extern "C" {
 		unsigned char* field_flags;
 		uint16_t       field_count;
 		int some_shit;
-		void*          vsl;
+		struct vsl_log*vsl;
 		void*          ws;
 		uint16_t       status;
 		uint8_t        protover;
 		uint8_t        conds;
 	};
 }
-typedef struct {
+struct guest_header_field {
 	int where;
 	uint32_t index;
 	uint32_t begin;
 	uint32_t end;
 	bool     deleted;
-} guest_header_field;
+};
 
 inline bool is_valid_index(const http* hp, unsigned idx) {
 	return idx >= 1 && idx < hp->field_count;
@@ -65,6 +62,15 @@ inline uint32_t field_length(const txt& field)
 	return field.end - field.begin;
 }
 
+/**
+ *  These are all system call handlers, which get called by the guest,
+ *  and so they have to maintain the integrity of Varnish by checking
+ *  everything, and placing sane limits on requests. Additionally,
+ *  some system calls are so expensive that they should increment
+ *  the guests instruction counter, to make sure that it reflects the
+ *  amount of work being done.
+**/
+
 APICALL(self_test)
 {
 	return -1;
@@ -88,7 +94,22 @@ APICALL(shm_log)
 {
 	auto [string] = machine.sysargs<riscv::String> ();
 	const auto* ctx = get_ctx(machine);
-	VSLb(ctx->vsl, SLT_VCL_Log, string.c_str());
+	VSLb(ctx->vsl, SLT_VCL_Log, "%.*s", (int) string.size(), string.c_str());
+	return 0;
+}
+
+APICALL(my_name)
+{
+	auto& script = get_script(machine);
+	SharedMemoryArea shm {script};
+	/* Put pointer, length in registers A0, A1 */
+	machine.cpu.reg(11) = script.name().size();
+	return shm.push(script.name());
+}
+APICALL(set_decision)
+{
+	auto [result, status] = machine.sysargs<riscv::String, int> ();
+	get_script(machine).set_result(result.to_string(), status);
 	return 0;
 }
 
@@ -146,8 +167,7 @@ APICALL(foreach_header_field)
 		if (deleted) {
 			const int idx = machine.memory.read<uint32_t>
 				(addr + offsetof(guest_header_field, index));
-			if (http_UnsetIdx(hp, idx - dcount++) < 0)
-				throw std::runtime_error("Unable to unset entry at " + std::to_string(idx));
+			http_UnsetIdx(hp, idx - dcount++);
 		}
 	}
 
@@ -162,10 +182,14 @@ APICALL(http_set_status)
 	/* Getter does not want to set status */
 	if (status < 0)
 		return hp->status;
+	/* Do the workspace allocation before making changes */
+	const char* string = WS_Printf(ctx->ws, "%u", status);
+	if (UNLIKELY(!string))
+		throw std::runtime_error("Out of workspace");
 	hp->status = status;
 	/* We have to overwrite the header field too */
-	field.begin = WS_Printf(ctx->ws, "%u", status);
-	field.end = field.begin + strlen(field.begin);
+	field.begin = string;
+	field.end = field.begin + strlen(string);
 	return status;
 }
 
@@ -177,6 +201,7 @@ APICALL(http_unset_re)
 	auto* ctx = get_ctx(machine);
 	auto* hp = get_http(ctx, (gethdr_e) where);
 
+	/* Unset header fields from the top down */
 	size_t mcount = 0;
 	for (int i = hp->field_count-1; i >= 6; i--)
 	{
@@ -218,19 +243,23 @@ APICALL(header_field_get)
 APICALL(header_field_append)
 {
 	auto [where, field, len] = machine.sysargs<int, uint32_t, uint32_t> ();
-
 	const auto* ctx = get_ctx(machine);
-	auto* hp = VRT_selecthttp(ctx, (gethdr_e) where);
-	if (hp == nullptr)
-		throw std::runtime_error("Selected HTTP not available at this time");
+	auto* hp = get_http(ctx, (gethdr_e) where);
 
 	auto* val = (char*) WS_Alloc(ctx->ws, len+1);
 	if (val == nullptr)
 		throw std::runtime_error("Unable to make room for HTTP header field");
 	machine.memory.memcpy_out(val, (uint32_t) field, len);
 	val[len] = 0;
-	http_SetHeader(hp, val);
-	return 0;
+
+	if (UNLIKELY(hp->field_count >= hp->fields_max)) {
+		VSLb(hp->vsl, SLT_LostHeader, "%.*s", (int) len, val);
+		return -1;
+	}
+
+	const int idx = hp->field_count++;
+	http_SetHeaderFixed(hp, idx, val, len);
+	return idx;
 }
 
 APICALL(header_field_set)
@@ -255,7 +284,7 @@ APICALL(header_field_set)
 		val[len] = 0;
 
 		/* Apply it at the given index */
-		http_SetH(hp, index, val);
+		http_SetHeaderFixed(hp, index, val, len);
 		return len;
 	}
 	return -1;
@@ -272,7 +301,8 @@ APICALL(header_field_unset)
 
 	if (is_valid_index(hp, index))
 	{
-		return http_UnsetIdx(hp, index);
+		http_UnsetIdx(hp, index);
+		return 0;
 	}
 	return -1;
 }
@@ -339,6 +369,9 @@ void Script::setup_syscall_interface(machine_t& machine)
 		{ECALL_ASSERT_FAIL, assertion_failed},
 		{ECALL_PRINT,       print},
 		{ECALL_LOG,         shm_log},
+
+		{ECALL_MY_NAME,      my_name},
+		{ECALL_SET_DECISION, set_decision},
 
 		{ECALL_REGEX_COMPILE, regex_compile},
 		{ECALL_REGEX_MATCH,   regex_match},

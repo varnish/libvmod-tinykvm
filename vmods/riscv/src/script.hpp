@@ -25,6 +25,13 @@ public:
 	void set_ctx(const vrt_ctx* ctx) { m_ctx = ctx; }
 	const auto* ctx() const noexcept { return m_ctx; }
 
+	const auto& name() const noexcept { return m_name; }
+	auto* want_result() const noexcept { return m_want_result.c_str(); }
+	int want_status() const noexcept { return m_want_status; }
+	void set_result(const std::string& res, int status) {
+		m_want_result = res; m_want_status = status;
+	}
+
 	auto& shm_address() { return m_shm_address; }
 
 	int    regex_find(uint32_t hash) const;
@@ -40,10 +47,10 @@ public:
 	bool crashed() const noexcept { return m_crashed; }
 	bool reset(); // true if the reset was successful
 
-	Script(const Script&, const vrt_ctx*,
+	Script(const std::vector<uint8_t>&,
+		const vrt_ctx*, const char* name,
 		uint64_t insn, uint64_t mem, uint64_t heap);
-	Script(const std::vector<uint8_t>& bin, const vrt_ctx*,
-		uint64_t insn, uint64_t mem, uint64_t heap);
+	Script(const Script& source, const vrt_ctx*);
 	~Script();
 
 private:
@@ -56,23 +63,24 @@ private:
 	void setup_syscall_interface(riscv::Machine<riscv::RISCV32>&);
 
 	riscv::Machine<riscv::RISCV32> m_machine;
-	const vrt_ctx* m_ctx = nullptr;
+	const vrt_ctx* m_ctx;
+	std::string m_name;
 	uint64_t    m_max_instructions = 0;
 	uint64_t    m_max_heap = 0;
 	uint64_t    m_max_memory = 0;
 	bool        m_crashed = false;
 	int         m_budget_overruns = 0;
 	void*       m_arena = nullptr;
-	/* An empty page used to syscall execution trap */
-	riscv::Page m_syscall_page {{ .read = false, .write = false }, nullptr};
-
 	uint32_t    m_shm_address = HIDDEN_AREA + 0x1000;
+
 	struct RegexCache {
 		struct vre* re   = nullptr;
 		uint32_t    hash = 0;
 		bool        non_owned = false;
 	};
 	eastl::fixed_vector<RegexCache, 16> m_regex_cache;
+	std::string m_want_result = "";
+	int         m_want_status = 403;
 };
 
 template <typename... Args>

@@ -8,13 +8,16 @@
 static const bool TRUSTED_CALLS = true;
 
 Script::Script(
-	const Script& source, const vrt_ctx* ctx,
-	uint64_t insn, uint64_t mem, uint64_t heap)
+	const Script& source, const vrt_ctx* ctx)
 	: m_machine(source.machine().memory.binary(), {
-		.memory_max = mem,  .owning_machine = &source.machine()
+		.memory_max = source.m_max_memory,
+		.owning_machine = &source.machine()
 	  }),
-	  m_ctx(ctx), m_max_instructions(insn),
-	  m_max_heap(heap), m_max_memory(mem)
+	  m_ctx(ctx),
+	  m_name(source.m_name),
+	  m_max_instructions(source.m_max_instructions),
+	  m_max_heap(source.m_max_heap),
+	  m_max_memory(source.m_max_memory)
 {
 	/* No initialization */
 	this->machine_setup(machine(), false);
@@ -30,11 +33,11 @@ Script::Script(
 }
 
 Script::Script(
-	const std::vector<uint8_t>& binary, const vrt_ctx* ctx,
+	const std::vector<uint8_t>& binary,
+	const vrt_ctx* ctx, const char* name,
 	uint64_t insn, uint64_t mem, uint64_t heap)
-	: m_machine(binary, { .memory_max = mem }),
-	  m_ctx(ctx), m_max_instructions(insn),
-	  m_max_heap(heap), m_max_memory(mem)
+	: m_machine(binary, { .memory_max = mem }), m_ctx(ctx), m_name(name),
+	  m_max_instructions(insn), m_max_heap(heap), m_max_memory(mem)
 {
 	this->machine_initialize(true);
 }
@@ -52,7 +55,7 @@ void Script::setup_virtual_memory()
 	const int heap_pageno   = 0x40000000 >> riscv::Page::SHIFT;
 	const int stack_pageno  = heap_pageno - 1;
 	auto& mem = machine().memory;
-	mem.set_stack_initial((uint32_t) stack_pageno << riscv::Page::SHIFT);
+	mem.set_stack_initial((uint32_t) stack_pageno * riscv::Page::size());
 	// this separates heap and stack
 	mem.install_shared_page(stack_pageno, riscv::Page::guard_page());
 }

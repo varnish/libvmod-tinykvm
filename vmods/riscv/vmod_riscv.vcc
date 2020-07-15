@@ -1,4 +1,4 @@
-$Module riscv 3 "RISC-V emulation VMOD"
+$Module riscv 3 "RISC-V Sandbox For VCL"
 
 DESCRIPTION
 ===========
@@ -22,18 +22,37 @@ $Object backend(INT max_instructions = 2000000, STRANDS arguments = 0)
 $Method BACKEND .from_body()
 
 
-$Object machine(INT max_instructions = 2000000, STRING filename, STRANDS args = 0)
+$Object machine(STRING name, STRING filename, INT max_instructions = 2000000, STRANDS arguments = 0)
 
-- Create machine that is initialized immediately
+- Create named machine that is initialized immediately
 - Arguments are passed into the main() function
 
 $Method INT     .call(STRING function)
 
-- Call into a new virtual machine cloned from the previously
+- Call into a new virtual machine quickly forked from the previously
   prepared machine, using copy-on-write mechanics.
 
-$Method INT     .call_known(INT idx)
 
-- Call a known function (on_client_request etc.) in a new virtual machine
-  cloned from the previously prepared machine, using copy-on-write mechanics.
+$Function BOOL    machine_present()
+
+- Returns true if there is a currently active machine.
+
+$Function INT     call(STRING function)
+
+- Calls the given function in the currently active machine.
+
+$Function STRING  current_name()
+
+- Returns the name of the currently active (last running) machine.
+- If no machine has been running in the current stage of VCL,
+  this function will return null, which can be tested in if statements.
+
+$Function STRING  want_result()
+
+- Returns the VCL decision that the guest wants to happen:
+  Lookup, Synth, etc.
+
+$Function INT     want_status()
+
+- Returns the status code that the guest wants to use, if relevant.
 

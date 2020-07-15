@@ -4,15 +4,20 @@
 #include "vcl.h"
 
 #include "vcc_if.h"
+#include "vmod_util.h"
 
 typedef void (*set_header_t) (struct http*, const char*);
 extern const char* execute_riscv(void* workspace, set_header_t, void* http,
 	const uint8_t* binary, size_t len, uint64_t instr_max);
-extern struct vmod_riscv_machine* riscv_create(const char* file, VRT_CTX, uint64_t insn);
+extern struct vmod_riscv_machine* riscv_create(const char* name,
+	const char* file, VRT_CTX, uint64_t insn);
 extern int riscv_forkcall(VRT_CTX, struct vmod_riscv_machine*, const char*);
-extern int riscv_forkcall_idx(VRT_CTX, struct vmod_riscv_machine*, int idx);
 extern int riscv_free(struct vmod_riscv_machine*);
-#include "vmod_util.h"
+// ???
+extern int riscv_current_call(VRT_CTX, const char*);
+extern const char* riscv_current_name(VRT_CTX);
+extern const char* riscv_current_result(VRT_CTX);
+extern int riscv_current_result_status(VRT_CTX);
 
 VCL_STRING
 vmod_exec(VRT_CTX, VCL_HTTP hp, VCL_INT instr_max, VCL_BLOB elf)
@@ -222,36 +227,68 @@ vmod_backend__fini(struct vmod_riscv_backend **priv)
 	FREE_OBJ(rvb);
 }
 
+/**
+ *  Sandbox section
+ *
+ *
+**/
 
 VCL_VOID
 vmod_machine__init(VRT_CTX, struct vmod_riscv_machine **init,
-	const char *vcl_name, VCL_INT max_instr, VCL_STRING elf, VCL_STRANDS args)
+	const char *vcl_name, VCL_STRING name, VCL_STRING elf,
+	VCL_INT max_instr, VCL_STRANDS args)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	(void) vcl_name;
 
-	*init = riscv_create(elf, ctx, max_instr);
+	*init = riscv_create(name, elf, ctx, max_instr);
 }
 
 VCL_VOID
-vmod_machine__fini(struct vmod_riscv_machine **priv)
+vmod_machine__fini(struct vmod_riscv_machine **rvm)
 {
-	riscv_free(*priv);
-	*priv = NULL;
+	CHECK_OBJ_NOTNULL(*rvm, RISCV_MACHINE_MAGIC);
+
+	riscv_free(*rvm);
+	*rvm = NULL;
 }
 
 VCL_INT vmod_machine_call(VRT_CTX,
 	struct vmod_riscv_machine *rvm, VCL_STRING function)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(rvm, RISCV_MACHINE_MAGIC);
 
 	return riscv_forkcall(ctx, rvm, function);
 }
 
-VCL_INT vmod_machine_call_known(VRT_CTX,
-	struct vmod_riscv_machine *rvm, VCL_INT idx)
+VCL_BOOL vmod_machine_present(VRT_CTX)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
-	return riscv_forkcall_idx(ctx, rvm, idx);
+	return riscv_current_name(ctx) != NULL;
+}
+VCL_INT vmod_call(VRT_CTX, VCL_STRING func)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	return riscv_current_call(ctx, func);
+}
+VCL_STRING vmod_current_name(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	return riscv_current_name(ctx);
+}
+VCL_STRING vmod_want_result(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	return riscv_current_result(ctx);
+}
+VCL_INT vmod_want_status(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	return riscv_current_result_status(ctx);
 }

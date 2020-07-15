@@ -6,34 +6,26 @@ inline long nanodiff(timespec start_time, timespec end_time);
 static std::vector<uint8_t> load_file(const std::string& filename);
 
 struct vmod_riscv_machine {
-	vmod_riscv_machine(std::vector<uint8_t> elf, VRT_CTX,
-		uint64_t insn, uint64_t mem, uint64_t heap)
-		: binary{std::move(elf)}, script{binary, ctx, insn, mem, heap},
-		  max_instructions(insn), max_memory(mem), max_heap(heap) {}
+	vmod_riscv_machine(const char* name, std::vector<uint8_t> elf,
+		VRT_CTX, uint64_t insn, uint64_t mem, uint64_t heap)
+		: binary{std::move(elf)}, script{binary, ctx, name, insn, mem, heap} {}
 
+	uint64_t magic = 0xb385716f486938e6;
 	const std::vector<uint8_t> binary;
 	Script   script;
-	uint64_t max_instructions;
-	uint64_t max_memory;
-	uint64_t max_heap;
-	eastl::fixed_vector<uint32_t, 8> lookup;
-	inline void lookup_add(const char* name) {
-		lookup.push_back(script.resolve_address(name));
-	}
 };
+#define SCRIPT_MAGIC 0x83e59fa5
 
 extern "C"
-vmod_riscv_machine* riscv_create(const char* file, VRT_CTX, uint64_t insn)
+vmod_riscv_machine* riscv_create(const char* name,
+	const char* file, VRT_CTX, uint64_t insn)
 {
 	auto* vrm = (vmod_riscv_machine*) WS_Alloc(ctx->ws, sizeof(vmod_riscv_machine));
 	if (UNLIKELY(vrm == nullptr))
 		VRT_fail(ctx, "Out of workspace");
 
-	new (vrm) vmod_riscv_machine(load_file(file), ctx,
+	new (vrm) vmod_riscv_machine(name, load_file(file), ctx,
 		/* Max instr: */ insn, /* Mem: */ 8*1024*1024, /* Heap: */ 6*1024*1024);
-	vrm->lookup_add("on_client_request");
-	vrm->lookup_add("on_synth");
-	vrm->lookup_add("on_backend_response");
 	return vrm;
 }
 
@@ -43,7 +35,7 @@ vmod_riscv_machine* riscv_create(const char* file, VRT_CTX, uint64_t insn)
 	auto x = time_now();  \
 	asm("" ::: "memory");
 
-inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, uint32_t addr)
+inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 {
 	auto* priv_task = VRT_priv_task(ctx, ctx);
 	if (!priv_task->priv)
@@ -53,12 +45,13 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, uint32_t addr)
 		TIMING_LOCATION(t0);
 	#endif
 		auto* script = (Script*) WS_Alloc(ctx->ws, sizeof(Script));
-		if (UNLIKELY(script == nullptr))
+		if (UNLIKELY(script == nullptr)) {
 			VRT_fail(ctx, "Out of workspace");
+			return -1;
+		}
 
 		try {
-			new (script) Script{vrm->script, ctx,
-				vrm->max_instructions, vrm->max_memory, vrm->max_heap};
+			new (script) Script{vrm->script, ctx};
 
 		} catch (std::exception& e) {
 			printf(">>> Exception: %s\n", e.what());
@@ -70,6 +63,7 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, uint32_t addr)
 	#endif
 
 		priv_task->priv = script;
+		priv_task->len  = SCRIPT_MAGIC;
 		priv_task->free = [] (void* script) {
 		#ifdef ENABLE_TIMING
 			TIMING_LOCATION(t2);
@@ -87,7 +81,7 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, uint32_t addr)
 	TIMING_LOCATION(t1);
 #endif
 	/* Call into the virtual machine */
-	int ret = script->call(addr);
+	int ret = script->call(func);
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t2);
 	printf("Time spent in forkcall(): %ld ns\n", nanodiff(t1, t2));
@@ -98,7 +92,7 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, uint32_t addr)
 extern "C"
 int riscv_forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 {
-	int ret = forkcall(ctx, vrm, vrm->script.resolve_address(func));
+	int ret = forkcall(ctx, vrm, func);
 	if (UNLIKELY(ret < 0)) {
 		VSLb(ctx->vsl, SLT_Error, "VM call '%s' failed. Return value: %d",
 			func, ret);
@@ -106,17 +100,54 @@ int riscv_forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 	}
 	return ret;
 }
-extern "C"
-int riscv_forkcall_idx(VRT_CTX, vmod_riscv_machine* vrm, int idx)
-{
-	return forkcall(ctx, vrm, vrm->lookup.at(idx));
-}
 
 extern "C"
 int riscv_free(vmod_riscv_machine* vrm)
 {
 	vrm->~vmod_riscv_machine();
 	return 0;
+}
+
+inline Script* get_machine(VRT_CTX)
+{
+	auto* priv_task = VRT_priv_task(ctx, ctx);
+	if (priv_task->priv && priv_task->len == SCRIPT_MAGIC)
+		return (Script*) priv_task->priv;
+	return nullptr;
+}
+
+extern "C"
+int riscv_current_call(VRT_CTX, const char* func)
+{
+	auto* script = get_machine(ctx);
+	if (script)
+		return script->call(func);
+	return -1;
+}
+
+extern "C"
+const char* riscv_current_name(VRT_CTX)
+{
+	auto* script = get_machine(ctx);
+	if (script)
+		return script->name().c_str();
+	return nullptr;
+}
+extern "C"
+const char* riscv_current_result(VRT_CTX)
+{
+	auto* script = get_machine(ctx);
+	if (script)
+		return script->want_result();
+	return nullptr;
+}
+extern "C"
+int riscv_current_result_status(VRT_CTX)
+{
+	auto* script = get_machine(ctx);
+	if (script)
+		return script->want_status();
+	return 400;
 }
 
 #include <unistd.h>
