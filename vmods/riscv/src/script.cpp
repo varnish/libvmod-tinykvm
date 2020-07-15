@@ -119,7 +119,10 @@ void Script::machine_setup(riscv::Machine<riscv::RISCV32>& machine, bool init)
 				(riscv::PageData*) WS_Alloc(m_ctx->ws, riscv::Page::size());
 			if (LIKELY(data != nullptr)) {
 				return mem.allocate_page(page,
-					riscv::PageAttributes{ .user_defined = 1 }, data);
+					riscv::PageAttributes{
+						.non_owning = true, // don't delete!
+						.user_defined = 1 },
+					data);
 			}
 			throw riscv::MachineException(
 				riscv::OUT_OF_MEMORY, "Out of memory", mem.pages_total());
