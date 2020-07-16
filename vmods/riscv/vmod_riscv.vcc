@@ -27,11 +27,21 @@ $Object machine(STRING name, STRING filename, INT max_instructions = 2000000, ST
 - Create named machine that is initialized immediately
 - Arguments are passed into the main() function
 
+$Method VOID    .add_known_function(STRING function)
+
+- Make this function faster to call later on.
+
 $Method INT     .call(STRING function)
 
 - Call into a new virtual machine quickly forked from the previously
   prepared machine, using copy-on-write mechanics.
 
+
+$Function VOID    add_known_function(STRING function)
+
+- Adds the given function to a list of functions that will be
+  automatically pre-warmed on each new machine created. The
+  function does not have to exist on every machine.
 
 $Function BOOL    machine_present()
 

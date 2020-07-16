@@ -4,17 +4,41 @@
 inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
 static std::vector<uint8_t> load_file(const std::string& filename);
+// functions used by all machines created during init, afterwards
+static std::vector<const char*> lookup_wishlist;
 
 struct vmod_riscv_machine {
 	vmod_riscv_machine(const char* name, std::vector<uint8_t> elf,
 		VRT_CTX, uint64_t insn, uint64_t mem, uint64_t heap)
-		: binary{std::move(elf)}, script{binary, ctx, name, insn, mem, heap} {}
+		: binary{std::move(elf)}, script{binary, ctx, name, insn, mem, heap}
+	{
+		for (const auto* func : lookup_wishlist) {
+			sym_lookup.emplace(strdup(func), lookup(func));
+		}
+	}
 
 	uint64_t magic = 0xb385716f486938e6;
 	const std::vector<uint8_t> binary;
 	Script   script;
+	// lookup tree for ELF symbol names
+	eastl::string_map<uint32_t,
+			eastl::str_less<const char*>,
+			eastl::allocator_malloc> sym_lookup;
+	inline uint32_t lookup(const char* name) {
+		const auto& it = sym_lookup.find(name);
+		if (it != sym_lookup.end()) return it->second;
+		// fallback
+		return script.resolve_address(name);
+	}
 };
 #define SCRIPT_MAGIC 0x83e59fa5
+
+//#define ENABLE_TIMING
+#define TIMING_LOCATION(x) \
+	asm("" ::: "memory"); \
+	auto x = time_now();  \
+	asm("" ::: "memory");
+
 
 extern "C"
 vmod_riscv_machine* riscv_create(const char* name,
@@ -29,11 +53,13 @@ vmod_riscv_machine* riscv_create(const char* name,
 	return vrm;
 }
 
-//#define ENABLE_TIMING
-#define TIMING_LOCATION(x) \
-	asm("" ::: "memory"); \
-	auto x = time_now();  \
-	asm("" ::: "memory");
+extern "C"
+void riscv_prewarm(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
+{
+	(void) ctx;
+	const auto addr = vrm->lookup(func);
+	vrm->sym_lookup.emplace(strdup(func), addr);
+}
 
 inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 {
@@ -81,7 +107,8 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 	TIMING_LOCATION(t1);
 #endif
 	/* Call into the virtual machine */
-	int ret = script->call(func);
+	const auto addr = vrm->lookup(func);
+	int ret = script->call(addr);
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t2);
 	printf("Time spent in forkcall(): %ld ns\n", nanodiff(t1, t2));
@@ -106,6 +133,13 @@ int riscv_free(vmod_riscv_machine* vrm)
 {
 	vrm->~vmod_riscv_machine();
 	return 0;
+}
+
+extern "C"
+void riscv_add_known(VRT_CTX, const char* func)
+{
+	(void) ctx;
+	lookup_wishlist.push_back(func);
 }
 
 inline Script* get_machine(VRT_CTX)
