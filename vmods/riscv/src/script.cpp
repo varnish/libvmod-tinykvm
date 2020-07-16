@@ -22,7 +22,6 @@ Script::Script(
 	/* No initialization */
 	this->machine_setup(machine(), false);
 
-	machine().memory.set_exit_address(source.machine().memory.exit_address());
 	/* Transfer data from the old arena, to fully replicate heap */
 	arena_transfer((sas_alloc::Arena*) source.m_arena, (sas_alloc::Arena*) m_arena);
 	/* Load the compiled regexes of the source */
