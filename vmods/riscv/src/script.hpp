@@ -22,8 +22,8 @@ public:
 	auto& machine() { return m_machine; }
 	const auto& machine() const { return m_machine; }
 
-	void set_ctx(const vrt_ctx* ctx) { m_ctx = ctx; }
 	const auto* ctx() const noexcept { return m_ctx; }
+	const auto* vrm() const noexcept { return m_vrm; }
 
 	const auto& name() const noexcept { return m_name; }
 	auto* want_result() const noexcept { return m_want_result.c_str(); }
@@ -50,7 +50,7 @@ public:
 	Script(const std::vector<uint8_t>&,
 		const vrt_ctx*, const char* name,
 		uint64_t insn, uint64_t mem, uint64_t heap);
-	Script(const Script& source, const vrt_ctx*);
+	Script(const Script& source, const vrt_ctx*, struct vmod_riscv_machine*);
 	~Script();
 
 private:
@@ -64,6 +64,7 @@ private:
 
 	riscv::Machine<riscv::RISCV32> m_machine;
 	const vrt_ctx* m_ctx;
+	const struct vmod_riscv_machine* m_vrm = nullptr;
 	std::string m_name;
 	uint64_t    m_max_instructions = 0;
 	uint64_t    m_max_heap = 0;

@@ -8,12 +8,12 @@
 static const bool TRUSTED_CALLS = true;
 
 Script::Script(
-	const Script& source, const vrt_ctx* ctx)
+	const Script& source, const vrt_ctx* ctx, struct vmod_riscv_machine* vrm)
 	: m_machine(source.machine().memory.binary(), {
 		.memory_max = source.m_max_memory,
 		.owning_machine = &source.machine()
 	  }),
-	  m_ctx(ctx),
+	  m_ctx(ctx), m_vrm(vrm),
 	  m_name(source.m_name),
 	  m_max_instructions(source.m_max_instructions),
 	  m_max_heap(source.m_max_heap),

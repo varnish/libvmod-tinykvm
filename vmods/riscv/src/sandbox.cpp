@@ -24,7 +24,7 @@ struct vmod_riscv_machine {
 	eastl::string_map<uint32_t,
 			eastl::str_less<const char*>,
 			eastl::allocator_malloc> sym_lookup;
-	inline uint32_t lookup(const char* name) {
+	inline uint32_t lookup(const char* name) const {
 		const auto& it = sym_lookup.find(name);
 		if (it != sym_lookup.end()) return it->second;
 		// fallback
@@ -77,7 +77,7 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 		}
 
 		try {
-			new (script) Script{vrm->script, ctx};
+			new (script) Script{vrm->script, ctx, vrm};
 
 		} catch (std::exception& e) {
 			printf(">>> Exception: %s\n", e.what());
@@ -154,8 +154,17 @@ extern "C"
 int riscv_current_call(VRT_CTX, const char* func)
 {
 	auto* script = get_machine(ctx);
-	if (script)
-		return script->call(func);
+	if (script) {
+	#ifdef ENABLE_TIMING
+		TIMING_LOCATION(t1);
+	#endif
+		int ret = script->call(script->vrm()->lookup(func));
+	#ifdef ENABLE_TIMING
+		TIMING_LOCATION(t2);
+		printf("Time spent in forkcall(): %ld ns\n", nanodiff(t1, t2));
+	#endif
+		return ret;
+	}
 	return -1;
 }
 
