@@ -3,7 +3,8 @@ project (vmod C CXX)
 include(../vmod.cmake vmod)
 
 add_vmod(vmod_riscv vmod_riscv.vcc "RISC-V machine emulation VMOD"
-	src/vmod_riscv.c
+	src/vmod_riscv_exec.c
+	src/vmod_riscv_sandbox.c
 	src/linux.cpp
 	src/sandbox.cpp
 	src/script.cpp
