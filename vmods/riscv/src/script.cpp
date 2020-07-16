@@ -126,6 +126,24 @@ void Script::machine_setup(riscv::Machine<riscv::RISCV32>& machine, bool init)
 			throw riscv::MachineException(
 				riscv::OUT_OF_MEMORY, "Out of memory", mem.pages_total());
 		});
+	machine.memory.set_page_write_handler(
+		[this] (auto& mem, riscv::Page& page) -> void {
+			assert(page.has_data() && page.attr.is_cow);
+			/* Pages are allocated from workspace */
+			auto* data =
+				(riscv::PageData*) WS_Copy(m_ctx->ws, page.data(), page.size());
+			if (LIKELY(data != nullptr)) {
+				/* Release any already non-owned data */
+				if (page.attr.non_owning)
+					page.m_page.release();
+				page.attr.is_cow = false;
+				page.attr.non_owning = true; /* Avoid calling delete */
+				page.m_page.reset(data);
+				return;
+			}
+			throw riscv::MachineException(
+				riscv::OUT_OF_MEMORY, "Out of memory", mem.pages_total());
+		});
 }
 void Script::handle_exception(uint32_t address)
 {
