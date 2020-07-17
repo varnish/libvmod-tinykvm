@@ -6,6 +6,9 @@
 #include "varnish.hpp"
 
 static const bool TRUSTED_CALLS = true;
+static constexpr int HEAP_PAGENO   = 0x40000000 >> riscv::Page::SHIFT;
+static constexpr int STACK_PAGENO  = HEAP_PAGENO - 1;
+
 
 Script::Script(
 	const Script& source, const vrt_ctx* ctx, struct vmod_riscv_machine* vrm)
@@ -51,12 +54,19 @@ Script::~Script()
 
 void Script::setup_virtual_memory()
 {
-	const int heap_pageno   = 0x40000000 >> riscv::Page::SHIFT;
-	const int stack_pageno  = heap_pageno - 1;
+	using namespace riscv;
 	auto& mem = machine().memory;
-	mem.set_stack_initial((uint32_t) stack_pageno * riscv::Page::size());
+	mem.set_stack_initial(STACK_PAGENO * Page::size());
 	// this separates heap and stack
-	mem.install_shared_page(stack_pageno, riscv::Page::guard_page());
+	mem.install_shared_page(STACK_PAGENO, Page::guard_page());
+
+	auto* ws = ctx()->ws;
+	new (&ro_area) MemArea<4> (machine(), RO_AREA_BEGIN, RO_AREA_END,
+		{ .write = false, .non_owning = true }, ws);
+	mem.install_shared_page(RO_AREA_END >> 12, Page::guard_page());
+	new (&rw_area) MemArea<4> (machine(), RW_AREA_BEGIN, RW_AREA_END,
+		{ .write = true, .non_owning = true }, ws);
+	mem.install_shared_page(RW_AREA_END >> 12, Page::guard_page());
 }
 
 bool Script::machine_initialize(bool init)
@@ -73,7 +83,7 @@ bool Script::machine_initialize(bool init)
 				return false;
 			}
 		} catch (riscv::MachineException& me) {
-			printf(">>> Machine exception %d: %s (data: %d)\n",
+			printf(">>> Machine exception %d: %s (data: %#x)\n",
 					me.type(), me.what(), me.data());
 #ifdef RISCV_DEBUG
 			machine().print_and_pause();
@@ -90,36 +100,21 @@ void Script::machine_setup(riscv::Machine<riscv::RISCV32>& machine, bool init)
 {
 	machine.set_userdata<Script>(this);
 
-	if (init)
-	{
-		const uint32_t exit_addr = machine.address_of("exit");
-		if (exit_addr)
-			machine.memory.set_exit_address(exit_addr);
-		else
-			throw std::runtime_error("The binary is missing a public exit function!");
-	}
-	// page protections and "hidden" stacks
-	this->setup_virtual_memory();
-	// add system call interface
-	this->m_arena = setup_native_heap_syscalls<4>(machine, m_max_heap);
-	setup_native_memory_syscalls<4>(machine, TRUSTED_CALLS);
-    setup_syscall_interface(machine);
-
-	machine.on_unhandled_syscall(
-		[this] (int number) {
-			VSLb(m_ctx->vsl, SLT_Debug,
-				"VM unhandled system call: %d\n", number);
-		});
-
 	machine.memory.set_page_fault_handler(
-		[this] (auto& mem, size_t page) -> riscv::Page& {
+		[this] (auto& mem, size_t pageno) -> riscv::Page& {
 			/* Pages are allocated from workspace */
+			//printf("Creating page %zu @ 0x%X\n", pageno, pageno * 4096);
+			bool dont_fork = false;
+			if (pageno >= STACK_PAGENO-128 && pageno < STACK_PAGENO) {
+				dont_fork = true;
+			}
 			auto* data =
 				(riscv::PageData*) WS_Alloc(m_ctx->ws, riscv::Page::size());
 			if (LIKELY(data != nullptr)) {
-				return mem.allocate_page(page,
+				return mem.allocate_page(pageno,
 					riscv::PageAttributes{
 						.non_owning = true, // don't delete!
+						.dont_fork  = dont_fork,
 						.user_defined = 1 },
 					data);
 			}
@@ -143,6 +138,33 @@ void Script::machine_setup(riscv::Machine<riscv::RISCV32>& machine, bool init)
 			}
 			throw riscv::MachineException(
 				riscv::OUT_OF_MEMORY, "Out of memory", mem.pages_total());
+		});
+
+	// page protections and "hidden" stacks
+	this->setup_virtual_memory();
+	// stack
+	machine.cpu.reset_stack_pointer();
+
+	if (init)
+	{
+		const uint32_t exit_addr = machine.address_of("exit");
+		if (exit_addr)
+			machine.memory.set_exit_address(exit_addr);
+		else
+			throw std::runtime_error("The binary is missing a public exit function!");
+		/* Newlib expects to find arguments on stack */
+		machine.setup_argv({ name() });
+	}
+
+	// add system call interface
+	this->m_arena = setup_native_heap_syscalls<4>(machine, m_max_heap);
+	setup_native_memory_syscalls<4>(machine, TRUSTED_CALLS);
+    setup_syscall_interface(machine);
+
+	machine.on_unhandled_syscall(
+		[this] (int number) {
+			VSLb(m_ctx->vsl, SLT_Debug,
+				"VM unhandled system call: %d\n", number);
 		});
 }
 void Script::handle_exception(uint32_t address)
@@ -185,6 +207,11 @@ void Script::print_backtrace(const uint32_t addr)
 	auto origin = machine().memory.lookup(addr);
 	printf("-> [-] 0x%08x + 0x%.3x: %s\n",
 			origin.address, origin.offset, origin.name.c_str());
+}
+
+uint32_t Script::guest_alloc(size_t len)
+{
+	return arena_malloc((sas_alloc::Arena*) m_arena, len);
 }
 
 uint32_t Script::resolve_address(const char* name) const {

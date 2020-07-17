@@ -3,11 +3,15 @@
 #include <functional>
 #include <libriscv/machine.hpp>
 #include <EASTL/fixed_vector.h>
+#include "memarea.hpp"
 struct vrt_ctx;
 
 class Script {
 public:
-	static constexpr uint32_t HIDDEN_AREA = 0x10000;
+	static constexpr uint32_t RO_AREA_BEGIN = 0x10000;
+	static constexpr uint32_t RO_AREA_END   = 0x11000;
+	static constexpr uint32_t RW_AREA_BEGIN = 0x12000;
+	static constexpr uint32_t RW_AREA_END   = 0x13000;
 
 	// call any script function, with any parameters
 	template <typename... Args>
@@ -32,7 +36,11 @@ public:
 		m_want_result = res; m_want_status = status;
 	}
 
+	uint32_t guest_alloc(size_t len);
 	auto& shm_address() { return m_shm_address; }
+
+	MemArea<4> ro_area;
+	MemArea<4> rw_area;
 
 	int    regex_find(uint32_t hash) const;
 	size_t regex_manage(struct vre*, uint32_t hash);
@@ -72,7 +80,7 @@ private:
 	bool        m_crashed = false;
 	int         m_budget_overruns = 0;
 	void*       m_arena = nullptr;
-	uint32_t    m_shm_address = HIDDEN_AREA + 0x1000;
+	uint32_t    m_shm_address = RO_AREA_END; /* It's a stack */
 
 	struct RegexCache {
 		struct vre* re   = nullptr;

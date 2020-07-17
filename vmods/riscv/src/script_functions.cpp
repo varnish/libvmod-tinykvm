@@ -86,16 +86,24 @@ APICALL(assertion_failed)
 }
 APICALL(print)
 {
-	auto [string] = machine.sysargs<riscv::String> ();
+	auto [buffer] = machine.sysargs<riscv::Buffer> ();
+	auto string = buffer.to_string();
 	printf(">>> Program says: %.*s", (int) string.size(), string.c_str());
 	return string.size();
 }
 APICALL(shm_log)
 {
-	auto [string] = machine.sysargs<riscv::String> ();
+	auto [string, len] = machine.sysargs<gaddr_t, uint32_t> ();
 	const auto* ctx = get_ctx(machine);
-	VSLb(ctx->vsl, SLT_VCL_Log, "%.*s", (int) string.size(), string.c_str());
-	return 0;
+
+	auto& script = get_script(machine);
+	auto* data = script.rw_area.host_addr(string, len);
+	if (data) {
+		VSLb(ctx->vsl, SLT_VCL_Log, "%.*s", (int) len, data);
+		return 0;
+	}
+	//VSLb(ctx->vsl, SLT_VCL_Log, "%.*s", (int) string.size(), string.c_str());
+	return -1;
 }
 
 APICALL(my_name)
@@ -108,7 +116,7 @@ APICALL(my_name)
 }
 APICALL(set_decision)
 {
-	auto [result, status] = machine.sysargs<riscv::String, int> ();
+	auto [result, status] = machine.sysargs<riscv::Buffer, int> ();
 	get_script(machine).set_result(result.to_string(), status);
 	return 0;
 }
@@ -167,7 +175,9 @@ APICALL(foreach_header_field)
 		if (deleted) {
 			const int idx = machine.memory.read<uint32_t>
 				(addr + offsetof(guest_header_field, index));
-			http_UnsetIdx(hp, idx - dcount++);
+			if (is_valid_index(hp, idx)) {
+				http_UnsetIdx(hp, idx - dcount++);
+			}
 		}
 	}
 
@@ -226,17 +236,23 @@ APICALL(header_field_get_length)
 
 APICALL(header_field_get)
 {
-	auto [where, index, fdata, sdata, sdatalen]
-		= machine.sysargs<int, uint32_t, gaddr_t, gaddr_t, uint32_t> ();
+	auto [where, index, fdata]
+		= machine.sysargs<int, uint32_t, gaddr_t> ();
 
 	auto [hp, field] = get_field(get_ctx(machine), where, index);
 	const uint32_t len = field_length(field);
-	if (len >= sdatalen || field.begin == nullptr)
+	if (field.begin == nullptr)
 		return -1;
 
+	/* Allocate the string on the guests heap, and copy it over */
+	auto sdata = get_script(machine).guest_alloc(len);
+	if (sdata == 0)
+		return -1;
+	machine.copy_to_guest(sdata, field.begin, len+1);
+
+	/* Copy over the new header field */
 	const guest_header_field hf {where, index, sdata, sdata + len, false};
 	machine.copy_to_guest(fdata, &hf, sizeof(hf));
-	machine.copy_to_guest(sdata, field.begin, len+1);
 	return len;
 }
 
@@ -264,10 +280,8 @@ APICALL(header_field_append)
 
 APICALL(header_field_set)
 {
-	auto [where, index, src, len]
-		= machine.sysargs<int, int, uint32_t, uint32_t> ();
-	if (len > 0x40000000)
-		throw std::runtime_error("Invalid length");
+	auto [where, index, buffer]
+		= machine.sysargs<int, int, riscv::Buffer> ();
 
 	const auto* ctx = get_ctx(machine);
 	auto* hp = VRT_selecthttp(ctx, (gethdr_e) where);
@@ -277,15 +291,16 @@ APICALL(header_field_set)
 	if (is_valid_index(hp, index))
 	{
 		/* Allocate and extract the new field value */
-		auto* val = (char*) WS_Alloc(ctx->ws, len+1);
+		auto* val = (char*) WS_Alloc(ctx->ws, buffer.size()+1);
 		if (val == nullptr)
 			throw std::runtime_error("Unable to make room for HTTP header field");
-		machine.memory.memcpy_out(val, (uint32_t) src, len);
-		val[len] = 0;
+
+		buffer.copy_to(val, buffer.size());
+		val[buffer.size()] = 0;
 
 		/* Apply it at the given index */
-		http_SetHeaderFixed(hp, index, val, len);
-		return len;
+		http_SetHeaderFixed(hp, index, val, buffer.size());
+		return buffer.size();
 	}
 	return -1;
 }
@@ -309,7 +324,8 @@ APICALL(header_field_unset)
 
 APICALL(regex_compile)
 {
-	auto [pattern] = machine.sysargs<riscv::String> ();
+	auto [pbuffer] = machine.sysargs<riscv::Buffer> ();
+	auto pattern = pbuffer.to_string();
 
 	const uint32_t hash = crc32(pattern.c_str(), pattern.size());
 	const int idx = get_script(machine).regex_find(hash);
@@ -324,35 +340,41 @@ APICALL(regex_compile)
 	if (re == nullptr) {
 		printf("Regex compile error: %s\n", error);
 		throw std::runtime_error(
-			"The regex pattern did not compile: " + pattern.to_string());
+			"The regex pattern did not compile: " + pattern);
 	}
 
 	return get_script(machine).regex_manage(re, hash);
 }
 APICALL(regex_match)
 {
-	auto [index, subject] = machine.sysargs<uint32_t, riscv::String> ();
+	auto [index, buffer] = machine.sysargs<uint32_t, riscv::Buffer> ();
 	auto* vre = get_script(machine).regex_get(index);
 	/* VRE_exec(const vre_t *code, const char *subject, int length,
 	    int startoffset, int options, int *ovector, int ovecsize,
 	    const volatile struct vre_limits *lim) */
+	auto subject = buffer.to_string();
 	return VRE_exec(vre, subject.c_str(), subject.size(), 0,
 		0, nullptr, 0, nullptr) >= 0;
 }
 APICALL(regex_subst)
 {
-	auto [index, subject, subst, dst, maxlen]
-		= machine.sysargs<uint32_t, riscv::String, riscv::String, gaddr_t, uint32_t> ();
+	auto [index, tbuffer, sbuffer, dst, maxlen]
+		= machine.sysargs<uint32_t, riscv::Buffer, riscv::Buffer, gaddr_t, uint32_t> ();
 	auto* re = get_script(machine).regex_get(index);
 
+	/* Run the regsub using existing 're' */
 	const bool all = (maxlen & 0x80000000);
+	auto subject = tbuffer.to_string();
+	auto subst   = sbuffer.to_string();
 	auto * result =
 		VRT_regsub(get_ctx(machine), all, subject.c_str(), re, subst.c_str());
 	if (result == nullptr)
 		return -1;
+
+	/* This call only supports dest buffer being in the RW area */
 	const size_t len =
 		std::min((size_t) maxlen & 0x7FFFFFFF, __builtin_strlen(result)+1);
-	machine.copy_to_guest((gaddr_t) dst, result, len);
+	machine.copy_to_guest(dst, result, len);
 	return len-1; /* The last byte is the zero, not reporting that */
 }
 APICALL(regex_delete)
