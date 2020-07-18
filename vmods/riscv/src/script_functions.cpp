@@ -33,6 +33,13 @@ struct guest_header_field {
 	bool     deleted;
 };
 
+inline void foreach(http* hp, riscv::Function<void(http*, txt&, size_t)> cb)
+{
+	for (size_t i = 0; i < hp->field_count; i++) {
+		cb(hp, hp->field_array[i], i);
+	}
+}
+
 inline bool is_valid_index(const http* hp, unsigned idx) {
 	return idx >= 1 && idx < hp->field_count;
 }
@@ -184,6 +191,14 @@ APICALL(foreach_header_field)
 
 	return acount;
 }
+
+APICALL(http_find)
+{
+	const auto [where, buffer] = machine.sysargs<int, int> ();
+
+	return -1;
+}
+
 APICALL(http_set_status)
 {
 	const auto [where, status] = machine.sysargs<int, int> ();

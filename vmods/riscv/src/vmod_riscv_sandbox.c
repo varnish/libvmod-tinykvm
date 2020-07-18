@@ -1,6 +1,8 @@
-#include "vmod_riscv.h"
+#include "vmod_riscv_sandbox.h"
 
-#include "vcl.h"
+#include <string.h>
+#include <cache/cache.h>
+
 #include "vcc_if.h"
 #include "vmod_util.h"
 
@@ -50,6 +52,8 @@ VCL_INT vmod_machine_call(VRT_CTX,
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	CHECK_OBJ_NOTNULL(rvm, RISCV_MACHINE_MAGIC);
+	if (function == NULL)
+		return (-1); /* ??? */
 
 	return riscv_forkcall(ctx, rvm, function);
 }
@@ -86,11 +90,13 @@ VCL_BOOL vmod_machine_present(VRT_CTX)
 	return riscv_current_name(ctx) != NULL;
 }
 /* Call into any currently running VM. */
-VCL_INT vmod_call(VRT_CTX, VCL_STRING func)
+VCL_INT vmod_call(VRT_CTX, VCL_STRING function)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	if (function == NULL)
+		return (-1); /* ??? */
 
-	return riscv_current_call(ctx, func);
+	return riscv_current_call(ctx, function);
 }
 VCL_INT vmod_call_index(VRT_CTX, VCL_INT index)
 {
