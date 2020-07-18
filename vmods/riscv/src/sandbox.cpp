@@ -13,7 +13,9 @@ struct vmod_riscv_machine {
 		: binary{std::move(elf)}, script{binary, ctx, name, insn, mem, heap}
 	{
 		for (const auto* func : lookup_wishlist) {
-			sym_lookup.emplace(strdup(func), lookup(func));
+			const auto addr = lookup(func);
+			sym_lookup.emplace(strdup(func), addr);
+			sym_vector.push_back({func, addr});
 		}
 	}
 
@@ -24,6 +26,7 @@ struct vmod_riscv_machine {
 	eastl::string_map<uint32_t,
 			eastl::str_less<const char*>,
 			eastl::allocator_malloc> sym_lookup;
+	std::vector<std::pair<const char*, uint32_t>> sym_vector;
 	inline uint32_t lookup(const char* name) const {
 		const auto& it = sym_lookup.find(name);
 		if (it != sym_lookup.end()) return it->second;
@@ -59,9 +62,10 @@ void riscv_prewarm(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 	(void) ctx;
 	const auto addr = vrm->lookup(func);
 	vrm->sym_lookup.emplace(strdup(func), addr);
+	vrm->sym_vector.push_back({func, addr});
 }
 
-inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
+inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, uint32_t addr)
 {
 	auto* priv_task = VRT_priv_task(ctx, ctx);
 	if (!priv_task->priv)
@@ -103,15 +107,14 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 	}
 	auto* script = (Script*) priv_task->priv;
 
-#ifdef ENABLE_TIMING
-	TIMING_LOCATION(t1);
-#endif
 	/* Call into the virtual machine */
-	const auto addr = vrm->lookup(func);
-	int ret = script->call(addr);
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t2);
-	printf("Time spent in forkcall(): %ld ns\n", nanodiff(t1, t2));
+#endif
+	int ret = script->call(addr);
+#ifdef ENABLE_TIMING
+	TIMING_LOCATION(t3);
+	printf("Time spent in forkcall(): %ld ns\n", nanodiff(t2, t3));
 #endif
 	return ret;
 }
@@ -119,13 +122,33 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 extern "C"
 int riscv_forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 {
-	int ret = forkcall(ctx, vrm, func);
+	const auto addr = vrm->lookup(func);
+	int ret = forkcall(ctx, vrm, addr);
 	if (UNLIKELY(ret < 0)) {
 		VSLb(ctx->vsl, SLT_Error, "VM call '%s' failed. Return value: %d",
 			func, ret);
 		VRT_fail(ctx, "VM call failed (negative result)");
 	}
 	return ret;
+}
+extern "C"
+int riscv_forkcall_idx(VRT_CTX, vmod_riscv_machine* vrm, int index)
+{
+	if (index >= 0 && index < vrm->sym_vector.size())
+	{
+		auto& entry = vrm->sym_vector[index];
+		const char* func = entry.first;
+
+		int ret = forkcall(ctx, vrm, entry.second);
+		if (UNLIKELY(ret < 0)) {
+			VSLb(ctx->vsl, SLT_Error,
+				"VM call '%s' failed. Return value: %d", func, ret);
+			VRT_fail(ctx, "VM call failed (negative result)");
+		}
+		return ret;
+	}
+	VRT_fail(ctx, "VM call failed (invalid index given)");
+	return -1;
 }
 
 extern "C"
@@ -165,6 +188,30 @@ int riscv_current_call(VRT_CTX, const char* func)
 	#endif
 		return ret;
 	}
+	return -1;
+}
+extern "C"
+int riscv_current_call_idx(VRT_CTX, int index)
+{
+	auto* script = get_machine(ctx);
+	if (script) {
+		if (index >= 0 && index < script->vrm()->sym_vector.size())
+		{
+			auto& entry = script->vrm()->sym_vector[index];
+		#ifdef ENABLE_TIMING
+			TIMING_LOCATION(t1);
+		#endif
+			int ret = script->call(entry.second);
+		#ifdef ENABLE_TIMING
+			TIMING_LOCATION(t2);
+			printf("Time spent in forkcall(): %ld ns\n", nanodiff(t1, t2));
+		#endif
+			return ret;
+		}
+		VRT_fail(ctx, "VM call failed (invalid index given)");
+		return -1;
+	}
+	VRT_fail(ctx, "VM call failed (no running machine)");
 	return -1;
 }
 

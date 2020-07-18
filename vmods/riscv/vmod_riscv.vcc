@@ -36,6 +36,22 @@ $Method INT     .call(STRING function)
 - Call into a new virtual machine quickly forked from the previously
   prepared machine, using copy-on-write mechanics.
 
+$Method INT     .call_index(INT index)
+
+- Call into a new virtual machine quickly forked from the previously
+  created machine, using copy-on-write mechanics. The index is the
+  entry number (counting from zero) given to add_known_function.
+
+  Example:
+
+  riscv.add_known_function("on_client_request")
+  riscv.add_known_function("on_synth")
+  new ypizza = riscv.machine(
+	  name = "ypizza.com",
+	  filename = "/home/gonzo/github/rvscript/programs/test");
+
+  ypizza.call_index(0); /* Call on_client_request */
+
 
 $Function VOID    add_known_function(STRING function)
 
@@ -50,6 +66,11 @@ $Function BOOL    machine_present()
 $Function INT     call(STRING function)
 
 - Calls the given function in the currently active machine.
+
+$Function INT     call_index(INT index)
+
+- Calls the given function at index in order added by add_known_function
+  (starting at zero), in the currently active machine.
 
 $Function STRING  current_name()
 

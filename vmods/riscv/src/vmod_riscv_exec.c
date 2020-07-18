@@ -3,6 +3,7 @@
 #include <malloc.h>
 #include "vcl.h"
 #include "vcc_if.h"
+#include "vmod_util.h"
 
 typedef void (*set_header_t) (struct http*, const char*);
 extern const char* execute_riscv(void* workspace, set_header_t, void* http,

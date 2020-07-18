@@ -4,6 +4,7 @@
 using gaddr_t = uint32_t;
 
 extern "C" {
+	void http_SetH(struct http *to, unsigned n, const char *fm);
 	void http_SetHeaderFixed(struct http *to, unsigned n, const char *, size_t);
 	void http_UnsetIdx(struct http *hp, unsigned idx);
 	struct txt {
@@ -274,7 +275,7 @@ APICALL(header_field_append)
 	}
 
 	const int idx = hp->field_count++;
-	http_SetHeaderFixed(hp, idx, val, len);
+	http_SetH(hp, idx, val);
 	return idx;
 }
 
@@ -299,7 +300,7 @@ APICALL(header_field_set)
 		val[buffer.size()] = 0;
 
 		/* Apply it at the given index */
-		http_SetHeaderFixed(hp, index, val, buffer.size());
+		http_SetH(hp, index, val);
 		return buffer.size();
 	}
 	return -1;

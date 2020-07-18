@@ -16,7 +16,8 @@ sub vcl_init {
 }
 
 sub vcl_recv {
-	ypizza.call("on_client_request");
+	//ypizza.call("on_client_request");
+	ypizza.call_index(0);
 
 	if (riscv.want_result() == "synth") {
 		return (synth(riscv.want_status()));
@@ -27,6 +28,7 @@ sub vcl_recv {
 
 sub vcl_synth {
 	if (riscv.machine_present()) {
-		riscv.call("on_synth");
+		//riscv.call("on_synth");
+		riscv.call_index(1);
 	}
 }
