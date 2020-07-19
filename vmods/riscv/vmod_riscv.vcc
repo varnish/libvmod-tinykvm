@@ -3,24 +3,51 @@ $Module riscv 3 "RISC-V Sandbox For VCL"
 DESCRIPTION
 ===========
 
-vmod_riscv allows executing 32-bit RISC-V binaries and returns their output.
+vmod_riscv allows creating ultra-low overhead virtual machines
+per request directly from VCL, that runs 32-bit RISC-V machine code.
+Each machine lives in complete separation and cannot affect any other.
+Machines communicate with Varnish using a system call API that covers
+all the basic tasks that tenants want to perform.
+Any programming language that is able to produce RISC-V machine code can
+be used on top of this, which allows using modern programming concepts,
+with complete language runtime-environments.
+
+Due to the low overhead nature of the machines, the API may be somewhat
+unique, however it's intended to be used by CDNs who know what they are doing.
+
+Example:
+	sub vcl_init {
+		/* These functions will be callable on every machine */
+		riscv.add_known_function("on_client_request");
+		riscv.add_known_function("on_synth");
+
+		/* Create some machines */
+		new ypizza = riscv.machine(
+			name = "ypizza.com",
+			filename = "/path/to/binary");
+		/* This specific machine has one more function we can call */
+		ypizza.add_known_function("test");
+	}
+
+	sub vcl_recv {
+		/* We can call functions directly by name */
+		ypizza.call("on_client_request");
+		/* But also by order of being added */
+		ypizza.call_index(0);
+
+		/* We can query what the machine wants to happen */
+		if (riscv.want_result() == "synth") {
+			/* And then do it for them */
+			return (synth(riscv.want_status()));
+		}
+
+		/* If we don't like it, we can do our own thing */
+		return (synth(403, "Verboten"));
+	}
+
 
 API
 ===
-
-$Function STRING exec(HTTP req, INT max_instructions, BLOB elf)
-
-Execute the given ELF binary, running its main function to completion or runs out of instructions limited by max_instructions. This will also initialize the machine, and may call destructors before exiting.
-
-- All measurements are stored in several HTTP header fields
-- Errors are stored in a X-Exception header field.
-- If an error occurs the return value is null (empty).
-- On success the machine output is returned.
-
-$Object backend(INT max_instructions = 2000000, STRANDS arguments = 0)
-
-$Method BACKEND .from_body()
-
 
 $Object machine(STRING name, STRING filename, INT max_instructions = 2000000, STRANDS arguments = 0)
 
@@ -87,3 +114,24 @@ $Function INT     want_status()
 
 - Returns the status code that the guest wants to use, if relevant.
 
+
+SIMPLE EXECUTION
+================
+
+These functions allows for simple execution of RISC-V machine code.
+The backend variant will take body bytes and try to execute it, then return
+the output from the machine in the response. Both functions set quite a few
+headers which all give information on how the execution went.
+
+$Function STRING exec(HTTP req, INT max_instructions, BLOB elf)
+
+Execute the given ELF binary, running its main function to completion or runs out of instructions limited by max_instructions. This will also initialize the machine, and may call destructors before exiting.
+
+- All measurements are stored in several HTTP header fields
+- Errors are stored in a X-Exception header field.
+- If an error occurs the return value is null (empty).
+- On success the machine output is returned.
+
+$Object backend(INT max_instructions = 2000000, STRANDS arguments = 0)
+
+$Method BACKEND .from_body()
