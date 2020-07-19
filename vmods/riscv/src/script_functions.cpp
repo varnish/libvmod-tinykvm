@@ -42,14 +42,14 @@ inline void foreach(http* hp, riscv::Function<void(http*, txt&, size_t)> cb)
 }
 
 inline bool is_valid_index(const http* hp, unsigned idx) {
-	return idx >= 1 && idx < hp->field_count;
+	return idx < hp->field_count;
 }
 
 inline http*
 get_http(VRT_CTX, int where)
 {
 	auto* hp = VRT_selecthttp(ctx, (gethdr_e) where);
-	if (hp == nullptr)
+	if (UNLIKELY(hp == nullptr))
 		throw std::runtime_error("Selected HTTP not available at this time");
 
 	return hp;
@@ -71,6 +71,28 @@ inline uint32_t field_length(const txt& field)
 	return field.end - field.begin;
 }
 
+inline size_t push_field(const http* hp, int where, unsigned index,
+	machine_t& machine, gaddr_t fdata)
+{
+	if (UNLIKELY(!is_valid_index(hp, index)))
+		throw std::out_of_range("Header field index not in bounds");
+	auto& field = hp->field_array[index];
+	if (UNLIKELY(field.begin == nullptr))
+		return -1;
+	const uint32_t len = field_length(field);
+
+	/* Allocate the string on the guests heap, and copy it over */
+	const gaddr_t sdata = get_script(machine).guest_alloc(len);
+	if (UNLIKELY(sdata == 0))
+		return -1;
+	machine.copy_to_guest(sdata, field.begin, len+1);
+
+	/* Copy over directly into fdata */
+	const guest_header_field hf {where, index, sdata, sdata + len, false};
+	machine.copy_to_guest(fdata, &hf, sizeof(hf));
+	return len;
+}
+
 /**
  *  These are all system call handlers, which get called by the guest,
  *  and so they have to maintain the integrity of Varnish by checking
@@ -88,15 +110,17 @@ APICALL(assertion_failed)
 {
 	auto [expr, file, line, func] =
 		machine.sysargs<std::string, std::string, int, std::string> ();
+	/* TODO: Use VSLb here */
 	fprintf(stderr, ">>> assertion failed: %s in %s:%d, function %s\n",
 		expr.c_str(), file.c_str(), line, func.c_str());
 	machine.stop();
-	return -1;
+	return -1; /* Maybe throw? */
 }
 APICALL(print)
 {
 	auto [buffer] = machine.sysargs<riscv::Buffer> ();
 	auto string = buffer.to_string();
+	/* TODO: Use VSLb here */
 	printf(">>> Program says: %.*s", (int) string.size(), string.c_str());
 	return string.size();
 }
@@ -111,8 +135,12 @@ APICALL(shm_log)
 		VSLb(ctx->vsl, SLT_VCL_Log, "%.*s", (int) len, data);
 		return 0;
 	}
-	//VSLb(ctx->vsl, SLT_VCL_Log, "%.*s", (int) string.size(), string.c_str());
-	return -1;
+	/* Fallback (with potential slow-path) */
+	script.machine().memory.memview(string, len,
+		[ctx] (const uint8_t* data, size_t len) {
+			VSLb(ctx->vsl, SLT_VCL_Log, "%.*s", (int) len, data);
+		});
+	return 0;
 }
 
 APICALL(my_name)
@@ -122,7 +150,7 @@ APICALL(my_name)
 	/* Put pointer, length in registers A0, A1 */
 	const size_t len = __builtin_strlen(script.name());
 	machine.cpu.reg(11) = len;
-	return shm.push(script.name(), len);
+	return shm.push(script.name(), len+1); /* Zero-terminated */
 }
 APICALL(set_decision)
 {
@@ -136,9 +164,7 @@ APICALL(foreach_header_field)
 	auto [where, func, data] = machine.sysargs<int, gaddr_t, gaddr_t> ();
 
 	const auto* ctx = get_ctx(machine);
-	auto* hp = VRT_selecthttp(ctx, (gethdr_e) where);
-	if (hp == nullptr)
-		throw std::runtime_error("Selected HTTP not available at this time");
+	auto* hp = get_http(ctx, (gethdr_e) where);
 
 	auto& script = get_script(machine);
 	/* Push the field struct as well as the string on hidden stack */
@@ -194,14 +220,18 @@ APICALL(foreach_header_field)
 	return acount;
 }
 
-APICALL(http_find)
+APICALL(http_field_by_name)
 {
-	const auto [where, buffer] = machine.sysargs<int, riscv::Buffer> ();
+	const auto [where, fieldname, fdata]
+		= machine.sysargs<int, std::string, gaddr_t> ();
 	auto* ctx = get_ctx(machine);
 	auto* hp = get_http(ctx, (gethdr_e) where);
 
-	
-	return -1;
+	/* Find the header field */
+	const unsigned index
+		= http_findhdr(hp, fieldname.size(), fieldname.c_str());
+
+	return push_field(hp, where, index, machine, fdata);
 }
 
 APICALL(http_set_status)
@@ -248,24 +278,12 @@ APICALL(http_unset_re)
 
 APICALL(header_field_get)
 {
-	auto [where, index, fdata]
+	const auto [where, index, fdata]
 		= machine.sysargs<int, uint32_t, gaddr_t> ();
 
-	auto [hp, field] = get_field(get_ctx(machine), where, index);
-	const uint32_t len = field_length(field);
-	if (field.begin == nullptr)
-		return -1;
+	const auto* hp = get_http(get_ctx(machine), (gethdr_e) where);
 
-	/* Allocate the string on the guests heap, and copy it over */
-	auto sdata = get_script(machine).guest_alloc(len);
-	if (sdata == 0)
-		return -1;
-	machine.copy_to_guest(sdata, field.begin, len+1);
-
-	/* Copy over the new header field */
-	const guest_header_field hf {where, index, sdata, sdata + len, false};
-	machine.copy_to_guest(fdata, &hf, sizeof(hf));
-	return len;
+	return push_field(hp, where, index, machine, (uint32_t) fdata);
 }
 
 APICALL(header_field_append)
@@ -296,9 +314,7 @@ APICALL(header_field_set)
 		= machine.sysargs<int, int, riscv::Buffer> ();
 
 	const auto* ctx = get_ctx(machine);
-	auto* hp = VRT_selecthttp(ctx, (gethdr_e) where);
-	if (hp == nullptr)
-		throw std::runtime_error("Selected HTTP not available at this time");
+	auto* hp = get_http(ctx, (gethdr_e) where);
 
 	if (is_valid_index(hp, index))
 	{
@@ -314,7 +330,8 @@ APICALL(header_field_set)
 		http_SetH(hp, index, val);
 		return buffer.size();
 	}
-	return -1;
+	/* This will halt execution */
+	throw std::out_of_range("Header field index not in bounds");
 }
 
 APICALL(header_field_unset)
@@ -322,16 +339,14 @@ APICALL(header_field_unset)
 	auto [where, index] = machine.sysargs<int, int> ();
 
 	const auto* ctx = get_ctx(machine);
-	auto* hp = VRT_selecthttp(ctx, (gethdr_e) where);
-	if (hp == nullptr)
-		throw std::runtime_error("Selected HTTP not available at this time");
+	auto* hp = get_http(ctx, (gethdr_e) where);
 
 	if (is_valid_index(hp, index))
 	{
 		http_UnsetIdx(hp, index);
 		return 0;
 	}
-	return -1;
+	throw std::out_of_range("Header field index not in bounds");
 }
 
 APICALL(regex_compile)
@@ -420,6 +435,6 @@ void Script::setup_syscall_interface(machine_t& machine)
 
 		{ECALL_HTTP_SET_STATUS, http_set_status},
 		{ECALL_HTTP_UNSET_RE,   http_unset_re},
-		{ECALL_HTTP_FIND,       http_find},
+		{ECALL_HTTP_FIND,       http_field_by_name},
 	});
 }
