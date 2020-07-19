@@ -241,7 +241,7 @@ const char* riscv_current_name(VRT_CTX)
 {
 	auto* script = get_machine(ctx);
 	if (script)
-		return script->name().c_str();
+		return script->name();
 	return nullptr;
 }
 extern "C"

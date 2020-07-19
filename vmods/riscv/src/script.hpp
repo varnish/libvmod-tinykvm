@@ -73,7 +73,7 @@ private:
 	riscv::Machine<riscv::RISCV32> m_machine;
 	const vrt_ctx* m_ctx;
 	const struct vmod_riscv_machine* m_vrm = nullptr;
-	std::string m_name;
+	const char* m_name;
 	uint64_t    m_max_instructions = 0;
 	uint64_t    m_max_heap = 0;
 	uint64_t    m_max_memory = 0;
@@ -88,7 +88,7 @@ private:
 		bool        non_owned = false;
 	};
 	eastl::fixed_vector<RegexCache, 16> m_regex_cache;
-	std::string m_want_result = "";
+	std::string m_want_result;
 	int         m_want_status = 403;
 };
 

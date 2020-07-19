@@ -7,6 +7,7 @@ extern "C" {
 	void http_SetH(struct http *to, unsigned n, const char *fm);
 	void http_SetHeaderFixed(struct http *to, unsigned n, const char *, size_t);
 	void http_UnsetIdx(struct http *hp, unsigned idx);
+	unsigned http_findhdr(const struct http *hp, unsigned l, const char *hdr);
 	struct txt {
 		const char* begin;
 		const char* end;
@@ -119,8 +120,9 @@ APICALL(my_name)
 	auto& script = get_script(machine);
 	SharedMemoryArea shm {script};
 	/* Put pointer, length in registers A0, A1 */
-	machine.cpu.reg(11) = script.name().size();
-	return shm.push(script.name());
+	const size_t len = __builtin_strlen(script.name());
+	machine.cpu.reg(11) = len;
+	return shm.push(script.name(), len);
 }
 APICALL(set_decision)
 {
@@ -194,8 +196,11 @@ APICALL(foreach_header_field)
 
 APICALL(http_find)
 {
-	const auto [where, buffer] = machine.sysargs<int, int> ();
+	const auto [where, buffer] = machine.sysargs<int, riscv::Buffer> ();
+	auto* ctx = get_ctx(machine);
+	auto* hp = get_http(ctx, (gethdr_e) where);
 
+	
 	return -1;
 }
 
@@ -239,15 +244,6 @@ APICALL(http_unset_re)
 		}
 	}
 	return mcount;
-}
-
-APICALL(header_field_get_length)
-{
-	const auto [where, index]
-		= machine.sysargs<int, int> ();
-	const auto [hp, field] = get_field(get_ctx(machine), where, index);
-
-	return field_length(field);
 }
 
 APICALL(header_field_get)
@@ -417,7 +413,6 @@ void Script::setup_syscall_interface(machine_t& machine)
 		{ECALL_REGEX_FREE,    regex_delete},
 
 		{ECALL_FOREACH_FIELD, foreach_header_field},
-		{ECALL_FIELD_GET_L,   header_field_get_length},
 		{ECALL_FIELD_GET,     header_field_get},
 		{ECALL_FIELD_APPEND,  header_field_append},
 		{ECALL_FIELD_SET,     header_field_set},
@@ -425,5 +420,6 @@ void Script::setup_syscall_interface(machine_t& machine)
 
 		{ECALL_HTTP_SET_STATUS, http_set_status},
 		{ECALL_HTTP_UNSET_RE,   http_unset_re},
+		{ECALL_HTTP_FIND,       http_find},
 	});
 }
