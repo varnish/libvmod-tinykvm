@@ -27,9 +27,15 @@ vmod_riscv_machine* riscv_create(const char* name,
 	if (UNLIKELY(vrm == nullptr))
 		VRT_fail(ctx, "Out of workspace");
 
-	new (vrm) vmod_riscv_machine(name, load_file(file), ctx,
-		/* Max instr: */ insn, MAX_MEMORY, MAX_HEAP);
-	return vrm;
+	try {
+		new (vrm) vmod_riscv_machine(name, load_file(file), ctx,
+			/* Max instr: */ insn, MAX_MEMORY, MAX_HEAP);
+		return vrm;
+	} catch (const std::exception& e) {
+		VRT_fail(ctx, "Exception when creating machine '%s': %s",
+			name, e.what());
+		return nullptr;
+	}
 }
 
 extern "C"
@@ -60,7 +66,7 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, uint32_t addr)
 			new (script) Script{vrm->script, ctx, vrm};
 
 		} catch (std::exception& e) {
-			VSLb(ctx->vsl, SLT_Error,
+			VRT_fail(ctx,
 				"VM '%s' exception: %s", script->name(), e.what());
 			return -1;
 		}
@@ -93,6 +99,7 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, uint32_t addr)
 	TIMING_LOCATION(t3);
 	printf("Time spent in forkcall(): %ld ns\n", nanodiff(t2, t3));
 #endif
+	//printf("Machine pages: %zu\n", script->machine().memory.pages_total());
 	return ret;
 }
 

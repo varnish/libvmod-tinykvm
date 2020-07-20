@@ -16,9 +16,6 @@ public:
 
 	// call any script function, with any parameters
 	template <typename... Args>
-	inline long call(const char* name, Args&&...);
-
-	template <typename... Args>
 	inline long call(uint32_t addr, Args&&...);
 
 	template <typename... Args>
@@ -55,7 +52,6 @@ public:
 
 	void print_backtrace(const uint32_t addr);
 
-	bool crashed() const noexcept { return m_crashed; }
 	bool reset(); // true if the reset was successful
 
 	Script(const std::vector<uint8_t>&, const vrt_ctx*, const vmod_riscv_machine*);
@@ -74,10 +70,10 @@ private:
 	riscv::Machine<riscv::RISCV32> m_machine;
 	const vrt_ctx* m_ctx;
 	const struct vmod_riscv_machine* m_vrm = nullptr;
-	bool        m_crashed = false;
-	int         m_budget_overruns = 0;
 	void*       m_arena = nullptr;
 	uint32_t    m_shm_address = RO_AREA_END; /* It's a stack */
+	int         m_want_status = 403;
+	std::string m_want_result;
 
 	struct RegexCache {
 		struct vre* re   = nullptr;
@@ -85,8 +81,6 @@ private:
 		bool        non_owned = false;
 	};
 	eastl::fixed_vector<RegexCache, 16> m_regex_cache;
-	std::string m_want_result;
-	int         m_want_status = 403;
 };
 
 template <typename... Args>
@@ -109,16 +103,6 @@ inline long Script::call(uint32_t address, Args&&... args)
 		this->handle_exception(address);
 	}
 	return -1;
-}
-template <typename... Args>
-inline long Script::call(const char* func, Args&&... args)
-{
-	const auto address = machine().address_of(func);
-	if (UNLIKELY(address == 0)) {
-		fprintf(stderr, "Script::call could not find: %s!\n", func);
-		return -1;
-	}
-	return call(address, std::forward<Args>(args)...);
 }
 
 template <typename... Args>

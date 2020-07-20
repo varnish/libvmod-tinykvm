@@ -1,12 +1,12 @@
 #include "script.hpp"
 
-#include "crc32.hpp"
 #include <include/syscall_helpers.hpp>
 #include "machine/include_api.hpp"
 #include "sandbox.hpp"
 #include "varnish.hpp"
 
 static const bool TRUSTED_CALLS = true;
+static constexpr bool VERBOSE_ERRORS = true;
 static constexpr int HEAP_PAGENO   = 0x40000000 >> riscv::Page::SHIFT;
 static constexpr int STACK_PAGENO  = HEAP_PAGENO - 1;
 
@@ -169,30 +169,36 @@ void Script::handle_exception(uint32_t address)
 		throw;
 	}
 	catch (const riscv::MachineException& e) {
+		if constexpr (VERBOSE_ERRORS) {
 		fprintf(stderr, "Script exception: %s (data: %#x)\n", e.what(), e.data());
 		fprintf(stderr, ">>> Machine registers:\n[PC\t%08X] %s\n",
 			machine().cpu.pc(),
 			machine().cpu.registers().to_string().c_str());
+		}
 	}
 	catch (const std::exception& e) {
-		fprintf(stderr, "Script exception: %s\n", e.what());
+		if constexpr (VERBOSE_ERRORS) {
+			fprintf(stderr, "Script exception: %s\n", e.what());
+		}
+		VRT_fail(m_ctx, "Script exception: %s", e.what());
 	}
-	printf("Program page: %s\n", machine().memory.get_page_info(machine().cpu.pc()).c_str());
-	printf("Stack page: %s\n", machine().memory.get_page_info(machine().cpu.reg(2)).c_str());
+	if constexpr (VERBOSE_ERRORS) {
+		printf("Program page: %s\n", machine().memory.get_page_info(machine().cpu.pc()).c_str());
+		printf("Stack page: %s\n", machine().memory.get_page_info(machine().cpu.reg(2)).c_str());
 
-	auto callsite = machine().memory.lookup(address);
-	fprintf(stderr, "Function call: %s\n", callsite.name.c_str());
-	this->print_backtrace(address);
-	this->m_crashed = true;
+		auto callsite = machine().memory.lookup(address);
+		fprintf(stderr, "Function call: %s\n", callsite.name.c_str());
+		this->print_backtrace(address);
+	}
 }
 void Script::handle_timeout(uint32_t address)
 {
-	this->m_budget_overruns ++;
-	auto callsite = machine().memory.lookup(address);
-	fprintf(stderr, "Script hit max instructions for: %s"
-		" (Overruns: %d)\n", callsite.name.c_str(), m_budget_overruns);
-	/* Maybe not always true, but ... */
-	this->m_crashed = true;
+	if constexpr (VERBOSE_ERRORS) {
+		auto callsite = machine().memory.lookup(address);
+		fprintf(stderr, "Script hit max instructions for: %s\n",
+			callsite.name.c_str());
+	}
+	VRT_fail(m_ctx, "Script for '%s' timed out", name());
 }
 void Script::print_backtrace(const uint32_t addr)
 {

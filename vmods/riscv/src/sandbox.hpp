@@ -17,8 +17,6 @@ struct vmod_riscv_machine {
 			const auto callsite = script.callsite(addr);
 			sym_vector.push_back({func, addr, callsite.size});
 		}
-		printf("Machine source size: %zu\n", sizeof(*this));
-		printf("Machine forked size: %zu\n", sizeof(Script));
 	}
 
 	inline uint32_t lookup(const char* name) const {
