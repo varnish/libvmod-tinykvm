@@ -19,7 +19,6 @@ sub vcl_init {
 }
 
 sub vcl_recv {
-	//ypizza.call("on_client_request");
 	ypizza.call_index(0);  /* on_client_request */
 
 	if (riscv.want_result() == "synth") {
@@ -30,12 +29,13 @@ sub vcl_recv {
 }
 
 sub vcl_hash {
-	riscv.call_index(1); /* on_hash */
+	if (riscv.machine_present()) {
+		riscv.call_index(1); /* on_hash */
+	}
 }
 
 sub vcl_synth {
 	if (riscv.machine_present()) {
-		//riscv.call("on_synth");
 		riscv.call_index(2); /* on_synth */
 	}
 }

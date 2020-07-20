@@ -5,6 +5,7 @@
 #include <EASTL/fixed_vector.h>
 #include "memarea.hpp"
 struct vrt_ctx;
+struct vmod_riscv_machine;
 
 class Script {
 public:
@@ -29,7 +30,8 @@ public:
 	const auto* ctx() const noexcept { return m_ctx; }
 	const auto* vrm() const noexcept { return m_vrm; }
 
-	const auto& name() const noexcept { return m_name; }
+	uint64_t max_instructions() const noexcept;
+	const char* name() const noexcept;
 	auto* want_result() const noexcept { return m_want_result.c_str(); }
 	int want_status() const noexcept { return m_want_status; }
 	void set_result(const std::string& res, int status) {
@@ -56,10 +58,8 @@ public:
 	bool crashed() const noexcept { return m_crashed; }
 	bool reset(); // true if the reset was successful
 
-	Script(const std::vector<uint8_t>&,
-		const vrt_ctx*, const char* name,
-		uint64_t insn, uint64_t mem, uint64_t heap);
-	Script(const Script& source, const vrt_ctx*, struct vmod_riscv_machine*);
+	Script(const std::vector<uint8_t>&, const vrt_ctx*, const vmod_riscv_machine*);
+	Script(const Script& source, const vrt_ctx*, const vmod_riscv_machine*);
 	~Script();
 
 private:
@@ -74,10 +74,6 @@ private:
 	riscv::Machine<riscv::RISCV32> m_machine;
 	const vrt_ctx* m_ctx;
 	const struct vmod_riscv_machine* m_vrm = nullptr;
-	const char* m_name;
-	uint64_t    m_max_instructions = 0;
-	uint64_t    m_max_heap = 0;
-	uint64_t    m_max_memory = 0;
 	bool        m_crashed = false;
 	int         m_budget_overruns = 0;
 	void*       m_arena = nullptr;
@@ -102,7 +98,7 @@ inline long Script::call(uint32_t address, Args&&... args)
 		// setup calling convention
 		machine().setup_call(address, std::forward<Args>(args)...);
 		// execute function
-		machine().simulate<true>(m_max_instructions);
+		machine().simulate<true>(max_instructions());
 		// address-sized integer return value
 		return machine().cpu.reg(riscv::RISCV::REG_ARG0);
 	}

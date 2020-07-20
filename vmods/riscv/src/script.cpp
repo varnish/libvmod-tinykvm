@@ -3,6 +3,7 @@
 #include "crc32.hpp"
 #include <include/syscall_helpers.hpp>
 #include "machine/include_api.hpp"
+#include "sandbox.hpp"
 #include "varnish.hpp"
 
 static const bool TRUSTED_CALLS = true;
@@ -11,16 +12,12 @@ static constexpr int STACK_PAGENO  = HEAP_PAGENO - 1;
 
 
 Script::Script(
-	const Script& source, const vrt_ctx* ctx, struct vmod_riscv_machine* vrm)
+	const Script& source, const vrt_ctx* ctx, const vmod_riscv_machine* vrm)
 	: m_machine(source.machine().memory.binary(), {
-		.memory_max = source.m_max_memory,
+		.memory_max = vrm->max_memory,
 		.owning_machine = &source.machine()
 	  }),
-	  m_ctx(ctx), m_vrm(vrm),
-	  m_name(source.m_name),
-	  m_max_instructions(source.m_max_instructions),
-	  m_max_heap(source.m_max_heap),
-	  m_max_memory(source.m_max_memory)
+	  m_ctx(ctx), m_vrm(vrm)
 {
 	/* No initialization */
 	this->machine_setup(machine(), false);
@@ -36,10 +33,9 @@ Script::Script(
 
 Script::Script(
 	const std::vector<uint8_t>& binary,
-	const vrt_ctx* ctx, const char* name,
-	uint64_t insn, uint64_t mem, uint64_t heap)
-	: m_machine(binary, { .memory_max = mem }), m_ctx(ctx), m_name(name),
-	  m_max_instructions(insn), m_max_heap(heap), m_max_memory(mem)
+	const vrt_ctx* ctx, const vmod_riscv_machine* vrm)
+	: m_machine(binary, { .memory_max = vrm->max_memory }),
+	  m_ctx(ctx), m_vrm(vrm)
 {
 	this->machine_initialize(true);
 }
@@ -76,9 +72,9 @@ bool Script::machine_initialize(bool init)
 	// run through the initialization
 	if (init) {
 		try {
-			machine().simulate(m_max_instructions);
+			machine().simulate(max_instructions());
 
-			if (UNLIKELY(machine().cpu.instruction_counter() >= m_max_instructions)) {
+			if (UNLIKELY(machine().cpu.instruction_counter() >= max_instructions())) {
 				printf(">>> Exception: Ran out of instructions\n");
 				return false;
 			}
@@ -157,7 +153,7 @@ void Script::machine_setup(riscv::Machine<riscv::RISCV32>& machine, bool init)
 	}
 
 	// add system call interface
-	this->m_arena = setup_native_heap_syscalls<4>(machine, m_max_heap);
+	this->m_arena = setup_native_heap_syscalls<4>(machine, vrm()->max_heap);
 	setup_native_memory_syscalls<4>(machine, TRUSTED_CALLS);
     setup_syscall_interface(machine);
 
@@ -207,6 +203,15 @@ void Script::print_backtrace(const uint32_t addr)
 	auto origin = machine().memory.lookup(addr);
 	printf("-> [-] 0x%08x + 0x%.3x: %s\n",
 			origin.address, origin.offset, origin.name.c_str());
+}
+
+uint64_t Script::max_instructions() const noexcept
+{
+	return vrm()->max_instructions;
+}
+const char* Script::name() const noexcept
+{
+	return vrm()->name;
 }
 
 uint32_t Script::guest_alloc(size_t len)

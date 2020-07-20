@@ -1,5 +1,5 @@
 #pragma once
-#define SYSCALL_BASE 100
+#define SYSCALL_BASE 10
 
 enum
 {

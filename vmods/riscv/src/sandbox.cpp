@@ -1,54 +1,15 @@
-#include "script.hpp"
+#include "sandbox.hpp"
 #include "varnish.hpp"
 
 inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
 static std::vector<uint8_t> load_file(const std::string& filename);
 // functions used by all machines created during init, afterwards
-static std::vector<const char*> lookup_wishlist;
+std::vector<const char*> riscv_lookup_wishlist;
 static const size_t TOO_SMALL = 8;
+static const uint64_t MAX_MEMORY = 800 * 1024;
+static const uint64_t MAX_HEAP   = 640 * 1024;
 
-struct vmod_riscv_machine {
-	vmod_riscv_machine(const char* name, std::vector<uint8_t> elf,
-		VRT_CTX, uint64_t insn, uint64_t mem, uint64_t heap)
-		: binary{std::move(elf)}, script{binary, ctx, name, insn, mem, heap}
-	{
-		for (const auto* func : lookup_wishlist) {
-			/* NOTE: We can't check if addr is 0 here, because
-			   the wishlist applies to ALL machines. */
-			const auto addr = lookup(func);
-			sym_lookup.emplace(strdup(func), addr);
-			const auto callsite = script.callsite(addr);
-			sym_vector.push_back({func, addr, callsite.size});
-		}
-	}
-
-	inline uint32_t lookup(const char* name) const {
-		const auto& it = sym_lookup.find(name);
-		if (it != sym_lookup.end()) return it->second;
-		// fallback
-		return script.resolve_address(name);
-	}
-	inline auto callsite(const char* name) {
-		auto addr = lookup(name);
-		return script.callsite(addr);
-	}
-
-	const uint64_t magic = 0xb385716f486938e6;
-	const std::vector<uint8_t> binary;
-	Script   script;
-	/* Lookup tree for ELF symbol names */
-	eastl::string_map<uint32_t,
-			eastl::str_less<const char*>,
-			eastl::allocator_malloc> sym_lookup;
-	/* Index vector for ELF symbol names, used by call_index(..) */
-	struct Lookup {
-		const char* func;
-		uint32_t    addr;
-		size_t      size;
-	};
-	std::vector<Lookup> sym_vector;
-};
 #define SCRIPT_MAGIC 0x83e59fa5
 
 //#define ENABLE_TIMING
@@ -67,7 +28,7 @@ vmod_riscv_machine* riscv_create(const char* name,
 		VRT_fail(ctx, "Out of workspace");
 
 	new (vrm) vmod_riscv_machine(name, load_file(file), ctx,
-		/* Max instr: */ insn, /* Mem: */ 8*1024*1024, /* Heap: */ 6*1024*1024);
+		/* Max instr: */ insn, MAX_MEMORY, MAX_HEAP);
 	return vrm;
 }
 
@@ -99,7 +60,8 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, uint32_t addr)
 			new (script) Script{vrm->script, ctx, vrm};
 
 		} catch (std::exception& e) {
-			printf(">>> Exception: %s\n", e.what());
+			VSLb(ctx->vsl, SLT_Error,
+				"VM '%s' exception: %s", script->name(), e.what());
 			return -1;
 		}
 	#ifdef ENABLE_TIMING
@@ -139,16 +101,11 @@ int riscv_forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 {
 	const auto addr = vrm->lookup(func);
 	if (UNLIKELY(addr == 0)) {
-		VRT_fail(ctx, "VM call failed (no such function: '%s')", func);
+		VSLb(ctx->vsl, SLT_Error,
+			"VM call '%s' failed: The function is missing", func);
 		return -1;
 	}
-	int ret = forkcall(ctx, vrm, addr);
-	if (UNLIKELY(ret < 0)) {
-		VSLb(ctx->vsl, SLT_Error, "VM call '%s' failed. Return value: %d",
-			func, ret);
-		VRT_fail(ctx, "VM call failed (negative result: %d)", ret);
-	}
-	return ret;
+	return forkcall(ctx, vrm, addr);
 }
 extern "C"
 int riscv_forkcall_idx(VRT_CTX, vmod_riscv_machine* vrm, int index)
@@ -157,8 +114,8 @@ int riscv_forkcall_idx(VRT_CTX, vmod_riscv_machine* vrm, int index)
 	{
 		auto& entry = vrm->sym_vector[index];
 		if (UNLIKELY(entry.addr == 0)) {
-			VRT_fail(ctx, "VM call failed (function '%s' at index %d not available)",
-				entry.func, index);
+			VSLb(ctx->vsl, SLT_Error,
+				"VM call '%s' failed: The function is missing", entry.func);
 			return -1;
 		}
 		if (UNLIKELY(entry.size <= TOO_SMALL)) {
@@ -168,13 +125,7 @@ int riscv_forkcall_idx(VRT_CTX, vmod_riscv_machine* vrm, int index)
 			return 0;
 		}
 
-		int ret = forkcall(ctx, vrm, entry.addr);
-		if (UNLIKELY(ret < 0)) {
-			VSLb(ctx->vsl, SLT_Error,
-				"VM call '%s' failed. Return value: %d", entry.func, ret);
-			VRT_fail(ctx, "VM call failed (negative result)");
-		}
-		return ret;
+		return forkcall(ctx, vrm, entry.addr);
 	}
 	VRT_fail(ctx, "VM call failed (invalid call index given: %d)", index);
 	return -1;
@@ -191,7 +142,7 @@ extern "C"
 void riscv_add_known(VRT_CTX, const char* func)
 {
 	(void) ctx;
-	lookup_wishlist.push_back(func);
+	riscv_lookup_wishlist.push_back(func);
 }
 
 inline Script* get_machine(VRT_CTX)
@@ -212,7 +163,8 @@ int riscv_current_call(VRT_CTX, const char* func)
 	#endif
 		const auto addr = script->vrm()->lookup(func);
 		if (UNLIKELY(addr == 0)) {
-			VRT_fail(ctx, "VM call failed (no such function: '%s')", func);
+			VSLb(ctx->vsl, SLT_Error,
+				"VM call '%s' failed: The function is missing", func);
 			return -1;
 		}
 		int ret = script->call(addr);
@@ -233,7 +185,8 @@ int riscv_current_call_idx(VRT_CTX, int index)
 		{
 			auto& entry = script->vrm()->sym_vector[index];
 			if (UNLIKELY(entry.addr == 0)) {
-				VRT_fail(ctx, "VM call failed (function '%s' at index %d not available)",
+				VSLb(ctx->vsl, SLT_Error,
+					"VM call '%s' failed: The function at index %d is not availble",
 					entry.func, index);
 				return -1;
 			}
@@ -256,7 +209,7 @@ int riscv_current_call_idx(VRT_CTX, int index)
 		VRT_fail(ctx, "VM call failed (invalid index given: %d)", index);
 		return -1;
 	}
-	VRT_fail(ctx, "VM call failed (no running machine)");
+	VRT_fail(ctx, "current_call_idx() failed (no running machine)");
 	return -1;
 }
 
