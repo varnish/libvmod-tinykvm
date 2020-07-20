@@ -6,6 +6,7 @@ inline long nanodiff(timespec start_time, timespec end_time);
 static std::vector<uint8_t> load_file(const std::string& filename);
 // functions used by all machines created during init, afterwards
 static std::vector<const char*> lookup_wishlist;
+static const size_t TOO_SMALL = 8;
 
 struct vmod_riscv_machine {
 	vmod_riscv_machine(const char* name, std::vector<uint8_t> elf,
@@ -17,7 +18,8 @@ struct vmod_riscv_machine {
 			   the wishlist applies to ALL machines. */
 			const auto addr = lookup(func);
 			sym_lookup.emplace(strdup(func), addr);
-			sym_vector.push_back({func, addr});
+			const auto callsite = script.callsite(addr);
+			sym_vector.push_back({func, addr, callsite.size});
 		}
 	}
 
@@ -26,6 +28,10 @@ struct vmod_riscv_machine {
 		if (it != sym_lookup.end()) return it->second;
 		// fallback
 		return script.resolve_address(name);
+	}
+	inline auto callsite(const char* name) {
+		auto addr = lookup(name);
+		return script.callsite(addr);
 	}
 
 	const uint64_t magic = 0xb385716f486938e6;
@@ -36,7 +42,12 @@ struct vmod_riscv_machine {
 			eastl::str_less<const char*>,
 			eastl::allocator_malloc> sym_lookup;
 	/* Index vector for ELF symbol names, used by call_index(..) */
-	std::vector<std::pair<const char*, uint32_t>> sym_vector;
+	struct Lookup {
+		const char* func;
+		uint32_t    addr;
+		size_t      size;
+	};
+	std::vector<Lookup> sym_vector;
 };
 #define SCRIPT_MAGIC 0x83e59fa5
 
@@ -64,9 +75,9 @@ extern "C"
 void riscv_prewarm(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 {
 	(void) ctx;
-	const auto addr = vrm->lookup(func);
-	vrm->sym_lookup.emplace(strdup(func), addr);
-	vrm->sym_vector.push_back({func, addr});
+	const auto site = vrm->callsite(func);
+	vrm->sym_lookup.emplace(strdup(site.name.c_str()), site.address);
+	vrm->sym_vector.push_back({site.name.c_str(), site.address, site.size});
 }
 
 inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, uint32_t addr)
@@ -145,16 +156,22 @@ int riscv_forkcall_idx(VRT_CTX, vmod_riscv_machine* vrm, int index)
 	if (index >= 0 && index < vrm->sym_vector.size())
 	{
 		auto& entry = vrm->sym_vector[index];
-		if (UNLIKELY(entry.second == 0)) {
-			VRT_fail(ctx, "VM call failed (function at index %d not available)", index);
+		if (UNLIKELY(entry.addr == 0)) {
+			VRT_fail(ctx, "VM call failed (function '%s' at index %d not available)",
+				entry.func, index);
 			return -1;
 		}
-		const char* func = entry.first;
+		if (UNLIKELY(entry.size <= TOO_SMALL)) {
+			VSLb(ctx->vsl, SLT_Debug, "VM call '%s' is being skipped.",
+				entry.func);
+			//printf("Callsite: %s -> %zu\n", entry.func, entry.size);
+			return 0;
+		}
 
-		int ret = forkcall(ctx, vrm, entry.second);
+		int ret = forkcall(ctx, vrm, entry.addr);
 		if (UNLIKELY(ret < 0)) {
 			VSLb(ctx->vsl, SLT_Error,
-				"VM call '%s' failed. Return value: %d", func, ret);
+				"VM call '%s' failed. Return value: %d", entry.func, ret);
 			VRT_fail(ctx, "VM call failed (negative result)");
 		}
 		return ret;
@@ -215,14 +232,21 @@ int riscv_current_call_idx(VRT_CTX, int index)
 		if (index >= 0 && index < script->vrm()->sym_vector.size())
 		{
 			auto& entry = script->vrm()->sym_vector[index];
-			if (UNLIKELY(entry.second == 0)) {
-				VRT_fail(ctx, "VM call failed (function at index %d not available)", index);
+			if (UNLIKELY(entry.addr == 0)) {
+				VRT_fail(ctx, "VM call failed (function '%s' at index %d not available)",
+					entry.func, index);
 				return -1;
+			}
+			if (UNLIKELY(entry.size <= TOO_SMALL)) {
+				VSLb(ctx->vsl, SLT_Debug, "VM call '%s' is being skipped.",
+					entry.func);
+				//printf("Callsite: %s -> %zu\n", entry.func, entry.size);
+				return 0;
 			}
 		#ifdef ENABLE_TIMING
 			TIMING_LOCATION(t1);
 		#endif
-			int ret = script->call(entry.second);
+			int ret = script->call(entry.addr);
 		#ifdef ENABLE_TIMING
 			TIMING_LOCATION(t2);
 			printf("Time spent in forkcall(): %ld ns\n", nanodiff(t1, t2));

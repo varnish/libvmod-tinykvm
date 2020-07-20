@@ -49,6 +49,7 @@ public:
 
 	std::string symbol_name(uint32_t address) const;
 	uint32_t resolve_address(const char* name) const;
+	auto     callsite(uint32_t addr) const { return machine().memory.lookup(addr); }
 
 	void print_backtrace(const uint32_t addr);
 
