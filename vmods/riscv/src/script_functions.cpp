@@ -26,12 +26,15 @@ extern "C" {
 		uint8_t        conds;
 	};
 }
+#define HDR_FIRST   6
+
 struct guest_header_field {
 	int where;
 	uint32_t index;
 	uint32_t begin;
 	uint32_t end;
-	bool     deleted;
+	bool     deleted = false;
+	bool     foreach = false;
 };
 
 inline void foreach(http* hp, riscv::Function<void(http*, txt&, size_t)> cb)
@@ -88,7 +91,7 @@ inline size_t push_field(const http* hp, int where, unsigned index,
 	machine.copy_to_guest(sdata, field.begin, len+1);
 
 	/* Copy over directly into fdata */
-	const guest_header_field hf {where, index, sdata, sdata + len, false};
+	const guest_header_field hf {where, index, sdata, sdata + len};
 	machine.copy_to_guest(fdata, &hf, sizeof(hf));
 	return len;
 }
@@ -120,8 +123,9 @@ APICALL(print)
 {
 	auto [buffer] = machine.sysargs<riscv::Buffer> ();
 	auto string = buffer.to_string();
-	/* TODO: Use VSLb here */
-	printf(">>> Program says: %.*s", (int) string.size(), string.c_str());
+	/* TODO: Use VSLb here or disable this completely */
+	printf(">>> %s: %.*s", get_script(machine).name(),
+		(int) string.size(), string.c_str());
 	return string.size();
 }
 APICALL(shm_log)
@@ -171,7 +175,7 @@ APICALL(foreach_header_field)
 	SharedMemoryArea shm {script};
 
 	/* Make room for worst case number of fields */
-	const size_t  pcount = hp->field_count - 6;
+	const size_t  pcount = hp->field_count - HDR_FIRST;
 	gaddr_t data_addr = shm.address() - pcount * sizeof(guest_header_field);
 	gaddr_t field_addr = data_addr;
 
@@ -181,7 +185,7 @@ APICALL(foreach_header_field)
 	int acount = 0;
 
 	/* Iterate each header field */
-	for (unsigned idx = 6; idx < hp->field_count; idx++) {
+	for (unsigned idx = HDR_FIRST; idx < hp->field_count; idx++) {
 		const auto& field = hp->field_array[idx];
 		const uint32_t len = field_length(field);
 		/* Ignore empty fields (?) */
@@ -190,7 +194,7 @@ APICALL(foreach_header_field)
 
 		const uint32_t sh_data = shm_data.push(field.begin, len + 1);
 		shm_fields.write<guest_header_field>(
-			{(gethdr_e) where, idx, sh_data, sh_data + len, false});
+			{(gethdr_e) where, idx, sh_data, sh_data + len, false, true});
 		acount ++; /* Actual */
 	}
 
@@ -233,6 +237,27 @@ APICALL(http_field_by_name)
 
 	return push_field(hp, where, index, machine, fdata);
 }
+APICALL(http_copy_from)
+{
+	const auto [where, index, dest]
+		= machine.sysargs<int, unsigned, int> ();
+	auto* ctx = get_ctx(machine);
+
+	auto [hp_from, field_from] = get_field(ctx, (gethdr_e) where, index);
+	auto* hp_dest = get_http(ctx, (gethdr_e) dest);
+
+	const size_t len = field_length(field_from);
+	/* Avoid overflowing dest */
+	if (UNLIKELY(hp_dest->field_count >= hp_dest->fields_max)) {
+		VSLb(hp_dest->vsl, SLT_LostHeader,
+			"%.*s", (int) len, field_from.begin);
+		return -1;
+	}
+
+	const int idx_dest = hp_dest->field_count++;
+	http_SetH(hp_dest, idx_dest, field_from.begin);
+	return idx_dest;
+}
 
 APICALL(http_set_status)
 {
@@ -264,7 +289,7 @@ APICALL(http_unset_re)
 
 	/* Unset header fields from the top down */
 	size_t mcount = 0;
-	for (int i = hp->field_count-1; i >= 6; i--)
+	for (int i = hp->field_count-1; i >= HDR_FIRST; i--)
 	{
 		auto& field = hp->field_array[i];
 		if ( VRE_exec(vre, field.begin, field.end - field.begin,
@@ -341,7 +366,8 @@ APICALL(header_field_unset)
 	const auto* ctx = get_ctx(machine);
 	auto* hp = get_http(ctx, (gethdr_e) where);
 
-	if (is_valid_index(hp, index))
+	/* You are not allowed to unset proto fields */
+	if (is_valid_index(hp, index) && index >= HDR_FIRST)
 	{
 		http_UnsetIdx(hp, index);
 		return 0;
@@ -436,5 +462,6 @@ void Script::setup_syscall_interface(machine_t& machine)
 		{ECALL_HTTP_SET_STATUS, http_set_status},
 		{ECALL_HTTP_UNSET_RE,   http_unset_re},
 		{ECALL_HTTP_FIND,       http_field_by_name},
+		{ECALL_HTTP_COPY,       http_copy_from},
 	});
 }

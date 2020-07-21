@@ -17,7 +17,7 @@ sub vcl_init {
 	/* Create some machines */
 	new ypizza = riscv.machine(
 		name = "ypizza.com",
-		filename = "/home/gonzo/github/rvscript/programs/test2",
+		filename = "/home/gonzo/github/rvscript/programs/test",
 		max_instructions = 1000000);
 	ypizza.add_known_function("test");
 }
