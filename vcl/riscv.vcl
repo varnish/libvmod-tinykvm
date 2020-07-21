@@ -4,6 +4,9 @@ import riscv;
 backend default none;
 
 sub vcl_init {
+	/* Initialize the VMOD with some mandatory settings */
+	riscv.init(default_filename = "/home/gonzo/github/rvscript/programs/default");
+
 	/* These functions will be callable on every machine created after */
 	riscv.add_known_function("on_client_request");
 	riscv.add_known_function("on_hash");
@@ -14,7 +17,8 @@ sub vcl_init {
 	/* Create some machines */
 	new ypizza = riscv.machine(
 		name = "ypizza.com",
-		filename = "/home/gonzo/github/rvscript/programs/test");
+		filename = "/home/gonzo/github/rvscript/programs/test2",
+		max_instructions = 1000000);
 	ypizza.add_known_function("test");
 }
 

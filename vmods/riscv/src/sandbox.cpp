@@ -4,6 +4,7 @@
 inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
 static std::vector<uint8_t> load_file(const std::string& filename);
+static std::string riscv_default_program;
 // functions used by all machines created during init, afterwards
 std::vector<const char*> riscv_lookup_wishlist;
 static const size_t TOO_SMALL = 8;
@@ -18,6 +19,21 @@ static const uint64_t MAX_HEAP   = 640 * 1024;
 	auto x = time_now();  \
 	asm("" ::: "memory");
 
+extern "C"
+void riscv_set_default(const char* filename)
+{
+	riscv_default_program = filename;
+}
+
+static std::vector<uint8_t> file_loader(const char* file)
+{
+	try {
+		return load_file(file);
+	} catch (const std::exception& e) {
+		fprintf(stderr, "Exception: %s. Using default program.\n", e.what());
+		return load_file(riscv_default_program.c_str());
+	}
+}
 
 extern "C"
 vmod_riscv_machine* riscv_create(const char* name,
@@ -28,7 +44,7 @@ vmod_riscv_machine* riscv_create(const char* name,
 		VRT_fail(ctx, "Out of workspace");
 
 	try {
-		new (vrm) vmod_riscv_machine(name, load_file(file), ctx,
+		new (vrm) vmod_riscv_machine(name, file_loader(file), ctx,
 			/* Max instr: */ insn, MAX_MEMORY, MAX_HEAP);
 		return vrm;
 	} catch (const std::exception& e) {

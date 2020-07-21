@@ -17,6 +17,9 @@ unique, however it's intended to be used by CDNs who know what they are doing.
 
 Example:
 	sub vcl_init {
+		/* Initialize the VMOD with some mandatory settings */
+		riscv.init(default_filename = "/home/user/default_program");
+
 		/* These functions will be callable on every machine */
 		riscv.add_known_function("on_client_request");
 		riscv.add_known_function("on_synth");
@@ -48,6 +51,13 @@ Example:
 
 API
 ===
+
+$Function VOID init(STRING default_filename)
+
+- Set the filename for the machine to be loaded when any other machine
+  fails to load. This machine will act as a default replacement for
+  any missing or broken binaries supplied by tenants.
+
 
 $Object machine(STRING name, STRING filename, INT max_instructions = 2000000, STRANDS arguments = 0)
 

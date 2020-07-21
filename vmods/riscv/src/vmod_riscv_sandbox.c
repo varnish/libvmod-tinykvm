@@ -6,6 +6,7 @@
 #include "vcc_if.h"
 #include "vmod_util.h"
 
+extern void riscv_set_default(const char* filename);
 // Create new machine and call into it.
 extern struct vmod_riscv_machine* riscv_create(const char* name,
 	const char* file, VRT_CTX, uint64_t insn);
@@ -23,6 +24,15 @@ extern int riscv_current_call_idx(VRT_CTX, VCL_INT);
 extern const char* riscv_current_name(VRT_CTX);
 extern const char* riscv_current_result(VRT_CTX);
 extern int riscv_current_result_status(VRT_CTX);
+
+VCL_VOID
+vmod_init(VRT_CTX, VCL_STRING elfpath)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	assert(elfpath != NULL);
+
+	riscv_set_default(elfpath);
+}
 
 /* Create new machine object, which can be used to fork new
    VMs for client requests and backend fetches, etc. */
