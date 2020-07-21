@@ -14,7 +14,7 @@ static constexpr int STACK_PAGENO  = HEAP_PAGENO - 1;
 Script::Script(
 	const Script& source, const vrt_ctx* ctx, const vmod_riscv_machine* vrm)
 	: m_machine(source.machine().memory.binary(), {
-		.memory_max = vrm->max_memory,
+		.memory_max = 0,
 		.owning_machine = &source.machine()
 	  }),
 	  m_ctx(ctx), m_vrm(vrm)
@@ -115,7 +115,7 @@ void Script::machine_setup(riscv::Machine<riscv::RISCV32>& machine, bool init)
 					data);
 			}
 			throw riscv::MachineException(
-				riscv::OUT_OF_MEMORY, "Out of memory", mem.pages_total());
+				riscv::OUT_OF_MEMORY, "Out of memory", mem.pages_active());
 		});
 	machine.memory.set_page_write_handler(
 		[this] (auto& mem, riscv::Page& page) -> void {
@@ -133,7 +133,7 @@ void Script::machine_setup(riscv::Machine<riscv::RISCV32>& machine, bool init)
 				return;
 			}
 			throw riscv::MachineException(
-				riscv::OUT_OF_MEMORY, "Out of memory", mem.pages_total());
+				riscv::OUT_OF_MEMORY, "Out of memory", mem.pages_active());
 		});
 
 	// page protections and "hidden" stacks

@@ -113,10 +113,6 @@ execute_riscv(void* workspace, set_header_t set_header, void* header,
 		set_header(header, WS_Printf(workspace, "X-Binary-Size: %zu", len));
 		const size_t active_mem = machine.memory.pages_active() * 4096;
 		set_header(header, WS_Printf(workspace, "X-Memory-Usage: %zu", active_mem));
-		const size_t highest_mem = machine.memory.pages_highest_active() * 4096;
-		set_header(header, WS_Printf(workspace, "X-Memory-Highest: %zu", highest_mem));
-		const size_t max_mem = machine.memory.pages_total() * 4096;
-		set_header(header, WS_Printf(workspace, "X-Memory-Max: %zu", highest_mem));
 		return WS_Printf(workspace, "%s", state.output.c_str());
 	}
 	else {

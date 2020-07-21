@@ -28,14 +28,14 @@ Example:
 		new ypizza = riscv.machine(
 			name = "ypizza.com",
 			filename = "/path/to/binary");
-		/* This specific machine has one more function we can call */
+		/* This specific machine has more functions we can call */
 		ypizza.add_known_function("test");
 	}
 
 	sub vcl_recv {
 		/* We can call functions directly by name */
 		ypizza.call("on_client_request");
-		/* But also by order of being added */
+		/* But also by order of add_known_function */
 		ypizza.call_index(0);
 
 		/* We can query what the machine wants to happen */
