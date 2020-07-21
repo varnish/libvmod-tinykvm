@@ -26,7 +26,8 @@ extern "C" {
 		uint8_t        conds;
 	};
 }
-#define HDR_FIRST   6
+#define HDR_FIRST     6
+#define HDR_INVALID   UINT32_MAX
 
 struct guest_header_field {
 	int where;
@@ -44,6 +45,9 @@ inline void foreach(http* hp, riscv::Function<void(http*, txt&, size_t)> cb)
 	}
 }
 
+inline bool is_invalid(unsigned idx) {
+	return idx == HDR_INVALID;
+}
 inline bool is_valid_index(const http* hp, unsigned idx) {
 	return idx < hp->field_count;
 }
@@ -75,7 +79,7 @@ inline uint32_t field_length(const txt& field)
 }
 
 inline size_t push_field(const http* hp, int where, unsigned index,
-	machine_t& machine, gaddr_t fdata)
+	machine_t& machine, gaddr_t fdata, bool alloc)
 {
 	if (UNLIKELY(!is_valid_index(hp, index)))
 		throw std::out_of_range("Header field index not in bounds");
@@ -84,16 +88,28 @@ inline size_t push_field(const http* hp, int where, unsigned index,
 		return -1;
 	const uint32_t len = field_length(field);
 
-	/* Allocate the string on the guests heap, and copy it over */
-	const gaddr_t sdata = get_script(machine).guest_alloc(len);
-	if (UNLIKELY(sdata == 0))
-		return -1;
-	machine.copy_to_guest(sdata, field.begin, len+1);
+	guest_header_field hf;
+	if (alloc) {
+		/* Allocate the string on the guests heap, and copy it over */
+		const gaddr_t sdata = get_script(machine).guest_alloc(len);
+		if (UNLIKELY(sdata == 0))
+			return -1;
+		machine.copy_to_guest(sdata, field.begin, len+1);
 
+		hf = {where, index, sdata, sdata + len};
+	} else {
+		hf = {where, index, 0, len};
+	}
 	/* Copy over directly into fdata */
-	const guest_header_field hf {where, index, sdata, sdata + len};
 	machine.copy_to_guest(fdata, &hf, sizeof(hf));
 	return len;
+}
+
+inline size_t push_invalid_field(int where, machine_t& machine, gaddr_t fdata)
+{
+	const guest_header_field hf {where, HDR_INVALID, 0, 0};
+	machine.copy_to_guest(fdata, &hf, sizeof(hf));
+	return 0;
 }
 
 /**
@@ -231,17 +247,22 @@ APICALL(http_field_by_name)
 	auto* ctx = get_ctx(machine);
 	auto* hp = get_http(ctx, (gethdr_e) where);
 
-	/* Find the header field */
-	const unsigned index
+	/* Find the header field by its name */
+	unsigned index
 		= http_findhdr(hp, fieldname.size(), fieldname.c_str());
-
-	return push_field(hp, where, index, machine, fdata);
+	if (index > 0)
+		return push_field(hp, where, index, machine, fdata, false);
+	/* Not found -> invalid header field */
+	return push_invalid_field(where, machine, fdata);
 }
 APICALL(http_copy_from)
 {
 	const auto [where, index, dest]
 		= machine.sysargs<int, unsigned, int> ();
 	auto* ctx = get_ctx(machine);
+	/* Ignore invalid header fields?? */
+	if (is_invalid(index))
+		return HDR_INVALID;
 
 	auto [hp_from, field_from] = get_field(ctx, (gethdr_e) where, index);
 	auto* hp_dest = get_http(ctx, (gethdr_e) dest);
@@ -308,7 +329,7 @@ APICALL(header_field_get)
 
 	const auto* hp = get_http(get_ctx(machine), (gethdr_e) where);
 
-	return push_field(hp, where, index, machine, (uint32_t) fdata);
+	return push_field(hp, where, index, machine, (uint32_t) fdata, true);
 }
 
 APICALL(header_field_append)
@@ -336,7 +357,7 @@ APICALL(header_field_append)
 APICALL(header_field_set)
 {
 	auto [where, index, buffer]
-		= machine.sysargs<int, int, riscv::Buffer> ();
+		= machine.sysargs<int, unsigned, riscv::Buffer> ();
 
 	const auto* ctx = get_ctx(machine);
 	auto* hp = get_http(ctx, (gethdr_e) where);
@@ -355,13 +376,16 @@ APICALL(header_field_set)
 		http_SetH(hp, index, val);
 		return buffer.size();
 	}
+	else if (index == HDR_INVALID) {
+		return -1;
+	}
 	/* This will halt execution */
 	throw std::out_of_range("Header field index not in bounds");
 }
 
 APICALL(header_field_unset)
 {
-	auto [where, index] = machine.sysargs<int, int> ();
+	auto [where, index] = machine.sysargs<int, unsigned> ();
 
 	const auto* ctx = get_ctx(machine);
 	auto* hp = get_http(ctx, (gethdr_e) where);
@@ -371,6 +395,8 @@ APICALL(header_field_unset)
 	{
 		http_UnsetIdx(hp, index);
 		return 0;
+	} else if (index == HDR_INVALID) {
+		return -1; /* Silently ignored */
 	}
 	throw std::out_of_range("Header field index not in bounds");
 }
@@ -430,6 +456,25 @@ APICALL(regex_subst)
 	machine.copy_to_guest(dst, result, len);
 	return len-1; /* The last byte is the zero, not reporting that */
 }
+APICALL(regex_subst_hdr)
+{
+	auto [ridx, where, index, subst, all]
+		= machine.sysargs<uint32_t, int, uint32_t, std::string, int> ();
+	auto* re = get_script(machine).regex_get(ridx);
+	auto* ctx = get_ctx(machine);
+	if (index == HDR_INVALID)
+		return -1;
+	auto [hp, field] = get_field(ctx, (gethdr_e) where, index);
+
+	/* Run the regsub using existing 're' */
+	auto * result =
+		VRT_regsub(ctx, all, field.begin, re, subst.c_str());
+	if (result == nullptr)
+		return -1;
+
+	http_SetH(hp, index, result);
+	return __builtin_strlen(result);
+}
 APICALL(regex_delete)
 {
 	auto [index] = machine.sysargs<uint32_t> ();
@@ -451,6 +496,7 @@ void Script::setup_syscall_interface(machine_t& machine)
 		{ECALL_REGEX_COMPILE, regex_compile},
 		{ECALL_REGEX_MATCH,   regex_match},
 		{ECALL_REGEX_SUBST,   regex_subst},
+		{ECALL_REGSUB_HDR,    regex_subst_hdr},
 		{ECALL_REGEX_FREE,    regex_delete},
 
 		{ECALL_FOREACH_FIELD, foreach_header_field},
