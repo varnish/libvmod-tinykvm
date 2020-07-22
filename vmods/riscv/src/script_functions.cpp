@@ -78,12 +78,9 @@ inline uint32_t field_length(const txt& field)
 
 inline gaddr_t push_data(machine_t& machine, const char* data, size_t len)
 {
-	/* Allocate the string on the guests heap, and copy it over */
-	const gaddr_t sdata = get_script(machine).guest_alloc(len);
-	if (UNLIKELY(sdata == 0))
-		return 0;
-	machine.copy_to_guest(sdata, data, len);
-	return sdata;
+	/* Allocate the string on the shared memory area */
+	SharedMemoryArea shm {get_script(machine)};
+	return shm.push(data, len);
 }
 
 /**
@@ -140,11 +137,10 @@ APICALL(shm_log)
 APICALL(my_name)
 {
 	auto& script = get_script(machine);
-	SharedMemoryArea shm {script};
 	/* Put pointer, length in registers A0, A1 */
 	const size_t len = __builtin_strlen(script.name());
 	machine.cpu.reg(11) = len;
-	return shm.push(script.name(), len+1); /* Zero-terminated */
+	return push_data(machine, script.name(), len+1); /* Zero-terminated */
 }
 APICALL(set_decision)
 {
@@ -334,7 +330,7 @@ APICALL(header_field_retrieve)
 		const auto& field = hp->field_array[index];
 		const size_t len = field_length(field);
 		auto addr = push_data(machine, field.begin, len+1);
-		machine.cpu.reg(11) = len;
+		machine.cpu.reg(11) = addr + len;
 		return addr;
 	}
 	return 0;
@@ -400,13 +396,22 @@ APICALL(header_field_copy)
 	auto* hp = get_http(ctx, (gethdr_e) where);
 	auto* src_hp = get_http(ctx, (gethdr_e) src_where);
 
-	if (is_valid_index(hp, index) && is_valid_index(src_hp, src_index))
+	if (is_valid_index(hp, index))
 	{
-		const auto& src_field = src_hp->field_array[src_index];
+		if (is_valid_index(src_hp, src_index))
+		{
+			const auto& src_field = src_hp->field_array[src_index];
 
-		/* Apply it at the given index */
-		http_SetH(hp, index, src_field.begin);
-		return field_length(src_field);
+			/* Apply it at the given index */
+			http_SetH(hp, index, src_field.begin);
+			return field_length(src_field);
+		}
+		else /* In VCL you can unset a header field by assigning it
+			to a non-existing other header field. */
+		{
+			http_UnsetIdx(hp, index);
+			return 0;
+		}
 	}
 	else if (index == HDR_INVALID || src_index == HDR_INVALID) {
 		return -1;
