@@ -7,6 +7,7 @@ extern "C" {
 	void http_SetH(struct http *to, unsigned n, const char *fm);
 	void http_UnsetIdx(struct http *hp, unsigned idx);
 	unsigned http_findhdr(const struct http *hp, unsigned l, const char *hdr);
+	void HSH_AddString(struct req *, void *ctx, const char *str);
 	struct txt {
 		const char* begin;
 		const char* end;
@@ -177,6 +178,22 @@ APICALL(set_decision)
 	get_script(machine).set_result(result.to_string(), status);
 	return 0;
 }
+APICALL(ban)
+{
+	auto [buffer] = machine.sysargs<std::string> ();
+	auto* ctx = get_ctx(machine);
+
+	VRT_ban_string(ctx, buffer.c_str());
+	return 0;
+}
+APICALL(hash_data)
+{
+	auto [buffer] = machine.sysargs<std::string> ();
+	auto* ctx = get_ctx(machine);
+
+	HSH_AddString(ctx->req, ctx->specific, buffer.c_str());
+	return 0;
+}
 
 APICALL(foreach_header_field)
 {
@@ -319,6 +336,16 @@ APICALL(http_unset_re)
 		}
 	}
 	return mcount;
+}
+
+APICALL(http_rollback)
+{
+	const auto [where] = machine.sysargs<int> ();
+	auto* ctx = get_ctx(machine);
+	auto* hp = get_http(ctx, (gethdr_e) where);
+
+	VRT_Rollback(ctx, hp);
+	return 0;
 }
 
 APICALL(header_field_get)
@@ -504,6 +531,8 @@ void Script::setup_syscall_interface(machine_t& machine)
 
 		{ECALL_MY_NAME,      my_name},
 		{ECALL_SET_DECISION, set_decision},
+		{ECALL_BAN,          ban},
+		{ECALL_HASH_DATA,    hash_data},
 
 		{ECALL_REGEX_COMPILE, regex_compile},
 		{ECALL_REGEX_MATCH,   regex_match},
@@ -522,5 +551,6 @@ void Script::setup_syscall_interface(machine_t& machine)
 		{ECALL_HTTP_UNSET_RE,   http_unset_re},
 		{ECALL_HTTP_FIND,       http_field_by_name},
 		{ECALL_HTTP_COPY,       http_copy_from},
+		{ECALL_HTTP_ROLLBACK,   http_rollback},
 	});
 }
