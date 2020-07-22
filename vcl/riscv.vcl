@@ -1,7 +1,10 @@
 vcl 4.1;
 import riscv;
 
-backend default none;
+backend default {
+	.host = "127.0.0.1";
+	.port = "8081";
+}
 
 sub vcl_init {
 	/* Initialize the VMOD with some mandatory settings */

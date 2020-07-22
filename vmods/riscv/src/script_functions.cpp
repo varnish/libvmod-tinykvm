@@ -5,7 +5,6 @@ using gaddr_t = uint32_t;
 
 extern "C" {
 	void http_SetH(struct http *to, unsigned n, const char *fm);
-	void http_SetHeaderFixed(struct http *to, unsigned n, const char *, size_t);
 	void http_UnsetIdx(struct http *hp, unsigned idx);
 	unsigned http_findhdr(const struct http *hp, unsigned l, const char *hdr);
 	struct txt {
@@ -329,7 +328,20 @@ APICALL(header_field_get)
 
 	const auto* hp = get_http(get_ctx(machine), (gethdr_e) where);
 
-	return push_field(hp, where, index, machine, (uint32_t) fdata, true);
+	if (is_valid_index(hp, index)) {
+		return push_field(hp, where, index, machine, fdata, false);
+	}
+	return push_invalid_field(where, machine, fdata);
+}
+
+APICALL(header_field_retrieve)
+{
+	const auto [where, index, fdata]
+		= machine.sysargs<int, uint32_t, gaddr_t> ();
+
+	const auto* hp = get_http(get_ctx(machine), (gethdr_e) where);
+
+	return push_field(hp, where, index, machine, fdata, true);
 }
 
 APICALL(header_field_append)
@@ -501,6 +513,7 @@ void Script::setup_syscall_interface(machine_t& machine)
 
 		{ECALL_FOREACH_FIELD, foreach_header_field},
 		{ECALL_FIELD_GET,     header_field_get},
+		{ECALL_FIELD_RETRIEVE,header_field_retrieve},
 		{ECALL_FIELD_APPEND,  header_field_append},
 		{ECALL_FIELD_SET,     header_field_set},
 		{ECALL_FIELD_UNSET,   header_field_unset},
