@@ -32,8 +32,6 @@ extern "C" {
 struct guest_header_field {
 	int where;
 	uint32_t index;
-	uint32_t begin;
-	uint32_t end;
 	bool     deleted = false;
 	bool     foreach = false;
 };
@@ -78,38 +76,14 @@ inline uint32_t field_length(const txt& field)
 	return field.end - field.begin;
 }
 
-inline size_t push_field(const http* hp, int where, unsigned index,
-	machine_t& machine, gaddr_t fdata, bool alloc)
+inline gaddr_t push_data(machine_t& machine, const char* data, size_t len)
 {
-	if (UNLIKELY(!is_valid_index(hp, index)))
-		throw std::out_of_range("Header field index not in bounds");
-	auto& field = hp->field_array[index];
-	if (UNLIKELY(field.begin == nullptr))
-		return -1;
-	const uint32_t len = field_length(field);
-
-	guest_header_field hf;
-	if (alloc) {
-		/* Allocate the string on the guests heap, and copy it over */
-		const gaddr_t sdata = get_script(machine).guest_alloc(len);
-		if (UNLIKELY(sdata == 0))
-			return -1;
-		machine.copy_to_guest(sdata, field.begin, len+1);
-
-		hf = {where, index, sdata, sdata + len};
-	} else {
-		hf = {where, index, 0, len};
-	}
-	/* Copy over directly into fdata */
-	machine.copy_to_guest(fdata, &hf, sizeof(hf));
-	return len;
-}
-
-inline size_t push_invalid_field(int where, machine_t& machine, gaddr_t fdata)
-{
-	const guest_header_field hf {where, HDR_INVALID, 0, 0};
-	machine.copy_to_guest(fdata, &hf, sizeof(hf));
-	return 0;
+	/* Allocate the string on the guests heap, and copy it over */
+	const gaddr_t sdata = get_script(machine).guest_alloc(len);
+	if (UNLIKELY(sdata == 0))
+		return 0;
+	machine.copy_to_guest(sdata, data, len);
+	return sdata;
 }
 
 /**
@@ -208,12 +182,10 @@ APICALL(foreach_header_field)
 
 	/* Make room for worst case number of fields */
 	const size_t  pcount = hp->field_count - HDR_FIRST;
-	gaddr_t data_addr = shm.address() - pcount * sizeof(guest_header_field);
-	gaddr_t field_addr = data_addr;
+	gaddr_t field_addr = shm.address() - pcount * sizeof(guest_header_field);
 
 	const gaddr_t first = field_addr;
 	SharedMemoryArea shm_fields {script, field_addr};
-	SharedMemoryArea shm_data   {script, data_addr};
 	int acount = 0;
 
 	/* Iterate each header field */
@@ -224,14 +196,12 @@ APICALL(foreach_header_field)
 		if (len == 0)
 			continue;
 
-		const uint32_t sh_data = shm_data.push(field.begin, len + 1);
 		shm_fields.write<guest_header_field>(
-			{(gethdr_e) where, idx, sh_data, sh_data + len, false, true});
+			{(gethdr_e) where, idx, false, true});
 		acount ++; /* Actual */
 	}
-
 	/* This will prevent other pushes to interfere with this */
-	shm.set(shm_data.address());
+	shm.set(first);
 
 	/* Call into the machine using pre-emption */
 	script.preempt((gaddr_t) func, (gaddr_t) data, (gaddr_t) first, (int) acount);
@@ -256,10 +226,9 @@ APICALL(foreach_header_field)
 	return acount;
 }
 
-APICALL(http_field_by_name)
+APICALL(http_find_name)
 {
-	const auto [where, fieldname, fdata]
-		= machine.sysargs<int, std::string, gaddr_t> ();
+	const auto [where, fieldname] = machine.sysargs<int, std::string> ();
 	auto* ctx = get_ctx(machine);
 	auto* hp = get_http(ctx, (gethdr_e) where);
 
@@ -267,9 +236,9 @@ APICALL(http_field_by_name)
 	unsigned index
 		= http_findhdr(hp, fieldname.size(), fieldname.c_str());
 	if (index > 0)
-		return push_field(hp, where, index, machine, fdata, false);
+		return index;
 	/* Not found -> invalid header field */
-	return push_invalid_field(where, machine, fdata);
+	return HDR_INVALID;
 }
 APICALL(http_copy_from)
 {
@@ -350,15 +319,7 @@ APICALL(http_rollback)
 
 APICALL(header_field_get)
 {
-	const auto [where, index, fdata]
-		= machine.sysargs<int, uint32_t, gaddr_t> ();
-
-	const auto* hp = get_http(get_ctx(machine), (gethdr_e) where);
-
-	if (is_valid_index(hp, index)) {
-		return push_field(hp, where, index, machine, fdata, false);
-	}
-	return push_invalid_field(where, machine, fdata);
+	return -1;
 }
 
 APICALL(header_field_retrieve)
@@ -368,7 +329,15 @@ APICALL(header_field_retrieve)
 
 	const auto* hp = get_http(get_ctx(machine), (gethdr_e) where);
 
-	return push_field(hp, where, index, machine, fdata, true);
+	if (is_valid_index(hp, index))
+	{
+		const auto& field = hp->field_array[index];
+		const size_t len = field_length(field);
+		auto addr = push_data(machine, field.begin, len+1);
+		machine.cpu.reg(11) = len;
+		return addr;
+	}
+	return 0;
 }
 
 APICALL(header_field_append)
@@ -416,6 +385,30 @@ APICALL(header_field_set)
 		return buffer.size();
 	}
 	else if (index == HDR_INVALID) {
+		return -1;
+	}
+	/* This will halt execution */
+	throw std::out_of_range("Header field index not in bounds");
+}
+
+APICALL(header_field_copy)
+{
+	auto [where, index, src_where, src_index]
+		= machine.sysargs<int, unsigned, int, unsigned> ();
+
+	const auto* ctx = get_ctx(machine);
+	auto* hp = get_http(ctx, (gethdr_e) where);
+	auto* src_hp = get_http(ctx, (gethdr_e) src_where);
+
+	if (is_valid_index(hp, index) && is_valid_index(src_hp, src_index))
+	{
+		const auto& src_field = src_hp->field_array[src_index];
+
+		/* Apply it at the given index */
+		http_SetH(hp, index, src_field.begin);
+		return field_length(src_field);
+	}
+	else if (index == HDR_INVALID || src_index == HDR_INVALID) {
 		return -1;
 	}
 	/* This will halt execution */
@@ -545,11 +538,12 @@ void Script::setup_syscall_interface(machine_t& machine)
 		{ECALL_FIELD_RETRIEVE,header_field_retrieve},
 		{ECALL_FIELD_APPEND,  header_field_append},
 		{ECALL_FIELD_SET,     header_field_set},
+		{ECALL_FIELD_COPY,    header_field_copy},
 		{ECALL_FIELD_UNSET,   header_field_unset},
 
 		{ECALL_HTTP_SET_STATUS, http_set_status},
 		{ECALL_HTTP_UNSET_RE,   http_unset_re},
-		{ECALL_HTTP_FIND,       http_field_by_name},
+		{ECALL_HTTP_FIND,       http_find_name},
 		{ECALL_HTTP_COPY,       http_copy_from},
 		{ECALL_HTTP_ROLLBACK,   http_rollback},
 	});
