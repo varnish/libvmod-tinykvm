@@ -5,7 +5,8 @@
 #include "crc32.hpp"
 #include "shm.hpp"
 
-using machine_t = riscv::Machine<4>;
+using machine_t = Script::machine_t;
+using gaddr_t = Script::gaddr_t;
 
 #define APICALL(func) static long func(machine_t& machine [[maybe_unused]])
 

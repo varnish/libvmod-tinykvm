@@ -9,17 +9,20 @@ struct vmod_riscv_machine;
 
 class Script {
 public:
-	static constexpr uint32_t RO_AREA_BEGIN = 0x10000;
-	static constexpr uint32_t RO_AREA_END   = 0x11000;
-	static constexpr uint32_t RW_AREA_BEGIN = 0x12000;
-	static constexpr uint32_t RW_AREA_END   = 0x13000;
+	static constexpr int MARCH = riscv::RISCV64;
+	using gaddr_t = riscv::address_type<MARCH>;
+	using machine_t = riscv::Machine<MARCH>;
+	static constexpr gaddr_t RO_AREA_BEGIN = 0x10000;
+	static constexpr gaddr_t RO_AREA_END   = 0x11000;
+	static constexpr gaddr_t RW_AREA_BEGIN = 0x12000;
+	static constexpr gaddr_t RW_AREA_END   = 0x13000;
 
 	// call any script function, with any parameters
 	template <typename... Args>
-	inline long call(uint32_t addr, Args&&...);
+	inline long call(gaddr_t addr, Args&&...);
 
 	template <typename... Args>
-	inline long preempt(uint32_t addr, Args&&...);
+	inline long preempt(gaddr_t addr, Args&&...);
 
 	auto& machine() { return m_machine; }
 	const auto& machine() const { return m_machine; }
@@ -35,22 +38,22 @@ public:
 		m_want_result = res; m_want_status = status;
 	}
 
-	uint32_t guest_alloc(size_t len);
+	gaddr_t guest_alloc(size_t len);
 	auto& shm_address() { return m_shm_address; }
 
-	MemArea<4> ro_area;
-	MemArea<4> rw_area;
+	MemArea<MARCH> ro_area;
+	MemArea<MARCH> rw_area;
 
 	int    regex_find(uint32_t hash) const;
 	size_t regex_manage(struct vre*, uint32_t hash);
 	void   regex_free(size_t);
 	struct vre* regex_get(size_t idx) { return m_regex_cache.at(idx).re; }
 
-	std::string symbol_name(uint32_t address) const;
-	uint32_t resolve_address(const char* name) const;
-	auto     callsite(uint32_t addr) const { return machine().memory.lookup(addr); }
+	std::string symbol_name(gaddr_t address) const;
+	gaddr_t resolve_address(const char* name) const;
+	auto    callsite(gaddr_t addr) const { return machine().memory.lookup(addr); }
 
-	void print_backtrace(const uint32_t addr);
+	void print_backtrace(const gaddr_t addr);
 
 	bool reset(); // true if the reset was successful
 
@@ -60,18 +63,18 @@ public:
 
 private:
 	void setup_virtual_memory();
-	void handle_exception(uint32_t);
-	void handle_timeout(uint32_t);
+	void handle_exception(gaddr_t);
+	void handle_timeout(gaddr_t);
 	bool install_binary(const std::string& file, bool shared = true);
 	bool machine_initialize(bool init);
-	void machine_setup(riscv::Machine<riscv::RISCV32>&, bool init);
-	void setup_syscall_interface(riscv::Machine<riscv::RISCV32>&);
+	void machine_setup(machine_t&, bool init);
+	void setup_syscall_interface(machine_t&);
 
-	riscv::Machine<riscv::RISCV32> m_machine;
+	machine_t m_machine;
 	const vrt_ctx* m_ctx;
 	const struct vmod_riscv_machine* m_vrm = nullptr;
 	void*       m_arena = nullptr;
-	uint32_t    m_shm_address = RO_AREA_END; /* It's a stack */
+	gaddr_t     m_shm_address = RO_AREA_END; /* It's a stack */
 	int         m_want_status = 403;
 	std::string m_want_result;
 
@@ -84,7 +87,7 @@ private:
 };
 
 template <typename... Args>
-inline long Script::call(uint32_t address, Args&&... args)
+inline long Script::call(gaddr_t address, Args&&... args)
 {
 	try {
 		// reset the stack pointer to an initial location (deliberately)
@@ -106,7 +109,7 @@ inline long Script::call(uint32_t address, Args&&... args)
 }
 
 template <typename... Args>
-inline long Script::preempt(uint32_t address, Args&&... args)
+inline long Script::preempt(gaddr_t address, Args&&... args)
 {
 	const auto regs = machine().cpu.registers();
 	try {

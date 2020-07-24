@@ -57,10 +57,10 @@ void Script::setup_virtual_memory()
 	mem.install_shared_page(STACK_PAGENO, Page::guard_page());
 
 	auto* ws = ctx()->ws;
-	new (&ro_area) MemArea<4> (machine(), RO_AREA_BEGIN, RO_AREA_END,
+	new (&ro_area) MemArea<MARCH> (machine(), RO_AREA_BEGIN, RO_AREA_END,
 		{ .write = false, .non_owning = true }, ws);
 	mem.install_shared_page(RO_AREA_END >> 12, Page::guard_page());
-	new (&rw_area) MemArea<4> (machine(), RW_AREA_BEGIN, RW_AREA_END,
+	new (&rw_area) MemArea<MARCH> (machine(), RW_AREA_BEGIN, RW_AREA_END,
 		{ .write = true, .non_owning = true }, ws);
 	mem.install_shared_page(RW_AREA_END >> 12, Page::guard_page());
 }
@@ -92,7 +92,7 @@ bool Script::machine_initialize(bool init)
 	}
     return true;
 }
-void Script::machine_setup(riscv::Machine<riscv::RISCV32>& machine, bool init)
+void Script::machine_setup(machine_t& machine, bool init)
 {
 	machine.set_userdata<Script>(this);
 
@@ -143,7 +143,7 @@ void Script::machine_setup(riscv::Machine<riscv::RISCV32>& machine, bool init)
 
 	if (init)
 	{
-		const uint32_t exit_addr = machine.address_of("exit");
+		const auto exit_addr = machine.address_of("exit");
 		if (exit_addr)
 			machine.memory.set_exit_address(exit_addr);
 		else
@@ -153,8 +153,8 @@ void Script::machine_setup(riscv::Machine<riscv::RISCV32>& machine, bool init)
 	}
 
 	// add system call interface
-	this->m_arena = setup_native_heap_syscalls<4>(machine, vrm()->max_heap);
-	setup_native_memory_syscalls<4>(machine, TRUSTED_CALLS);
+	this->m_arena = setup_native_heap_syscalls<MARCH>(machine, vrm()->max_heap);
+	setup_native_memory_syscalls<MARCH>(machine, TRUSTED_CALLS);
     setup_syscall_interface(machine);
 
 	machine.on_unhandled_syscall(
@@ -163,7 +163,7 @@ void Script::machine_setup(riscv::Machine<riscv::RISCV32>& machine, bool init)
 				"VM unhandled system call: %d\n", number);
 		});
 }
-void Script::handle_exception(uint32_t address)
+void Script::handle_exception(gaddr_t address)
 {
 	try {
 		throw;
@@ -191,7 +191,7 @@ void Script::handle_exception(uint32_t address)
 		this->print_backtrace(address);
 	}
 }
-void Script::handle_timeout(uint32_t address)
+void Script::handle_timeout(gaddr_t address)
 {
 	if constexpr (VERBOSE_ERRORS) {
 		auto callsite = machine().memory.lookup(address);
@@ -200,7 +200,7 @@ void Script::handle_timeout(uint32_t address)
 	}
 	VRT_fail(m_ctx, "Script for '%s' timed out", name());
 }
-void Script::print_backtrace(const uint32_t addr)
+void Script::print_backtrace(const gaddr_t addr)
 {
 	machine().memory.print_backtrace(
 		[] (const char* buffer, size_t len) {
@@ -220,15 +220,15 @@ const char* Script::name() const noexcept
 	return vrm()->name;
 }
 
-uint32_t Script::guest_alloc(size_t len)
+Script::gaddr_t Script::guest_alloc(size_t len)
 {
 	return arena_malloc((sas_alloc::Arena*) m_arena, len);
 }
 
-uint32_t Script::resolve_address(const char* name) const {
+Script::gaddr_t Script::resolve_address(const char* name) const {
 	return machine().address_of(name);
 }
-std::string Script::symbol_name(uint32_t address) const
+std::string Script::symbol_name(gaddr_t address) const
 {
 	auto callsite = machine().memory.lookup(address);
 	return callsite.name;

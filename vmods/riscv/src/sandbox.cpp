@@ -63,7 +63,7 @@ void riscv_prewarm(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 	vrm->sym_vector.push_back({site.name.c_str(), site.address, site.size});
 }
 
-inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, uint32_t addr)
+inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, Script::gaddr_t addr)
 {
 	auto* priv_task = VRT_priv_task(ctx, ctx);
 	if (!priv_task->priv)

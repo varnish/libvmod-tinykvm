@@ -1,8 +1,6 @@
 #pragma once
 #include <libriscv/machine.hpp>
 
-using machine_t = riscv::Machine<4>;
-
 /* TODO: prevent too much recursion
    TODO: prevent stack overflow     */
 
@@ -44,11 +42,11 @@ struct SharedMemoryArea
 	}
 
 	uint32_t address() const noexcept { return dst; }
-	void     set(uint32_t addr) { dst = addr; }
+	void     set(Script::gaddr_t addr) { dst = addr; }
 
 	SharedMemoryArea(Script& script)
 		: machine(script.machine()), dst(script.shm_address()), stored_dst(dst) {}
-	SharedMemoryArea(Script& script, uint32_t& addr)
+	SharedMemoryArea(Script& script, Script::gaddr_t& addr)
 		: machine(script.machine()), dst(addr), stored_dst(addr) {}
 	/* When this gets destroyed, we restore the stack to its original value */
 	~SharedMemoryArea() {
@@ -57,7 +55,7 @@ struct SharedMemoryArea
 
 private:
 	static constexpr uint32_t ALIGN_MASK = ~0x3;
-	machine_t& machine;
-	uint32_t& dst;
-	uint32_t  stored_dst;
+	Script::machine_t& machine;
+	Script::gaddr_t& dst;
+	Script::gaddr_t  stored_dst;
 };

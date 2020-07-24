@@ -1,7 +1,6 @@
 #include "script_functions.hpp"
 #include "machine/include_api.hpp"
 #include "varnish.hpp"
-using gaddr_t = uint32_t;
 
 extern "C" {
 	void http_SetH(struct http *to, unsigned n, const char *fm);

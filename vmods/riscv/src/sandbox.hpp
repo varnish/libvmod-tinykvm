@@ -19,7 +19,7 @@ struct vmod_riscv_machine {
 		}
 	}
 
-	inline uint32_t lookup(const char* name) const {
+	inline Script::gaddr_t lookup(const char* name) const {
 		const auto& it = sym_lookup.find(name);
 		if (it != sym_lookup.end()) return it->second;
 		// fallback
@@ -38,14 +38,14 @@ struct vmod_riscv_machine {
 	const uint64_t max_heap;
 	Script   script;
 	/* Lookup tree for ELF symbol names */
-	eastl::string_map<uint32_t,
+	eastl::string_map<Script::gaddr_t,
 			eastl::str_less<const char*>,
 			eastl::allocator_malloc> sym_lookup;
 	/* Index vector for ELF symbol names, used by call_index(..) */
 	struct Lookup {
 		const char* func;
-		uint32_t    addr;
-		size_t      size;
+		Script::gaddr_t addr;
+		size_t size;
 	};
 	std::vector<Lookup> sym_vector;
 
