@@ -17,3 +17,9 @@ inline const auto* get_ctx(machine_t& m) {
 inline auto& get_script(machine_t& m) {
 	return *m.get_userdata<Script> ();
 }
+
+template <typename... T>
+constexpr auto make_array(T&&... t) -> std::array<std::common_type_t<T...>, sizeof...(t)>
+{
+	return {std::forward<T>(t)...};
+}

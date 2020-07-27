@@ -4,12 +4,19 @@
 #include "machine/include_api.hpp"
 #include "sandbox.hpp"
 #include "varnish.hpp"
+inline timespec time_now();
+inline long nanodiff(timespec start_time, timespec end_time);
 
 static const bool TRUSTED_CALLS = true;
 static constexpr bool VERBOSE_ERRORS = true;
 static constexpr int HEAP_PAGENO   = 0x40000000 >> riscv::Page::SHIFT;
 static constexpr int STACK_PAGENO  = HEAP_PAGENO - 1;
 
+//#define ENABLE_TIMING
+#define TIMING_LOCATION(x) \
+	asm("" ::: "memory"); \
+	auto x = time_now();  \
+	asm("" ::: "memory");
 
 Script::Script(
 	const Script& source, const vrt_ctx* ctx, const vmod_riscv_machine* vrm)
@@ -153,15 +160,35 @@ void Script::machine_setup(machine_t& machine, bool init)
 	}
 
 	// add system call interface
+#ifdef ENABLE_TIMING
+	TIMING_LOCATION(t0);
+#endif
+	/*this->m_arena = setup_native_heap_syscalls<MARCH>(
+		machine, vrm()->max_heap, [this] (size_t size) {
+			return WS_Alloc(m_ctx->ws, size);
+		});*/
 	this->m_arena = setup_native_heap_syscalls<MARCH>(machine, vrm()->max_heap);
+
+#ifdef ENABLE_TIMING
+	TIMING_LOCATION(t1);
+#endif
 	setup_native_memory_syscalls<MARCH>(machine, TRUSTED_CALLS);
+#ifdef ENABLE_TIMING
+	TIMING_LOCATION(t2);
+#endif
     setup_syscall_interface(machine);
 
-	machine.on_unhandled_syscall(
+	/*machine.on_unhandled_syscall(
 		[this] (int number) {
 			VSLb(m_ctx->vsl, SLT_Debug,
 				"VM unhandled system call: %d\n", number);
-		});
+		});*/
+#ifdef ENABLE_TIMING
+	TIMING_LOCATION(t3);
+	printf("Time spent setting up arena: %ld ns, nat.mem: %ld ns, syscalls: %ld ns\n",
+		nanodiff(t0, t1), nanodiff(t1, t2), nanodiff(t2, t3));
+#endif
+
 }
 void Script::handle_exception(gaddr_t address)
 {
@@ -249,4 +276,16 @@ size_t Script::regex_manage(struct vre* ptr, uint32_t hash)
 void Script::regex_free(size_t idx)
 {
 	m_regex_cache.at(idx) = { nullptr, 0 };
+}
+
+timespec time_now()
+{
+	timespec t;
+	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t);
+	return t;
+}
+long nanodiff(timespec start_time, timespec end_time)
+{
+	assert(end_time.tv_sec == 0); /* We should never use seconds */
+	return end_time.tv_nsec - start_time.tv_nsec;
 }

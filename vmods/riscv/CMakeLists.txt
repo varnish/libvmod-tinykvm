@@ -23,7 +23,7 @@ target_compile_definitions(vmod_riscv PRIVATE
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-set_target_properties(vmod_riscv PROPERTIES CXX_STANDARD 17)
+set_target_properties(vmod_riscv PROPERTIES CXX_STANDARD 20)
 target_include_directories(vmod_riscv PRIVATE libriscv/emulator/syscalls)
 target_include_directories(vmod_riscv PRIVATE libriscv/emulator/src)
 

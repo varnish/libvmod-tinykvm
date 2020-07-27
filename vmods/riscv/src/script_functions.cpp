@@ -163,6 +163,10 @@ APICALL(hash_data)
 	HSH_AddString(ctx->req, ctx->specific, buffer.c_str());
 	return 0;
 }
+APICALL(purge)
+{
+	return -1;
+}
 
 APICALL(foreach_header_field)
 {
@@ -520,35 +524,38 @@ APICALL(regex_delete)
 
 void Script::setup_syscall_interface(machine_t& machine)
 {
-	machine.install_syscall_handlers({
-		{ECALL_SELF_TEST,   self_test},
-		{ECALL_ASSERT_FAIL, assertion_failed},
-		{ECALL_PRINT,       print},
-		{ECALL_LOG,         shm_log},
+	#define FPTR(x) machine_t::syscall_fptr_t { x }
+	static constinit std::array<const machine_t::syscall_t, ECALL_LAST - SYSCALL_BASE> handlers {
+		FPTR(self_test),
+		FPTR(assertion_failed),
+		FPTR(print),
+		FPTR(shm_log),
 
-		{ECALL_MY_NAME,      my_name},
-		{ECALL_SET_DECISION, set_decision},
-		{ECALL_BAN,          ban},
-		{ECALL_HASH_DATA,    hash_data},
+		FPTR(regex_compile),
+		FPTR(regex_match),
+		FPTR(regex_subst),
+		FPTR(regex_subst_hdr),
+		FPTR(regex_delete),
 
-		{ECALL_REGEX_COMPILE, regex_compile},
-		{ECALL_REGEX_MATCH,   regex_match},
-		{ECALL_REGEX_SUBST,   regex_subst},
-		{ECALL_REGSUB_HDR,    regex_subst_hdr},
-		{ECALL_REGEX_FREE,    regex_delete},
+		FPTR(my_name),
+		FPTR(set_decision),
+		FPTR(ban),
+		FPTR(hash_data),
+		FPTR(purge),
 
-		{ECALL_FOREACH_FIELD, foreach_header_field},
-		{ECALL_FIELD_GET,     header_field_get},
-		{ECALL_FIELD_RETRIEVE,header_field_retrieve},
-		{ECALL_FIELD_APPEND,  header_field_append},
-		{ECALL_FIELD_SET,     header_field_set},
-		{ECALL_FIELD_COPY,    header_field_copy},
-		{ECALL_FIELD_UNSET,   header_field_unset},
+		FPTR(foreach_header_field),
+		FPTR(header_field_get),
+		FPTR(header_field_retrieve),
+		FPTR(header_field_append),
+		FPTR(header_field_set),
+		FPTR(header_field_copy),
+		FPTR(header_field_unset),
 
-		{ECALL_HTTP_SET_STATUS, http_set_status},
-		{ECALL_HTTP_UNSET_RE,   http_unset_re},
-		{ECALL_HTTP_FIND,       http_find_name},
-		{ECALL_HTTP_COPY,       http_copy_from},
-		{ECALL_HTTP_ROLLBACK,   http_rollback},
-	});
+		FPTR(http_rollback),
+		FPTR(http_copy_from),
+		FPTR(http_set_status),
+		FPTR(http_unset_re),
+		FPTR(http_find_name)
+	};
+	machine.install_syscall_handler_range(SYSCALL_BASE, handlers);
 }

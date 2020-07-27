@@ -1,0 +1,61 @@
+==== Varnish recv + 32-bit hello_world, synth(234) ====
+Thread Stats   Avg      Stdev     Max   +/- Stdev
+  Latency   817.10us  440.50us  35.90ms   64.07%
+  Req/Sec     1.53k    95.11     6.50k    71.65%
+1499851 requests in 25.00s, 736.64MB read
+Requests/sec:  60001.21
+Transfer/sec:     29.47MB
+
+Thread Stats   Avg      Stdev     Max   +/- Stdev
+  Latency   819.29us  411.96us  11.92ms   64.07%
+  Req/Sec     1.53k    94.19     2.89k    70.83%
+1499838 requests in 25.00s, 736.63MB read
+Requests/sec:  60001.41
+Transfer/sec:     29.47MB
+
+==== Varnish recv + 64-bit hello_world, synth(234) ====
+Thread Stats   Avg      Stdev     Max   +/- Stdev
+  Latency   813.75us  409.63us  10.05ms   63.93%
+  Req/Sec     1.53k    93.02     3.22k    72.30%
+1499859 requests in 25.00s, 734.52MB read
+Requests/sec:  60001.71
+Transfer/sec:     29.38MB
+
+Thread Stats   Avg      Stdev     Max   +/- Stdev
+  Latency   813.65us  408.99us   2.87ms   63.92%
+  Req/Sec     1.53k    92.39     1.89k    71.82%
+1499860 requests in 25.00s, 736.64MB read
+Requests/sec:  60001.36
+Transfer/sec:     29.47MB
+
+==== Varnish recv + 64-bit synth(234) ====
+Thread Stats   Avg      Stdev     Max   +/- Stdev
+  Latency   811.87us  412.68us   5.38ms   63.67%
+  Req/Sec     1.52k    91.09     2.11k    72.75%
+1499851 requests in 25.00s, 701.62MB read
+Requests/sec:  60002.97
+Transfer/sec:     28.07MB
+
+Thread Stats   Avg      Stdev     Max   +/- Stdev
+  Latency   810.93us  410.27us   2.13ms   63.67%
+  Req/Sec     1.52k    89.99     1.89k    73.36%
+1499863 requests in 25.00s, 703.75MB read
+Requests/sec:  60000.56
+Transfer/sec:     28.15MB
+
+==== Varnish synth(403) ====
+Thread Stats   Avg      Stdev     Max   +/- Stdev
+  Latency   800.97us  419.88us   2.61ms   62.13%
+  Req/Sec     1.53k    81.87     1.89k    75.51%
+1499874 requests in 25.00s, 638.70MB read
+Non-2xx or 3xx responses: 1499874
+Requests/sec:  60001.20
+Transfer/sec:     25.55MB
+
+Thread Stats   Avg      Stdev     Max   +/- Stdev
+  Latency   798.71us  419.55us   5.29ms   62.13%
+  Req/Sec     1.53k    81.73     2.11k    75.13%
+1499870 requests in 25.00s, 640.81MB read
+Non-2xx or 3xx responses: 1499870
+Requests/sec:  60001.31
+Transfer/sec:     25.64MB
