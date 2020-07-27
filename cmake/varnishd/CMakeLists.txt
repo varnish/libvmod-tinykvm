@@ -297,3 +297,7 @@ if (LIBUNWIND)
 	target_link_libraries(varnishd ${LIBUNWIND})
 	target_compile_definitions(varnishd PRIVATE USE_LIBUNWIND=1)
 endif()
+
+if (NOT SHARED_LIBRISCV)
+	target_link_libraries(varnishd stdc++ -Wl,--whole-archive sandbox -Wl,--no-whole-archive)
+endif()

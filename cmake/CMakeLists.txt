@@ -117,6 +117,7 @@ if (VARNISH_PLUS)
 	add_subdirectory(jemalloc)
 	set(OPENSSL_BUILD_VERSION "1.1.1e" CACHE STRING "")
 	add_subdirectory(${CMAKE_SOURCE_DIR}/../ext/openssl-cmake build_openssl)
+	add_subdirectory(sandbox)
 endif()
 
 add_subdirectory(varnishd    build_varnishd)

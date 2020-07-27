@@ -198,8 +198,8 @@ void Script::handle_exception(gaddr_t address)
 	catch (const riscv::MachineException& e) {
 		if constexpr (VERBOSE_ERRORS) {
 		fprintf(stderr, "Script exception: %s (data: %#x)\n", e.what(), e.data());
-		fprintf(stderr, ">>> Machine registers:\n[PC\t%08X] %s\n",
-			machine().cpu.pc(),
+		fprintf(stderr, ">>> Machine registers:\n[PC\t%08lX] %s\n",
+			(long) machine().cpu.pc(),
 			machine().cpu.registers().to_string().c_str());
 		}
 	}
@@ -234,8 +234,9 @@ void Script::print_backtrace(const gaddr_t addr)
 			printf("-> %.*s\n", (int)len, buffer);
 		});
 	auto origin = machine().memory.lookup(addr);
-	printf("-> [-] 0x%08x + 0x%.3x: %s\n",
-			origin.address, origin.offset, origin.name.c_str());
+	printf("-> [-] 0x%08lx + 0x%.3x: %s\n",
+			(long) origin.address,
+			origin.offset, origin.name.c_str());
 }
 
 uint64_t Script::max_instructions() const noexcept
@@ -278,6 +279,7 @@ void Script::regex_free(size_t idx)
 	m_regex_cache.at(idx) = { nullptr, 0 };
 }
 
+#ifdef ENABLE_TIMING
 timespec time_now()
 {
 	timespec t;
@@ -289,3 +291,4 @@ long nanodiff(timespec start_time, timespec end_time)
 	assert(end_time.tv_sec == 0); /* We should never use seconds */
 	return end_time.tv_nsec - start_time.tv_nsec;
 }
+#endif
