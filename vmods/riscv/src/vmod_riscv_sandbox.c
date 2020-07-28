@@ -12,7 +12,7 @@ extern struct vmod_riscv_machine* riscv_create(const char* name,
 	const char* file, VRT_CTX, uint64_t insn);
 extern void riscv_prewarm(VRT_CTX, struct vmod_riscv_machine*, const char*);
 extern int riscv_forkcall(VRT_CTX, struct vmod_riscv_machine*, const char*);
-extern int riscv_forkcall_idx(VRT_CTX, struct vmod_riscv_machine*, VCL_INT);
+extern int riscv_forkcall_idx(VRT_CTX, struct vmod_riscv_machine*, int);
 extern int riscv_free(struct vmod_riscv_machine*);
 // Adds function to list that will be fed to each new
 // machine created afterwards.
@@ -20,7 +20,7 @@ extern void riscv_add_known(VRT_CTX, const char* function);
 // Functions operating on a machine already forked, which
 // is accessible through a priv_task.
 extern int riscv_current_call(VRT_CTX, const char*);
-extern int riscv_current_call_idx(VRT_CTX, VCL_INT);
+extern int riscv_current_call_idx(VRT_CTX, int);
 extern const char* riscv_current_name(VRT_CTX);
 extern const char* riscv_current_result(VRT_CTX);
 extern int riscv_current_result_status(VRT_CTX);
