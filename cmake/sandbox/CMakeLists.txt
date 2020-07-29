@@ -3,6 +3,9 @@ project (sandbox CXX)
 
 option(SHARED_LIBRISCV "Build the libriscv sandbox as a VMOD" OFF)
 
+# WARNING: everything!
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++20 -O2 -g")
+
 add_subdirectory(libriscv/lib)
 target_compile_definitions(riscv PUBLIC
 	RISCV_THROW_UNIMPLEMENTED=1
@@ -10,8 +13,14 @@ target_compile_definitions(riscv PUBLIC
 	RISCV_DISABLE_SYM_LOOKUP=1
 	RISCV_SYSCALLS_MAX=100)
 
-# WARNING: everything!
-target_compile_options(riscv PUBLIC -march=native -Ofast -flto)
+if (NATIVE)
+	target_compile_options(riscv PUBLIC -march=native -Ofast)
+	target_compile_options(EASTL PUBLIC -march=native -Ofast)
+endif()
+if (LTO_ENABLE)
+	target_compile_options(riscv PUBLIC -flto)
+	target_compile_options(EASTL PUBLIC -flto)
+endif()
 
 list(APPEND RISCV_SOURCES
 	src/linux.cpp
