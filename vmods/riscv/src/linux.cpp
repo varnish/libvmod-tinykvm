@@ -5,7 +5,7 @@
 #include <include/threads.hpp>
 #include <linux.hpp>
 extern "C" __attribute__((format(printf, 2, 3)))
-const char* WS_Printf(void *ws, const char *fmt, ...);
+char* WS_Printf(void *ws, const char *fmt, ...);
 
 // avoid endless loops and excessive memory usage
 static const uint32_t MAX_MEMORY     = 32 * 1024 * 1024;
