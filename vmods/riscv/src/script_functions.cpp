@@ -144,7 +144,12 @@ APICALL(my_name)
 APICALL(set_decision)
 {
 	auto [result, status] = machine.sysargs<riscv::Buffer, int> ();
-	get_script(machine).set_result(result.to_string(), status);
+	auto& script = get_script(machine);
+	if (result.is_sequential()) {
+		script.set_result(result.c_str(), status);
+	} else {
+		script.set_result(result.to_string(), status);
+	}
 	return 0;
 }
 APICALL(ban)
@@ -227,15 +232,24 @@ APICALL(foreach_header_field)
 
 APICALL(http_find_name)
 {
-	const auto [where, fieldname] = machine.sysargs<int, std::string> ();
+	const auto [where, fieldname] = machine.sysargs<int, riscv::Buffer> ();
 	auto* ctx = get_ctx(machine);
 	auto* hp = get_http(ctx, (gethdr_e) where);
 
-	/* Find the header field by its name */
-	unsigned index
-		= http_findhdr(hp, fieldname.size(), fieldname.c_str());
-	if (index > 0)
-		return index;
+	if (fieldname.is_sequential())
+	{
+		/* Find the header field by its name */
+		unsigned index
+			= http_findhdr(hp, fieldname.size(), fieldname.c_str());
+		if (index > 0)
+			return index;
+	} else {
+		/* Find the header field by its name */
+		unsigned index
+			= http_findhdr(hp, fieldname.size(), fieldname.to_string().c_str());
+		if (index > 0)
+			return index;
+	}
 	/* Not found -> invalid header field */
 	return HDR_INVALID;
 }
@@ -353,7 +367,7 @@ APICALL(header_field_append)
 
 	if (UNLIKELY(hp->field_count >= hp->fields_max)) {
 		VSLb(hp->vsl, SLT_LostHeader, "%.*s", (int) len, val);
-		return -1;
+		return HDR_INVALID;
 	}
 
 	const int idx = hp->field_count++;
@@ -413,11 +427,11 @@ APICALL(header_field_copy)
 			to a non-existing other header field. */
 		{
 			http_UnsetIdx(hp, index);
-			return 0;
+			return HDR_INVALID;
 		}
 	}
 	else if (index == HDR_INVALID || src_index == HDR_INVALID) {
-		return -1;
+		return HDR_INVALID;
 	}
 	/* This will halt execution */
 	throw std::out_of_range("Header field index not in bounds");
