@@ -17,3 +17,12 @@ struct vmod_riscv_backend
 
 	struct director dir;
 };
+
+struct vmod_riscv_updater
+{
+	uint64_t magic;
+	struct director dir;
+
+	uint64_t max_binary_size;
+	struct vmod_riscv_machine *machine;
+};

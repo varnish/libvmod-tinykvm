@@ -28,7 +28,13 @@ struct MemArea
 		assert(b % riscv::Page::size() == 0);
 		assert(e % riscv::Page::size() == 0);
 		const size_t bytes = e - b;
-		this->m_data = (char*) WS_Alloc(ws, bytes);
+
+		this->m_heap_alloced = (ws == nullptr);
+		if (!m_heap_alloced)
+			this->m_data = (char*) WS_Alloc(ws, bytes);
+		else
+			this->m_data = new char[bytes];
+
 		if (this->m_data == nullptr)
 			throw std::runtime_error("Unable to allocate memory range of size " + std::to_string(bytes));
 
@@ -44,4 +50,5 @@ struct MemArea
 	address_t m_begin = 0;
 	address_t m_end   = 0;
 	char*     m_data  = nullptr;
+	bool      m_heap_alloced = false;
 };

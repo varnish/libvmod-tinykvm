@@ -1,5 +1,6 @@
 vcl 4.1;
 import riscv;
+import std;
 
 backend default {
 	.host = "127.0.0.1";
@@ -30,6 +31,14 @@ sub vcl_init {
 }
 
 sub vcl_recv {
+	/* Live update mechanism */
+	if (req.method == "POST") {
+		std.cache_req_body(15MB);
+		set req.backend_hint = xpizza.live_update();
+		set req.backend_hint = ypizza.live_update();
+		return (pass);
+	}
+
 	if (req.url == "/") {
 		xpizza.call_index(0);  /* on_client_request */
 	} else {

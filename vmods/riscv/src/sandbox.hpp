@@ -1,12 +1,10 @@
 #pragma once
 #include "script.hpp"
 
-struct vmod_riscv_machine {
-	vmod_riscv_machine(const char* name, std::vector<uint8_t> elf,
-		VRT_CTX, uint64_t insn, uint64_t mem, uint64_t heap)
-		: binary{std::move(elf)}, name(name),
-		  max_instructions(insn), max_memory(mem), max_heap(heap),
-		  script{binary, ctx, this}
+struct MachineInstance {
+	MachineInstance(std::vector<uint8_t> elf, VRT_CTX, vmod_riscv_machine* vrm)
+		: binary{std::move(elf)},
+		  script{binary, ctx, vrm, *this}
 	{
 		extern std::vector<const char*> riscv_lookup_wishlist;
 		for (const auto* func : riscv_lookup_wishlist) {
@@ -25,17 +23,8 @@ struct vmod_riscv_machine {
 		// fallback
 		return script.resolve_address(name);
 	}
-	inline auto callsite(const char* name) {
-		auto addr = lookup(name);
-		return script.callsite(addr);
-	}
 
-	const uint64_t magic = 0xb385716f486938e6;
 	const std::vector<uint8_t> binary;
-	const char*    name;
-	const uint64_t max_instructions;
-	const uint64_t max_memory;
-	const uint64_t max_heap;
 	Script   script;
 	/* Lookup tree for ELF symbol names */
 	eastl::string_map<Script::gaddr_t,
@@ -48,6 +37,34 @@ struct vmod_riscv_machine {
 		size_t size;
 	};
 	std::vector<Lookup> sym_vector;
+};
 
+struct vmod_riscv_machine {
+	vmod_riscv_machine(const char* nm, std::vector<uint8_t> elf,
+		VRT_CTX, uint64_t insn, uint64_t mem, uint64_t heap)
+		: name(nm), max_instructions(insn), max_memory(mem), max_heap(heap),
+		  machine{std::make_unique<MachineInstance> (std::move(elf), ctx, this)}
+	{
+		/* */
+	}
+
+	auto& script() { return machine->script; }
+	inline Script::gaddr_t lookup(const char* name) const {
+		return machine->lookup(name);
+	}
+
+	inline auto callsite(const char* name) {
+		auto addr = machine->lookup(name);
+		return script().callsite(addr);
+	}
+
+	/* Initialized during vcl_init */
+	const uint64_t magic = 0xb385716f486938e6;
+	const char*    name;
+	const uint64_t max_instructions;
+	const uint64_t max_memory;
+	const uint64_t max_heap;
+	/* Hot-swappable machine */
+	std::unique_ptr<MachineInstance> machine;
 	static std::vector<const char*> lookup_wishlist;
 };

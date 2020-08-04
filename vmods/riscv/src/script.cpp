@@ -24,7 +24,7 @@ Script::Script(
 		.memory_max = 0,
 		.owning_machine = &source.machine()
 	  }),
-	  m_ctx(ctx), m_vrm(vrm)
+	  m_ctx(ctx), m_vrm(vrm), m_inst(source.instance())
 {
 	/* No initialization */
 	this->machine_setup(machine(), false);
@@ -40,9 +40,9 @@ Script::Script(
 
 Script::Script(
 	const std::vector<uint8_t>& binary,
-	const vrt_ctx* ctx, const vmod_riscv_machine* vrm)
+	const vrt_ctx* ctx, const vmod_riscv_machine* vrm, const MachineInstance& inst)
 	: m_machine(binary, { .memory_max = vrm->max_memory }),
-	  m_ctx(ctx), m_vrm(vrm)
+	  m_ctx(ctx), m_vrm(vrm), m_inst(inst)
 {
 	this->machine_initialize(true);
 }
@@ -55,7 +55,7 @@ Script::~Script()
 			VRE_free(&entry.re);
 }
 
-void Script::setup_virtual_memory()
+void Script::setup_virtual_memory(bool init)
 {
 	using namespace riscv;
 	auto& mem = machine().memory;
@@ -63,7 +63,7 @@ void Script::setup_virtual_memory()
 	// this separates heap and stack
 	mem.install_shared_page(STACK_PAGENO, Page::guard_page());
 
-	auto* ws = ctx()->ws;
+	auto* ws = (init) ? nullptr : ctx()->ws;
 	new (&ro_area) MemArea<MARCH> (machine(), RO_AREA_BEGIN, RO_AREA_END,
 		{ .write = false, .non_owning = true }, ws);
 	mem.install_shared_page(RO_AREA_END >> 12, Page::guard_page());
@@ -103,21 +103,18 @@ void Script::machine_setup(machine_t& machine, bool init)
 {
 	machine.set_userdata<Script>(this);
 
+	if (init == false)
+	{
 	machine.memory.set_page_fault_handler(
 		[this] (auto& mem, size_t pageno) -> riscv::Page& {
 			/* Pages are allocated from workspace */
 			//printf("Creating page %zu @ 0x%X\n", pageno, pageno * 4096);
-			bool dont_fork = false;
-			if (pageno >= STACK_PAGENO-128 && pageno < STACK_PAGENO) {
-				dont_fork = true;
-			}
 			auto* data =
 				(riscv::PageData*) WS_Alloc(m_ctx->ws, riscv::Page::size());
 			if (LIKELY(data != nullptr)) {
 				return mem.allocate_page(pageno,
 					riscv::PageAttributes{
 						.non_owning = true, // don't delete!
-						.dont_fork  = dont_fork,
 						.user_defined = 1 },
 					data);
 			}
@@ -142,9 +139,35 @@ void Script::machine_setup(machine_t& machine, bool init)
 			throw riscv::MachineException(
 				riscv::OUT_OF_MEMORY, "Out of memory", mem.pages_active());
 		});
+	}
+	else {
+		machine.memory.set_page_fault_handler(
+			[] (auto& mem, size_t pageno) -> riscv::Page& {
+				bool dont_fork = false;
+				if (pageno >= STACK_PAGENO-128 && pageno < STACK_PAGENO) {
+					dont_fork = true;
+				}
+				auto* data = new riscv::PageData {};
+				return mem.allocate_page(pageno,
+					riscv::PageAttributes{
+						.dont_fork  = dont_fork,
+						.user_defined = 1 },
+					data);
+			});
+		machine.memory.set_page_write_handler(
+			[] (auto& mem, riscv::Page& page) -> void {
+				assert(page.has_data() && page.attr.is_cow);
+				auto* data = new riscv::PageData {page.page()};
+				/* Release any already non-owned data */
+				if (page.attr.non_owning)
+					page.m_page.release();
+				page.attr.is_cow = false;
+				page.m_page.reset(data);
+			});
+	}
 
 	// page protections and "hidden" stacks
-	this->setup_virtual_memory();
+	this->setup_virtual_memory(init);
 	// stack
 	machine.cpu.reset_stack_pointer();
 
@@ -163,11 +186,16 @@ void Script::machine_setup(machine_t& machine, bool init)
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t0);
 #endif
-	this->m_arena = setup_native_heap_syscalls<MARCH>(
-		machine, vrm()->max_heap, [this] (size_t size) {
-			return WS_Alloc(m_ctx->ws, size);
-		});
-	//this->m_arena = setup_native_heap_syscalls<MARCH>(machine, vrm()->max_heap);
+	if (init == false)
+	{
+		this->m_arena = setup_native_heap_syscalls<MARCH>(
+			machine, vrm()->max_heap, [this] (size_t size) {
+				return WS_Alloc(m_ctx->ws, size);
+			});
+	} else {
+		this->m_arena =
+			setup_native_heap_syscalls<MARCH>(machine, vrm()->max_heap);
+	}
 
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t1);

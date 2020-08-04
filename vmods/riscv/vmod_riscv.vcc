@@ -89,6 +89,12 @@ $Method INT     .call_index(INT index)
 
   ypizza.call_index(0); /* Call on_client_request */
 
+$Method BACKEND .live_update(BYTES max_size = 2097152)
+
+- Update this machine using binary data received in the
+  current request. If the machine fails to load, the old machine
+  will be kept running.
+
 
 $Function VOID    add_known_function(STRING function)
 

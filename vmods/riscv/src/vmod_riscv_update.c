@@ -5,33 +5,8 @@
 #include "vcc_if.h"
 #include "vmod_util.h"
 
-typedef void (*set_header_t) (struct http*, const char*);
-extern const char* execute_riscv(void* workspace, set_header_t, void* http,
-	const uint8_t* binary, size_t len, uint64_t instr_max);
+extern const char* riscv_update(struct vmod_riscv_machine*, const uint8_t*, size_t);
 
-
-VCL_STRING
-vmod_exec(VRT_CTX, VCL_HTTP hp, VCL_INT instr_max, VCL_BLOB elf)
-{
-	CHECK_OBJ_NOTNULL(hp, HTTP_MAGIC);
-	(void) ctx;
-
-	if (elf == NULL)
-		return NULL;
-
-	const char* output = execute_riscv(ctx->ws,
-		http_SetHeader, hp, elf->priv, elf->len, instr_max);
-
-	return (output); /* leak */
-}
-
-VCL_BACKEND vmod_backend_from_body(VRT_CTX, struct vmod_riscv_backend *rvb)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	CHECK_OBJ_NOTNULL(rvb, RISCV_BACKEND_MAGIC);
-
-	return (&rvb->dir);
-}
 
 static void v_matchproto_(vdi_panic_f)
 riscvbe_panic(const struct director *dir, struct vsb *vsb)
@@ -43,7 +18,11 @@ riscvbe_panic(const struct director *dir, struct vsb *vsb)
 static void v_matchproto_(vdi_finish_f)
 riscvbe_finish(const struct director *dir, struct worker *wrk, struct busyobj *bo)
 {
-	(void) dir;
+	CHECK_OBJ_NOTNULL(dir, DIRECTOR_MAGIC);
+	struct vmod_riscv_updater *rvu = (struct vmod_riscv_updater *) dir->priv;
+	CHECK_OBJ_NOTNULL(rvu, RISCV_BACKEND_MAGIC);
+	//FREE_OBJ(dir);
+	//FREE_OBJ(rvu);
 	(void) wrk;
 	/* */
 	bo->htc = NULL;
@@ -70,7 +49,7 @@ pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 }
 
 static const struct vfp riscv_fetch_processor = {
-	.name = "riscv_backend",
+	.name = "riscv_updater_backend",
 	.pull = pull,
 };
 
@@ -141,12 +120,9 @@ riscvbe_gethdrs(const struct director *dir,
 	priv->priv = vsb;
 	priv->free = destroy_vsb;
 
-	/* execute the data as ELF */
+	/* Get the ELF binary */
 	const uint8_t *result_data = (const uint8_t *) VSB_data(vsb);
 	const size_t   result_len = VSB_len(vsb);
-
-	struct vmod_riscv_backend *rvb;
-	CAST_OBJ_NOTNULL(rvb, dir->priv, RISCV_BACKEND_MAGIC);
 
 	struct http *http = bo->beresp;
 	if (http == NULL)
@@ -158,22 +134,29 @@ riscvbe_gethdrs(const struct director *dir,
 		return (-1);
 	INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
 
-	/* simulate some RISC-V */
-	const char* output = execute_riscv(
-		bo->ws, http_SetHeader, http,
-		result_data, result_len, rvb->max_instructions);
+	/* Update this machine */
+	struct vmod_riscv_updater *rvu;
+	CAST_OBJ_NOTNULL(rvu, dir->priv, RISCV_BACKEND_MAGIC);
 
-	const size_t output_len = __builtin_strlen(output);
-	http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
-	http_PrintfHeader(bo->beresp, "Content-Length: %jd", output_len);
+	if (result_len <= rvu->max_binary_size)
+	{
+		const char* output = riscv_update(rvu->machine, result_data, result_len);
 
-	/* store the output in workspace and free result */
-	bo->htc->content_length = output_len;
-	bo->htc->priv = WS_Copy(bo->ws, output, output_len);
-	bo->htc->body_status = BS_LENGTH;
-	/* The zero-length string that can be returned is .rodata */
-	if (output != NULL && output[0] != 0)
-		free((void*) output);
+		const size_t output_len = __builtin_strlen(output);
+		http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
+		http_PrintfHeader(bo->beresp, "Content-Length: %jd", output_len);
+
+		/* store the output in workspace and free result */
+		bo->htc->content_length = output_len;
+		bo->htc->priv = WS_Copy(bo->ws, output, output_len);
+		bo->htc->body_status = BS_LENGTH;
+		/* The zero-length string that can be returned is .rodata */
+		if (output != NULL && output[0] != 0)
+			free((void*) output);
+	}
+	else {
+		http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
+	}
 	if (bo->htc->priv == NULL)
 		return (-1);
 
@@ -185,35 +168,25 @@ riscvbe_gethdrs(const struct director *dir,
 	return (0);
 }
 
-VCL_VOID
-vmod_backend__init(VRT_CTX, struct vmod_riscv_backend **init,
-	const char *vcl_name, VCL_INT max_instr, VCL_STRANDS args)
+VCL_BACKEND vmod_machine_live_update(VRT_CTX, struct vmod_riscv_machine *rvm, VCL_BYTES max_size)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	(void) vcl_name;
 
-	struct vmod_riscv_backend *rvb;
-	ALLOC_OBJ(rvb, RISCV_BACKEND_MAGIC);
-	AN(rvb);
+	struct vmod_riscv_updater *rvu;
+	ALLOC_OBJ(rvu, RISCV_BACKEND_MAGIC);
+	AN(rvu);
 
-	INIT_OBJ(&rvb->dir, DIRECTOR_MAGIC);
-	rvb->dir.priv = rvb;
-	rvb->dir.name = "RISC-V director";
-	rvb->dir.vcl_name = "TODO: fixme";
-	rvb->dir.gethdrs = riscvbe_gethdrs;
-	rvb->dir.finish  = riscvbe_finish;
-	rvb->dir.panic   = riscvbe_panic;
+	INIT_OBJ(&rvu->dir, DIRECTOR_MAGIC);
+	rvu->dir.priv = rvu;
+	rvu->dir.name = "RISC-V director";
+	rvu->dir.vcl_name = "vmod_machine_update";
+	rvu->dir.gethdrs = riscvbe_gethdrs;
+	rvu->dir.finish  = riscvbe_finish;
+	rvu->dir.panic   = riscvbe_panic;
 
-	rvb->max_instructions = max_instr;
+	rvu->max_binary_size = max_size;
+	rvu->machine = rvm;
 
-	*init = rvb; /* check this */
-}
-
-VCL_VOID
-vmod_backend__fini(struct vmod_riscv_backend **priv)
-{
-	struct vmod_riscv_backend *rvb;
-
-	TAKE_OBJ_NOTNULL(rvb, priv, RISCV_BACKEND_MAGIC);
-	FREE_OBJ(rvb);
+	/* TODO: use priv_task here? */
+	return &rvu->dir;
 }

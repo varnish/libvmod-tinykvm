@@ -53,14 +53,30 @@ vmod_riscv_machine* riscv_create(const char* name,
 		return nullptr;
 	}
 }
+extern "C"
+const char* riscv_update(vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
+{
+	try {
+		/* Note: CTX is NULL here */
+		std::vector<uint8_t> binary {data, data + len};
+		auto inst = std::make_unique<MachineInstance>(std::move(binary), nullptr, vrm);
+		vrm->machine.swap(inst);
+		/* TODO: not randomly drop old_instance */
+		inst.release();
+		return strdup("Update successful");
+	} catch (const std::exception& e) {
+		/* Pass the actual error back to the client */
+		return strdup(e.what());
+	}
+}
 
 extern "C"
 void riscv_prewarm(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 {
 	(void) ctx;
 	const auto site = vrm->callsite(func);
-	vrm->sym_lookup.emplace(strdup(site.name.c_str()), site.address);
-	vrm->sym_vector.push_back({site.name.c_str(), site.address, site.size});
+	vrm->machine->sym_lookup.emplace(strdup(site.name.c_str()), site.address);
+	vrm->machine->sym_vector.push_back({site.name.c_str(), site.address, site.size});
 }
 
 inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, Script::gaddr_t addr)
@@ -79,7 +95,7 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, Script::gaddr_t addr)
 		}
 
 		try {
-			new (script) Script{vrm->script, ctx, vrm};
+			new (script) Script{vrm->script(), ctx, vrm};
 
 		} catch (std::exception& e) {
 			VRT_fail(ctx,
@@ -133,9 +149,9 @@ int riscv_forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 extern "C"
 int riscv_forkcall_idx(VRT_CTX, vmod_riscv_machine* vrm, int index)
 {
-	if (index >= 0 && index < vrm->sym_vector.size())
+	if (index >= 0 && index < vrm->machine->sym_vector.size())
 	{
-		auto& entry = vrm->sym_vector[index];
+		auto& entry = vrm->machine->sym_vector[index];
 		if (UNLIKELY(entry.addr == 0)) {
 			VSLb(ctx->vsl, SLT_Error,
 				"VM call '%s' failed: The function is missing", entry.func);
@@ -204,9 +220,9 @@ int riscv_current_call_idx(VRT_CTX, int index)
 {
 	auto* script = get_machine(ctx);
 	if (script) {
-		if (index >= 0 && index < script->vrm()->sym_vector.size())
+		if (index >= 0 && index < script->instance().sym_vector.size())
 		{
-			auto& entry = script->vrm()->sym_vector[index];
+			auto& entry = script->instance().sym_vector[index];
 			if (UNLIKELY(entry.addr == 0)) {
 				VSLb(ctx->vsl, SLT_Error,
 					"VM call '%s' failed: The function at index %d is not availble",

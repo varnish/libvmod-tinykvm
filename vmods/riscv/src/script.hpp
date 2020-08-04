@@ -6,6 +6,7 @@
 #include "memarea.hpp"
 struct vrt_ctx;
 struct vmod_riscv_machine;
+struct MachineInstance;
 
 class Script {
 public:
@@ -29,6 +30,7 @@ public:
 
 	const auto* ctx() const noexcept { return m_ctx; }
 	const auto* vrm() const noexcept { return m_vrm; }
+	const auto& instance() const noexcept { return m_inst; }
 
 	uint64_t max_instructions() const noexcept;
 	const char* name() const noexcept;
@@ -57,12 +59,12 @@ public:
 
 	bool reset(); // true if the reset was successful
 
-	Script(const std::vector<uint8_t>&, const vrt_ctx*, const vmod_riscv_machine*);
+	Script(const std::vector<uint8_t>&, const vrt_ctx*, const vmod_riscv_machine*, const MachineInstance&);
 	Script(const Script& source, const vrt_ctx*, const vmod_riscv_machine*);
 	~Script();
 
 private:
-	void setup_virtual_memory();
+	void setup_virtual_memory(bool init);
 	void handle_exception(gaddr_t);
 	void handle_timeout(gaddr_t);
 	bool install_binary(const std::string& file, bool shared = true);
@@ -73,6 +75,7 @@ private:
 	machine_t m_machine;
 	const vrt_ctx* m_ctx;
 	const struct vmod_riscv_machine* m_vrm = nullptr;
+	const MachineInstance& m_inst;
 	void*       m_arena = nullptr;
 	gaddr_t     m_shm_address = RO_AREA_END; /* It's a stack */
 	int         m_want_status = 403;
