@@ -123,14 +123,16 @@ APICALL(shm_log)
 	auto* data = script.rw_area.host_addr(string, len);
 	if (data) {
 		VSLb(ctx->vsl, SLT_VCL_Log, "%.*s", (int) len, data);
-		return 0;
+		return len;
 	}
 	/* Fallback (with potential slow-path) */
-	script.machine().memory.memview(string, len,
-		[ctx] (const uint8_t* data, size_t len) {
-			VSLb(ctx->vsl, SLT_VCL_Log, "%.*s", (int) len, data);
-		});
-	return 0;
+	auto buffer = machine.memory.rvbuffer(string, len);
+	if (buffer.is_sequential()) {
+		VSLb(ctx->vsl, SLT_VCL_Log, "%.*s", (int) buffer.size(), buffer.c_str());
+		return len;
+	}
+	// TODO: slow-path
+	return -1;
 }
 
 APICALL(my_name)
@@ -513,16 +515,21 @@ APICALL(regex_subst)
 APICALL(regex_subst_hdr)
 {
 	auto [ridx, where, index, subst, all]
-		= machine.sysargs<uint32_t, int, uint32_t, std::string, int> ();
+		= machine.sysargs<uint32_t, int, uint32_t, riscv::Buffer, int> ();
 	auto* re = get_script(machine).regex_get(ridx);
 	auto* ctx = get_ctx(machine);
 	if (index == HDR_INVALID)
 		return -1;
 	auto [hp, field] = get_field(ctx, (gethdr_e) where, index);
 
+	const char* result = nullptr;
+
 	/* Run the regsub using existing 're' */
-	auto * result =
-		VRT_regsub(ctx, all, field.begin, re, subst.c_str());
+	if (subst.is_sequential()) {
+		result = VRT_regsub(ctx, all, field.begin, re, subst.c_str());
+	} else {
+		result = VRT_regsub(ctx, all, field.begin, re, subst.to_string().c_str());
+	}
 	if (result == nullptr)
 		return -1;
 

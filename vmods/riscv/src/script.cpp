@@ -163,11 +163,11 @@ void Script::machine_setup(machine_t& machine, bool init)
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t0);
 #endif
-	/*this->m_arena = setup_native_heap_syscalls<MARCH>(
+	this->m_arena = setup_native_heap_syscalls<MARCH>(
 		machine, vrm()->max_heap, [this] (size_t size) {
 			return WS_Alloc(m_ctx->ws, size);
-		});*/
-	this->m_arena = setup_native_heap_syscalls<MARCH>(machine, vrm()->max_heap);
+		});
+	//this->m_arena = setup_native_heap_syscalls<MARCH>(machine, vrm()->max_heap);
 
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t1);
