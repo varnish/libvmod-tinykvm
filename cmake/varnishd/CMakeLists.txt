@@ -301,3 +301,6 @@ endif()
 if (NOT SHARED_LIBRISCV)
 	target_link_libraries(varnishd stdc++ -Wl,--whole-archive sandbox -Wl,--no-whole-archive)
 endif()
+
+# faster
+target_link_libraries(varnishd stdc++ faster)

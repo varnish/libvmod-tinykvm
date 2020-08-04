@@ -22,3 +22,6 @@
 [submodule "vmods/riscv/libriscv"]
 	path = vmods/riscv/libriscv
 	url = git@github.com:fwsGonzo/libriscv.git
+[submodule "src/faster/fmt"]
+	path = src/faster/fmt
+	url = https://github.com/fmtlib/fmt.git
