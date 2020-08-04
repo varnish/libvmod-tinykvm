@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 3.0.2)
 project (sandbox CXX)
 
-option(SHARED_LIBRISCV "Build the libriscv sandbox as a VMOD" OFF)
+option(SHARED_LIBRISCV "Build the libriscv sandbox PIC" ON)
 
 # WARNING: everything!
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++20 -O2 -g")
