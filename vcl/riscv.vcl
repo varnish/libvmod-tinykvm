@@ -18,6 +18,10 @@ sub vcl_init {
 	riscv.add_known_function("on_backend_response");
 
 	/* Create some machines */
+	new xpizza = riscv.machine(
+		name = "xpizza.com",
+		filename = "/home/gonzo/github/rvscript/programs/hello_world",
+		max_instructions = 1000000);
 	new ypizza = riscv.machine(
 		name = "ypizza.com",
 		filename = "/home/gonzo/github/rvscript/programs/test",
@@ -26,7 +30,11 @@ sub vcl_init {
 }
 
 sub vcl_recv {
-	ypizza.call_index(0);  /* on_client_request */
+	if (req.url == "/") {
+		xpizza.call_index(0);  /* on_client_request */
+	} else {
+		ypizza.call_index(0);  /* on_client_request */
+	}
 
 	if (riscv.want_result() == "synth") {
 		return (synth(riscv.want_status()));
