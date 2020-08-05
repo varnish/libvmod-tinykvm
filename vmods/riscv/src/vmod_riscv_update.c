@@ -173,8 +173,15 @@ VCL_BACKEND vmod_machine_live_update(VRT_CTX, struct vmod_riscv_machine *rvm, VC
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
 	struct vmod_riscv_updater *rvu;
-	ALLOC_OBJ(rvu, RISCV_BACKEND_MAGIC);
-	AN(rvu);
+	rvu = WS_Alloc(ctx->ws, sizeof(struct vmod_riscv_updater));
+	if (rvu == NULL) {
+		VRT_fail(ctx, "");
+		return NULL;
+	}
+
+	INIT_OBJ(rvu, RISCV_BACKEND_MAGIC);
+	rvu->max_binary_size = max_size;
+	rvu->machine = rvm;
 
 	INIT_OBJ(&rvu->dir, DIRECTOR_MAGIC);
 	rvu->dir.priv = rvu;
@@ -184,9 +191,5 @@ VCL_BACKEND vmod_machine_live_update(VRT_CTX, struct vmod_riscv_machine *rvm, VC
 	rvu->dir.finish  = riscvbe_finish;
 	rvu->dir.panic   = riscvbe_panic;
 
-	rvu->max_binary_size = max_size;
-	rvu->machine = rvm;
-
-	/* TODO: use priv_task here? */
 	return &rvu->dir;
 }
