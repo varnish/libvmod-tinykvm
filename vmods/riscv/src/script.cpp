@@ -154,16 +154,6 @@ void Script::machine_setup(machine_t& machine, bool init)
 						.user_defined = 1 },
 					data);
 			});
-		machine.memory.set_page_write_handler(
-			[] (auto& mem, riscv::Page& page) -> void {
-				assert(page.has_data() && page.attr.is_cow);
-				auto* data = new riscv::PageData {page.page()};
-				/* Release any already non-owned data */
-				if (page.attr.non_owning)
-					page.m_page.release();
-				page.attr.is_cow = false;
-				page.m_page.reset(data);
-			});
 	}
 
 	// page protections and "hidden" stacks

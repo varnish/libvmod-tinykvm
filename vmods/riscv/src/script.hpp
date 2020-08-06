@@ -58,6 +58,8 @@ public:
 	void print_backtrace(const gaddr_t addr);
 
 	bool reset(); // true if the reset was successful
+	void decomission() { m_decomissioned = true; }
+	bool is_decomissioned() const noexcept { return m_decomissioned; }
 
 	Script(const std::vector<uint8_t>&, const vrt_ctx*, const vmod_riscv_machine*, const MachineInstance&);
 	Script(const Script& source, const vrt_ctx*, const vmod_riscv_machine*);
@@ -78,8 +80,10 @@ private:
 	const MachineInstance& m_inst;
 	void*       m_arena = nullptr;
 	gaddr_t     m_shm_address = RO_AREA_END; /* It's a stack */
-	int         m_want_status = 403;
+
 	std::string m_want_result;
+	int         m_want_status = 403;
+	bool        m_decomissioned = false;
 
 	struct RegexCache {
 		struct vre* re   = nullptr;

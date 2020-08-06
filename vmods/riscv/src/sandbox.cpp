@@ -56,13 +56,19 @@ vmod_riscv_machine* riscv_create(const char* name,
 extern "C"
 const char* riscv_update(vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
 {
+	/* ELF loader will not be run for empty binary */
+	if (UNLIKELY(data == nullptr || len == 0)) {
+		return strdup("Empty file received");
+	}
 	try {
 		/* Note: CTX is NULL here */
 		std::vector<uint8_t> binary {data, data + len};
 		auto inst = std::make_unique<MachineInstance>(std::move(binary), nullptr, vrm);
 		vrm->machine.swap(inst);
-		/* TODO: not randomly drop old_instance */
-		inst.release();
+		/* FIXME: not randomly drop old_instance */
+		auto* decomissioned = inst.release();
+		decomissioned->script.decomission();
+		/* TODO: delete when nobody uses it anymore */
 		return strdup("Update successful");
 	} catch (const std::exception& e) {
 		/* Pass the actual error back to the client */

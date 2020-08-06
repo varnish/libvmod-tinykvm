@@ -46,6 +46,10 @@ struct MemArea
 			offset += riscv::Page::size();
 		}
 	}
+	~MemArea() {
+		if (m_heap_alloced)
+			delete this->m_data;
+	}
 
 	address_t m_begin = 0;
 	address_t m_end   = 0;
