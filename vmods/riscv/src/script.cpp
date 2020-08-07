@@ -265,6 +265,10 @@ const char* Script::name() const noexcept
 {
 	return vrm()->name;
 }
+const char* Script::group() const noexcept
+{
+	return vrm()->group;
+}
 
 Script::gaddr_t Script::guest_alloc(size_t len)
 {

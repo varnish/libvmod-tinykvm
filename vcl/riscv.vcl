@@ -8,9 +8,6 @@ backend default {
 }
 
 sub vcl_init {
-	/* Initialize the VMOD with some mandatory settings */
-	riscv.init(default_filename = "/home/gonzo/github/rvscript/programs/default");
-
 	/* These functions will be callable on every machine created after */
 	riscv.add_known_function("on_client_request");
 	riscv.add_known_function("on_hash");
@@ -34,7 +31,6 @@ sub vcl_recv {
 	/* Live update mechanism */
 	if (req.method == "POST") {
 		std.cache_req_body(15MB);
-		set req.backend_hint = xpizza.live_update();
 		set req.backend_hint = ypizza.live_update();
 		return (pass);
 	}

@@ -17,9 +17,6 @@ unique, however it's intended to be used by CDNs who know what they are doing.
 
 Example:
 	sub vcl_init {
-		/* Initialize the VMOD with some mandatory settings */
-		riscv.init(default_filename = "/home/user/default_program");
-
 		/* These functions will be callable on every machine */
 		riscv.add_known_function("on_client_request");
 		riscv.add_known_function("on_synth");
@@ -27,6 +24,7 @@ Example:
 		/* Create some machines */
 		new ypizza = riscv.machine(
 			name = "ypizza.com",
+			group = "premium",
 			filename = "/path/to/binary");
 		/* This specific machine has more functions we can call */
 		ypizza.add_known_function("test");
@@ -52,17 +50,10 @@ Example:
 API
 ===
 
-$Function VOID init(STRING default_filename)
-
-- Set the filename for the machine to be loaded when any other machine
-  fails to load. This machine will act as a default replacement for
-  any missing or broken binaries supplied by tenants.
-
-
-$Object machine(STRING name, STRING filename, INT max_instructions = 2000000, STRANDS arguments = 0)
+$Object machine(STRING name, STRING filename, STRING group = "", INT max_instructions = 2000000)
 
 - Create named machine that is initialized immediately
-- Arguments are passed into the main() function
+- Broken machines return 500 server error
 
 $Method VOID    .add_known_function(STRING function)
 
@@ -117,7 +108,13 @@ $Function INT     call_index(INT index)
 
 $Function STRING  current_name()
 
-- Returns the name of the currently active (last running) machine.
+- Returns the name of the currently active machine.
+- If no machine has been running in the current stage of VCL,
+  this function will return null, which can be tested in if statements.
+
+$Function STRING  current_group()
+
+- Returns the group of the currently active machine.
 - If no machine has been running in the current stage of VCL,
   this function will return null, which can be tested in if statements.
 

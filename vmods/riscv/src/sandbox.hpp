@@ -40,9 +40,11 @@ struct MachineInstance {
 };
 
 struct vmod_riscv_machine {
-	vmod_riscv_machine(const char* nm, std::vector<uint8_t> elf,
-		VRT_CTX, uint64_t insn, uint64_t mem, uint64_t heap)
-		: name(nm), max_instructions(insn), max_memory(mem), max_heap(heap),
+	vmod_riscv_machine(const char* nm, const char* grp,
+		std::vector<uint8_t> elf, VRT_CTX,
+		uint64_t insn, uint64_t mem, uint64_t heap)
+		: name(nm), group(grp),
+		  max_instructions(insn), max_memory(mem), max_heap(heap),
 		  machine{std::make_unique<MachineInstance> (std::move(elf), ctx, this)}
 	{
 		/* */
@@ -61,6 +63,7 @@ struct vmod_riscv_machine {
 	/* Initialized during vcl_init */
 	const uint64_t magic = 0xb385716f486938e6;
 	const char*    name;
+	const char*    group;
 	const uint64_t max_instructions;
 	const uint64_t max_memory;
 	const uint64_t max_heap;

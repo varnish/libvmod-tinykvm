@@ -6,10 +6,9 @@
 #include "vcc_if.h"
 #include "vmod_util.h"
 
-extern void riscv_set_default(const char* filename);
 // Create new machine and call into it.
 extern struct vmod_riscv_machine* riscv_create(const char* name,
-	const char* file, VRT_CTX, uint64_t insn);
+	const char* file, const char* group, VRT_CTX, uint64_t insn);
 extern void riscv_prewarm(VRT_CTX, struct vmod_riscv_machine*, const char*);
 extern int riscv_forkcall(VRT_CTX, struct vmod_riscv_machine*, const char*);
 extern int riscv_forkcall_idx(VRT_CTX, struct vmod_riscv_machine*, int);
@@ -22,29 +21,21 @@ extern void riscv_add_known(VRT_CTX, const char* function);
 extern int riscv_current_call(VRT_CTX, const char*);
 extern int riscv_current_call_idx(VRT_CTX, int);
 extern const char* riscv_current_name(VRT_CTX);
+extern const char* riscv_current_group(VRT_CTX);
 extern const char* riscv_current_result(VRT_CTX);
 extern int riscv_current_result_status(VRT_CTX);
-
-VCL_VOID
-vmod_init(VRT_CTX, VCL_STRING elfpath)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	assert(elfpath != NULL);
-
-	riscv_set_default(elfpath);
-}
 
 /* Create new machine object, which can be used to fork new
    VMs for client requests and backend fetches, etc. */
 VCL_VOID
 vmod_machine__init(VRT_CTX, struct vmod_riscv_machine **init,
 	const char *vcl_name, VCL_STRING name, VCL_STRING elf,
-	VCL_INT max_instr, VCL_STRANDS args)
+	VCL_STRING group, VCL_INT max_instr)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	(void) vcl_name;
 
-	*init = riscv_create(name, elf, ctx, max_instr);
+	*init = riscv_create(name, group, elf, ctx, max_instr);
 }
 VCL_VOID
 vmod_machine__fini(struct vmod_riscv_machine **rvm)
@@ -119,6 +110,12 @@ VCL_STRING vmod_current_name(VRT_CTX)
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
 	return riscv_current_name(ctx);
+}
+VCL_STRING vmod_current_group(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	return riscv_current_group(ctx);
 }
 
 /* Returns a string that represents what the VM wants to happen next.

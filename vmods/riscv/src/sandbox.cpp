@@ -27,16 +27,11 @@ void riscv_set_default(const char* filename)
 
 static std::vector<uint8_t> file_loader(const char* file)
 {
-	try {
-		return load_file(file);
-	} catch (const std::exception& e) {
-		fprintf(stderr, "Exception: %s. Using default program.\n", e.what());
-		return load_file(riscv_default_program.c_str());
-	}
+	return load_file(file);
 }
 
 extern "C"
-vmod_riscv_machine* riscv_create(const char* name,
+vmod_riscv_machine* riscv_create(const char* name, const char* group,
 	const char* file, VRT_CTX, uint64_t insn)
 {
 	auto* vrm = (vmod_riscv_machine*) WS_Alloc(ctx->ws, sizeof(vmod_riscv_machine));
@@ -44,7 +39,7 @@ vmod_riscv_machine* riscv_create(const char* name,
 		VRT_fail(ctx, "Out of workspace");
 
 	try {
-		new (vrm) vmod_riscv_machine(name, file_loader(file), ctx,
+		new (vrm) vmod_riscv_machine(name, group, file_loader(file), ctx,
 			/* Max instr: */ insn, MAX_MEMORY, MAX_HEAP);
 		return vrm;
 	} catch (const std::exception& e) {
@@ -61,6 +56,9 @@ const char* riscv_update(vmod_riscv_machine* vrm, const uint8_t* data, size_t le
 		return strdup("Empty file received");
 	}
 	try {
+	#ifdef ENABLE_TIMING
+		TIMING_LOCATION(t0);
+	#endif
 		/* Note: CTX is NULL here */
 		std::vector<uint8_t> binary {data, data + len};
 		auto inst = std::make_unique<MachineInstance>(std::move(binary), nullptr, vrm);
@@ -68,6 +66,10 @@ const char* riscv_update(vmod_riscv_machine* vrm, const uint8_t* data, size_t le
 		/* FIXME: not randomly drop old_instance */
 		auto* decomissioned = inst.release();
 		decomissioned->script.decomission();
+	#ifdef ENABLE_TIMING
+		TIMING_LOCATION(t1);
+		printf("Time spent updating: %ld ns\n", nanodiff(t0, t1));
+	#endif
 		/* TODO: delete when nobody uses it anymore */
 		return strdup("Update successful");
 	} catch (const std::exception& e) {
@@ -260,6 +262,14 @@ int riscv_current_call_idx(VRT_CTX, int index)
 
 extern "C"
 const char* riscv_current_name(VRT_CTX)
+{
+	auto* script = get_machine(ctx);
+	if (script)
+		return script->name();
+	return nullptr;
+}
+extern "C"
+const char* riscv_current_group(VRT_CTX)
 {
 	auto* script = get_machine(ctx);
 	if (script)

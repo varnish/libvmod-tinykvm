@@ -10,7 +10,7 @@ struct MachineInstance;
 
 class Script {
 public:
-	static constexpr int MARCH = riscv::RISCV64;
+	static constexpr int MARCH = riscv::RISCV32;
 	using gaddr_t = riscv::address_type<MARCH>;
 	using machine_t = riscv::Machine<MARCH>;
 	static constexpr gaddr_t RO_AREA_BEGIN = 0x10000;
@@ -34,6 +34,7 @@ public:
 
 	uint64_t max_instructions() const noexcept;
 	const char* name() const noexcept;
+	const char* group() const noexcept;
 	auto* want_result() const noexcept { return m_want_result.c_str(); }
 	int want_status() const noexcept { return m_want_status; }
 	void set_result(const std::string& res, int status) {
