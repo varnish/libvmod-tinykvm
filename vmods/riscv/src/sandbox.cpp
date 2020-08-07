@@ -87,7 +87,7 @@ void riscv_prewarm(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 	vrm->machine->sym_vector.push_back({site.name.c_str(), site.address, site.size});
 }
 
-inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, Script::gaddr_t addr)
+inline Script* vmfork(VRT_CTX, vmod_riscv_machine* vrm)
 {
 	auto* priv_task = VRT_priv_task(ctx, ctx);
 	if (!priv_task->priv)
@@ -99,7 +99,7 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, Script::gaddr_t addr)
 		auto* script = (Script*) WS_Alloc(ctx->ws, sizeof(Script));
 		if (UNLIKELY(script == nullptr)) {
 			VRT_fail(ctx, "Out of workspace");
-			return -1;
+			return nullptr;
 		}
 
 		try {
@@ -108,7 +108,7 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, Script::gaddr_t addr)
 		} catch (std::exception& e) {
 			VRT_fail(ctx,
 				"VM '%s' exception: %s", script->name(), e.what());
-			return -1;
+			return nullptr;
 		}
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);
@@ -126,9 +126,26 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, Script::gaddr_t addr)
 			TIMING_LOCATION(t3);
 			printf("Time spent in destructor: %ld ns\n", nanodiff(t2, t3));
 		#endif
-			};
+		};
 	}
-	auto* script = (Script*) priv_task->priv;
+	return (Script*) priv_task->priv;
+}
+
+extern "C"
+int riscv_fork(VRT_CTX, vmod_riscv_machine* vrm)
+{
+	auto* script = vmfork(ctx, vrm);
+	if (UNLIKELY(script == nullptr))
+		return -1;
+
+	return 0;
+}
+
+inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, Script::gaddr_t addr)
+{
+	auto* script = vmfork(ctx, vrm);
+	if (UNLIKELY(script == nullptr))
+		return -1;
 
 	/* Call into the virtual machine */
 #ifdef ENABLE_TIMING

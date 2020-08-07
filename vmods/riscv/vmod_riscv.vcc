@@ -50,6 +50,13 @@ Example:
 API
 ===
 
+$Function VOID add_known_function(STRING function)
+
+- Adds the given function to a list of functions that will be
+  automatically pre-warmed on each new machine created. The
+  function does not have to exist on every machine.
+
+
 $Object machine(STRING name, STRING filename, STRING group = "", INT max_instructions = 2000000)
 
 - Create named machine that is initialized immediately
@@ -59,16 +66,21 @@ $Method VOID    .add_known_function(STRING function)
 
 - Make this function faster to call later on.
 
+$Method INT     .fork()
+
+- Create a new virtual machine quickly forked from the previously
+  prepared machine, using copy-on-write mechanics.
+
 $Method INT     .call(STRING function)
 
-- Call into a new virtual machine quickly forked from the previously
-  prepared machine, using copy-on-write mechanics.
+- Call given function in this virtual machine.
+- If no machine is forked, fork.
 
 $Method INT     .call_index(INT index)
 
-- Call into a new virtual machine quickly forked from the previously
-  created machine, using copy-on-write mechanics. The index is the
-  entry number (counting from zero) given to add_known_function.
+- Call given function in this virtual machine.
+- If no machine is forked, fork.
+- The index is the entry number (counting from zero) given to add_known_function.
 
   Example:
 
@@ -86,12 +98,6 @@ $Method BACKEND .live_update(BYTES max_size = 2097152)
   current request. If the machine fails to load, the old machine
   will be kept running.
 
-
-$Function VOID    add_known_function(STRING function)
-
-- Adds the given function to a list of functions that will be
-  automatically pre-warmed on each new machine created. The
-  function does not have to exist on every machine.
 
 $Function BOOL    machine_present()
 
@@ -126,6 +132,11 @@ $Function STRING  want_result()
 $Function INT     want_status()
 
 - Returns the status code that the guest wants to use, if relevant.
+
+$Function BACKEND vm_backend()
+
+- Returns a backend that will call into the current machine to produce a response.
+- Produces 500 server error if there is no active machine, or an error happens.
 
 
 SIMPLE EXECUTION

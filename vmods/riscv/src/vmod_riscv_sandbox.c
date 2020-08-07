@@ -10,6 +10,7 @@
 extern struct vmod_riscv_machine* riscv_create(const char* name,
 	const char* file, const char* group, VRT_CTX, uint64_t insn);
 extern void riscv_prewarm(VRT_CTX, struct vmod_riscv_machine*, const char*);
+extern int riscv_fork(VRT_CTX, struct vmod_riscv_machine*);
 extern int riscv_forkcall(VRT_CTX, struct vmod_riscv_machine*, const char*);
 extern int riscv_forkcall_idx(VRT_CTX, struct vmod_riscv_machine*, int);
 extern int riscv_free(struct vmod_riscv_machine*);
@@ -46,6 +47,15 @@ vmod_machine__fini(struct vmod_riscv_machine **rvm)
 	*rvm = NULL;
 }
 
+/* Fork into a new VM. The VM is freed when the
+   request (priv_task) ends. */
+VCL_INT vmod_machine_fork(VRT_CTX, struct vmod_riscv_machine *rvm)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(rvm, RISCV_MACHINE_MAGIC);
+
+	return riscv_fork(ctx, rvm);
+}
 /* Fork and call into a new VM. The VM is freed when the
    request (priv_task) ends. */
 VCL_INT vmod_machine_call(VRT_CTX,
@@ -133,4 +143,13 @@ VCL_INT vmod_want_status(VRT_CTX)
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
 	return riscv_current_result_status(ctx);
+}
+
+/* Returns the status code the VM wants to return, when relevant.
+   Such as when calling synth(). */
+VCL_BACKEND vmod_vm_backend(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	return NULL;
 }
