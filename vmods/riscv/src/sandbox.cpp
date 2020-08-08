@@ -87,7 +87,7 @@ void riscv_prewarm(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 	vrm->machine->sym_vector.push_back({site.name.c_str(), site.address, site.size});
 }
 
-inline Script* vmfork(VRT_CTX, vmod_riscv_machine* vrm)
+inline Script* vmfork(VRT_CTX, const vmod_riscv_machine* vrm)
 {
 	auto* priv_task = VRT_priv_task(ctx, ctx);
 	if (!priv_task->priv)
@@ -218,7 +218,17 @@ inline Script* get_machine(VRT_CTX)
 }
 
 extern "C"
-int riscv_current_call(VRT_CTX, const char* func)
+const struct vmod_riscv_machine* riscv_current_machine(VRT_CTX)
+{
+	auto* script = get_machine(ctx);
+	if (script) {
+		return script->vrm();
+	}
+	return nullptr;
+}
+
+extern "C"
+long riscv_current_call(VRT_CTX, const char* func)
 {
 	auto* script = get_machine(ctx);
 	if (script) {
@@ -241,7 +251,7 @@ int riscv_current_call(VRT_CTX, const char* func)
 	return -1;
 }
 extern "C"
-int riscv_current_call_idx(VRT_CTX, int index)
+long riscv_current_call_idx(VRT_CTX, int index)
 {
 	auto* script = get_machine(ctx);
 	if (script) {
@@ -307,7 +317,35 @@ int riscv_current_result_status(VRT_CTX)
 	auto* script = get_machine(ctx);
 	if (script)
 		return script->want_status();
-	return 400;
+	return 503;
+}
+
+extern "C"
+std::pair<const char*, size_t> riscv_string_call(VRT_CTX, const char* func)
+{
+	long res = riscv_current_call(ctx, func);
+	if (res > 0)
+	{
+		auto* script = get_machine(ctx);
+		if (script) {
+			try {
+				/* Get return address */
+				const auto addr = script->machine().cpu.reg(10);
+				const auto size = script->machine().cpu.reg(11);
+				/* Convert return address into string */
+				const auto buffer = script->machine().memory.rvbuffer(addr, size);
+				if (buffer.is_sequential())
+					return {strdup(buffer.c_str()), buffer.size()};
+				else
+					return {strdup(buffer.to_string().c_str()), buffer.size()};
+			} catch (std::exception& e) {
+				VRT_fail(ctx,
+					"VM '%s' exception: %s", script->name(), e.what());
+				return {nullptr, 0};
+			}
+		}
+	}
+	return {nullptr, 0};
 }
 
 #include <unistd.h>

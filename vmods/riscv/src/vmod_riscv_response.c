@@ -5,8 +5,12 @@
 #include "vcc_if.h"
 #include "vmod_util.h"
 
-extern const char* riscv_update(struct vmod_riscv_machine*, const uint8_t*, size_t);
-
+extern struct vmod_riscv_machine* riscv_current_machine(VRT_CTX);
+struct backend_buffer {
+	const char* data;
+	size_t      size;
+};
+extern struct backend_buffer riscv_string_call(VRT_CTX, const char*);
 
 static void v_matchproto_(vdi_panic_f)
 riscvbe_panic(const struct director *dir, struct vsb *vsb)
@@ -49,7 +53,7 @@ pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 }
 
 static const struct vfp riscv_fetch_processor = {
-	.name = "riscv_updater_backend",
+	.name = "riscv_response_backend",
 	.pull = pull,
 };
 
@@ -68,32 +72,6 @@ vfp_init(struct busyobj *bo)
 	vfe->priv2 = bo->htc->content_length;
 }
 
-
-static int
-aggregate_body(void *priv, int flush, int last, const void *ptr, ssize_t len)
-{
-	struct vsb *vsb = (struct vsb *)priv;
-
-	(void)flush;
-	(void)last;
-
-	CAST_OBJ_NOTNULL(vsb, priv, VSB_MAGIC);
-
-	VSB_bcat(vsb, ptr, len);
-	return (0);
-}
-
-static void v_matchproto_(vmod_priv_free_f)
-destroy_vsb(void *priv)
-{
-	struct vsb *vsb;
-
-	AN(priv);
-	CAST_OBJ_NOTNULL(vsb, priv, VSB_MAGIC);
-
-	VSB_destroy(&vsb);
-}
-
 static int v_matchproto_(vdi_gethdrs_f)
 riscvbe_gethdrs(const struct director *dir,
 	struct worker *wrk, struct busyobj *bo)
@@ -105,25 +83,6 @@ riscvbe_gethdrs(const struct director *dir,
 	CHECK_OBJ_NOTNULL(bo->beresp, HTTP_MAGIC);
 	AZ(bo->htc);
 
-	/* Put request BODY into vsb */
-	struct vsb *vsb = VSB_new_auto();
-	AN(vsb);
-	if (bo->req)
-		VRB_Iterate(bo->req, aggregate_body, vsb);
-	else if (bo->bereq_body)
-		ObjIterate(bo->wrk, bo->bereq_body, vsb, aggregate_body,
-		    0, 0, -1);
-	VSB_finish(vsb);
-
-	/* cleanup for vsb */
-	struct vmod_priv *priv = vmod_util_get_priv_task(NULL, bo, dir);
-	priv->priv = vsb;
-	priv->free = destroy_vsb;
-
-	/* Get the ELF binary */
-	const uint8_t *result_data = (const uint8_t *) VSB_data(vsb);
-	const size_t   result_len = VSB_len(vsb);
-
 	struct http *http = bo->beresp;
 	if (http == NULL)
 		return (-1);
@@ -134,31 +93,28 @@ riscvbe_gethdrs(const struct director *dir,
 		return (-1);
 	INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
 
-	/* Update this machine */
-	struct vmod_riscv_updater *rvu;
-	CAST_OBJ_NOTNULL(rvu, dir->priv, RISCV_BACKEND_MAGIC);
+	/* Produce backend response */
+	struct vmod_riscv_response *rvr;
+	CAST_OBJ_NOTNULL(rvr, dir->priv, RISCV_BACKEND_MAGIC);
 
-	if (result_len <= rvu->max_binary_size)
+	const char* output = rvr->output_data;
+	if (output != NULL)
 	{
-		const char* output = riscv_update(rvu->machine, result_data, result_len);
-
-		const size_t output_len = __builtin_strlen(output);
 		http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
-		http_PrintfHeader(bo->beresp, "Content-Length: %jd", output_len);
+		http_PrintfHeader(bo->beresp, "Content-Length: %jd", rvr->output_size);
 
 		/* store the output in workspace and free result */
-		bo->htc->content_length = output_len;
-		bo->htc->priv = WS_Copy(bo->ws, output, output_len);
+		bo->htc->content_length = rvr->output_size;
+		bo->htc->priv = WS_Copy(bo->ws, output, rvr->output_size);
 		bo->htc->body_status = BS_LENGTH;
-		/* The zero-length string that can be returned is .rodata */
-		if (output != NULL && output[0] != 0)
-			free((void*) output);
+
+		free((void*) output);
+		if (bo->htc->priv == NULL)
+			return (-1);
 	}
 	else {
 		http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
 	}
-	if (bo->htc->priv == NULL)
-		return (-1);
 
 	/* We need to call this function specifically, otherwise
 	   nobody will call our VFP functions */
@@ -168,28 +124,31 @@ riscvbe_gethdrs(const struct director *dir,
 	return (0);
 }
 
-VCL_BACKEND vmod_machine_live_update(VRT_CTX, struct vmod_riscv_machine *rvm, VCL_BYTES max_size)
+VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING func)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
-	struct vmod_riscv_updater *rvu;
-	rvu = WS_Alloc(ctx->ws, sizeof(struct vmod_riscv_updater));
-	if (rvu == NULL) {
-		VRT_fail(ctx, "Unable to allocate memory for update");
+	struct vmod_riscv_response *rvr;
+	rvr = WS_Alloc(ctx->ws, sizeof(struct vmod_riscv_response));
+	if (rvr == NULL) {
+		VRT_fail(ctx, "Out of memory");
 		return NULL;
 	}
 
-	INIT_OBJ(rvu, RISCV_BACKEND_MAGIC);
-	rvu->max_binary_size = max_size;
-	rvu->machine = rvm;
+	struct backend_buffer output = riscv_string_call(ctx, func);
 
-	INIT_OBJ(&rvu->dir, DIRECTOR_MAGIC);
-	rvu->dir.priv = rvu;
-	rvu->dir.name = "VM updater director";
-	rvu->dir.vcl_name = "vmod_machine_update";
-	rvu->dir.gethdrs = riscvbe_gethdrs;
-	rvu->dir.finish  = riscvbe_finish;
-	rvu->dir.panic   = riscvbe_panic;
+	INIT_OBJ(rvr, RISCV_BACKEND_MAGIC);
+	rvr->output_data = output.data;
+	rvr->output_size = output.size;
+	rvr->max_response_size = 0;
 
-	return &rvu->dir;
+	INIT_OBJ(&rvr->dir, DIRECTOR_MAGIC);
+	rvr->dir.priv = rvr;
+	rvr->dir.name = "VM response director";
+	rvr->dir.vcl_name = "vmod_vm_backend";
+	rvr->dir.gethdrs = riscvbe_gethdrs;
+	rvr->dir.finish  = riscvbe_finish;
+	rvr->dir.panic   = riscvbe_panic;
+
+	return &rvr->dir;
 }

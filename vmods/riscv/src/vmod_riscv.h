@@ -26,3 +26,13 @@ struct vmod_riscv_updater
 	uint64_t max_binary_size;
 	struct vmod_riscv_machine *machine;
 };
+
+struct vmod_riscv_response
+{
+	uint64_t magic;
+	struct director dir;
+
+	const char* output_data;
+	size_t      output_size;
+	uint64_t max_response_size;
+};

@@ -144,12 +144,3 @@ VCL_INT vmod_want_status(VRT_CTX)
 
 	return riscv_current_result_status(ctx);
 }
-
-/* Returns the status code the VM wants to return, when relevant.
-   Such as when calling synth(). */
-VCL_BACKEND vmod_vm_backend(VRT_CTX)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-
-	return NULL;
-}

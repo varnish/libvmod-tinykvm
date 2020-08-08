@@ -50,7 +50,7 @@ struct vmod_riscv_machine {
 		/* */
 	}
 
-	auto& script() { return machine->script; }
+	const auto& script() const { return machine->script; }
 	inline Script::gaddr_t lookup(const char* name) const {
 		return machine->lookup(name);
 	}
