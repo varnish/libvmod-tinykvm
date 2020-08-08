@@ -332,12 +332,9 @@ std::pair<const char*, size_t> riscv_string_call(VRT_CTX, const char* func)
 				/* Get return address */
 				const auto addr = script->machine().cpu.reg(10);
 				const auto size = script->machine().cpu.reg(11);
-				/* Convert return address into string */
+				/* Convert return address into byte array */
 				const auto buffer = script->machine().memory.rvbuffer(addr, size);
-				if (buffer.is_sequential())
-					return {strdup(buffer.c_str()), buffer.size()};
-				else
-					return {strdup(buffer.to_string().c_str()), buffer.size()};
+				return {buffer.to_buffer(), buffer.size()};
 			} catch (std::exception& e) {
 				VRT_fail(ctx,
 					"VM '%s' exception: %s", script->name(), e.what());
