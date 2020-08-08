@@ -133,7 +133,7 @@ $Function INT     want_status()
 
 - Returns the status code that the guest wants to use, if relevant.
 
-$Function BACKEND vm_backend(STRING function)
+$Function BACKEND vm_backend()
 
 - Returns a backend that will call into the current machine to produce a response.
 - Produces 500 server error if there is no active machine, or an error happens.

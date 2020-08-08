@@ -42,15 +42,13 @@ sub vcl_recv {
 	} else {
 		ypizza.call_index(0);  /* on_client_request */
 	}
-	set req.backend_hint = riscv.vm_backend("my_page");
-	return (pass);
 
 	/* Make decision */
 	if (riscv.want_result() == "synth") {
 		return (synth(riscv.want_status()));
 	}
 	else if (riscv.want_result() == "backend") {
-		set req.backend_hint = riscv.vm_backend("my_page");
+		set req.backend_hint = riscv.vm_backend();
 		return (pass);
 	}
 

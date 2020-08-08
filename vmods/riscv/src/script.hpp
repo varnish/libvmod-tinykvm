@@ -36,9 +36,9 @@ public:
 	const char* name() const noexcept;
 	const char* group() const noexcept;
 	auto* want_result() const noexcept { return m_want_result.c_str(); }
-	int want_status() const noexcept { return m_want_status; }
-	void set_result(const std::string& res, int status) {
-		m_want_result = res; m_want_status = status;
+	gaddr_t want_value() const noexcept { return m_want_value; }
+	void set_result(const std::string& res, gaddr_t value) {
+		m_want_result = res; m_want_value = value;
 	}
 
 	gaddr_t guest_alloc(size_t len);
@@ -83,7 +83,7 @@ private:
 	gaddr_t     m_shm_address = RO_AREA_END; /* It's a stack */
 
 	std::string m_want_result;
-	int         m_want_status = 403;
+	gaddr_t     m_want_value = 403;
 	bool        m_decomissioned = false;
 
 	struct RegexCache {

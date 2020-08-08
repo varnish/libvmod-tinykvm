@@ -38,6 +38,6 @@ struct vmod_riscv_response
 	struct director dir;
 
 	struct vmod_riscv_machine *machine;
-	const char* func;
+	uint64_t func;
 	uint64_t max_response_size;
 };

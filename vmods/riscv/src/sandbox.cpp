@@ -312,11 +312,11 @@ const char* riscv_current_result(VRT_CTX)
 	return nullptr;
 }
 extern "C"
-int riscv_current_result_status(VRT_CTX)
+long riscv_current_result_status(VRT_CTX)
 {
 	auto* script = get_machine(ctx);
 	if (script)
-		return script->want_status();
+		return script->want_value();
 	return 503;
 }
 
@@ -326,14 +326,8 @@ struct backend_buffer {
 	unsigned    size;
 };
 extern "C"
-struct backend_buffer riscv_backend_call(VRT_CTX, struct vmod_riscv_machine* vrm, const char* func)
+struct backend_buffer riscv_backend_call(VRT_CTX, struct vmod_riscv_machine* vrm, long func)
 {
-	const auto addr = vrm->lookup(func);
-	if (UNLIKELY(addr == 0)) {
-		VSLb(ctx->vsl, SLT_Error,
-			"VM call '%s' failed: The function is missing", func);
-		return {nullptr, nullptr, 0};
-	}
 	auto* script = (Script*) WS_Alloc(ctx->ws, sizeof(Script));
 	if (UNLIKELY(script == nullptr)) {
 		VSLb(ctx->vsl, SLT_Error, "Out of workspace");
@@ -348,7 +342,7 @@ struct backend_buffer riscv_backend_call(VRT_CTX, struct vmod_riscv_machine* vrm
 	}
 	/* Call the backend response function */
 	try {
-		script->machine().vmcall(addr);
+		script->machine().vmcall(func);
 		/* Get content-type and data */
 		const auto [type, data] = script->machine().sysargs<std::string, riscv::Buffer> ();
 		/* Return content-type, data, size */
