@@ -124,10 +124,6 @@ riscvbe_gethdrs(const struct director *dir,
 	const uint8_t *result_data = (const uint8_t *) VSB_data(vsb);
 	const size_t   result_len = VSB_len(vsb);
 
-	struct http *http = bo->beresp;
-	if (http == NULL)
-		return (-1);
-
 	/* finish the backend request */
 	bo->htc = WS_Alloc(bo->ws, sizeof *bo->htc);
 	if (bo->htc == NULL)
