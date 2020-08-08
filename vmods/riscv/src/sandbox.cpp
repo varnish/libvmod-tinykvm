@@ -326,7 +326,7 @@ struct backend_buffer {
 	unsigned    size;
 };
 extern "C"
-struct backend_buffer riscv_string_call(VRT_CTX, const char* func)
+struct backend_buffer riscv_backend_call(VRT_CTX, const char* func)
 {
 	if (riscv_current_call(ctx, func) > 0)
 	{

@@ -6,7 +6,7 @@
 #include "vmod_util.h"
 
 extern struct vmod_riscv_machine* riscv_current_machine(VRT_CTX);
-extern struct backend_buffer riscv_string_call(VRT_CTX, const char*);
+extern struct backend_buffer riscv_backend_call(VRT_CTX, const char*);
 
 static void v_matchproto_(vdi_panic_f)
 riscvbe_panic(const struct director *dir, struct vsb *vsb)
@@ -133,7 +133,7 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING func)
 	}
 
 	INIT_OBJ(rvr, RISCV_BACKEND_MAGIC);
-	rvr->output = riscv_string_call(ctx, func);
+	rvr->output = riscv_backend_call(ctx, func);
 	rvr->max_response_size = 0;
 
 	INIT_OBJ(&rvr->dir, DIRECTOR_MAGIC);
