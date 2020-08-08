@@ -27,12 +27,16 @@ struct vmod_riscv_updater
 	struct vmod_riscv_machine *machine;
 };
 
+struct backend_buffer {
+	const char* type;
+	const char* data;
+	unsigned    size;
+};
 struct vmod_riscv_response
 {
 	uint64_t magic;
 	struct director dir;
 
-	const char* output_data;
-	size_t      output_size;
+	struct backend_buffer output;
 	uint64_t max_response_size;
 };

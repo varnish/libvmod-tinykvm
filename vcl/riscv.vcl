@@ -14,6 +14,7 @@ sub vcl_init {
 	riscv.add_known_function("on_synth");
 	riscv.add_known_function("on_backend_fetch");
 	riscv.add_known_function("on_backend_response");
+	riscv.add_known_function("my_page");
 
 	/* Create some machines */
 	new xpizza = riscv.machine(

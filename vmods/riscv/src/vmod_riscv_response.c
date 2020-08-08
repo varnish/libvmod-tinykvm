@@ -6,10 +6,6 @@
 #include "vmod_util.h"
 
 extern struct vmod_riscv_machine* riscv_current_machine(VRT_CTX);
-struct backend_buffer {
-	const char* data;
-	size_t      size;
-};
 extern struct backend_buffer riscv_string_call(VRT_CTX, const char*);
 
 static void v_matchproto_(vdi_panic_f)
@@ -97,24 +93,25 @@ riscvbe_gethdrs(const struct director *dir,
 	struct vmod_riscv_response *rvr;
 	CAST_OBJ_NOTNULL(rvr, dir->priv, RISCV_BACKEND_MAGIC);
 
-	const char* output = rvr->output_data;
-	if (output != NULL)
+	if (rvr->output.data != NULL && rvr->output.type != NULL)
 	{
 		http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
-		http_PrintfHeader(bo->beresp, "Content-Length: %jd", rvr->output_size);
+		http_PrintfHeader(bo->beresp, "Content-Length: %u", rvr->output.size);
+		http_PrintfHeader(bo->beresp, "Content-Type: %s", rvr->output.type);
 
 		/* store the output in workspace and free result */
-		bo->htc->content_length = rvr->output_size;
-		bo->htc->priv = WS_Copy(bo->ws, output, rvr->output_size);
+		bo->htc->content_length = rvr->output.size;
+		bo->htc->priv = WS_Copy(bo->ws, rvr->output.data, rvr->output.size);
 		bo->htc->body_status = BS_LENGTH;
 
-		free((void*) output);
 		if (bo->htc->priv == NULL)
 			return (-1);
 	}
 	else {
 		http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
 	}
+	free((void*) rvr->output.data);
+	free((void*) rvr->output.type);
 
 	/* We need to call this function specifically, otherwise
 	   nobody will call our VFP functions */
@@ -135,11 +132,8 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING func)
 		return NULL;
 	}
 
-	struct backend_buffer output = riscv_string_call(ctx, func);
-
 	INIT_OBJ(rvr, RISCV_BACKEND_MAGIC);
-	rvr->output_data = output.data;
-	rvr->output_size = output.size;
+	rvr->output = riscv_string_call(ctx, func);
 	rvr->max_response_size = 0;
 
 	INIT_OBJ(&rvr->dir, DIRECTOR_MAGIC);

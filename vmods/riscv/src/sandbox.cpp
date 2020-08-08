@@ -320,29 +320,31 @@ int riscv_current_result_status(VRT_CTX)
 	return 503;
 }
 
+struct backend_buffer {
+	const char* type;
+	const char* data;
+	unsigned    size;
+};
 extern "C"
-std::pair<const char*, size_t> riscv_string_call(VRT_CTX, const char* func)
+struct backend_buffer riscv_string_call(VRT_CTX, const char* func)
 {
-	long res = riscv_current_call(ctx, func);
-	if (res > 0)
+	if (riscv_current_call(ctx, func) > 0)
 	{
 		auto* script = get_machine(ctx);
 		if (script) {
 			try {
-				/* Get return address */
-				const auto addr = script->machine().cpu.reg(10);
-				const auto size = script->machine().cpu.reg(11);
-				/* Convert return address into byte array */
-				const auto buffer = script->machine().memory.rvbuffer(addr, size);
-				return {buffer.to_buffer(), buffer.size()};
+				/* Get content-type and data */
+				const auto [type, data] = script->machine().sysargs<std::string, riscv::Buffer> ();
+				/* Return content-type, data, size */
+				return {strdup(type.c_str()), data.to_buffer(), (unsigned) data.size()};
 			} catch (std::exception& e) {
 				VRT_fail(ctx,
 					"VM '%s' exception: %s", script->name(), e.what());
-				return {nullptr, 0};
+				return {nullptr, nullptr, 0};
 			}
 		}
 	}
-	return {nullptr, 0};
+	return {nullptr, nullptr, 0};
 }
 
 #include <unistd.h>
