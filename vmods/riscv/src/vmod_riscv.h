@@ -37,6 +37,7 @@ struct vmod_riscv_response
 	uint64_t magic;
 	struct director dir;
 
-	struct backend_buffer output;
+	struct vmod_riscv_machine *machine;
+	const char* func;
 	uint64_t max_response_size;
 };

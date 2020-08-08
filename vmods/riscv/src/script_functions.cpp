@@ -52,10 +52,26 @@ inline bool is_valid_index(const http* hp, unsigned idx) {
 inline http*
 get_http(VRT_CTX, int where)
 {
-	auto* hp = VRT_selecthttp(ctx, (gethdr_e) where);
+	struct http* hp = nullptr;
+	switch (where) {
+	case HDR_REQ:
+		hp = ctx->http_req;
+		break;
+	case HDR_REQ_TOP:
+		hp = ctx->http_req_top;
+		break;
+	case HDR_BEREQ:
+		hp = ctx->http_bereq;
+		break;
+	case HDR_BERESP:
+		hp = ctx->http_beresp;
+		break;
+	case HDR_RESP:
+		hp = ctx->http_resp;
+		break;
+	}
 	if (UNLIKELY(hp == nullptr))
 		throw std::runtime_error("Selected HTTP not available at this time");
-
 	return hp;
 }
 inline std::tuple<http*, txt&>
@@ -357,14 +373,14 @@ APICALL(header_field_retrieve)
 
 APICALL(header_field_append)
 {
-	auto [where, field, len] = machine.sysargs<int, uint32_t, uint32_t> ();
+	auto [where, field, len] = machine.sysargs<int, gaddr_t, uint32_t> ();
 	const auto* ctx = get_ctx(machine);
 	auto* hp = get_http(ctx, (gethdr_e) where);
 
 	auto* val = (char*) WS_Alloc(ctx->ws, len+1);
 	if (val == nullptr)
 		throw std::runtime_error("Unable to make room for HTTP header field");
-	machine.memory.memcpy_out(val, (uint32_t) field, len);
+	machine.memory.memcpy_out(val, (gaddr_t) field, len);
 	val[len] = 0;
 
 	if (UNLIKELY(hp->field_count >= hp->fields_max)) {

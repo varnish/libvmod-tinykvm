@@ -326,25 +326,41 @@ struct backend_buffer {
 	unsigned    size;
 };
 extern "C"
-struct backend_buffer riscv_backend_call(VRT_CTX, const char* func)
+struct backend_buffer riscv_backend_call(VRT_CTX, struct vmod_riscv_machine* vrm, const char* func)
 {
-	if (riscv_current_call(ctx, func) > 0)
-	{
-		auto* script = get_machine(ctx);
-		if (script) {
-			try {
-				/* Get content-type and data */
-				const auto [type, data] = script->machine().sysargs<std::string, riscv::Buffer> ();
-				/* Return content-type, data, size */
-				return {strdup(type.c_str()), data.to_buffer(), (unsigned) data.size()};
-			} catch (std::exception& e) {
-				VRT_fail(ctx,
-					"VM '%s' exception: %s", script->name(), e.what());
-				return {nullptr, nullptr, 0};
-			}
-		}
+	const auto addr = vrm->lookup(func);
+	if (UNLIKELY(addr == 0)) {
+		VSLb(ctx->vsl, SLT_Error,
+			"VM call '%s' failed: The function is missing", func);
+		return {nullptr, nullptr, 0};
 	}
-	return {nullptr, nullptr, 0};
+	auto* script = (Script*) WS_Alloc(ctx->ws, sizeof(Script));
+	if (UNLIKELY(script == nullptr)) {
+		VSLb(ctx->vsl, SLT_Error, "Out of workspace");
+		return {nullptr, nullptr, 0};
+	}
+	/* Fork new machine */
+	try {
+		new (script) Script{vrm->script(), ctx, vrm};
+	} catch (std::exception& e) {
+		VSLb(ctx->vsl, SLT_Error, "VM fork exception: %s", e.what());
+		return {nullptr, nullptr, 0};
+	}
+	/* Call the backend response function */
+	try {
+		script->machine().vmcall(addr);
+		/* Get content-type and data */
+		const auto [type, data] = script->machine().sysargs<std::string, riscv::Buffer> ();
+		/* Return content-type, data, size */
+		backend_buffer result {strdup(type.c_str()), data.to_buffer(), (unsigned) data.size()};
+		script->~Script(); /* call destructor */
+		return result;
+	} catch (std::exception& e) {
+		//VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
+		printf("VM call exception: %s\n", e.what());
+		script->~Script(); /* call destructor */
+		return {nullptr, nullptr, 0};
+	}
 }
 
 #include <unistd.h>
