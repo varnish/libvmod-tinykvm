@@ -344,17 +344,22 @@ struct backend_buffer riscv_backend_call(VRT_CTX, struct vmod_riscv_machine* vrm
 	try {
 		script->machine().vmcall(func);
 		/* Get content-type and data */
-		const auto [type, data] = script->machine().sysargs<std::string, riscv::Buffer> ();
-		/* Return content-type, data, size */
-		backend_buffer result {strdup(type.c_str()), data.to_buffer(), (unsigned) data.size()};
-		script->~Script(); /* call destructor */
-		return result;
+		const auto [type, data] = script->machine().sysargs<riscv::Buffer, riscv::Buffer> ();
+		auto* mimebuf = (char*) WS_Alloc(ctx->ws, type.size());
+		auto* databuf = (char*) WS_Alloc(ctx->ws, data.size());
+		if (mimebuf && databuf)
+		{
+			/* Return content-type, data, size */
+			backend_buffer result {type.to_buffer(mimebuf), data.to_buffer(databuf), (unsigned) data.size()};
+			script->~Script(); /* call destructor */
+			return result;
+		}
 	} catch (std::exception& e) {
 		//VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
 		printf("VM call exception: %s\n", e.what());
-		script->~Script(); /* call destructor */
-		return {nullptr, nullptr, 0};
 	}
+	script->~Script(); /* call destructor */
+	return {nullptr, nullptr, 0};
 }
 
 #include <unistd.h>

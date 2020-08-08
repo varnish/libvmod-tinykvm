@@ -5,6 +5,7 @@
 #include "vcc_if.h"
 #include "vmod_util.h"
 
+extern long riscv_current_result_status(VRT_CTX);
 extern struct vmod_riscv_machine* riscv_current_machine(VRT_CTX);
 extern struct backend_buffer riscv_backend_call(VRT_CTX, struct vmod_riscv_machine*, long);
 
@@ -111,11 +112,8 @@ riscvbe_gethdrs(const struct director *dir,
 
 		/* store the output in workspace and free result */
 		bo->htc->content_length = output.size;
-		bo->htc->priv = WS_Copy(bo->ws, output.data, output.size);
+		bo->htc->priv = (void *)output.data;
 		bo->htc->body_status = BS_LENGTH;
-
-		free((void*) output.data);
-		free((void*) output.type);
 
 		if (bo->htc->priv == NULL)
 			return (-1);
