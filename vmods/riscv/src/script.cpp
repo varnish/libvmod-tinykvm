@@ -62,13 +62,13 @@ void Script::setup_virtual_memory(bool init)
 	mem.set_stack_initial(STACK_PAGENO * Page::size());
 	// this separates heap and stack
 	mem.install_shared_page(STACK_PAGENO, Page::guard_page());
-
+	// don't fork the shared memory areas - it will cause syscall trouble
 	auto* ws = (init) ? nullptr : ctx()->ws;
 	new (&ro_area) MemArea<MARCH> (machine(), RO_AREA_BEGIN, RO_AREA_END,
-		{ .write = false, .non_owning = true }, ws);
+		{ .write = false, .non_owning = true, .dont_fork = true }, ws);
 	mem.install_shared_page(RO_AREA_END >> 12, Page::guard_page());
 	new (&rw_area) MemArea<MARCH> (machine(), RW_AREA_BEGIN, RW_AREA_END,
-		{ .write = true, .non_owning = true }, ws);
+		{ .write = true, .non_owning = true, .dont_fork = true }, ws);
 	mem.install_shared_page(RW_AREA_END >> 12, Page::guard_page());
 }
 

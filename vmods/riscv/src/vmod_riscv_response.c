@@ -1,6 +1,7 @@
 #include "vmod_riscv.h"
 
 #include <malloc.h>
+#include <vtim.h>
 #include "vcl.h"
 #include "vcc_if.h"
 #include "vmod_util.h"
@@ -109,6 +110,10 @@ riscvbe_gethdrs(const struct director *dir,
 		http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
 		http_PrintfHeader(bo->beresp, "Content-Length: %u", output.size);
 		http_PrintfHeader(bo->beresp, "Content-Type: %s", output.type);
+
+		char timestamp[VTIM_FORMAT_SIZE];
+		VTIM_format(VTIM_real(), timestamp);
+		http_PrintfHeader(bo->beresp, "Last-Modified: %s", timestamp);
 
 		/* store the output in workspace and free result */
 		bo->htc->content_length = output.size;
