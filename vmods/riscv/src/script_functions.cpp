@@ -168,6 +168,7 @@ APICALL(set_decision)
 	} else {
 		script.set_result(result.to_string(), status);
 	}
+	machine.stop();
 	return 0;
 }
 APICALL(ban)
