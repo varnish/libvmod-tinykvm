@@ -1,4 +1,5 @@
 vcl 4.1;
+import file;
 import riscv;
 import std;
 
@@ -8,6 +9,9 @@ backend default {
 }
 
 sub vcl_init {
+
+	new f = file.init("/home/gonzo");
+
 	/* These functions will be callable on every machine created after */
 	riscv.add_known_function("on_client_request");
 	riscv.add_known_function("on_hash");
@@ -39,6 +43,9 @@ sub vcl_recv {
 	/* Determine tenant and call into VM */
 	if (req.url == "/") {
 		xpizza.call_index(0);  /* on_client_request */
+	} else if (req.url == "/file.txt") {
+		set req.backend_hint = f.backend();
+		return (hash);
 	} else {
 		ypizza.call_index(0);  /* on_client_request */
 	}
@@ -49,7 +56,7 @@ sub vcl_recv {
 	}
 	else if (riscv.want_result() == "backend") {
 		set req.backend_hint = riscv.vm_backend();
-		return (pass);
+		return (hash);
 	}
 
 	return (synth(403, "Verboten"));

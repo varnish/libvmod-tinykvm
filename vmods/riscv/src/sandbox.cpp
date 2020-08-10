@@ -4,11 +4,9 @@
 inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
 static std::vector<uint8_t> load_file(const std::string& filename);
-static std::string riscv_default_program;
 // functions used by all machines created during init, afterwards
 std::vector<const char*> riscv_lookup_wishlist;
-static const size_t TOO_SMALL = 8;
-static const uint64_t MAX_MEMORY = 800 * 1024;
+static const size_t TOO_SMALL = 8; // vmcalls that can be skipped
 static const uint64_t MAX_HEAP   = 640 * 1024;
 
 #define SCRIPT_MAGIC 0x83e59fa5
@@ -19,12 +17,6 @@ static const uint64_t MAX_HEAP   = 640 * 1024;
 	auto x = time_now();  \
 	asm("" ::: "memory");
 
-extern "C"
-void riscv_set_default(const char* filename)
-{
-	riscv_default_program = filename;
-}
-
 static std::vector<uint8_t> file_loader(const char* file)
 {
 	return load_file(file);
@@ -32,7 +24,7 @@ static std::vector<uint8_t> file_loader(const char* file)
 
 extern "C"
 vmod_riscv_machine* riscv_create(const char* name, const char* group,
-	const char* file, VRT_CTX, uint64_t insn)
+	const char* file, VRT_CTX, uint64_t insn, uint64_t max_mem)
 {
 	auto* vrm = (vmod_riscv_machine*) WS_Alloc(ctx->ws, sizeof(vmod_riscv_machine));
 	if (UNLIKELY(vrm == nullptr))
@@ -40,7 +32,7 @@ vmod_riscv_machine* riscv_create(const char* name, const char* group,
 
 	try {
 		new (vrm) vmod_riscv_machine(name, group, file_loader(file), ctx,
-			/* Max instr: */ insn, MAX_MEMORY, MAX_HEAP);
+			/* Max instr: */ insn, max_mem, MAX_HEAP);
 		return vrm;
 	} catch (const std::exception& e) {
 		VRT_fail(ctx, "Exception when creating machine '%s': %s",

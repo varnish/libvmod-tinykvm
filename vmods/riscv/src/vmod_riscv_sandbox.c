@@ -8,7 +8,7 @@
 
 // Create new machine and call into it.
 extern struct vmod_riscv_machine* riscv_create(const char* name,
-	const char* file, const char* group, VRT_CTX, uint64_t insn);
+	const char* file, const char* group, VRT_CTX, uint64_t insn, uint64_t mem);
 extern void riscv_prewarm(VRT_CTX, struct vmod_riscv_machine*, const char*);
 extern int riscv_fork(VRT_CTX, struct vmod_riscv_machine*);
 extern int riscv_forkcall(VRT_CTX, struct vmod_riscv_machine*, const char*);
@@ -31,12 +31,12 @@ extern int riscv_current_result_status(VRT_CTX);
 VCL_VOID
 vmod_machine__init(VRT_CTX, struct vmod_riscv_machine **init,
 	const char *vcl_name, VCL_STRING name, VCL_STRING elf,
-	VCL_STRING group, VCL_INT max_instr)
+	VCL_STRING group, VCL_INT max_instr, VCL_INT max_mem)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	(void) vcl_name;
 
-	*init = riscv_create(name, group, elf, ctx, max_instr);
+	*init = riscv_create(name, group, elf, ctx, max_instr, max_mem);
 }
 VCL_VOID
 vmod_machine__fini(struct vmod_riscv_machine **rvm)

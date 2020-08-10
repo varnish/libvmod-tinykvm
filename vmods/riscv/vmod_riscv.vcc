@@ -57,7 +57,7 @@ $Function VOID add_known_function(STRING function)
   function does not have to exist on every machine.
 
 
-$Object machine(STRING name, STRING filename, STRING group = "", INT max_instructions = 2000000)
+$Object machine(STRING name, STRING filename, STRING group = "", INT max_instructions = 2000000, INT max_memory = 8388608)
 
 - Create named machine that is initialized immediately
 - Broken machines return 500 server error
