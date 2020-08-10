@@ -563,7 +563,12 @@ APICALL(regex_delete)
 void Script::setup_syscall_interface(machine_t& machine)
 {
 	#define FPTR(x) machine_t::syscall_fptr_t { x }
-	static constinit std::array<const machine_t::syscall_t, ECALL_LAST - SYSCALL_BASE> handlers {
+	#ifdef __GNUG__
+	#define FuckOff
+	#else
+	#define FuckOff constinit
+	#endif
+	static FuckOff std::array<const machine_t::syscall_t, ECALL_LAST - SYSCALL_BASE> handlers {
 		FPTR(self_test),
 		FPTR(assertion_failed),
 		FPTR(print),

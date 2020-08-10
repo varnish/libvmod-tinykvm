@@ -43,7 +43,7 @@ target_include_directories(sandbox PRIVATE libriscv/emulator/src)
 target_compile_definitions(sandbox PRIVATE
 	NATIVE_SYSCALLS_BASE=80
 )
-target_link_libraries(sandbox PUBLIC riscv)
+target_link_libraries(sandbox PUBLIC riscv stdc++)
 
 if (SHARED_LIBRISCV)
 	set_property(TARGET EASTL PROPERTY POSITION_INDEPENDENT_CODE 1)
