@@ -41,7 +41,7 @@ else()
 	find_program(VARNISHD    "varnishd")
 	find_program(VARNISHTEST "varnishtest")
 endif()
-# this will fill the PYTHON_EXECUTABLE variable, which is only
+# this will fill the Python3_EXECUTABLE variable, which is only
 # required when trying to run a python script without the executable bit
 find_package(Python3 COMPONENTS Interpreter)
 

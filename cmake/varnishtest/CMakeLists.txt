@@ -14,7 +14,7 @@ add_custom_target(teken_generate
 )
 
 add_custom_command(
-    COMMAND ${PYTHON_EXECUTABLE} ${PATH}/huffman_gen.py ${VARNISH_PATH}/include/tbl/vhp_huffman.h > vtc_h2_dectbl.h
+    COMMAND ${Python3_EXECUTABLE} ${PATH}/huffman_gen.py ${VARNISH_PATH}/include/tbl/vhp_huffman.h > vtc_h2_dectbl.h
     OUTPUT  vtc_h2_dectbl.h
     DEPENDS ${VARNISH_PATH}/include/tbl/vhp_huffman.h
     COMMENT "Generating vtc_h2_dectbl header for varnishtest"

@@ -2,7 +2,7 @@ set (PATH ${VARNISH_PATH}/lib/libvarnishapi)
 
 # libvarnishapi/vxp_fixed_token.c
 add_custom_command(
-    COMMAND ${PYTHON_EXECUTABLE} ${PATH}/generate.py
+    COMMAND ${Python3_EXECUTABLE} ${PATH}/generate.py
     WORKING_DIRECTORY ${PATH}
     OUTPUT  ${PATH}/vxp_fixed_token.c
     DEPENDS ${PATH}/generate.py

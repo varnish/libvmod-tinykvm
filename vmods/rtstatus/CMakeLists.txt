@@ -5,7 +5,7 @@ include(../vmod.cmake vmod)
 set (PATH ${VARNISH_SOURCE_DIR}/lib/libvmod_rtstatus)
 
 add_custom_command(
-	COMMAND ${PYTHON_EXECUTABLE} ${PATH}/cstring.py ${PATH}/rtstatus.html > vmod_rtstatus_html.h
+	COMMAND ${Python3_EXECUTABLE} ${PATH}/cstring.py ${PATH}/rtstatus.html > vmod_rtstatus_html.h
 	DEPENDS ${PATH}/cstring.py ${PATH}/rtstatus.html
 	OUTPUT  vmod_rtstatus_html.h
 )

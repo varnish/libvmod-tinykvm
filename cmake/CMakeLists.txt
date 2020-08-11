@@ -47,6 +47,10 @@ endif()
 if (NATIVE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
 endif()
+if(CMAKE_BUILD_TYPE MATCHES Release)
+	# workaround for GCC failing isnan checks
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-fast-math")
+endif()
 
 if (SINGLE_PROCESS)
 	message(STATUS "When building in single-process mode all tests are disabled.")
@@ -108,6 +112,9 @@ endif()
 set (VARNISH_PATH ${CMAKE_SOURCE_DIR}/../ext/${VARNISH_BRANCH_DIR})
 # TODO: generate this folder and config.h instead
 set (CONFIG_PATH ${CMAKE_SOURCE_DIR}/include)
+
+# Most Varnish projects require Python3
+find_package(Python3 COMPONENTS Interpreter)
 
 add_subdirectory(libvarnish)
 add_subdirectory(libvapi)

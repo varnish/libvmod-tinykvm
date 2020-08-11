@@ -172,7 +172,7 @@ add_custom_target(vhp_gen_hufdec ALL
 ## Generate the built-in VCL C-file ##
 add_custom_command(
         OUTPUT builtin_vcl.c
-        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/builtin_vcl.py ${VD_PATH}/builtin.vcl builtin_vcl.c
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/builtin_vcl.py ${VD_PATH}/builtin.vcl builtin_vcl.c
         DEPENDS ${VD_PATH}/builtin.vcl
     )
 add_custom_target(generate_builtin_vcl
