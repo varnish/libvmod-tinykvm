@@ -2,6 +2,7 @@ vcl 4.1;
 import file;
 import riscv;
 import std;
+import utils;
 
 backend default {
 	.host = "127.0.0.1";
@@ -48,6 +49,7 @@ sub vcl_recv {
 		return (hash);
 	} else if (req.url == "/backend") {
 		set req.backend_hint = ypizza.vm_backend("my_page");
+		set req.url = req.url + "?" + utils.fast_random_int(80);
 		return (hash);
 	} else {
 		ypizza.call_index(0);  /* on_client_request */
