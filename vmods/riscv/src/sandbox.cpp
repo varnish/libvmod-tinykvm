@@ -195,6 +195,13 @@ int riscv_free(vmod_riscv_machine* vrm)
 }
 
 extern "C"
+uint64_t riscv_resolve_name(struct vmod_riscv_machine* vrm, const char* symb)
+{
+	return vrm->lookup(symb);
+}
+
+
+extern "C"
 void riscv_add_known(VRT_CTX, const char* func)
 {
 	(void) ctx;
@@ -347,7 +354,7 @@ struct backend_buffer riscv_backend_call(VRT_CTX, struct vmod_riscv_machine* vrm
 			return result;
 		}
 	} catch (std::exception& e) {
-		//VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
+		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
 		printf("VM call exception: %s\n", e.what());
 	}
 	script->~Script(); /* call destructor */

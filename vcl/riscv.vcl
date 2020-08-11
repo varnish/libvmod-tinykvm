@@ -46,6 +46,9 @@ sub vcl_recv {
 	} else if (req.url == "/file.txt") {
 		set req.backend_hint = f.backend();
 		return (hash);
+	} else if (req.url == "/backend") {
+		set req.backend_hint = ypizza.vm_backend("my_page");
+		return (hash);
 	} else {
 		ypizza.call_index(0);  /* on_client_request */
 	}

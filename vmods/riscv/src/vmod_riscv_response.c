@@ -9,6 +9,7 @@
 extern long riscv_current_result_status(VRT_CTX);
 extern struct vmod_riscv_machine* riscv_current_machine(VRT_CTX);
 extern struct backend_buffer riscv_backend_call(VRT_CTX, struct vmod_riscv_machine*, long);
+extern uint64_t riscv_resolve_name(struct vmod_riscv_machine*, const char*);
 
 static void v_matchproto_(vdi_panic_f)
 riscvbe_panic(const struct director *dir, struct vsb *vsb)
@@ -98,7 +99,7 @@ riscvbe_gethdrs(const struct director *dir,
 		.http_beresp = bo->beresp,
 	};
 	struct backend_buffer output =
-		riscv_backend_call(&ctx, rvr->machine, rvr->func);
+		riscv_backend_call(&ctx, rvr->machine, rvr->funcaddr);
 
 	if (output.data == NULL || output.type == NULL)
 	{
@@ -132,6 +133,17 @@ riscvbe_gethdrs(const struct director *dir,
 	return (0);
 }
 
+static void setup_response_director(struct director *dir, struct vmod_riscv_response *rvr)
+{
+	INIT_OBJ(dir, DIRECTOR_MAGIC);
+	dir->priv = rvr;
+	dir->name = "VM backend director";
+	dir->vcl_name = "vmod_riscv";
+	dir->gethdrs = riscvbe_gethdrs;
+	dir->finish  = riscvbe_finish;
+	dir->panic   = riscvbe_panic;
+}
+
 VCL_BACKEND vmod_vm_backend(VRT_CTX)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
@@ -145,16 +157,32 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX)
 
 	INIT_OBJ(rvr, RISCV_BACKEND_MAGIC);
 	rvr->machine = riscv_current_machine(ctx);
-	rvr->func = riscv_current_result_status(ctx);
+	rvr->funcaddr = riscv_current_result_status(ctx);
 	rvr->max_response_size = 0;
 
-	INIT_OBJ(&rvr->dir, DIRECTOR_MAGIC);
-	rvr->dir.priv = rvr;
-	rvr->dir.name = "VM response director";
-	rvr->dir.vcl_name = "vmod_vm_backend";
-	rvr->dir.gethdrs = riscvbe_gethdrs;
-	rvr->dir.finish  = riscvbe_finish;
-	rvr->dir.panic   = riscvbe_panic;
+	setup_response_director(&rvr->dir, rvr);
+
+	return &rvr->dir;
+}
+
+VCL_BACKEND vmod_machine_vm_backend(VRT_CTX,
+    struct vmod_riscv_machine *machine, VCL_STRING func)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	struct vmod_riscv_response *rvr;
+	rvr = WS_Alloc(ctx->ws, sizeof(struct vmod_riscv_response));
+	if (rvr == NULL) {
+		VRT_fail(ctx, "Out of memory");
+		return NULL;
+	}
+
+	INIT_OBJ(rvr, RISCV_BACKEND_MAGIC);
+	rvr->machine = machine;
+	rvr->funcaddr = riscv_resolve_name(machine, func);
+	rvr->max_response_size = 0;
+
+	setup_response_director(&rvr->dir, rvr);
 
 	return &rvr->dir;
 }

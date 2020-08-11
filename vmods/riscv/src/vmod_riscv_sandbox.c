@@ -24,7 +24,7 @@ extern int riscv_current_call_idx(VRT_CTX, int);
 extern const char* riscv_current_name(VRT_CTX);
 extern const char* riscv_current_group(VRT_CTX);
 extern const char* riscv_current_result(VRT_CTX);
-extern int riscv_current_result_status(VRT_CTX);
+extern long riscv_current_result_status(VRT_CTX);
 
 /* Create new machine object, which can be used to fork new
    VMs for client requests and backend fetches, etc. */

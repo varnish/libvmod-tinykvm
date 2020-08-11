@@ -98,6 +98,10 @@ $Method BACKEND .live_update(BYTES max_size = 2097152)
   current request. If the machine fails to load, the old machine
   will be kept running.
 
+$Method BACKEND .vm_backend(STRING function)
+
+- Call given function and use as generator for backend response
+
 
 $Function BOOL    machine_present()
 
