@@ -295,7 +295,7 @@ find_library(LIBUNWIND unwind)
 
 if (LIBUNWIND)
 	target_link_libraries(varnishd ${LIBUNWIND})
-	target_compile_definitions(varnishd PRIVATE USE_LIBUNWIND=1)
+	target_compile_definitions(varnishd PRIVATE WITH_UNWIND=1 UNW_LOCAL_ONLY=1)
 endif()
 
 if (NOT SHARED_LIBRISCV)
