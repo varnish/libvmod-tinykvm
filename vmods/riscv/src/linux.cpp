@@ -3,7 +3,6 @@
 #include <EASTL/fixed_vector.h>
 #include <include/syscall_helpers.hpp>
 #include <include/threads.hpp>
-#include <linux.hpp>
 extern "C" __attribute__((format(printf, 2, 3)))
 char* WS_Printf(void *ws, const char *fmt, ...);
 
@@ -35,7 +34,7 @@ execute_riscv(void* workspace, set_header_t set_header, void* header,
 	// go-time: create machine, execute code
 	riscv::Machine<riscv::RISCV32> machine { vbin, MAX_MEMORY };
 
-	prepare_linux<riscv::RISCV32>(machine, args, env);
+	machine.setup_linux(args, env);
 	setup_linux_syscalls(state, machine);
 	setup_multithreading(state, machine);
 

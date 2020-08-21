@@ -168,8 +168,10 @@ void Script::machine_setup(machine_t& machine, bool init)
 			machine.memory.set_exit_address(exit_addr);
 		else
 			throw std::runtime_error("The binary is missing a public exit function!");
-		/* Newlib expects to find arguments on stack */
-		machine.setup_argv({ name() });
+		// Full Linux-compatible stack
+		machine.setup_linux(
+			{name()},
+			{"LC_CTYPE=C", "LC_ALL=C", "USER=groot"});
 	}
 
 	// add system call interface

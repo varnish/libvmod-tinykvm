@@ -27,7 +27,6 @@ list(APPEND RISCV_SOURCES
 	src/sandbox.cpp
 	src/script.cpp
 	src/script_functions.cpp
-	libriscv/emulator/src/linux.cpp
 	libriscv/emulator/syscalls/src/syscalls.cpp
 	libriscv/emulator/syscalls/src/threads.cpp
 	libriscv/emulator/syscalls/src/posix_threads.cpp
@@ -39,7 +38,6 @@ add_library(sandbox STATIC ${RISCV_SOURCES})
 set_target_properties(sandbox PROPERTIES CXX_STANDARD 20)
 target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/include)
 target_include_directories(sandbox PRIVATE libriscv/emulator/syscalls)
-target_include_directories(sandbox PRIVATE libriscv/emulator/src)
 target_compile_definitions(sandbox PRIVATE
 	NATIVE_SYSCALLS_BASE=80
 )

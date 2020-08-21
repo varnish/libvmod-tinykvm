@@ -10,7 +10,7 @@ struct MachineInstance;
 
 class Script {
 public:
-	static constexpr int MARCH = riscv::RISCV32;
+	static constexpr int MARCH = riscv::RISCV64;
 	using gaddr_t = riscv::address_type<MARCH>;
 	using machine_t = riscv::Machine<MARCH>;
 	static constexpr gaddr_t RO_AREA_BEGIN = 0x10000;
