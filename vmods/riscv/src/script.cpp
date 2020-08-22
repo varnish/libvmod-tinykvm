@@ -105,7 +105,7 @@ void Script::machine_setup(machine_t& machine, bool init)
 
 	if (init == false)
 	{
-	machine.memory.set_page_fault_handler(
+		machine.memory.set_page_fault_handler(
 		[this] (auto& mem, size_t pageno) -> riscv::Page& {
 			/* Pages are allocated from workspace */
 			//printf("Creating page %zu @ 0x%X\n", pageno, pageno * 4096);
@@ -121,7 +121,7 @@ void Script::machine_setup(machine_t& machine, bool init)
 			throw riscv::MachineException(
 				riscv::OUT_OF_MEMORY, "Out of memory", mem.pages_active());
 		});
-	machine.memory.set_page_write_handler(
+		machine.memory.set_page_write_handler(
 		[this] (auto& mem, riscv::Page& page) -> void {
 			assert(page.has_data() && page.attr.is_cow);
 			/* Pages are allocated from workspace */
@@ -170,8 +170,8 @@ void Script::machine_setup(machine_t& machine, bool init)
 			throw std::runtime_error("The binary is missing a public exit function!");
 		// Full Linux-compatible stack
 		machine.setup_linux(
-			{name()},
-			{"LC_CTYPE=C", "LC_ALL=C", "USER=groot"});
+			{ name() },
+			{ "LC_CTYPE=C", "LC_ALL=C", "USER=groot" });
 	}
 
 	// add system call interface

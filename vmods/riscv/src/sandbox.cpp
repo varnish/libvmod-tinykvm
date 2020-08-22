@@ -3,11 +3,11 @@
 
 inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
-static std::vector<uint8_t> load_file(const std::string& filename);
+static std::vector<uint8_t> file_loader(const std::string& file);
 // functions used by all machines created during init, afterwards
 std::vector<const char*> riscv_lookup_wishlist;
 static const size_t TOO_SMALL = 8; // vmcalls that can be skipped
-static const uint64_t MAX_HEAP   = 640 * 1024;
+static const uint64_t MAX_HEAP = 640 * 1024;
 
 #define SCRIPT_MAGIC 0x83e59fa5
 
@@ -17,18 +17,16 @@ static const uint64_t MAX_HEAP   = 640 * 1024;
 	auto x = time_now();  \
 	asm("" ::: "memory");
 
-static std::vector<uint8_t> file_loader(const char* file)
-{
-	return load_file(file);
-}
 
 extern "C"
 vmod_riscv_machine* riscv_create(const char* name, const char* group,
 	const char* file, VRT_CTX, uint64_t insn, uint64_t max_mem)
 {
 	auto* vrm = (vmod_riscv_machine*) WS_Alloc(ctx->ws, sizeof(vmod_riscv_machine));
-	if (UNLIKELY(vrm == nullptr))
+	if (UNLIKELY(vrm == nullptr)) {
 		VRT_fail(ctx, "Out of workspace");
+		return nullptr;
+	}
 
 	try {
 		new (vrm) vmod_riscv_machine(name, group, file_loader(file), ctx,
@@ -362,7 +360,7 @@ struct backend_buffer riscv_backend_call(VRT_CTX, struct vmod_riscv_machine* vrm
 }
 
 #include <unistd.h>
-std::vector<uint8_t> load_file(const std::string& filename)
+std::vector<uint8_t> file_loader(const std::string& filename)
 {
     size_t size = 0;
     FILE* f = fopen(filename.c_str(), "rb");

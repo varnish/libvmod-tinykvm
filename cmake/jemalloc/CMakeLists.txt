@@ -9,7 +9,6 @@ add_custom_command(
 	OUTPUT  ${PATH}/src/arena.c
 	WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 	DEPENDS ${JEMALLOC_ARCHIVE}
-	COMMENT "Unpacking ${JEMALLOC_ARCHIVE}"
 	VERBATIM)
 add_custom_target(jemalloc_in_a_box
 	DEPENDS ${PATH}/src/arena.c)
@@ -51,18 +50,16 @@ set (SOURCES
 )
 set_source_files_properties(${SOURCES} PROPERTIES GENERATED TRUE)
 
-if (SANITIZE)
-	add_library(jemalloc SHARED ${SOURCES})
-	target_compile_options(jemalloc PRIVATE "${SANITIZE_FLAGS}")
-else()
-	add_library(jemalloc STATIC ${SOURCES})
-endif()
+add_library(jemalloc SHARED ${SOURCES})
 target_include_directories(jemalloc PUBLIC ${PATH}/include)
 target_include_directories(jemalloc PRIVATE ${CONFIG_PATH})
 target_compile_definitions(jemalloc PRIVATE _GNU_SOURCE)
 target_compile_options(jemalloc PRIVATE "-std=gnu11" "-O3")
 if (NATIVE)
 	target_compile_options(jemalloc PRIVATE "-march=native")
+endif()
+if (SANITIZE)
+	target_compile_options(jemalloc PRIVATE "${SANITIZE_FLAGS}")
 endif()
 target_link_libraries(jemalloc pthread)
 add_dependencies(jemalloc jemalloc_configure)
