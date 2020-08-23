@@ -35,7 +35,7 @@ list(APPEND RISCV_SOURCES
 )
 
 add_library(sandbox STATIC ${RISCV_SOURCES})
-set_target_properties(sandbox PROPERTIES CXX_STANDARD 20)
+set_target_properties(sandbox PROPERTIES CXX_STANDARD 17)
 target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/include)
 target_include_directories(sandbox PRIVATE libriscv/emulator/syscalls)
 target_compile_definitions(sandbox PRIVATE
