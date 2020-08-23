@@ -196,20 +196,21 @@ void Script::machine_setup(machine_t& machine, bool init)
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t2);
 #endif
-    setup_syscall_interface(machine);
+	setup_syscall_interface(machine);
 
-	/*machine.on_unhandled_syscall(
-		[this] (int number) {
-			VSLb(m_ctx->vsl, SLT_Debug,
-				"VM unhandled system call: %d\n", number);
-		});*/
+	machine.on_unhandled_syscall(
+		[] (int number) {
+			//VSLb(m_ctx->vsl, SLT_Debug,
+			//	"VM unhandled system call: %d\n", number);
+			printf("VM unhandled system call: %d\n", number);
+		});
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t3);
 	printf("Time spent setting up arena: %ld ns, nat.mem: %ld ns, syscalls: %ld ns\n",
 		nanodiff(t0, t1), nanodiff(t1, t2), nanodiff(t2, t3));
 #endif
-
 }
+
 void Script::handle_exception(gaddr_t address)
 {
 	try {

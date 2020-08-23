@@ -25,11 +25,11 @@ sub vcl_init {
 	new xpizza = riscv.machine(
 		name = "xpizza.com",
 		filename = "/home/gonzo/github/rvscript/programs/hello_world",
-		max_instructions = 1000000);
+		max_instructions = 88000000);
 	new ypizza = riscv.machine(
 		name = "ypizza.com",
-		filename = "/home/gonzo/github/rvscript/programs/test",
-		max_instructions = 1000000);
+		filename = "/home/gonzo/github/rvscript/programs/pythran",
+		max_instructions = 88000000);
 	ypizza.add_known_function("test");
 }
 

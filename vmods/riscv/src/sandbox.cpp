@@ -6,7 +6,7 @@ inline long nanodiff(timespec start_time, timespec end_time);
 static std::vector<uint8_t> file_loader(const std::string& file);
 // functions used by all machines created during init, afterwards
 std::vector<const char*> riscv_lookup_wishlist;
-static const size_t TOO_SMALL = 8; // vmcalls that can be skipped
+static const size_t TOO_SMALL = 3; // vmcalls that can be skipped
 static const uint64_t MAX_HEAP = 640 * 1024;
 
 #define SCRIPT_MAGIC 0x83e59fa5
