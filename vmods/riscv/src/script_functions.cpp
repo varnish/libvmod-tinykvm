@@ -6,6 +6,7 @@ extern "C" {
 	void http_SetH(struct http *to, unsigned n, const char *fm);
 	void http_UnsetIdx(struct http *hp, unsigned idx);
 	unsigned http_findhdr(const struct http *hp, unsigned l, const char *hdr);
+	void http_PrintfHeader(struct http *to, const char *fmt, ...);
 	void HSH_AddString(struct req *, void *ctx, const char *str);
 	struct txt {
 		const char* begin;
@@ -190,6 +191,33 @@ APICALL(hash_data)
 APICALL(purge)
 {
 	return -1;
+}
+
+APICALL(synth)
+{
+	const auto* ctx = get_ctx(machine);
+	if (ctx->method == VCL_MET_SYNTH ||
+		ctx->method == VCL_MET_BACKEND_ERROR)
+	{
+		auto* hp = get_http(ctx, HDR_RESP);
+		const auto [type, data] = machine.sysargs<riscv::Buffer, riscv::Buffer> ();
+		http_PrintfHeader(hp, "Content-Length: %u", data.size());
+		http_PrintfHeader(hp, "Content-Type: %.*s", (int) type.size(), type.to_string().c_str());
+
+		auto* vsb = (struct vsb*) ctx->specific;
+		assert(vsb != nullptr);
+
+		VSB_clear(vsb);
+		if (data.is_sequential())
+			VSB_bcat(vsb, data.c_str(), data.size());
+		else
+			VSB_bcat(vsb, data.to_string().c_str(), data.size());
+		//VSB_finish(vsb);
+		machine.stop();
+		return 0;
+	}
+	throw std::runtime_error(
+	    "Synth can only be used in vcl_synth or vcl_backend_error");
 }
 
 APICALL(foreach_header_field)
@@ -585,6 +613,7 @@ void Script::setup_syscall_interface(machine_t& machine)
 		FPTR(ban),
 		FPTR(hash_data),
 		FPTR(purge),
+		FPTR(synth),
 
 		FPTR(foreach_header_field),
 		FPTR(header_field_get),

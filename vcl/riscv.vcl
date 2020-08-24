@@ -76,5 +76,6 @@ sub vcl_hash {
 sub vcl_synth {
 	if (riscv.machine_present()) {
 		riscv.call_index(2); /* on_synth */
+		return (deliver);
 	}
 }
