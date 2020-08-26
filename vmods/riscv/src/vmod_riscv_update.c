@@ -5,7 +5,7 @@
 #include "vcc_if.h"
 #include "vmod_util.h"
 
-extern const char* riscv_update(struct vmod_riscv_machine*, const uint8_t*, size_t);
+extern const char* riscv_update(struct vsl_log*, struct vmod_riscv_machine*, const uint8_t*, size_t);
 
 
 static void v_matchproto_(vdi_panic_f)
@@ -136,7 +136,7 @@ riscvbe_gethdrs(const struct director *dir,
 
 	if (result_len <= rvu->max_binary_size)
 	{
-		const char* output = riscv_update(rvu->machine, result_data, result_len);
+		const char* output = riscv_update(bo->vsl, rvu->machine, result_data, result_len);
 
 		const size_t output_len = __builtin_strlen(output);
 		http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);

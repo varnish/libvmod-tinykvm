@@ -4,6 +4,7 @@
 inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
 static std::vector<uint8_t> file_loader(const std::string& file);
+static bool file_writer(const std::string& file, const std::vector<uint8_t>&);
 // functions used by all machines created during init, afterwards
 std::vector<const char*> riscv_lookup_wishlist;
 static const size_t TOO_SMALL = 3; // vmcalls that can be skipped
@@ -18,6 +19,23 @@ static const uint64_t MAX_HEAP = 640 * 1024;
 	asm("" ::: "memory");
 
 
+vmod_riscv_machine::vmod_riscv_machine(
+	const char* nm, const char* grp, const char* file,
+	VRT_CTX, uint64_t insn, uint64_t mem, uint64_t heap)
+	: name(nm), group(grp), filename(file),
+	  max_instructions(insn), max_memory(mem), max_heap(heap)
+{
+	try {
+		auto elf = file_loader(file);
+		machine = std::make_unique<MachineInstance> (std::move(elf), ctx, this);
+	} catch (const std::exception& e) {
+		/*VSLb(ctx->vsl, SLT_Error,
+			"Exception when creating machine '%s': %s",
+			name, e.what());*/
+		machine = nullptr;
+	}
+}
+
 extern "C"
 vmod_riscv_machine* riscv_create(const char* name, const char* group,
 	const char* file, VRT_CTX, uint64_t insn, uint64_t max_mem)
@@ -29,7 +47,7 @@ vmod_riscv_machine* riscv_create(const char* name, const char* group,
 	}
 
 	try {
-		new (vrm) vmod_riscv_machine(name, group, file_loader(file), ctx,
+		new (vrm) vmod_riscv_machine(name, group, file, ctx,
 			/* Max instr: */ insn, max_mem, MAX_HEAP);
 		return vrm;
 	} catch (const std::exception& e) {
@@ -39,7 +57,7 @@ vmod_riscv_machine* riscv_create(const char* name, const char* group,
 	}
 }
 extern "C"
-const char* riscv_update(vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
+const char* riscv_update(struct vsl_log* vsl, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
 {
 	/* ELF loader will not be run for empty binary */
 	if (UNLIKELY(data == nullptr || len == 0)) {
@@ -53,13 +71,26 @@ const char* riscv_update(vmod_riscv_machine* vrm, const uint8_t* data, size_t le
 		std::vector<uint8_t> binary {data, data + len};
 		auto inst = std::make_unique<MachineInstance>(std::move(binary), nullptr, vrm);
 		vrm->machine.swap(inst);
-		/* FIXME: not randomly drop old_instance */
-		auto* decomissioned = inst.release();
-		decomissioned->script.decomission();
+		/* Could be updating for the first time */
+		if (inst != nullptr)
+		{
+			/* FIXME: not randomly drop old_instance */
+			auto* decomissioned = inst.release();
+			decomissioned->script.decomission();
+		}
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);
 		printf("Time spent updating: %ld ns\n", nanodiff(t0, t1));
 	#endif
+		bool ok = file_writer(vrm->filename, vrm->machine->binary);
+		if (!ok) {
+			/* Writing the tenant program to file failed */
+			char buffer[800];
+			const int len = snprintf(buffer, sizeof(buffer),
+				"Could not write '%s'", vrm->filename);
+			VSLb(vsl, SLT_Error, "%.*s", len, buffer);
+			return strdup(buffer);
+		}
 		/* TODO: delete when nobody uses it anymore */
 		return strdup("Update successful");
 	} catch (const std::exception& e) {
@@ -72,6 +103,8 @@ extern "C"
 void riscv_prewarm(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 {
 	(void) ctx;
+	if (UNLIKELY(vrm->no_program_loaded()))
+		return;
 	const auto site = vrm->callsite(func);
 	vrm->machine->sym_lookup.emplace(strdup(site.name.c_str()), site.address);
 	vrm->machine->sym_vector.push_back({site.name.c_str(), site.address, site.size});
@@ -82,10 +115,13 @@ inline Script* vmfork(VRT_CTX, const vmod_riscv_machine* vrm)
 	auto* priv_task = VRT_priv_task(ctx, ctx);
 	if (!priv_task->priv)
 	{
-		/* Allocate Script on workspace, and construct it in-place */
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t0);
 	#endif
+		/* First-time tenants could have no program */
+		if (UNLIKELY(vrm->no_program_loaded()))
+			return nullptr;
+		/* Allocate Script on workspace, and construct it in-place */
 		auto* script = (Script*) WS_Alloc(ctx->ws, sizeof(Script));
 		if (UNLIKELY(script == nullptr)) {
 			VRT_fail(ctx, "Out of workspace");
@@ -164,6 +200,8 @@ int riscv_forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
 extern "C"
 int riscv_forkcall_idx(VRT_CTX, vmod_riscv_machine* vrm, int index)
 {
+	if (UNLIKELY(vrm->no_program_loaded()))
+		return -1;
 	if (index >= 0 && index < vrm->machine->sym_vector.size())
 	{
 		auto& entry = vrm->machine->sym_vector[index];
@@ -378,6 +416,16 @@ std::vector<uint8_t> file_loader(const std::string& filename)
     }
     fclose(f);
     return result;
+}
+bool file_writer(const std::string& filename, const std::vector<uint8_t>& binary)
+{
+    FILE* f = fopen(filename.c_str(), "wb");
+    if (f == NULL)
+		return false;
+
+	const size_t n = fwrite(binary.data(), 1, binary.size(), f);
+    fclose(f);
+	return n == binary.size();
 }
 
 timespec time_now()

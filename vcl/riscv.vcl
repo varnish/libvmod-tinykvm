@@ -11,7 +11,7 @@ backend default {
 
 sub vcl_init {
 
-	new f = file.init("/home/gonzo");
+	new f = file.init("/tmp");
 
 	/* These functions will be callable on every machine created after */
 	riscv.add_known_function("on_client_request");
@@ -28,7 +28,7 @@ sub vcl_init {
 		max_instructions = 88000000);
 	new ypizza = riscv.machine(
 		name = "ypizza.com",
-		filename = "/home/gonzo/github/rvscript/programs/pythran",
+		filename = "/tmp/pythran",
 		max_instructions = 88000000);
 	ypizza.add_known_function("test");
 }
