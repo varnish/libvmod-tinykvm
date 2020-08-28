@@ -17,15 +17,11 @@ unique, however it's intended to be used by CDNs who know what they are doing.
 
 Example:
 	sub vcl_init {
-		/* These functions will be callable on every machine */
-		riscv.add_known_function("on_client_request");
-		riscv.add_known_function("on_synth");
-
 		/* Create some machines */
 		new ypizza = riscv.machine(
 			name = "ypizza.com",
 			group = "premium",
-			filename = "/path/to/binary");
+			filename = "/tmp/tenants/ypizza");
 		/* This specific machine has more functions we can call */
 		ypizza.add_known_function("test");
 	}
@@ -33,8 +29,6 @@ Example:
 	sub vcl_recv {
 		/* We can call functions directly by name */
 		ypizza.call("on_client_request");
-		/* But also by order of add_known_function */
-		ypizza.call_index(0);
 
 		/* We can query what the machine wants to happen */
 		if (riscv.want_result() == "synth") {
@@ -70,27 +64,29 @@ $Method INT     .fork()
 
 - Create a new virtual machine quickly forked from the previously
   prepared machine, using copy-on-write mechanics.
+  "on_init",
+  "on_client_request",
+  "on_hash",
+  "on_synth",
+  "on_backend_fetch",
+  "on_backend_response"
 
 $Method INT     .call(STRING function)
 
-- Call given function in this virtual machine.
-- If no machine is forked, fork.
-
-$Method INT     .call_index(INT index)
+$Method INT     .fastcall(ENUM {ON_REQUEST, ON_HASH, ON_SYNTH,
+		ON_BACKEND_FETCH, ON_BACKEND_RESPONSE} index = "ON_REQUEST")
 
 - Call given function in this virtual machine.
 - If no machine is forked, fork.
-- The index is the entry number (counting from zero) given to add_known_function.
 
   Example:
 
-  riscv.add_known_function("on_client_request")
-  riscv.add_known_function("on_synth")
   new ypizza = riscv.machine(
 	  name = "ypizza.com",
-	  filename = "/home/gonzo/github/rvscript/programs/test");
+	  filename = "/tmp/test");
 
-  ypizza.call_index(0); /* Call on_client_request */
+  ypizza.call("on_client_request");
+  ypizza.fastcall(ON_REQUEST);
 
 $Method BACKEND .live_update(BYTES max_size = 2097152)
 
@@ -111,7 +107,8 @@ $Function INT     call(STRING function)
 
 - Calls the given function in the currently active machine.
 
-$Function INT     call_index(INT index)
+$Function INT     fastcall(ENUM {ON_REQUEST, ON_HASH, ON_SYNTH,
+		ON_BACKEND_FETCH, ON_BACKEND_RESPONSE} index = "ON_REQUEST")
 
 - Calls the given function at index in order added by add_known_function
   (starting at zero), in the currently active machine.

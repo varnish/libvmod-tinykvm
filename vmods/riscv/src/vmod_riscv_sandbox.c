@@ -26,6 +26,16 @@ extern const char* riscv_current_group(VRT_CTX);
 extern const char* riscv_current_result(VRT_CTX);
 extern long riscv_current_result_status(VRT_CTX);
 
+static inline int enum_to_idx(VCL_ENUM e)
+{
+	if (e == vmod_enum_ON_REQUEST) return 1;
+	if (e == vmod_enum_ON_HASH)    return 2;
+	if (e == vmod_enum_ON_SYNTH)   return 3;
+	if (e == vmod_enum_ON_BACKEND_FETCH) return 4;
+	if (e == vmod_enum_ON_BACKEND_RESPONSE) return 5;
+	return -1;
+}
+
 /* Create new machine object, which can be used to fork new
    VMs for client requests and backend fetches, etc. */
 VCL_VOID
@@ -68,13 +78,13 @@ VCL_INT vmod_machine_call(VRT_CTX,
 
 	return riscv_forkcall(ctx, rvm, function);
 }
-VCL_INT vmod_machine_call_index(VRT_CTX,
-	struct vmod_riscv_machine *rvm, VCL_INT index)
+VCL_INT vmod_machine_fastcall(VRT_CTX,
+    struct vmod_riscv_machine *rvm, VCL_ENUM e)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	CHECK_OBJ_NOTNULL(rvm, RISCV_MACHINE_MAGIC);
 
-	return riscv_forkcall_idx(ctx, rvm, index);
+	return riscv_forkcall_idx(ctx, rvm, enum_to_idx(e));
 }
 
 /* Make given function faster to look up and so on. */
@@ -109,11 +119,11 @@ VCL_INT vmod_call(VRT_CTX, VCL_STRING function)
 
 	return riscv_current_call(ctx, function);
 }
-VCL_INT vmod_call_index(VRT_CTX, VCL_INT index)
+VCL_INT vmod_fastcall(VRT_CTX, VCL_ENUM e)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
-	return riscv_current_call_idx(ctx, index);
+	return riscv_current_call_idx(ctx, enum_to_idx(e));
 }
 VCL_STRING vmod_current_name(VRT_CTX)
 {

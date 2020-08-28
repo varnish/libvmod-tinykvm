@@ -13,14 +13,6 @@ sub vcl_init {
 
 	new f = file.init("/tmp");
 
-	/* These functions will be callable on every machine created after */
-	riscv.add_known_function("on_client_request");
-	riscv.add_known_function("on_hash");
-	riscv.add_known_function("on_synth");
-	riscv.add_known_function("on_backend_fetch");
-	riscv.add_known_function("on_backend_response");
-	riscv.add_known_function("my_page");
-
 	/* Create some machines */
 	new xpizza = riscv.machine(
 		name = "xpizza.com",
@@ -30,7 +22,7 @@ sub vcl_init {
 		name = "ypizza.com",
 		filename = "/tmp/pythran",
 		max_instructions = 88000000);
-	ypizza.add_known_function("test");
+	ypizza.add_known_function("my_page");
 }
 
 sub vcl_recv {
@@ -43,7 +35,7 @@ sub vcl_recv {
 
 	/* Determine tenant and call into VM */
 	if (req.url == "/") {
-		xpizza.call_index(0);  /* on_client_request */
+		xpizza.fastcall(ON_REQUEST);
 	} else if (req.url == "/file.txt") {
 		set req.backend_hint = f.backend();
 		return (hash);
@@ -52,7 +44,7 @@ sub vcl_recv {
 		set req.url = req.url + "?" + utils.fast_random_int(80);
 		return (hash);
 	} else {
-		ypizza.call_index(0);  /* on_client_request */
+		ypizza.fastcall(ON_REQUEST);
 	}
 
 	/* Make decision */
@@ -69,13 +61,13 @@ sub vcl_recv {
 
 sub vcl_hash {
 	if (riscv.machine_present()) {
-		riscv.call_index(1); /* on_hash */
+		riscv.fastcall(ON_HASH);
 	}
 }
 
 sub vcl_synth {
 	if (riscv.machine_present()) {
-		riscv.call_index(2); /* on_synth */
+		riscv.fastcall(ON_SYNTH);
 		return (deliver);
 	}
 }

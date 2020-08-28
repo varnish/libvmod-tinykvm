@@ -5,8 +5,15 @@ inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
 static std::vector<uint8_t> file_loader(const std::string& file);
 static bool file_writer(const std::string& file, const std::vector<uint8_t>&);
-// functions used by all machines created during init, afterwards
-std::vector<const char*> riscv_lookup_wishlist;
+// functions available to all machines created during init
+std::vector<const char*> riscv_lookup_wishlist {
+	"on_init",
+	"on_client_request",
+	"on_hash",
+	"on_synth",
+	"on_backend_fetch",
+	"on_backend_response"
+};
 static const size_t TOO_SMALL = 3; // vmcalls that can be skipped
 static const uint64_t MAX_HEAP = 640 * 1024;
 
