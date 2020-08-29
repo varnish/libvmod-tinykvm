@@ -24,6 +24,7 @@ endif()
 
 list(APPEND RISCV_SOURCES
 	src/linux.cpp
+	src/machine_instance.cpp
 	src/sandbox.cpp
 	src/script.cpp
 	src/script_functions.cpp

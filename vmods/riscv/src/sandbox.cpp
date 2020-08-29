@@ -1,7 +1,7 @@
 #include "sandbox.hpp"
 #include "varnish.hpp"
 
-#define ENABLE_TIMING
+//#define ENABLE_TIMING
 #define TIMING_LOCATION(x) \
 	asm("" ::: "memory"); \
 	auto x = time_now();  \
@@ -80,9 +80,9 @@ const char* riscv_update(struct vsl_log* vsl, vmod_riscv_machine* vrm, const uin
 		/* Could be updating for the first time */
 		if (inst != nullptr)
 		{
-			/* FIXME: not randomly drop old_instance */
 			auto* decomissioned = inst.release();
 			decomissioned->script.decomission();
+			decomissioned->remove_reference();
 		}
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);
@@ -98,7 +98,7 @@ const char* riscv_update(struct vsl_log* vsl, vmod_riscv_machine* vrm, const uin
 			return strdup(buffer);
 		}
 		/* TODO: delete when nobody uses it anymore */
-		return strdup("Update successful");
+		return strdup("Update successful\n");
 	} catch (const std::exception& e) {
 		/* Pass the actual error back to the client */
 		return strdup(e.what());
@@ -134,10 +134,12 @@ inline Script* vmfork(VRT_CTX, const vmod_riscv_machine* vrm)
 			return nullptr;
 		}
 
+		vrm->machine->add_reference();
 		try {
 			new (script) Script{vrm->script(), ctx, vrm};
 
 		} catch (std::exception& e) {
+			vrm->machine->remove_reference();
 			VRT_fail(ctx,
 				"VM '%s' exception: %s", script->name(), e.what());
 			return nullptr;
@@ -399,9 +401,11 @@ struct backend_buffer riscv_backend_call(VRT_CTX, struct vmod_riscv_machine* vrm
 		return {nullptr, nullptr, 0};
 	}
 	/* Fork new machine */
+	vrm->machine->add_reference();
 	try {
 		new (script) Script{vrm->script(), ctx, vrm};
 	} catch (std::exception& e) {
+		vrm->machine->remove_reference();
 		VSLb(ctx->vsl, SLT_Error, "VM fork exception: %s", e.what());
 		return {nullptr, nullptr, 0};
 	}

@@ -2,7 +2,7 @@
 #include "machine/include_api.hpp"
 #include "varnish.hpp"
 
-#define ENABLE_TIMING
+//#define ENABLE_TIMING
 #define TIMING_LOCATION(x) \
 	asm("" ::: "memory"); \
 	auto x = time_now();  \

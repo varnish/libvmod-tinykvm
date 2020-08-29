@@ -53,6 +53,7 @@ Script::~Script()
 	for (auto& entry : m_regex_cache)
 		if (entry.re && !entry.non_owned)
 			VRE_free(&entry.re);
+	m_inst.remove_reference();
 }
 
 void Script::setup_virtual_memory(bool init)
