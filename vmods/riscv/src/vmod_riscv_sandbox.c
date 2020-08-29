@@ -21,10 +21,12 @@ extern void riscv_add_known(VRT_CTX, const char* function);
 // is accessible through a priv_task.
 extern int riscv_current_call(VRT_CTX, const char*);
 extern int riscv_current_call_idx(VRT_CTX, int);
+extern int riscv_current_resume(VRT_CTX);
 extern const char* riscv_current_name(VRT_CTX);
 extern const char* riscv_current_group(VRT_CTX);
 extern const char* riscv_current_result(VRT_CTX);
 extern long riscv_current_result_status(VRT_CTX);
+extern int  riscv_current_is_paused(VRT_CTX);
 
 static inline int enum_to_idx(VCL_ENUM e)
 {
@@ -125,6 +127,12 @@ VCL_INT vmod_fastcall(VRT_CTX, VCL_ENUM e)
 
 	return riscv_current_call_idx(ctx, enum_to_idx(e));
 }
+VCL_INT vmod_resume(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	return riscv_current_resume(ctx);
+}
 VCL_STRING vmod_current_name(VRT_CTX)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
@@ -153,4 +161,10 @@ VCL_INT vmod_want_status(VRT_CTX)
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
 	return riscv_current_result_status(ctx);
+}
+VCL_BOOL vmod_want_resume(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	return riscv_current_is_paused(ctx);
 }

@@ -1,6 +1,13 @@
 #include "sandbox.hpp"
 #include "varnish.hpp"
 
+#define ENABLE_TIMING
+#define TIMING_LOCATION(x) \
+	asm("" ::: "memory"); \
+	auto x = time_now();  \
+	asm("" ::: "memory");
+
+
 inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
 static std::vector<uint8_t> file_loader(const std::string& file);
@@ -16,15 +23,7 @@ std::vector<const char*> riscv_lookup_wishlist {
 };
 static const size_t TOO_SMALL = 3; // vmcalls that can be skipped
 static const uint64_t MAX_HEAP = 640 * 1024;
-
 #define SCRIPT_MAGIC 0x83e59fa5
-
-//#define ENABLE_TIMING
-#define TIMING_LOCATION(x) \
-	asm("" ::: "memory"); \
-	auto x = time_now();  \
-	asm("" ::: "memory");
-
 
 vmod_riscv_machine::vmod_riscv_machine(
 	const char* nm, const char* grp, const char* file,
@@ -328,6 +327,22 @@ long riscv_current_call_idx(VRT_CTX, int index)
 	VRT_fail(ctx, "current_call_idx() failed (no running machine)");
 	return -1;
 }
+extern "C"
+int riscv_current_resume(VRT_CTX)
+{
+	auto* script = get_machine(ctx);
+	if (script) {
+	#ifdef ENABLE_TIMING
+		TIMING_LOCATION(t1);
+	#endif
+		int ret = script->resume(script->max_instructions());
+	#ifdef ENABLE_TIMING
+		TIMING_LOCATION(t2);
+		printf("Time spent in resume(): %ld ns\n", nanodiff(t1, t2));
+	#endif
+		return ret;
+	}
+}
 
 extern "C"
 const char* riscv_current_name(VRT_CTX)
@@ -360,6 +375,14 @@ long riscv_current_result_status(VRT_CTX)
 	if (script)
 		return script->want_value();
 	return 503;
+}
+extern "C"
+int  riscv_current_is_paused(VRT_CTX)
+{
+	auto* script = get_machine(ctx);
+	if (script)
+		return script->is_paused();
+	return 0;
 }
 
 struct backend_buffer {

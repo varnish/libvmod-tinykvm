@@ -2,6 +2,14 @@
 #include "machine/include_api.hpp"
 #include "varnish.hpp"
 
+#define ENABLE_TIMING
+#define TIMING_LOCATION(x) \
+	asm("" ::: "memory"); \
+	auto x = time_now();  \
+	asm("" ::: "memory");
+
+inline timespec time_now();
+inline long nanodiff(timespec start_time, timespec end_time);
 extern "C" {
 	void http_SetH(struct http *to, unsigned n, const char *fm);
 	void http_UnsetIdx(struct http *hp, unsigned idx);
@@ -162,12 +170,13 @@ APICALL(my_name)
 }
 APICALL(set_decision)
 {
-	auto [result, status] = machine.sysargs<riscv::Buffer, int> ();
+	auto [result, status, paused] =
+		machine.sysargs<riscv::Buffer, int, bool> ();
 	auto& script = get_script(machine);
 	if (result.is_sequential()) {
-		script.set_result(result.c_str(), status);
+		script.set_result(result.c_str(), status, paused);
 	} else {
-		script.set_result(result.to_string(), status);
+		script.set_result(result.to_string(), status, paused);
 	}
 	machine.stop();
 	return 0;
@@ -195,6 +204,9 @@ APICALL(purge)
 
 APICALL(synth)
 {
+#ifdef ENABLE_TIMING
+	TIMING_LOCATION(t0);
+#endif
 	const auto* ctx = get_ctx(machine);
 	if (ctx->method == VCL_MET_SYNTH ||
 		ctx->method == VCL_MET_BACKEND_ERROR)
@@ -214,6 +226,10 @@ APICALL(synth)
 			VSB_bcat(vsb, data.to_string().c_str(), data.size());
 		//VSB_finish(vsb);
 		machine.stop();
+#ifdef ENABLE_TIMING
+		TIMING_LOCATION(t1);
+		printf("Time spent in synth syscall: %ld ns\n", nanodiff(t0, t1));
+#endif
 		return 0;
 	}
 	throw std::runtime_error(
@@ -630,4 +646,16 @@ void Script::setup_syscall_interface(machine_t& machine)
 		FPTR(http_find_name)
 	};
 	machine.install_syscall_handler_range(SYSCALL_BASE, handlers);
+}
+
+timespec time_now()
+{
+	timespec t;
+	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t);
+	return t;
+}
+long nanodiff(timespec start_time, timespec end_time)
+{
+	assert(end_time.tv_sec == 0); /* We should never use seconds */
+	return end_time.tv_nsec - start_time.tv_nsec;
 }

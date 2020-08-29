@@ -25,6 +25,8 @@ public:
 	template <typename... Args>
 	inline long preempt(gaddr_t addr, Args&&...);
 
+	inline long resume(uint64_t cycles);
+
 	auto& machine() { return m_machine; }
 	const auto& machine() const { return m_machine; }
 
@@ -37,9 +39,10 @@ public:
 	const char* group() const noexcept;
 	auto* want_result() const noexcept { return m_want_result.c_str(); }
 	gaddr_t want_value() const noexcept { return m_want_value; }
-	void set_result(const std::string& res, gaddr_t value) {
-		m_want_result = res; m_want_value = value;
+	void set_result(const std::string& res, gaddr_t value, bool p) {
+		m_want_result = res; m_want_value = value; m_is_paused = p;
 	}
+	bool is_paused() const noexcept { return m_is_paused; }
 
 	gaddr_t guest_alloc(size_t len);
 	auto& shm_address() { return m_shm_address; }
@@ -84,6 +87,7 @@ private:
 
 	std::string m_want_result;
 	gaddr_t     m_want_value = 403;
+	bool        m_is_paused = false;
 	bool        m_decomissioned = false;
 
 	struct RegexCache {
@@ -133,5 +137,17 @@ inline long Script::preempt(gaddr_t address, Args&&... args)
 		this->handle_exception(address);
 	}
 	machine().cpu.registers() = regs;
+	return -1;
+}
+
+inline long Script::resume(uint64_t cycles)
+{
+	try {
+		machine().simulate<false>(cycles);
+		return machine().cpu.reg(10);
+	}
+	catch (const std::exception& e) {
+		this->handle_exception(machine().cpu.pc());
+	}
 	return -1;
 }

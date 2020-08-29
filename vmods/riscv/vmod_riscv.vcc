@@ -113,6 +113,10 @@ $Function INT     fastcall(ENUM {ON_REQUEST, ON_HASH, ON_SYNTH,
 - Calls the given function at index in order added by add_known_function
   (starting at zero), in the currently active machine.
 
+$Function INT     resume()
+
+- Resumes a paused machine.
+
 $Function STRING  current_name()
 
 - Returns the name of the currently active machine.
@@ -133,6 +137,10 @@ $Function STRING  want_result()
 $Function INT     want_status()
 
 - Returns the status code that the guest wants to use, if relevant.
+
+$Function BOOL    want_resume()
+
+- Returns true if the machine was paused, and may be resumed.
 
 $Function BACKEND vm_backend()
 

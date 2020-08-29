@@ -67,7 +67,11 @@ sub vcl_hash {
 
 sub vcl_synth {
 	if (riscv.machine_present()) {
-		riscv.fastcall(ON_SYNTH);
+		if (riscv.want_resume()) {
+			riscv.resume();
+		} else {
+			riscv.fastcall(ON_SYNTH);
+		}
 		return (deliver);
 	}
 }
