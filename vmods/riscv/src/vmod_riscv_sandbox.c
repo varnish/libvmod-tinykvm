@@ -6,22 +6,14 @@
 #include "vcc_if.h"
 #include "vmod_util.h"
 
-// Create new machine and call into it.
-extern struct vmod_riscv_machine* riscv_create(const char* name,
-	const char* file, const char* group, VRT_CTX, uint64_t insn, uint64_t mem);
-extern void riscv_prewarm(VRT_CTX, struct vmod_riscv_machine*, const char*);
-extern int riscv_fork(VRT_CTX, struct vmod_riscv_machine*);
-extern int riscv_forkcall(VRT_CTX, struct vmod_riscv_machine*, const char*);
-extern int riscv_forkcall_idx(VRT_CTX, struct vmod_riscv_machine*, int);
-extern int riscv_free(struct vmod_riscv_machine*);
-// Adds function to list that will be fed to each new
-// machine created afterwards.
-extern void riscv_add_known(VRT_CTX, const char* function);
+extern void init_tenants(VRT_CTX, const char*);
+
+extern void* riscv_fork(VRT_CTX, const char*);
 // Functions operating on a machine already forked, which
 // is accessible through a priv_task.
-extern int riscv_current_call(VRT_CTX, const char*);
-extern int riscv_current_call_idx(VRT_CTX, int);
-extern int riscv_current_resume(VRT_CTX);
+extern long riscv_current_call(VRT_CTX, const char*);
+extern long riscv_current_call_idx(VRT_CTX, int);
+extern long riscv_current_resume(VRT_CTX);
 extern const char* riscv_current_name(VRT_CTX);
 extern const char* riscv_current_group(VRT_CTX);
 extern const char* riscv_current_result(VRT_CTX);
@@ -38,75 +30,25 @@ static inline int enum_to_idx(VCL_ENUM e)
 	return -1;
 }
 
-/* Create new machine object, which can be used to fork new
-   VMs for client requests and backend fetches, etc. */
-VCL_VOID
-vmod_machine__init(VRT_CTX, struct vmod_riscv_machine **init,
-	const char *vcl_name, VCL_STRING name, VCL_STRING elf,
-	VCL_STRING group, VCL_INT max_instr, VCL_INT max_mem)
+/* Load tenant information from a JSON file */
+VCL_VOID vmod_load_tenants(VRT_CTX, VCL_STRING filename)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	(void) vcl_name;
 
-	*init = riscv_create(name, group, elf, ctx, max_instr, max_mem);
-}
-VCL_VOID
-vmod_machine__fini(struct vmod_riscv_machine **rvm)
-{
-	CHECK_OBJ_NOTNULL(*rvm, RISCV_MACHINE_MAGIC);
-
-	riscv_free(*rvm);
-	*rvm = NULL;
+	init_tenants(ctx, filename);
 }
 
 /* Fork into a new VM. The VM is freed when the
    request (priv_task) ends. */
-VCL_INT vmod_machine_fork(VRT_CTX, struct vmod_riscv_machine *rvm)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	CHECK_OBJ_NOTNULL(rvm, RISCV_MACHINE_MAGIC);
-
-	return riscv_fork(ctx, rvm);
-}
-/* Fork and call into a new VM. The VM is freed when the
-   request (priv_task) ends. */
-VCL_INT vmod_machine_call(VRT_CTX,
-	struct vmod_riscv_machine *rvm, VCL_STRING function)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	CHECK_OBJ_NOTNULL(rvm, RISCV_MACHINE_MAGIC);
-	if (function == NULL)
-		return (-1); /* ??? */
-
-	return riscv_forkcall(ctx, rvm, function);
-}
-VCL_INT vmod_machine_fastcall(VRT_CTX,
-    struct vmod_riscv_machine *rvm, VCL_ENUM e)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	CHECK_OBJ_NOTNULL(rvm, RISCV_MACHINE_MAGIC);
-
-	return riscv_forkcall_idx(ctx, rvm, enum_to_idx(e));
-}
-
-/* Make given function faster to look up and so on. */
-VCL_VOID vmod_machine_add_known_function(VRT_CTX,
-	struct vmod_riscv_machine *rvm, VCL_STRING function)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	CHECK_OBJ_NOTNULL(rvm, RISCV_MACHINE_MAGIC);
-
-	return riscv_prewarm(ctx, rvm, function);
-}
-VCL_VOID vmod_add_known_function(VRT_CTX, VCL_STRING function)
+VCL_BOOL vmod_fork(VRT_CTX, VCL_STRING tenant)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
-	riscv_add_known(ctx, function);
+	return riscv_fork(ctx, tenant) != NULL;
 }
 
 /* Check if there is a VM currently for this request. */
-VCL_BOOL vmod_machine_present(VRT_CTX)
+VCL_BOOL vmod_active(VRT_CTX)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 

@@ -6,28 +6,14 @@ option(SHARED_LIBRISCV "Build the libriscv sandbox PIC" ON)
 # WARNING: everything!
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++20 -O2 -g")
 
-add_subdirectory(libriscv/lib)
-target_compile_definitions(riscv PUBLIC
-	RISCV_THROW_UNIMPLEMENTED=1
-	RISCV_EBREAK_MEANS_STOP=1
-	RISCV_DISABLE_SYM_LOOKUP=1
-	RISCV_SYSCALLS_MAX=100)
-
-if (NATIVE)
-	target_compile_options(riscv PUBLIC -march=native -Ofast)
-	target_compile_options(EASTL PUBLIC -march=native -Ofast)
-endif()
-if (LTO_ENABLE)
-	target_compile_options(riscv PUBLIC -flto)
-	target_compile_options(EASTL PUBLIC -flto)
-endif()
-
 list(APPEND RISCV_SOURCES
 	src/linux.cpp
 	src/machine_instance.cpp
 	src/sandbox.cpp
 	src/script.cpp
 	src/script_functions.cpp
+	src/tenancy.cpp
+	src/vmod_riscv.cpp
 	libriscv/emulator/syscalls/src/syscalls.cpp
 	libriscv/emulator/syscalls/src/threads.cpp
 	libriscv/emulator/syscalls/src/posix_threads.cpp
@@ -42,7 +28,30 @@ target_include_directories(sandbox PRIVATE libriscv/emulator/syscalls)
 target_compile_definitions(sandbox PRIVATE
 	NATIVE_SYSCALLS_BASE=80
 )
-target_link_libraries(sandbox PUBLIC riscv stdc++)
+
+add_subdirectory(libriscv/lib)
+target_compile_definitions(riscv PUBLIC
+	RISCV_THROW_UNIMPLEMENTED=1
+	RISCV_EBREAK_MEANS_STOP=1
+	RISCV_DISABLE_SYM_LOOKUP=1
+	RISCV_SYSCALLS_MAX=100)
+
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+set(JSON_Install    OFF CACHE INTERNAL "")
+add_subdirectory(ext/json)
+
+
+if (NATIVE)
+	target_compile_options(riscv PUBLIC -march=native -Ofast)
+	target_compile_options(EASTL PUBLIC -march=native -Ofast)
+endif()
+if (LTO_ENABLE)
+	target_compile_options(riscv PUBLIC -flto)
+	target_compile_options(EASTL PUBLIC -flto)
+endif()
+
+
+target_link_libraries(sandbox PUBLIC nlohmann_json riscv stdc++)
 
 if (SHARED_LIBRISCV)
 	set_property(TARGET EASTL PROPERTY POSITION_INDEPENDENT_CODE 1)

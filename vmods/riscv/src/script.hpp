@@ -35,8 +35,8 @@ public:
 	const auto& instance() const noexcept { return m_inst; }
 
 	uint64_t max_instructions() const noexcept;
-	const char* name() const noexcept;
-	const char* group() const noexcept;
+	const std::string& name() const noexcept;
+	const std::string& group() const noexcept;
 	auto* want_result() const noexcept { return m_want_result.c_str(); }
 	gaddr_t want_value() const noexcept { return m_want_value; }
 	void set_result(const std::string& res, gaddr_t value, bool p) {

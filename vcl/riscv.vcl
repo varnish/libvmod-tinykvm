@@ -13,38 +13,32 @@ sub vcl_init {
 
 	new f = file.init("/tmp");
 
-	/* Create some machines */
-	new xpizza = riscv.machine(
-		name = "xpizza.com",
-		filename = "/home/gonzo/github/rvscript/programs/hello_world",
-		max_instructions = 88000000);
-	new ypizza = riscv.machine(
-		name = "ypizza.com",
-		filename = "/tmp/pythran",
-		max_instructions = 88000000);
-	ypizza.add_known_function("my_page");
+	riscv.load_tenants("/home/gonzo/tenants.json");
 }
 
 sub vcl_recv {
 	/* Live update mechanism */
 	if (req.method == "POST") {
 		std.cache_req_body(15MB);
-		set req.backend_hint = ypizza.live_update();
+		set req.backend_hint = riscv.live_update("ypizza.com");
 		return (pass);
 	}
 
 	/* Determine tenant and call into VM */
 	if (req.url == "/") {
-		xpizza.fastcall(ON_REQUEST);
+		riscv.fork("xpizza.com");
+		riscv.fastcall(ON_REQUEST);
 	} else if (req.url == "/file.txt") {
 		set req.backend_hint = f.backend();
 		return (hash);
 	} else if (req.url == "/backend") {
-		set req.backend_hint = ypizza.vm_backend("my_page");
+		riscv.fork("ypizza.com");
+		set req.backend_hint = riscv.vm_backend("my_page");
 		set req.url = req.url + "?" + utils.fast_random_int(80);
 		return (hash);
 	} else {
-		ypizza.fastcall(ON_REQUEST);
+		riscv.fork("ypizza.com");
+		riscv.fastcall(ON_REQUEST);
 	}
 
 	/* Make decision */
@@ -60,13 +54,13 @@ sub vcl_recv {
 }
 
 sub vcl_hash {
-	if (riscv.machine_present()) {
+	if (riscv.active()) {
 		riscv.fastcall(ON_HASH);
 	}
 }
 
 sub vcl_synth {
-	if (riscv.machine_present()) {
+	if (riscv.active()) {
 		if (riscv.want_resume()) {
 			riscv.resume();
 		} else {
@@ -74,4 +68,11 @@ sub vcl_synth {
 		}
 		return (deliver);
 	}
+	set resp.http.X-Tenant = riscv.current_name();
+	set resp.http.X-Something = "123";
+}
+
+sub vcl_deliver {
+	set resp.http.X-Tenant = riscv.current_name();
+	set resp.http.X-Something = "123";
 }

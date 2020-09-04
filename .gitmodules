@@ -25,3 +25,6 @@
 [submodule "src/faster/fmt"]
 	path = src/faster/fmt
 	url = https://github.com/fmtlib/fmt.git
+[submodule "cmake/sandbox/ext/json"]
+	path = cmake/sandbox/ext/json
+	url = https://github.com/nlohmann/json.git

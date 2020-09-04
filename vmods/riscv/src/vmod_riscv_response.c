@@ -144,7 +144,7 @@ static void setup_response_director(struct director *dir, struct vmod_riscv_resp
 	dir->panic   = riscvbe_panic;
 }
 
-VCL_BACKEND vmod_vm_backend(VRT_CTX)
+VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING func)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
@@ -157,29 +157,16 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX)
 
 	INIT_OBJ(rvr, RISCV_BACKEND_MAGIC);
 	rvr->machine = riscv_current_machine(ctx);
-	rvr->funcaddr = riscv_current_result_status(ctx);
-	rvr->max_response_size = 0;
-
-	setup_response_director(&rvr->dir, rvr);
-
-	return &rvr->dir;
-}
-
-VCL_BACKEND vmod_machine_vm_backend(VRT_CTX,
-    struct vmod_riscv_machine *machine, VCL_STRING func)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-
-	struct vmod_riscv_response *rvr;
-	rvr = WS_Alloc(ctx->ws, sizeof(struct vmod_riscv_response));
-	if (rvr == NULL) {
-		VRT_fail(ctx, "Out of memory");
+	if (rvr->machine == NULL) {
+		VRT_fail(ctx, "No tenant active");
 		return NULL;
 	}
 
-	INIT_OBJ(rvr, RISCV_BACKEND_MAGIC);
-	rvr->machine = machine;
-	rvr->funcaddr = riscv_resolve_name(machine, func);
+	if (func) {
+		rvr->funcaddr = riscv_resolve_name(rvr->machine, func);
+	} else {
+		rvr->funcaddr = riscv_current_result_status(ctx);
+	}
 	rvr->max_response_size = 0;
 
 	setup_response_director(&rvr->dir, rvr);

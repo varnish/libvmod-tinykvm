@@ -41,7 +41,7 @@ Script::Script(
 Script::Script(
 	const std::vector<uint8_t>& binary,
 	const vrt_ctx* ctx, const vmod_riscv_machine* vrm, const MachineInstance& inst)
-	: m_machine(binary, { .memory_max = vrm->max_memory }),
+	: m_machine(binary, { .memory_max = vrm->config.max_memory }),
 	  m_ctx(ctx), m_vrm(vrm), m_inst(inst)
 {
 	this->machine_initialize(true);
@@ -182,12 +182,12 @@ void Script::machine_setup(machine_t& machine, bool init)
 	if (init == false)
 	{
 		this->m_arena = setup_native_heap_syscalls<MARCH>(
-			machine, vrm()->max_heap, [this] (size_t size) {
+			machine, vrm()->config.max_heap, [this] (size_t size) {
 				return WS_Alloc(m_ctx->ws, size);
 			});
 	} else {
 		this->m_arena =
-			setup_native_heap_syscalls<MARCH>(machine, vrm()->max_heap);
+			setup_native_heap_syscalls<MARCH>(machine, vrm()->config.max_heap);
 	}
 
 #ifdef ENABLE_TIMING
@@ -247,7 +247,7 @@ void Script::handle_timeout(gaddr_t address)
 		fprintf(stderr, "Script hit max instructions for: %s\n",
 			callsite.name.c_str());
 	}
-	VRT_fail(m_ctx, "Script for '%s' timed out", name());
+	VRT_fail(m_ctx, "Script for '%s' timed out", name().c_str());
 }
 void Script::print_backtrace(const gaddr_t addr)
 {
@@ -263,15 +263,15 @@ void Script::print_backtrace(const gaddr_t addr)
 
 uint64_t Script::max_instructions() const noexcept
 {
-	return vrm()->max_instructions;
+	return vrm()->config.max_instructions;
 }
-const char* Script::name() const noexcept
+const std::string& Script::name() const noexcept
 {
-	return vrm()->name;
+	return vrm()->config.name;
 }
-const char* Script::group() const noexcept
+const std::string& Script::group() const noexcept
 {
-	return vrm()->group;
+	return vrm()->config.group;
 }
 
 Script::gaddr_t Script::guest_alloc(size_t len)

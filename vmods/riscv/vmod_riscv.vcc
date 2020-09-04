@@ -4,31 +4,30 @@ DESCRIPTION
 ===========
 
 vmod_riscv allows creating ultra-low overhead virtual machines
-per request directly from VCL, that runs 32-bit RISC-V machine code.
+per request directly from VCL, that runs RISC-V machine code.
 Each machine lives in complete separation and cannot affect any other.
 Machines communicate with Varnish using a system call API that covers
 all the basic tasks that tenants want to perform.
 Any programming language that is able to produce RISC-V machine code can
 be used on top of this, which allows using modern programming concepts,
-with complete language runtime-environments.
+and complete runtime-environments.
 
 Due to the low overhead nature of the machines, the API may be somewhat
 unique, however it's intended to be used by CDNs who know what they are doing.
 
 Example:
 	sub vcl_init {
-		/* Create some machines */
-		new ypizza = riscv.machine(
-			name = "ypizza.com",
-			group = "premium",
-			filename = "/tmp/tenants/ypizza");
-		/* This specific machine has more functions we can call */
-		ypizza.add_known_function("test");
+		/* Initialize some tenants from JSON */
+		riscv.load_tenants("/path/to/tenants.json");
 	}
 
 	sub vcl_recv {
+		/* Select a tenant to handle this request */
+		riscv.fork("ypizza.com");
+		/* Add CDNs custom header fields */
+		set req.http.X-Tenant = riscv.current_name();
 		/* We can call functions directly by name */
-		ypizza.call("on_client_request");
+		riscv.call("on_client_request");
 
 		/* We can query what the machine wants to happen */
 		if (riscv.want_result() == "synth") {
@@ -44,64 +43,42 @@ Example:
 API
 ===
 
-$Function VOID add_known_function(STRING function)
+$Function VOID load_tenants(STRING json_filepath)
 
-- Adds the given function to a list of functions that will be
-  automatically pre-warmed on each new machine created. The
-  function does not have to exist on every machine.
+- Load tenants from a JSON file in this format:
 
+	"group_name": {
+		"max_instructions": 2000000,
+		"max_memory": 4194304,
+		"max_heap":  4194304
+	},
+	"tenant_name": {
+		"filename": "/path/to/program",
+		"group": "groupname"
+	}
 
-$Object machine(STRING name, STRING filename, STRING group = "", INT max_instructions = 2000000, INT max_memory = 8388608)
+- The program does not have to exist, it only needs to be
+  accessible to Varnish. When a tenant sends a new program
+  to Varnish, it will try to write to that location.
 
-- Create named machine that is initialized immediately
-- Broken machines return 500 server error
+$Function BOOL    fork(STRING tenant)
 
-$Method VOID    .add_known_function(STRING function)
+- Tenant names are the object names in the JSON configuration file.
+- Quickly create a new tenant machine forked from a previously
+  fully prepared machine, using copy-on-write mechanics.
+- Returns true if the fork succeeded.
 
-- Make this function faster to call later on.
-
-$Method INT     .fork()
-
-- Create a new virtual machine quickly forked from the previously
-  prepared machine, using copy-on-write mechanics.
-  "on_init",
-  "on_client_request",
-  "on_hash",
-  "on_synth",
-  "on_backend_fetch",
-  "on_backend_response"
-
-$Method INT     .call(STRING function)
-
-$Method INT     .fastcall(ENUM {ON_REQUEST, ON_HASH, ON_SYNTH,
-		ON_BACKEND_FETCH, ON_BACKEND_RESPONSE} index = "ON_REQUEST")
-
-- Call given function in this virtual machine.
-- If no machine is forked, fork.
-
-  Example:
-
-  new ypizza = riscv.machine(
-	  name = "ypizza.com",
-	  filename = "/tmp/test");
-
-  ypizza.call("on_client_request");
-  ypizza.fastcall(ON_REQUEST);
-
-$Method BACKEND .live_update(BYTES max_size = 2097152)
+$Function BACKEND live_update(STRING tenant, BYTES max_size = 2097152)
 
 - Update this machine using binary data received in the
   current request. If the machine fails to load, the old machine
   will be kept running.
-
-$Method BACKEND .vm_backend(STRING function)
-
-- Call given function and use as generator for backend response
+- Tenant name must be specified to avoid accidents.
 
 
-$Function BOOL    machine_present()
+$Function BOOL    active()
 
-- Returns true if there is a currently active machine.
+- Returns true if there is a currently active tenant.
 
 $Function INT     call(STRING function)
 
@@ -115,7 +92,7 @@ $Function INT     fastcall(ENUM {ON_REQUEST, ON_HASH, ON_SYNTH,
 
 $Function INT     resume()
 
-- Resumes a paused machine.
+- Resumes a paused tenant machine.
 
 $Function STRING  current_name()
 
@@ -137,15 +114,22 @@ $Function STRING  want_result()
 $Function INT     want_status()
 
 - Returns the status code that the guest wants to use, if relevant.
+- Returns zero (0) if no status has been set.
 
 $Function BOOL    want_resume()
 
 - Returns true if the machine was paused, and may be resumed.
 
-$Function BACKEND vm_backend()
+$Function BACKEND vm_backend(STRING func = 0)
 
 - Returns a backend that will call into the current machine to produce a response.
 - Produces 500 server error if there is no active machine, or an error happens.
+- Call with no function specified if tenant has made a "backend" decision.
+
+	if (riscv.want_result() == "backend") {
+		set req.backend_hint = riscv.vm_backend();
+		return (hash);
+	}
 
 
 SIMPLE EXECUTION

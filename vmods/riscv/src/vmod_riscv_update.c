@@ -1,4 +1,5 @@
 #include "vmod_riscv.h"
+#include "vmod_riscv_sandbox.h"
 
 #include <malloc.h>
 #include "vcl.h"
@@ -6,7 +7,8 @@
 #include "vmod_util.h"
 
 extern const char* riscv_update(struct vsl_log*, struct vmod_riscv_machine*, const uint8_t*, size_t);
-
+extern const struct vmod_riscv_machine* riscv_current_machine(VRT_CTX);
+extern struct vmod_riscv_machine* tenant_find(VRT_CTX, const char*);
 
 static void v_matchproto_(vdi_panic_f)
 riscvbe_panic(const struct director *dir, struct vsb *vsb)
@@ -164,9 +166,15 @@ riscvbe_gethdrs(const struct director *dir,
 	return (0);
 }
 
-VCL_BACKEND vmod_machine_live_update(VRT_CTX, struct vmod_riscv_machine *rvm, VCL_BYTES max_size)
+VCL_BACKEND vmod_live_update(VRT_CTX, VCL_STRING tenant, VCL_BYTES max_size)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	struct vmod_riscv_machine *rvm = tenant_find(ctx, tenant);
+	if (rvm == NULL) {
+		VRT_fail(ctx, "Could not find tenant: %s", tenant);
+		return NULL;
+	}
 
 	struct vmod_riscv_updater *rvu;
 	rvu = WS_Alloc(ctx->ws, sizeof(struct vmod_riscv_updater));

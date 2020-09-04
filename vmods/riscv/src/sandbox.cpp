@@ -10,113 +10,23 @@
 
 inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
-static std::vector<uint8_t> file_loader(const std::string& file);
-static bool file_writer(const std::string& file, const std::vector<uint8_t>&);
-// functions available to all machines created during init
-std::vector<const char*> riscv_lookup_wishlist {
-	"on_init",
-	"on_client_request",
-	"on_hash",
-	"on_synth",
-	"on_backend_fetch",
-	"on_backend_response"
-};
-static const size_t TOO_SMALL = 3; // vmcalls that can be skipped
-static const uint64_t MAX_HEAP = 640 * 1024;
-#define SCRIPT_MAGIC 0x83e59fa5
+std::vector<uint8_t> file_loader(const std::string& file);
 
-vmod_riscv_machine::vmod_riscv_machine(
-	const char* nm, const char* grp, const char* file,
-	VRT_CTX, uint64_t insn, uint64_t mem, uint64_t heap)
-	: name(nm), group(grp), filename(file),
-	  max_instructions(insn), max_memory(mem), max_heap(heap)
+vmod_riscv_machine::vmod_riscv_machine(VRT_CTX, const TenantConfig& conf)
+	: config{conf}
 {
 	try {
-		auto elf = file_loader(file);
+		auto elf = file_loader(conf.filename);
 		machine = std::make_unique<MachineInstance> (std::move(elf), ctx, this);
 	} catch (const std::exception& e) {
-		/*VSLb(ctx->vsl, SLT_Error,
+		VSL(SLT_Error, 0,
 			"Exception when creating machine '%s': %s",
-			name, e.what());*/
+			conf.name.c_str(), e.what());
 		machine = nullptr;
 	}
 }
 
-extern "C"
-vmod_riscv_machine* riscv_create(const char* name, const char* group,
-	const char* file, VRT_CTX, uint64_t insn, uint64_t max_mem)
-{
-	auto* vrm = (vmod_riscv_machine*) WS_Alloc(ctx->ws, sizeof(vmod_riscv_machine));
-	if (UNLIKELY(vrm == nullptr)) {
-		VRT_fail(ctx, "Out of workspace");
-		return nullptr;
-	}
-
-	try {
-		new (vrm) vmod_riscv_machine(name, group, file, ctx,
-			/* Max instr: */ insn, max_mem, MAX_HEAP);
-		return vrm;
-	} catch (const std::exception& e) {
-		VRT_fail(ctx, "Exception when creating machine '%s': %s",
-			name, e.what());
-		return nullptr;
-	}
-}
-extern "C"
-const char* riscv_update(struct vsl_log* vsl, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
-{
-	/* ELF loader will not be run for empty binary */
-	if (UNLIKELY(data == nullptr || len == 0)) {
-		return strdup("Empty file received");
-	}
-	try {
-	#ifdef ENABLE_TIMING
-		TIMING_LOCATION(t0);
-	#endif
-		/* Note: CTX is NULL here */
-		std::vector<uint8_t> binary {data, data + len};
-		auto inst = std::make_unique<MachineInstance>(std::move(binary), nullptr, vrm);
-		vrm->machine.swap(inst);
-		/* Could be updating for the first time */
-		if (inst != nullptr)
-		{
-			auto* decomissioned = inst.release();
-			decomissioned->script.decomission();
-			decomissioned->remove_reference();
-		}
-	#ifdef ENABLE_TIMING
-		TIMING_LOCATION(t1);
-		printf("Time spent updating: %ld ns\n", nanodiff(t0, t1));
-	#endif
-		bool ok = file_writer(vrm->filename, vrm->machine->binary);
-		if (!ok) {
-			/* Writing the tenant program to file failed */
-			char buffer[800];
-			const int len = snprintf(buffer, sizeof(buffer),
-				"Could not write '%s'", vrm->filename);
-			VSLb(vsl, SLT_Error, "%.*s", len, buffer);
-			return strdup(buffer);
-		}
-		/* TODO: delete when nobody uses it anymore */
-		return strdup("Update successful\n");
-	} catch (const std::exception& e) {
-		/* Pass the actual error back to the client */
-		return strdup(e.what());
-	}
-}
-
-extern "C"
-void riscv_prewarm(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
-{
-	(void) ctx;
-	if (UNLIKELY(vrm->no_program_loaded()))
-		return;
-	const auto site = vrm->callsite(func);
-	vrm->machine->sym_lookup.emplace(strdup(site.name.c_str()), site.address);
-	vrm->machine->sym_vector.push_back({site.name.c_str(), site.address, site.size});
-}
-
-inline Script* vmfork(VRT_CTX, const vmod_riscv_machine* vrm)
+Script* vmod_riscv_machine::vmfork(VRT_CTX)
 {
 	auto* priv_task = VRT_priv_task(ctx, ctx);
 	if (!priv_task->priv)
@@ -125,7 +35,7 @@ inline Script* vmfork(VRT_CTX, const vmod_riscv_machine* vrm)
 		TIMING_LOCATION(t0);
 	#endif
 		/* First-time tenants could have no program */
-		if (UNLIKELY(vrm->no_program_loaded()))
+		if (UNLIKELY(this->no_program_loaded()))
 			return nullptr;
 		/* Allocate Script on workspace, and construct it in-place */
 		auto* script = (Script*) WS_Alloc(ctx->ws, sizeof(Script));
@@ -134,14 +44,14 @@ inline Script* vmfork(VRT_CTX, const vmod_riscv_machine* vrm)
 			return nullptr;
 		}
 
-		vrm->machine->add_reference();
+		this->machine->add_reference();
 		try {
-			new (script) Script{vrm->script(), ctx, vrm};
+			new (script) Script{this->script(), ctx, this};
 
 		} catch (std::exception& e) {
-			vrm->machine->remove_reference();
+			this->machine->remove_reference();
 			VRT_fail(ctx,
-				"VM '%s' exception: %s", script->name(), e.what());
+				"VM '%s' exception: %s", script->name().c_str(), e.what());
 			return nullptr;
 		}
 	#ifdef ENABLE_TIMING
@@ -165,19 +75,9 @@ inline Script* vmfork(VRT_CTX, const vmod_riscv_machine* vrm)
 	return (Script*) priv_task->priv;
 }
 
-extern "C"
-int riscv_fork(VRT_CTX, vmod_riscv_machine* vrm)
+int vmod_riscv_machine::forkcall(VRT_CTX, Script::gaddr_t addr)
 {
-	auto* script = vmfork(ctx, vrm);
-	if (UNLIKELY(script == nullptr))
-		return -1;
-
-	return 0;
-}
-
-inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, Script::gaddr_t addr)
-{
-	auto* script = vmfork(ctx, vrm);
+	auto* script = this->vmfork(ctx);
 	if (UNLIKELY(script == nullptr))
 		return -1;
 
@@ -194,242 +94,6 @@ inline int forkcall(VRT_CTX, vmod_riscv_machine* vrm, Script::gaddr_t addr)
 	return ret;
 }
 
-extern "C"
-int riscv_forkcall(VRT_CTX, vmod_riscv_machine* vrm, const char* func)
-{
-	const auto addr = vrm->lookup(func);
-	if (UNLIKELY(addr == 0)) {
-		VSLb(ctx->vsl, SLT_Error,
-			"VM call '%s' failed: The function is missing", func);
-		return -1;
-	}
-	return forkcall(ctx, vrm, addr);
-}
-extern "C"
-int riscv_forkcall_idx(VRT_CTX, vmod_riscv_machine* vrm, int index)
-{
-	if (UNLIKELY(vrm->no_program_loaded()))
-		return -1;
-	if (index >= 0 && index < vrm->machine->sym_vector.size())
-	{
-		auto& entry = vrm->machine->sym_vector[index];
-		if (UNLIKELY(entry.addr == 0)) {
-			VSLb(ctx->vsl, SLT_Error,
-				"VM call '%s' failed: The function is missing", entry.func);
-			return -1;
-		}
-		if (UNLIKELY(entry.size <= TOO_SMALL)) {
-			VSLb(ctx->vsl, SLT_Debug, "VM call '%s' is being skipped.",
-				entry.func);
-			//printf("Callsite: %s -> %zu\n", entry.func, entry.size);
-			return 0;
-		}
-
-		return forkcall(ctx, vrm, entry.addr);
-	}
-	VRT_fail(ctx, "VM call failed (invalid call index given: %d)", index);
-	return -1;
-}
-
-extern "C"
-int riscv_free(vmod_riscv_machine* vrm)
-{
-	vrm->~vmod_riscv_machine();
-	return 0;
-}
-
-extern "C"
-uint64_t riscv_resolve_name(struct vmod_riscv_machine* vrm, const char* symb)
-{
-	return vrm->lookup(symb);
-}
-
-
-extern "C"
-void riscv_add_known(VRT_CTX, const char* func)
-{
-	(void) ctx;
-	riscv_lookup_wishlist.push_back(func);
-}
-
-inline Script* get_machine(VRT_CTX)
-{
-	auto* priv_task = VRT_priv_task(ctx, ctx);
-	if (priv_task->priv && priv_task->len == SCRIPT_MAGIC)
-		return (Script*) priv_task->priv;
-	return nullptr;
-}
-
-extern "C"
-const struct vmod_riscv_machine* riscv_current_machine(VRT_CTX)
-{
-	auto* script = get_machine(ctx);
-	if (script) {
-		return script->vrm();
-	}
-	return nullptr;
-}
-
-extern "C"
-long riscv_current_call(VRT_CTX, const char* func)
-{
-	auto* script = get_machine(ctx);
-	if (script) {
-	#ifdef ENABLE_TIMING
-		TIMING_LOCATION(t1);
-	#endif
-		const auto addr = script->vrm()->lookup(func);
-		if (UNLIKELY(addr == 0)) {
-			VSLb(ctx->vsl, SLT_Error,
-				"VM call '%s' failed: The function is missing", func);
-			return -1;
-		}
-		int ret = script->call(addr);
-	#ifdef ENABLE_TIMING
-		TIMING_LOCATION(t2);
-		printf("Time spent in forkcall(): %ld ns\n", nanodiff(t1, t2));
-	#endif
-		return ret;
-	}
-	return -1;
-}
-extern "C"
-long riscv_current_call_idx(VRT_CTX, int index)
-{
-	auto* script = get_machine(ctx);
-	if (script) {
-		if (index >= 0 && index < script->instance().sym_vector.size())
-		{
-			auto& entry = script->instance().sym_vector[index];
-			if (UNLIKELY(entry.addr == 0)) {
-				VSLb(ctx->vsl, SLT_Error,
-					"VM call '%s' failed: The function at index %d is not availble",
-					entry.func, index);
-				return -1;
-			}
-			if (UNLIKELY(entry.size <= TOO_SMALL)) {
-				VSLb(ctx->vsl, SLT_Debug, "VM call '%s' is being skipped.",
-					entry.func);
-				//printf("Callsite: %s -> %zu\n", entry.func, entry.size);
-				return 0;
-			}
-		#ifdef ENABLE_TIMING
-			TIMING_LOCATION(t1);
-		#endif
-			int ret = script->call(entry.addr);
-		#ifdef ENABLE_TIMING
-			TIMING_LOCATION(t2);
-			printf("Time spent in forkcall(): %ld ns\n", nanodiff(t1, t2));
-		#endif
-			return ret;
-		}
-		VRT_fail(ctx, "VM call failed (invalid index given: %d)", index);
-		return -1;
-	}
-	VRT_fail(ctx, "current_call_idx() failed (no running machine)");
-	return -1;
-}
-extern "C"
-int riscv_current_resume(VRT_CTX)
-{
-	auto* script = get_machine(ctx);
-	if (script) {
-	#ifdef ENABLE_TIMING
-		TIMING_LOCATION(t1);
-	#endif
-		int ret = script->resume(script->max_instructions());
-	#ifdef ENABLE_TIMING
-		TIMING_LOCATION(t2);
-		printf("Time spent in resume(): %ld ns\n", nanodiff(t1, t2));
-	#endif
-		return ret;
-	}
-}
-
-extern "C"
-const char* riscv_current_name(VRT_CTX)
-{
-	auto* script = get_machine(ctx);
-	if (script)
-		return script->name();
-	return nullptr;
-}
-extern "C"
-const char* riscv_current_group(VRT_CTX)
-{
-	auto* script = get_machine(ctx);
-	if (script)
-		return script->name();
-	return nullptr;
-}
-extern "C"
-const char* riscv_current_result(VRT_CTX)
-{
-	auto* script = get_machine(ctx);
-	if (script)
-		return script->want_result();
-	return nullptr;
-}
-extern "C"
-long riscv_current_result_status(VRT_CTX)
-{
-	auto* script = get_machine(ctx);
-	if (script)
-		return script->want_value();
-	return 503;
-}
-extern "C"
-int  riscv_current_is_paused(VRT_CTX)
-{
-	auto* script = get_machine(ctx);
-	if (script)
-		return script->is_paused();
-	return 0;
-}
-
-struct backend_buffer {
-	const char* type;
-	const char* data;
-	unsigned    size;
-};
-extern "C"
-struct backend_buffer riscv_backend_call(VRT_CTX, struct vmod_riscv_machine* vrm, long func)
-{
-	auto* script = (Script*) WS_Alloc(ctx->ws, sizeof(Script));
-	if (UNLIKELY(script == nullptr)) {
-		VSLb(ctx->vsl, SLT_Error, "Out of workspace");
-		return {nullptr, nullptr, 0};
-	}
-	/* Fork new machine */
-	vrm->machine->add_reference();
-	try {
-		new (script) Script{vrm->script(), ctx, vrm};
-	} catch (std::exception& e) {
-		vrm->machine->remove_reference();
-		VSLb(ctx->vsl, SLT_Error, "VM fork exception: %s", e.what());
-		return {nullptr, nullptr, 0};
-	}
-	/* Call the backend response function */
-	try {
-		script->machine().vmcall(func);
-		/* Get content-type and data */
-		const auto [type, data] = script->machine().sysargs<riscv::Buffer, riscv::Buffer> ();
-		auto* mimebuf = (char*) WS_Alloc(ctx->ws, type.size());
-		auto* databuf = (char*) WS_Alloc(ctx->ws, data.size());
-		if (mimebuf && databuf)
-		{
-			/* Return content-type, data, size */
-			backend_buffer result {type.to_buffer(mimebuf), data.to_buffer(databuf), (unsigned) data.size()};
-			script->~Script(); /* call destructor */
-			return result;
-		}
-	} catch (std::exception& e) {
-		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
-		printf("VM call exception: %s\n", e.what());
-	}
-	script->~Script(); /* call destructor */
-	return {nullptr, nullptr, 0};
-}
 
 #include <unistd.h>
 std::vector<uint8_t> file_loader(const std::string& filename)
@@ -450,16 +114,6 @@ std::vector<uint8_t> file_loader(const std::string& filename)
     }
     fclose(f);
     return result;
-}
-bool file_writer(const std::string& filename, const std::vector<uint8_t>& binary)
-{
-    FILE* f = fopen(filename.c_str(), "wb");
-    if (f == NULL)
-		return false;
-
-	const size_t n = fwrite(binary.data(), 1, binary.size(), f);
-    fclose(f);
-	return n == binary.size();
 }
 
 timespec time_now()

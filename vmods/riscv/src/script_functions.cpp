@@ -135,7 +135,7 @@ APICALL(print)
 	auto [buffer] = machine.sysargs<riscv::Buffer> ();
 	auto string = buffer.to_string();
 	/* TODO: Use VSLb here or disable this completely */
-	printf(">>> %s: %.*s", get_script(machine).name(),
+	printf(">>> %s: %.*s", get_script(machine).name().c_str(),
 		(int) string.size(), string.c_str());
 	return string.size();
 }
@@ -163,10 +163,10 @@ APICALL(shm_log)
 APICALL(my_name)
 {
 	auto& script = get_script(machine);
+	const auto& name = script.name();
 	/* Put pointer, length in registers A0, A1 */
-	const size_t len = __builtin_strlen(script.name());
-	machine.cpu.reg(11) = len;
-	return push_data(machine, script.name(), len+1); /* Zero-terminated */
+	machine.cpu.reg(11) = name.size();
+	return push_data(machine, name.c_str(), name.size()+1); /* Zero-terminated */
 }
 APICALL(set_decision)
 {
