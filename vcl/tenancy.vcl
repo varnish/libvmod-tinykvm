@@ -1,5 +1,6 @@
 vcl 4.1;
 import riscv;
+import std;
 
 backend default {
 	.host = "127.0.0.1";
@@ -7,7 +8,8 @@ backend default {
 }
 
 sub vcl_init {
-	riscv.load_tenants("/home/gonzo/tenants.json");
+	riscv.load_tenants(
+		"/home/gonzo/github/varnish_autoperf/vcl/tenants.json");
 }
 
 sub vcl_recv {
@@ -18,12 +20,16 @@ sub vcl_recv {
 		/* Live update mechanism */
 		if (req.method == "POST") {
 			set req.backend_hint = riscv.live_update(req.http.Host);
+			std.cache_req_body(15MB);
 			return (pass);
 		}
-
-		riscv.fork(req.http.Host);
+		/* If fork fails, it's probably not a tenant */
+		if (!riscv.fork(req.http.Host)) {
+			return (synth(403));
+		}
 
 	} else {
+		/* No 'Host: tenant' specified */
 		return (synth(403));
 	}
 
