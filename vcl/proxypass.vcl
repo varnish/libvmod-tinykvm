@@ -7,6 +7,8 @@ backend default {
 }
 
 sub vcl_recv {
-	utils.set_bypass_buffer_size(2KB);
 	return (pass);
+}
+sub vcl_backend_response {
+	utils.set_bypass_buffer_size(2KB);
 }
