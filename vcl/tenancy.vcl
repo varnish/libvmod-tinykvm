@@ -23,8 +23,18 @@ sub vcl_recv {
 			std.cache_req_body(15MB);
 			return (pass);
 		}
+		/* Easier to work with wrk */
+		if (req.url == "/x") {
+			riscv.fork("xpizza.com");
+		}
+		else if (req.url == "/y") {
+			riscv.fork("ypizza.com");
+		}
+		else if (req.url == "/z") {
+			riscv.fork("zpizza.com");
+		}
 		/* If fork fails, it's probably not a tenant */
-		if (!riscv.fork(req.http.Host)) {
+		else if (!riscv.fork(req.http.Host)) {
 			return (synth(403));
 		}
 
