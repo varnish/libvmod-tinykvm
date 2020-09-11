@@ -16,7 +16,7 @@ const char* riscv_update(struct vsl_log* vsl, vmod_riscv_machine* vrm, const uin
 	#endif
 		/* Note: CTX is NULL here */
 		std::vector<uint8_t> binary {data, data + len};
-		auto inst = std::make_shared<MachineInstance>(std::move(binary), nullptr, vrm);
+		auto inst = std::make_shared<MachineInstance>(binary, nullptr, vrm);
 		inst->script.assign_instance(inst);
 		/* Decrements reference when it goes out of scope */
 		auto old = std::atomic_exchange(&vrm->machine, inst);
