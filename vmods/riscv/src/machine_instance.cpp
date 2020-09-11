@@ -8,3 +8,7 @@ std::vector<const char*> riscv_lookup_wishlist {
 	"on_backend_fetch",
 	"on_backend_response"
 };
+
+MachineInstance::~MachineInstance()
+{
+}

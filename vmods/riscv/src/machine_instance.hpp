@@ -18,6 +18,7 @@ struct MachineInstance
 			sym_vector.push_back({func, addr, callsite.size});
 		}
 	}
+	~MachineInstance();
 
 	inline Script::gaddr_t lookup(const char* name) const {
 		const auto& it = sym_lookup.find(name);

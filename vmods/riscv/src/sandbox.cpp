@@ -17,8 +17,8 @@ vmod_riscv_machine::vmod_riscv_machine(VRT_CTX, const TenantConfig& conf)
 {
 	try {
 		auto elf = file_loader(conf.filename);
-		machine = std::make_shared<MachineInstance> (std::move(elf), ctx, this);
-		machine->script.assign_instance(machine);
+		this->machine =
+			std::make_shared<MachineInstance> (std::move(elf), ctx, this);
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
 			"Exception when creating machine '%s': %s",
