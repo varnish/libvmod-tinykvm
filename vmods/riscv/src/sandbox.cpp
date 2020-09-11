@@ -17,7 +17,8 @@ vmod_riscv_machine::vmod_riscv_machine(VRT_CTX, const TenantConfig& conf)
 {
 	try {
 		auto elf = file_loader(conf.filename);
-		machine = std::make_unique<MachineInstance> (std::move(elf), ctx, this);
+		machine = std::make_shared<MachineInstance> (std::move(elf), ctx, this);
+		machine->script.assign_instance(machine);
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
 			"Exception when creating machine '%s': %s",
@@ -34,8 +35,9 @@ Script* vmod_riscv_machine::vmfork(VRT_CTX)
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t0);
 	#endif
+		auto program = this->machine;
 		/* First-time tenants could have no program */
-		if (UNLIKELY(this->no_program_loaded()))
+		if (UNLIKELY(program == nullptr))
 			return nullptr;
 		/* Allocate Script on workspace, and construct it in-place */
 		auto* script = (Script*) WS_Alloc(ctx->ws, sizeof(Script));
@@ -44,12 +46,11 @@ Script* vmod_riscv_machine::vmfork(VRT_CTX)
 			return nullptr;
 		}
 
-		this->machine->add_reference();
 		try {
-			new (script) Script{this->script(), ctx, this};
+			new (script) Script{program->script, ctx, this, *program};
+			script->assign_instance(program);
 
 		} catch (std::exception& e) {
-			this->machine->remove_reference();
 			VRT_fail(ctx,
 				"VM '%s' exception: %s", script->name().c_str(), e.what());
 			return nullptr;

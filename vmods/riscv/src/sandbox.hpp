@@ -19,16 +19,20 @@ struct vmod_riscv_machine
 	Script* vmfork(VRT_CTX);
 	bool no_program_loaded() const noexcept { return this->machine == nullptr; }
 
-	const auto& script() const { return machine->script; }
 	inline Script::gaddr_t lookup(const char* name) const {
-		if (LIKELY(machine != nullptr))
-			return machine->lookup(name);
+		auto program = machine;
+		if (LIKELY(program != nullptr))
+			return program->lookup(name);
 		return 0x0;
 	}
 
 	inline auto callsite(const char* name) {
-		auto addr = machine->lookup(name);
-		return script().callsite(addr);
+		auto program = machine;
+		if (LIKELY(program != nullptr)) {
+			auto addr = program->lookup(name);
+			return program->script.callsite(addr);
+		}
+		return decltype(program->script.callsite(0)) {};
 	}
 
 	vmod_riscv_machine(VRT_CTX, const TenantConfig&);
@@ -37,6 +41,6 @@ struct vmod_riscv_machine
 	const uint64_t magic = 0xb385716f486938e6;
 	const TenantConfig config;
 	/* Hot-swappable machine */
-	std::unique_ptr<MachineInstance> machine = nullptr;
+	std::shared_ptr<MachineInstance> machine = nullptr;
 	static std::vector<const char*> lookup_wishlist;
 };

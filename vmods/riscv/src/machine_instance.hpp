@@ -26,12 +26,8 @@ struct MachineInstance
 		return script.resolve_address(name);
 	}
 
-	void add_reference() const;
-	void remove_reference() const;
-
 	const std::vector<uint8_t> binary;
 	Script   script;
-	mutable std::atomic<unsigned> refcount = 1;
 	/* Lookup tree for ELF symbol names */
 	eastl::string_map<Script::gaddr_t,
 			eastl::str_less<const char*>,

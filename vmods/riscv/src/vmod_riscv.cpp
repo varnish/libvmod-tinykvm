@@ -16,20 +16,16 @@ const char* riscv_update(struct vsl_log* vsl, vmod_riscv_machine* vrm, const uin
 	#endif
 		/* Note: CTX is NULL here */
 		std::vector<uint8_t> binary {data, data + len};
-		auto inst = std::make_unique<MachineInstance>(std::move(binary), nullptr, vrm);
-		vrm->machine.swap(inst);
-		/* Could be updating for the first time */
-		if (inst != nullptr)
-		{
-			auto* decomissioned = inst.release();
-			decomissioned->script.decomission();
-			decomissioned->remove_reference();
-		}
+		auto inst = std::make_shared<MachineInstance>(std::move(binary), nullptr, vrm);
+		inst->script.assign_instance(inst);
+		/* Decrements reference when it goes out of scope */
+		auto old = std::atomic_exchange(&vrm->machine, inst);
+
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);
 		printf("Time spent updating: %ld ns\n", nanodiff(t0, t1));
 	#endif
-		bool ok = file_writer(vrm->config.filename, vrm->machine->binary);
+		bool ok = file_writer(vrm->config.filename, binary);
 		if (!ok) {
 			/* Writing the tenant program to file failed */
 			char buffer[800];
@@ -212,17 +208,18 @@ struct backend_buffer {
 extern "C"
 struct backend_buffer riscv_backend_call(VRT_CTX, struct vmod_riscv_machine* vrm, long func)
 {
+	auto program = vrm->machine;
+	if (program == nullptr)
+		return {nullptr, nullptr, 0};
 	auto* script = (Script*) WS_Alloc(ctx->ws, sizeof(Script));
 	if (UNLIKELY(script == nullptr)) {
 		VSLb(ctx->vsl, SLT_Error, "Out of workspace");
 		return {nullptr, nullptr, 0};
 	}
 	/* Fork new machine */
-	vrm->machine->add_reference();
 	try {
-		new (script) Script{vrm->script(), ctx, vrm};
+		new (script) Script{program->script, ctx, vrm, *program};
 	} catch (std::exception& e) {
-		vrm->machine->remove_reference();
 		VSLb(ctx->vsl, SLT_Error, "VM fork exception: %s", e.what());
 		return {nullptr, nullptr, 0};
 	}

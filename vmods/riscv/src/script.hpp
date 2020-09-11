@@ -33,6 +33,7 @@ public:
 	const auto* ctx() const noexcept { return m_ctx; }
 	const auto* vrm() const noexcept { return m_vrm; }
 	const auto& instance() const noexcept { return m_inst; }
+	void assign_instance(std::shared_ptr<MachineInstance> ref) { m_inst_ref = std::move(ref); }
 
 	uint64_t max_instructions() const noexcept;
 	const std::string& name() const noexcept;
@@ -62,11 +63,9 @@ public:
 	void print_backtrace(const gaddr_t addr);
 
 	bool reset(); // true if the reset was successful
-	void decomission() { m_decomissioned = true; }
-	bool is_decomissioned() const noexcept { return m_decomissioned; }
 
 	Script(const std::vector<uint8_t>&, const vrt_ctx*, const vmod_riscv_machine*, const MachineInstance&);
-	Script(const Script& source, const vrt_ctx*, const vmod_riscv_machine*);
+	Script(const Script& source, const vrt_ctx*, const vmod_riscv_machine*, const MachineInstance&);
 	~Script();
 
 private:
@@ -88,7 +87,6 @@ private:
 	std::string m_want_result;
 	gaddr_t     m_want_value = 403;
 	bool        m_is_paused = false;
-	bool        m_decomissioned = false;
 
 	struct RegexCache {
 		struct vre* re   = nullptr;
@@ -96,6 +94,9 @@ private:
 		bool        non_owned = false;
 	};
 	eastl::fixed_vector<RegexCache, 16> m_regex_cache;
+
+	/* Delete this last */
+	std::shared_ptr<MachineInstance> m_inst_ref = nullptr;
 };
 
 template <typename... Args>
