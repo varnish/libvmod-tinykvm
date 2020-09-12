@@ -24,6 +24,8 @@ const char* riscv_update(struct vsl_log* vsl, vmod_riscv_machine* vrm, const uin
 		TIMING_LOCATION(t1);
 		printf("Time spent updating: %ld ns\n", nanodiff(t0, t1));
 	#endif
+		/* If we arrive here, the initialization was successful,
+		   and we can proceed to store the program to disk. */
 		bool ok = file_writer(vrm->config.filename, binary);
 		if (!ok) {
 			/* Writing the tenant program to file failed */

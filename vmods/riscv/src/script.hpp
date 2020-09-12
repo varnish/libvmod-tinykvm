@@ -33,7 +33,7 @@ public:
 	const auto* ctx() const noexcept { return m_ctx; }
 	const auto* vrm() const noexcept { return m_vrm; }
 	const auto& instance() const noexcept { return m_inst; }
-	void assign_instance(std::shared_ptr<MachineInstance> ref) { m_inst_ref = std::move(ref); }
+	void assign_instance(std::shared_ptr<MachineInstance>& ref) { m_inst_ref = std::move(ref); }
 
 	uint64_t max_instructions() const noexcept;
 	const std::string& name() const noexcept;
