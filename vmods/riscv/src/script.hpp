@@ -69,12 +69,12 @@ public:
 	~Script();
 
 private:
-	void setup_virtual_memory(bool init);
 	void handle_exception(gaddr_t);
 	void handle_timeout(gaddr_t);
 	bool install_binary(const std::string& file, bool shared = true);
-	bool machine_initialize(bool init);
+	void machine_initialize();
 	void machine_setup(machine_t&, bool init);
+	void setup_virtual_memory(bool init);
 	void setup_syscall_interface(machine_t&);
 
 	machine_t m_machine;

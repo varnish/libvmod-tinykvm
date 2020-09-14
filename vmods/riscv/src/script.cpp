@@ -45,7 +45,7 @@ Script::Script(
 	: m_machine(binary, { .memory_max = vrm->config.max_memory }),
 	  m_ctx(ctx), m_vrm(vrm), m_inst(inst)
 {
-	this->machine_initialize(true);
+	this->machine_initialize();
 }
 
 Script::~Script()
@@ -73,32 +73,17 @@ void Script::setup_virtual_memory(bool init)
 	mem.install_shared_page(RW_AREA_END >> 12, Page::guard_page());
 }
 
-bool Script::machine_initialize(bool init)
+void Script::machine_initialize()
 {
 	// setup system calls and traps
-	this->machine_setup(machine(), init);
+	this->machine_setup(machine(), true);
 	// run through the initialization
-	if (init) {
-		try {
-			machine().simulate(max_instructions());
-
-			if (UNLIKELY(machine().cpu.instruction_counter() >= max_instructions())) {
-				printf(">>> Exception: Ran out of instructions\n");
-				return false;
-			}
-		} catch (riscv::MachineException& me) {
-			printf(">>> Machine exception %d: %s (data: %#x)\n",
-					me.type(), me.what(), me.data());
-#ifdef RISCV_DEBUG
-			machine().print_and_pause();
-#endif
-			return false;
-		} catch (std::exception& e) {
-			printf(">>> Exception: %s\n", e.what());
-			return false;
-		}
+	machine().simulate(max_instructions());
+	// catch program timeouts
+	if (UNLIKELY(machine().cpu.instruction_counter() >= max_instructions())) {
+		throw riscv::MachineTimeoutException(riscv::MAX_INSTRUCTIONS_REACHED,
+			"Maximum instruction counter reached", max_instructions());
 	}
-    return true;
 }
 void Script::machine_setup(machine_t& machine, bool init)
 {
