@@ -42,7 +42,7 @@ add_subdirectory(ext/json)
 
 
 if (NATIVE)
-	target_compile_options(riscv PUBLIC -march=native -Ofast)
+	target_compile_options(riscv PUBLIC -march=native -Ofast -fno-fast-math)
 	target_compile_options(EASTL PUBLIC -march=native -Ofast)
 endif()
 if (LTO_ENABLE)
@@ -51,7 +51,7 @@ if (LTO_ENABLE)
 endif()
 
 
-target_link_libraries(sandbox PUBLIC nlohmann_json riscv stdc++)
+target_link_libraries(sandbox PRIVATE nlohmann_json riscv stdc++)
 
 if (SHARED_LIBRISCV)
 	set_property(TARGET EASTL PROPERTY POSITION_INDEPENDENT_CODE 1)

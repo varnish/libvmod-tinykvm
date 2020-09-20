@@ -113,8 +113,10 @@ set (VARNISH_PATH ${CMAKE_SOURCE_DIR}/../ext/${VARNISH_BRANCH_DIR})
 # TODO: generate this folder and config.h instead
 set (CONFIG_PATH ${CMAKE_SOURCE_DIR}/include)
 
+if (NOT Python3_EXECUTABLE)
 # Most Varnish projects require Python3
 find_package(Python3 COMPONENTS Interpreter)
+endif()
 
 add_subdirectory(libvarnish)
 add_subdirectory(libvapi)
