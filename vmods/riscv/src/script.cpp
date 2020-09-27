@@ -78,7 +78,15 @@ void Script::machine_initialize()
 	// setup system calls and traps
 	this->machine_setup(machine(), true);
 	// run through the initialization
-	machine().simulate(max_instructions());
+	try {
+		machine().simulate<true>(max_instructions());
+	} catch (const riscv::MachineTimeoutException& e) {
+		handle_timeout(machine().cpu.pc());
+		throw;
+	} catch (const std::exception& e) {
+		handle_exception(machine().cpu.pc());
+		throw;
+	}
 	// catch program timeouts
 	if (UNLIKELY(machine().cpu.instruction_counter() >= max_instructions())) {
 		throw riscv::MachineTimeoutException(riscv::MAX_INSTRUCTIONS_REACHED,

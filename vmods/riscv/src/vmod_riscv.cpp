@@ -16,9 +16,13 @@ const char* riscv_update(struct vsl_log* vsl, vmod_riscv_machine* vrm, const uin
 	#endif
 		/* Note: CTX is NULL here */
 		std::vector<uint8_t> binary {data, data + len};
-		auto inst = std::make_shared<MachineInstance>(binary, nullptr, vrm);
-		/* Decrements reference when it goes out of scope */
-		auto old = std::atomic_exchange(&vrm->machine, std::move(inst));
+
+		auto inst = std::make_shared<MachineInstance>(std::move(binary), nullptr, vrm);
+		const auto& live_binary = inst->binary;
+		/* Decrements reference when it goes out of scope.
+		   We need the *new* instance alive for access to the binary
+		   when writing it to disk. Don't *move*. See below. */
+		auto old = std::atomic_exchange(&vrm->machine, inst);
 
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);
@@ -26,7 +30,7 @@ const char* riscv_update(struct vsl_log* vsl, vmod_riscv_machine* vrm, const uin
 	#endif
 		/* If we arrive here, the initialization was successful,
 		   and we can proceed to store the program to disk. */
-		bool ok = file_writer(vrm->config.filename, binary);
+		bool ok = file_writer(vrm->config.filename, live_binary);
 		if (!ok) {
 			/* Writing the tenant program to file failed */
 			char buffer[800];
@@ -38,6 +42,7 @@ const char* riscv_update(struct vsl_log* vsl, vmod_riscv_machine* vrm, const uin
 		/* TODO: delete when nobody uses it anymore */
 		return strdup("Update successful\n");
 	} catch (const std::exception& e) {
+
 		/* Pass the actual error back to the client */
 		return strdup(e.what());
 	}
