@@ -63,6 +63,7 @@ set(VSC_SOURCES
 )
 if (VARNISH_PLUS)
     list(APPEND VSC_SOURCES
+		VSC_brotli.vsc
         VSC_mse.vsc
     	VSC_mse_book.vsc
     	VSC_mse_store.vsc
@@ -97,7 +98,7 @@ target_compile_definitions(varnish PUBLIC VARNISH_STATE_DIR="${VSTATE_DIR}")
 target_compile_definitions(varnish PUBLIC VARNISH_VMOD_DIR="${VMOD_DIR}")
 target_compile_definitions(varnish PUBLIC VARNISH_VCL_DIR="${VCL_DIR}")
 target_compile_definitions(varnish PUBLIC -DNOT_IN_A_VMOD)
-target_link_libraries(varnish pcre m)
+target_link_libraries(varnish brotlidec brotlienc pcre m)
 #set_property(TARGET varnish PROPERTY POSITION_INDEPENDENT_CODE 1)
 
 if (LIBFUZZER)

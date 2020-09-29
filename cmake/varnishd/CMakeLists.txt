@@ -107,6 +107,9 @@ set(VARNISHD_SOURCES
 )
 if (VARNISH_PLUS)
     list (APPEND VARNISHD_SOURCES
+		${VD_PATH}/cache/cache_brotli.c
+		${VD_PATH}/cache/cache_brotli_vfp.c
+		${VD_PATH}/cache/cache_brotli_vdp.c
 		${VD_PATH}/cache/cache_governor.c
 		${VD_PATH}/cache/cache_tcp_oper.c
 		${VD_PATH}/cache/cache_vcl_vrt.c
@@ -131,6 +134,7 @@ if (VARNISH_PLUS)
 		${VD_PATH}/tls/cache_backend_ssl.c
 		${VD_PATH}/tls/cache_client_ssl.c
 		${VD_PATH}/tls/cache_tls.c
+		${VD_PATH}/vmod_util/brotli_util.c
 		${VD_PATH}/vmod_util/crypto_util.c
 		${VD_PATH}/vmod_util/edgestash_util.c
 		${VD_PATH}/vmod_util/file_util.c
@@ -232,7 +236,7 @@ if (LIBFUZZER)
 	endif()
 	# work-around: need to be done after setting VARNISH_PLUS
 	set_property(SOURCE ${LIBFUZZER_SOURCES} APPEND
-		PROPERTY COMPILE_DEFINITIONS 
+		PROPERTY COMPILE_DEFINITIONS
 		FUZZER_${FUZZER}=1
 		FUZZING_DIRECTORY="${CMAKE_SOURCE_DIR}"
 	)
