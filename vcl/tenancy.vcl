@@ -1,6 +1,8 @@
 vcl 4.1;
+import file;
 import riscv;
 import std;
+import utils;
 
 backend default {
 	.host = "127.0.0.1";
@@ -8,6 +10,7 @@ backend default {
 }
 
 sub vcl_init {
+	new f = file.init("/tmp");
 	riscv.load_tenants(
 		"/home/gonzo/github/varnish_autoperf/vcl/tenants.json");
 }
@@ -38,6 +41,10 @@ sub vcl_recv {
 			return (synth(403));
 		}
 
+	} else if (req.url == "/file") {
+		set req.backend_hint = f.backend();
+		set req.url = req.url + "?foo=" + utils.fast_random_int(100);
+		return (hash);
 	} else {
 		/* No 'Host: tenant' specified */
 		return (synth(403));
