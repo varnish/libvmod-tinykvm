@@ -10,7 +10,7 @@ backend default {
 }
 
 sub vcl_init {
-	new f = file.init("/tmp");
+	new f = file.init("/home/gonzo");
 	riscv.load_tenants(
 		"/home/gonzo/github/varnish_autoperf/vcl/tenants.json");
 }
