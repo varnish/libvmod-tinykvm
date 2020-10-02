@@ -12,4 +12,5 @@ RUN DEBIAN_FRONTEND=noninteractive apt install -y \
 	libpcre3-dev \
 	libconfig-dev \
 	libbrotli-dev \
-	libedit-dev
+	libedit-dev \
+	numactl numatop
