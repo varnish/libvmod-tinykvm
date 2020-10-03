@@ -219,11 +219,19 @@ APICALL(synth)
 		auto* vsb = (struct vsb*) ctx->specific;
 		assert(vsb != nullptr);
 
-		VSB_clear(vsb);
-		if (data.is_sequential())
-			VSB_bcat(vsb, data.c_str(), data.size());
-		else
+		if (data.is_sequential()) {
+			/* we need to get rid of the old data */
+			if (vsb->s_flags & VSB_DYNAMIC) {
+				free(vsb->s_buf);
+			}
+			vsb->s_buf = (char*) data.c_str();
+			vsb->s_size = data.size() + 1; /* pretend-zero */
+			vsb->s_len  = data.size();
+			vsb->s_flags = VSB_FIXEDLEN;
+		} else {
+			VSB_clear(vsb);
 			VSB_bcat(vsb, data.to_string().c_str(), data.size());
+		}
 		//VSB_finish(vsb);
 		machine.stop();
 #ifdef ENABLE_TIMING
