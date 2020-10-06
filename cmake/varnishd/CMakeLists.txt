@@ -118,6 +118,7 @@ if (VARNISH_PLUS)
 		${VD_PATH}/cache/cache_ykey.c
 		${VD_PATH}/common/common_vtls_sni.c
 		${VD_PATH}/storage/storage_ykey_mem.c
+		${VD_PATH}/storage/storage_sillymalloc.c
 		${VD_PATH}/storage/mse_book.c
 		${VD_PATH}/storage/mse_cache.c
 		${VD_PATH}/storage/mse_obj.c
@@ -126,6 +127,7 @@ if (VARNISH_PLUS)
 		${VD_PATH}/storage/mse_store.c
 		${VD_PATH}/storage/mse_transproxy.c
 		${VD_PATH}/storage/mse_aio.c
+		${VD_PATH}/storage/mse_panic.c
 		${VD_PATH}/storage/mse_populate.c
 		${VD_PATH}/storage/mse_varylib.c
 		${VD_PATH}/storage/mse_waterlevel.c
