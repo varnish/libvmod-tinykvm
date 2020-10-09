@@ -42,5 +42,4 @@ struct vmod_riscv_machine
 	const TenantConfig config;
 	/* Hot-swappable machine */
 	std::shared_ptr<MachineInstance> machine = nullptr;
-	static std::vector<const char*> lookup_wishlist;
 };

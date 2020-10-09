@@ -126,23 +126,23 @@ riscvbe_gethdrs(const struct director *dir,
 	const uint8_t *result_data = (const uint8_t *) VSB_data(vsb);
 	const size_t   result_len = VSB_len(vsb);
 
-	/* finish the backend request */
-	bo->htc = WS_Alloc(bo->ws, sizeof *bo->htc);
-	if (bo->htc == NULL)
-		return (-1);
-	INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
-
 	/* Update this machine */
 	struct vmod_riscv_updater *rvu;
 	CAST_OBJ_NOTNULL(rvu, dir->priv, RISCV_BACKEND_MAGIC);
 
 	if (result_len <= rvu->max_binary_size)
 	{
+		/* finish the backend request */
+		bo->htc = WS_Alloc(bo->ws, sizeof *bo->htc);
+		if (bo->htc == NULL)
+			return (-1);
+		INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
+
 		const char* output = riscv_update(bo->vsl, rvu->machine, result_data, result_len);
 
 		const size_t output_len = __builtin_strlen(output);
 		http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
-		http_PrintfHeader(bo->beresp, "Content-Length: %jd", output_len);
+		http_PrintfHeader(bo->beresp, "Content-Length: %zu", output_len);
 
 		/* store the output in workspace and free result */
 		bo->htc->content_length = output_len;
@@ -151,19 +151,19 @@ riscvbe_gethdrs(const struct director *dir,
 		/* The zero-length string that can be returned is .rodata */
 		if (output != NULL && output[0] != 0)
 			free((void*) output);
-	}
-	else {
-		http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
-	}
-	if (bo->htc->priv == NULL)
-		return (-1);
+		if (bo->htc->priv == NULL)
+			return (-1);
 
-	/* We need to call this function specifically, otherwise
-	   nobody will call our VFP functions */
-	typedef void sbe_vfp_init_cb_f(struct busyobj *bo);
-	extern void sbe_util_set_vfp_cb(struct busyobj *, sbe_vfp_init_cb_f *);
-	sbe_util_set_vfp_cb(bo, vfp_init);
-	return (0);
+		/* We need to call this function specifically, otherwise
+		   nobody will call our VFP functions */
+		typedef void sbe_vfp_init_cb_f(struct busyobj *bo);
+		extern void sbe_util_set_vfp_cb(struct busyobj *, sbe_vfp_init_cb_f *);
+		sbe_util_set_vfp_cb(bo, vfp_init);
+		return (0);
+	} else {
+		http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
+		return (-1);
+	}
 }
 
 VCL_BACKEND vmod_live_update(VRT_CTX, VCL_STRING tenant, VCL_BYTES max_size)

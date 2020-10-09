@@ -1,5 +1,6 @@
 #pragma once
 #include <libriscv/machine.hpp>
+#include <stdexcept>
 #include "varnish.hpp"
 
 template <int W>

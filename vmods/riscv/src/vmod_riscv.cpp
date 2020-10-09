@@ -39,11 +39,16 @@ const char* riscv_update(struct vsl_log* vsl, vmod_riscv_machine* vrm, const uin
 			VSLb(vsl, SLT_Error, "%.*s", len, buffer);
 			return strdup(buffer);
 		}
-		/* TODO: delete when nobody uses it anymore */
 		return strdup("Update successful\n");
+	} catch (const riscv::MachineException& e) {
+		if (e.type() == riscv::OUT_OF_MEMORY) {
+			/* Pass helpful explanation when OOM */
+			return strdup("Binary ran out of memory during initialization");
+		}
+		/* Pass machine error back to the client */
+		return strdup(e.what());
 	} catch (const std::exception& e) {
-
-		/* Pass the actual error back to the client */
+		/* Pass unknown error back to the client */
 		return strdup(e.what());
 	}
 }
