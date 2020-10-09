@@ -2,6 +2,7 @@
 
 #include <string.h>
 #include <cache/cache.h>
+#include <vsha256.h>
 
 #include "vcc_if.h"
 #include "vmod_util.h"
@@ -19,6 +20,7 @@ extern const char* riscv_current_group(VRT_CTX);
 extern const char* riscv_current_result(VRT_CTX);
 extern long riscv_current_result_status(VRT_CTX);
 extern int  riscv_current_is_paused(VRT_CTX);
+extern int  riscv_current_apply_hash(VRT_CTX);
 
 static inline int enum_to_idx(VCL_ENUM e)
 {
@@ -109,4 +111,18 @@ VCL_BOOL vmod_want_resume(VRT_CTX)
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
 	return riscv_current_is_paused(ctx);
+}
+VCL_BOOL vmod_apply_hash(VRT_CTX)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	return riscv_current_apply_hash(ctx);
+}
+
+void riscv_SetHash(struct req *req, VSHA256_CTX *ctx)
+{
+	CHECK_OBJ_NOTNULL(req, REQ_MAGIC);
+
+	req->is_force_hash = 1;
+	VSHA256_Final(req->digest, ctx);
 }

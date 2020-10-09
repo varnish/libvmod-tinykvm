@@ -22,7 +22,7 @@ sub vcl_recv {
 
 		/* Live update mechanism */
 		if (req.method == "POST") {
-			set req.backend_hint = riscv.live_update(req.http.Host);
+			set req.backend_hint = riscv.live_update(req.http.Host, 15MB);
 			std.cache_req_body(15MB);
 			return (pass);
 		}
@@ -36,15 +36,16 @@ sub vcl_recv {
 		else if (req.url == "/z") {
 			riscv.fork("zpizza.com");
 		}
+		else if (req.url == "/file") {
+			set req.backend_hint = f.backend();
+			set req.url = req.url + "?foo=" + utils.fast_random_int(100);
+			return (hash);
+		}
 		/* If fork fails, it's probably not a tenant */
 		else if (!riscv.fork(req.http.Host)) {
 			return (synth(403));
 		}
 
-	} else if (req.url == "/file") {
-		set req.backend_hint = f.backend();
-		set req.url = req.url + "?foo=" + utils.fast_random_int(100);
-		return (hash);
 	} else {
 		/* No 'Host: tenant' specified */
 		return (synth(403));
@@ -67,7 +68,7 @@ sub vcl_recv {
 
 sub vcl_hash {
 	if (riscv.active()) {
-		riscv.fastcall(ON_HASH);
+		riscv.apply_hash();
 	}
 }
 
@@ -79,5 +80,11 @@ sub vcl_synth {
 			riscv.fastcall(ON_SYNTH);
 		}
 		return (deliver);
+	}
+}
+
+sub vcl_backend_response {
+	if (riscv.want_resume()) {
+		riscv.resume();
 	}
 }

@@ -15,7 +15,6 @@ extern "C" {
 	void http_UnsetIdx(struct http *hp, unsigned idx);
 	unsigned http_findhdr(const struct http *hp, unsigned l, const char *hdr);
 	void http_PrintfHeader(struct http *to, const char *fmt, ...);
-	void HSH_AddString(struct req *, void *ctx, const char *str);
 	struct txt {
 		const char* begin;
 		const char* end;
@@ -191,10 +190,13 @@ APICALL(ban)
 }
 APICALL(hash_data)
 {
-	auto [buffer] = machine.sysargs<std::string> ();
-	auto* ctx = get_ctx(machine);
+	auto [buffer] = machine.sysargs<riscv::Buffer> ();
+	auto& script = get_script(machine);
 
-	HSH_AddString(ctx->req, ctx->specific, buffer.c_str());
+	if (buffer.is_sequential())
+		script.hash_buffer(buffer.c_str(), buffer.size());
+	else
+		script.hash_buffer(buffer.to_string().c_str(), buffer.size());
 	return 0;
 }
 APICALL(purge)

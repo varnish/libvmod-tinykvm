@@ -106,6 +106,12 @@ $Function STRING  current_group()
 - If no machine has been running in the current stage of VCL,
   this function will return null, which can be tested in if statements.
 
+$Function BOOL    apply_hash()
+
+- Tries to apply any previously computed hash.
+- Must be called from vcl_hash.
+- Returns true if there was a previously computed hash.
+
 $Function STRING  want_result()
 
 - Returns the VCL decision that the guest wants to happen:

@@ -210,6 +210,14 @@ int  riscv_current_is_paused(VRT_CTX)
 		return script->is_paused();
 	return 0;
 }
+extern "C"
+int  riscv_current_apply_hash(VRT_CTX)
+{
+	auto* script = get_machine(ctx);
+	if (script)
+		return script->apply_hash();
+	return 0;
+}
 
 struct backend_buffer {
 	const char* type;

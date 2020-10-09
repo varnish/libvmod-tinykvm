@@ -4,6 +4,7 @@
 #include "machine/include_api.hpp"
 #include "sandbox.hpp"
 #include "varnish.hpp"
+extern "C" void riscv_SetHash(struct req*, VSHA256_CTX*);
 inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
 
@@ -270,6 +271,31 @@ const std::string& Script::group() const noexcept
 Script::gaddr_t Script::guest_alloc(size_t len)
 {
 	return arena_malloc((sas_alloc::Arena*) m_arena, len);
+}
+
+inline void Script::init_sha256()
+{
+	this->m_sha_ctx =
+		(VSHA256_CTX*) WS_Alloc(ctx()->ws, sizeof(VSHA256_CTX));
+	if (!this->m_sha_ctx)
+		throw std::runtime_error("Out of workspace");
+	VSHA256_Init(this->m_sha_ctx);
+}
+void Script::hash_buffer(const char* buffer, int len)
+{
+	if (ctx() == nullptr) return;
+	if (m_sha_ctx == nullptr) init_sha256();
+
+	VSHA256_Update(this->m_sha_ctx, buffer, len);
+	VSLb(ctx()->vsl, SLT_Hash, "%.*s", len, buffer);
+}
+bool Script::apply_hash()
+{
+	if (m_sha_ctx && ctx()) {
+		riscv_SetHash(ctx()->req, m_sha_ctx);
+		return true;
+	}
+	return false;
 }
 
 Script::gaddr_t Script::resolve_address(const char* name) const {

@@ -51,6 +51,10 @@ public:
 	MemArea<MARCH> ro_area;
 	MemArea<MARCH> rw_area;
 
+	void init_sha256();
+	void hash_buffer(const char* buffer, int len);
+	bool apply_hash();
+
 	int    regex_find(uint32_t hash) const;
 	size_t regex_manage(struct vre*, uint32_t hash);
 	void   regex_free(size_t);
@@ -87,6 +91,7 @@ private:
 	std::string m_want_result;
 	gaddr_t     m_want_value = 403;
 	bool        m_is_paused = false;
+	struct VSHA256Context* m_sha_ctx = nullptr;
 
 	struct RegexCache {
 		struct vre* re   = nullptr;

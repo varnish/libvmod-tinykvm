@@ -1,7 +1,7 @@
 {
 	"default": {
 		"max_instructions": 2000000,
-		"max_memory": 4194304,
+		"max_memory": 42000000,
 		"max_heap":  4194304
 	},
 	"xpizza.com": {
