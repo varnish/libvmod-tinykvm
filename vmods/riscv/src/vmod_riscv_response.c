@@ -1,6 +1,7 @@
 #include "vmod_riscv.h"
 
 #include <malloc.h>
+#include <stdlib.h>
 #include <vtim.h>
 #include "vcl.h"
 #include "vcc_if.h"
@@ -8,7 +9,7 @@
 
 extern long riscv_current_result_status(VRT_CTX);
 extern struct vmod_riscv_machine* riscv_current_machine(VRT_CTX);
-extern struct backend_buffer riscv_backend_call(VRT_CTX, struct vmod_riscv_machine*, long);
+extern struct backend_buffer riscv_backend_call(VRT_CTX, const void*, long);
 extern uint64_t riscv_resolve_name(struct vmod_riscv_machine*, const char*);
 
 static void v_matchproto_(vdi_panic_f)
@@ -82,48 +83,46 @@ riscvbe_gethdrs(const struct director *dir,
 	CHECK_OBJ_NOTNULL(bo->beresp, HTTP_MAGIC);
 	AZ(bo->htc);
 
-	/* finish the backend request */
-	bo->htc = WS_Alloc(bo->ws, sizeof *bo->htc);
-	if (bo->htc == NULL)
-		return (-1);
-	INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
-
 	/* Produce backend response */
 	struct vmod_riscv_response *rvr;
 	CAST_OBJ_NOTNULL(rvr, dir->priv, RISCV_BACKEND_MAGIC);
 
 	const struct vrt_ctx ctx = {
-		.ws = bo->ws,
+		.magic = VRT_CTX_MAGIC,
+		.vcl = bo->vcl,
+		.ws  = bo->ws,
 		.vsl = bo->vsl,
-		.http_bereq = bo->bereq,
+		.req = NULL,
+		.bo  = bo,
+		.http_bereq  = bo->bereq,
 		.http_beresp = bo->beresp,
 	};
 	struct backend_buffer output =
-		riscv_backend_call(&ctx, rvr->machine, rvr->funcaddr);
+		riscv_backend_call(&ctx, rvr->priv_key, rvr->funcaddr);
 
 	if (output.data == NULL || output.type == NULL)
 	{
 		http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
 		return (-1);
 	}
-	else
-	{
-		http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
-		http_PrintfHeader(bo->beresp, "Content-Length: %u", output.size);
-		http_PrintfHeader(bo->beresp, "Content-Type: %s", output.type);
 
-		char timestamp[VTIM_FORMAT_SIZE];
-		VTIM_format(VTIM_real(), timestamp);
-		http_PrintfHeader(bo->beresp, "Last-Modified: %s", timestamp);
+	http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
+	http_PrintfHeader(bo->beresp, "Content-Type: %.*s",
+		(int) output.tsize, output.type);
 
-		/* store the output in workspace and free result */
-		bo->htc->content_length = output.size;
-		bo->htc->priv = (void *)output.data;
-		bo->htc->body_status = BS_LENGTH;
+	char timestamp[VTIM_FORMAT_SIZE];
+	VTIM_format(VTIM_real(), timestamp);
+	http_PrintfHeader(bo->beresp, "Last-Modified: %s", timestamp);
 
-		if (bo->htc->priv == NULL)
-			return (-1);
-	}
+	bo->htc = WS_Alloc(bo->ws, sizeof *bo->htc);
+	if (bo->htc == NULL)
+		return (-1);
+	INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
+
+	/* store the output in workspace and free result */
+	bo->htc->content_length = output.size;
+	bo->htc->priv = (void *)output.data;
+	bo->htc->body_status = BS_LENGTH;
 
 	/* We need to call this function specifically, otherwise
 	   nobody will call our VFP functions */
@@ -151,21 +150,24 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING func)
 	struct vmod_riscv_response *rvr;
 	rvr = WS_Alloc(ctx->ws, sizeof(struct vmod_riscv_response));
 	if (rvr == NULL) {
-		VRT_fail(ctx, "Out of memory");
+		VRT_fail(ctx, "Out of workspace");
 		return NULL;
 	}
 
 	INIT_OBJ(rvr, RISCV_BACKEND_MAGIC);
+	rvr->priv_key = ctx;
 	rvr->machine = riscv_current_machine(ctx);
 	if (rvr->machine == NULL) {
-		VRT_fail(ctx, "No tenant active");
+		VRT_fail(ctx, "VM backend: No active tenant");
 		return NULL;
 	}
 
 	if (func) {
-		rvr->funcaddr = riscv_resolve_name(rvr->machine, func);
-	} else {
-		rvr->funcaddr = riscv_current_result_status(ctx);
+		rvr->funcaddr = atoi(func);
+		/* If it's not an address, lookup as a public function */
+		if (rvr->funcaddr == 0x0) {
+			rvr->funcaddr = riscv_resolve_name(rvr->machine, func);
+		}
 	}
 	rvr->max_response_size = 0;
 

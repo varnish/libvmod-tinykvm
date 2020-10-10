@@ -126,14 +126,14 @@ $Function BOOL    want_resume()
 
 - Returns true if the machine was paused, and may be resumed.
 
-$Function BACKEND vm_backend(STRING func = 0)
+$Function BACKEND vm_backend(STRING func)
 
 - Returns a backend that will call into the current machine to produce a response.
 - Produces 500 server error if there is no active machine, or an error happens.
 - Call with no function specified if tenant has made a "backend" decision.
 
 	if (riscv.want_result() == "backend") {
-		set req.backend_hint = riscv.vm_backend();
+		set bereq.backend = riscv.vm_backend();
 		return (hash);
 	}
 

@@ -75,12 +75,17 @@ uint64_t riscv_resolve_name(struct vmod_riscv_machine* vrm, const char* symb)
 }
 
 
-inline Script* get_machine(VRT_CTX)
+inline Script* get_machine(VRT_CTX, const void* key)
 {
-	auto* priv_task = VRT_priv_task(ctx, ctx);
+	auto* priv_task = VRT_priv_task(ctx, key);
+	//printf("priv_task: ctx=%p bo=%p key=%p task=%p\n", ctx, ctx->bo, key, priv_task);
 	if (priv_task->priv && priv_task->len == SCRIPT_MAGIC)
 		return (Script*) priv_task->priv;
 	return nullptr;
+}
+inline Script* get_machine(VRT_CTX)
+{
+	return get_machine(ctx, ctx);
 }
 
 extern "C"
@@ -221,47 +226,65 @@ int  riscv_current_apply_hash(VRT_CTX)
 
 struct backend_buffer {
 	const char* type;
+	size_t      tsize;
 	const char* data;
-	unsigned    size;
+	size_t      size;
 };
-extern "C"
-struct backend_buffer riscv_backend_call(VRT_CTX, struct vmod_riscv_machine* vrm, long func)
+inline backend_buffer backend_error() {
+	return backend_buffer {nullptr, 0, nullptr, 0};
+}
+inline const char* optional_copy(VRT_CTX, const riscv::Buffer& buffer)
 {
-	auto program = vrm->machine;
-	if (program == nullptr)
-		return {nullptr, nullptr, 0};
-	auto* script = (Script*) WS_Alloc(ctx->ws, sizeof(Script));
-	if (UNLIKELY(script == nullptr)) {
-		VSLb(ctx->vsl, SLT_Error, "Out of workspace");
-		return {nullptr, nullptr, 0};
+	if (buffer.is_sequential())
+		return buffer.c_str();
+	else {
+		/* This buffer is fragmented, so we need to copy
+		   it piecewise into a memory allocation. */
+		char* data = (char*) WS_Alloc(ctx->ws, buffer.size());
+		if (data == nullptr)
+			throw std::runtime_error("Out of workspace");
+		buffer.copy_to(data, buffer.size());
+		return data;
 	}
-	/* Fork new machine */
-	try {
-		new (script) Script{program->script, ctx, vrm, *program};
-	} catch (std::exception& e) {
-		VSLb(ctx->vsl, SLT_Error, "VM fork exception: %s", e.what());
-		return {nullptr, nullptr, 0};
-	}
-	/* Call the backend response function */
-	try {
-		script->machine().vmcall(func);
-		/* Get content-type and data */
-		const auto [type, data] = script->machine().sysargs<riscv::Buffer, riscv::Buffer> ();
-		auto* mimebuf = (char*) WS_Alloc(ctx->ws, type.size());
-		auto* databuf = (char*) WS_Alloc(ctx->ws, data.size());
-		if (mimebuf && databuf)
-		{
+}
+
+extern "C"
+struct backend_buffer riscv_backend_call(VRT_CTX, const void* key, long func)
+{
+	auto* script = get_machine(ctx, key);
+	if (script) {
+		auto* old_ctx = script->ctx();
+		try {
+		#ifdef ENABLE_TIMING
+			TIMING_LOCATION(t1);
+		#endif
+			/* Use backend ctx which can write to beresp */
+			script->set_ctx(ctx);
+			/* Call the backend response function */
+			script->machine().vmcall(func);
+			/* Restore old ctx for backend_response */
+			script->set_ctx(old_ctx);
+			/* Get content-type and data */
+			const auto [type, data] = script->machine().sysargs<riscv::Buffer, riscv::Buffer> ();
 			/* Return content-type, data, size */
-			backend_buffer result {type.to_buffer(mimebuf), data.to_buffer(databuf), (unsigned) data.size()};
-			script->~Script(); /* call destructor */
+			const backend_buffer result {
+				.type = optional_copy(ctx, type),
+				.tsize = type.size(),
+				.data = optional_copy(ctx, data),
+				.size = data.size()
+			};
+		#ifdef ENABLE_TIMING
+			TIMING_LOCATION(t2);
+			printf("Time spent in backend_call(): %ld ns\n", nanodiff(t1, t2));
+		#endif
 			return result;
+		} catch (const std::exception& e) {
+			VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
+			printf("VM backend exception: %s\n", e.what());
+			script->set_ctx(old_ctx);
 		}
-	} catch (std::exception& e) {
-		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
-		printf("VM call exception: %s\n", e.what());
 	}
-	script->~Script(); /* call destructor */
-	return {nullptr, nullptr, 0};
+	return backend_error();
 }
 
 bool file_writer(const std::string& filename, const std::vector<uint8_t>& binary)

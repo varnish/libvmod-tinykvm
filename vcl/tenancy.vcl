@@ -59,7 +59,7 @@ sub vcl_recv {
 		return (synth(riscv.want_status()));
 	}
 	else if (riscv.want_result() == "backend") {
-		set req.backend_hint = riscv.vm_backend();
+		set req.http.X-Backend = riscv.want_status();
 		return (hash);
 	}
 
@@ -83,8 +83,21 @@ sub vcl_synth {
 	}
 }
 
+sub vcl_backend_fetch {
+	riscv.fork("zpizza.com");
+	riscv.fastcall(ON_BACKEND_FETCH);
+	if (bereq.http.X-Backend) {
+		set bereq.backend = riscv.vm_backend(bereq.http.X-Backend);
+		unset bereq.http.X-Decision;
+	}
+}
+
 sub vcl_backend_response {
-	if (riscv.want_resume()) {
-		riscv.resume();
+	if (riscv.active()) {
+		if (riscv.want_resume()) {
+			riscv.resume();
+		} else {
+			riscv.fastcall(ON_BACKEND_RESPONSE);
+		}
 	}
 }

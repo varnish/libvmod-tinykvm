@@ -79,7 +79,7 @@ get_http(VRT_CTX, int where)
 		break;
 	}
 	if (UNLIKELY(hp == nullptr))
-		throw std::runtime_error("Selected HTTP not available at this time");
+		throw std::runtime_error("Selected HTTP not available at this time: " + std::to_string(where));
 	return hp;
 }
 inline std::tuple<http*, txt&>
