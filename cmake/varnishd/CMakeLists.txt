@@ -118,7 +118,6 @@ if (VARNISH_PLUS)
 		${VD_PATH}/cache/cache_ykey.c
 		${VD_PATH}/common/common_vtls_sni.c
 		${VD_PATH}/storage/storage_ykey_mem.c
-		${VD_PATH}/storage/storage_sillymalloc.c
 		${VD_PATH}/storage/mse_book.c
 		${VD_PATH}/storage/mse_cache.c
 		${VD_PATH}/storage/mse_obj.c
@@ -141,6 +140,7 @@ if (VARNISH_PLUS)
 		${VD_PATH}/vmod_util/edgestash_util.c
 		${VD_PATH}/vmod_util/file_util.c
 		${VD_PATH}/vmod_util/synthbackend_util.c
+		${VD_PATH}/vmod_util/vcp_vfp.c
 		${VD_PATH}/vmod_util/vmod_util.c
 		${VD_PATH}/vmod_util/waf_util.c
 		${VD_PATH}/vmod_util/xbody_util.c
