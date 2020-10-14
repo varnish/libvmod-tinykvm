@@ -134,7 +134,7 @@ APICALL(print)
 	auto [buffer] = machine.sysargs<riscv::Buffer> ();
 	auto string = buffer.to_string();
 	/* TODO: Use VSLb here or disable this completely */
-	printf(">>> %s: %.*s", get_script(machine).name().c_str(),
+	printf(">>> %s: %.*s\n", get_script(machine).name().c_str(),
 		(int) string.size(), string.c_str());
 	return string.size();
 }
