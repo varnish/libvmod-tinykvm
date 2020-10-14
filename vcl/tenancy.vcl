@@ -84,7 +84,7 @@ sub vcl_synth {
 }
 
 sub vcl_backend_fetch {
-	if (riscv.fork("zpizza.com")) {
+	if (riscv.fork(bereq.http.Host)) {
 		riscv.fastcall(ON_BACKEND_FETCH);
 		if (bereq.http.X-Backend) {
 			set bereq.backend = riscv.vm_backend(bereq.http.X-Backend);

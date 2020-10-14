@@ -264,6 +264,7 @@ struct backend_buffer riscv_backend_call(VRT_CTX, const void* key, long func)
 			script->machine().vmcall(func);
 			/* Restore old ctx for backend_response */
 			script->set_ctx(old_ctx);
+
 			/* Get content-type and data */
 			const auto [type, data] = script->machine().sysargs<riscv::Buffer, riscv::Buffer> ();
 			/* Return content-type, data, size */
@@ -279,8 +280,8 @@ struct backend_buffer riscv_backend_call(VRT_CTX, const void* key, long func)
 		#endif
 			return result;
 		} catch (const std::exception& e) {
-			VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
 			printf("VM backend exception: %s\n", e.what());
+			VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
 			script->set_ctx(old_ctx);
 		}
 	}

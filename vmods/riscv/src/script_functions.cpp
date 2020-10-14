@@ -170,7 +170,7 @@ APICALL(my_name)
 APICALL(set_decision)
 {
 	auto [result, status, paused] =
-		machine.sysargs<riscv::Buffer, int, bool> ();
+		machine.sysargs<riscv::Buffer, gaddr_t, bool> ();
 	auto& script = get_script(machine);
 	if (result.is_sequential()) {
 		script.set_result(result.c_str(), status, paused);
