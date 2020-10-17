@@ -14,6 +14,7 @@ list(APPEND RISCV_SOURCES
 	src/script_functions.cpp
 	src/tenancy.cpp
 	src/vmod_riscv.cpp
+	src/varnish_interface.c
 	libriscv/emulator/syscalls/src/syscalls.cpp
 	libriscv/emulator/syscalls/src/threads.cpp
 	libriscv/emulator/syscalls/src/posix_threads.cpp
@@ -24,6 +25,7 @@ list(APPEND RISCV_SOURCES
 add_library(sandbox STATIC ${RISCV_SOURCES})
 set_target_properties(sandbox PROPERTIES CXX_STANDARD 17)
 target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/include)
+target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/bin/varnishd)
 target_include_directories(sandbox PRIVATE libriscv/emulator/syscalls)
 target_compile_definitions(sandbox PRIVATE
 	NATIVE_SYSCALLS_BASE=80
@@ -31,7 +33,6 @@ target_compile_definitions(sandbox PRIVATE
 
 add_subdirectory(libriscv/lib)
 target_compile_definitions(riscv PUBLIC
-	RISCV_THROW_UNIMPLEMENTED=1
 	RISCV_EBREAK_MEANS_STOP=1
 	RISCV_DISABLE_SYM_LOOKUP=1
 	RISCV_SYSCALLS_MAX=100)

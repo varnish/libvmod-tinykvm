@@ -118,11 +118,3 @@ VCL_BOOL vmod_apply_hash(VRT_CTX)
 
 	return riscv_current_apply_hash(ctx);
 }
-
-void riscv_SetHash(struct req *req, VSHA256_CTX *ctx)
-{
-	CHECK_OBJ_NOTNULL(req, REQ_MAGIC);
-
-	req->is_force_hash = 1;
-	VSHA256_Final(req->digest, ctx);
-}
