@@ -115,9 +115,11 @@ inline gaddr_t push_data(machine_t& machine, const char* data, size_t len)
  *  amount of work being done.
 **/
 
-APICALL(self_test)
+APICALL(fail)
 {
-	return -1;
+	auto [buffer] = machine.sysargs<riscv::Buffer> ();
+	machine.stop();
+	throw std::runtime_error("Assertion failed: " + buffer.to_string());
 }
 APICALL(assertion_failed)
 {
@@ -127,7 +129,7 @@ APICALL(assertion_failed)
 	fprintf(stderr, ">>> assertion failed: %s in %s:%d, function %s\n",
 		expr.c_str(), file.c_str(), line, func.c_str());
 	machine.stop();
-	return -1; /* Maybe throw? */
+	throw std::runtime_error("Assertion failed");
 }
 APICALL(print)
 {
@@ -623,7 +625,7 @@ void Script::setup_syscall_interface(machine_t& machine)
 	#define FuckOff constinit
 	#endif
 	static FuckOff std::array<const machine_t::syscall_t, ECALL_LAST - SYSCALL_BASE> handlers {
-		FPTR(self_test),
+		FPTR(fail),
 		FPTR(assertion_failed),
 		FPTR(print),
 		FPTR(shm_log),

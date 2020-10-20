@@ -5,8 +5,11 @@ using json = nlohmann::json;
 extern std::vector<uint8_t> file_loader(const std::string& filename);
 
 using MapType = eastl::string_map<struct vmod_riscv_machine*>;
+static MapType temporaries;
+
 inline MapType& tenants(VRT_CTX)
 {
+	(void) ctx;
 	static MapType t;
 	return t;
 }
@@ -27,10 +30,40 @@ extern "C"
 vmod_riscv_machine* tenant_find(VRT_CTX, const char* name)
 {
 	auto& map = tenants(ctx);
+	// regular tenants
 	auto it = map.find(name);
 	if (it != map.end())
 		return it->second;
+	// temporary tenants (updates)
+	it = temporaries.find(name);
+	if (it != map.end())
+		return it->second;
 	return nullptr;
+}
+
+vmod_riscv_machine* create_temporary_tenant(const vmod_riscv_machine* vrm)
+{
+	/* Create a new tenant with a temporary name,
+	   and no program file to load. */
+	TenantConfig config{vrm->config};
+	config.name.append("_temporary");
+	config.filename = "";
+	auto it = temporaries.try_emplace(
+		strdup(config.name.c_str()),
+		new vmod_riscv_machine(nullptr, config));
+	return it.first->second;
+}
+void delete_temporary_tenant(const vmod_riscv_machine* vrm)
+{
+	auto it = temporaries.find(vrm->config.name.c_str());
+	if (it != temporaries.end())
+	{
+		assert(vrm == it->second);
+		delete vrm;
+		temporaries.erase(it);
+		return;
+	}
+	throw std::runtime_error("Could not delete temporary tenant");
 }
 
 extern "C"

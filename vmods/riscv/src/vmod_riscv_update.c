@@ -6,7 +6,7 @@
 #include "vcc_if.h"
 #include "vmod_util.h"
 
-extern const char* riscv_update(struct vsl_log*, struct vmod_riscv_machine*, const uint8_t*, size_t);
+extern const char* riscv_update(VRT_CTX, struct vmod_riscv_machine*, const uint8_t*, size_t);
 extern const struct vmod_riscv_machine* riscv_current_machine(VRT_CTX);
 extern struct vmod_riscv_machine* tenant_find(VRT_CTX, const char*);
 
@@ -138,7 +138,17 @@ riscvbe_gethdrs(const struct director *dir,
 			return (-1);
 		INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
 
-		const char* output = riscv_update(bo->vsl, rvu->machine, result_data, result_len);
+		const struct vrt_ctx ctx = {
+			.magic = VRT_CTX_MAGIC,
+			.vcl = bo->vcl,
+			.ws  = bo->ws,
+			.vsl = bo->vsl,
+			.req = NULL,
+			.bo  = bo,
+			.http_bereq  = bo->bereq,
+			.http_beresp = bo->beresp,
+		};
+		const char* output = riscv_update(&ctx, rvu->machine, result_data, result_len);
 
 		const size_t output_len = __builtin_strlen(output);
 		http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);

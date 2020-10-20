@@ -3,8 +3,11 @@
 static bool file_writer(const std::string& file, const std::vector<uint8_t>&);
 static const size_t TOO_SMALL = 3; // vmcalls that can be skipped
 
+extern vmod_riscv_machine* create_temporary_tenant(const vmod_riscv_machine*);
+extern void delete_temporary_tenant(const vmod_riscv_machine*);
+
 extern "C"
-const char* riscv_update(struct vsl_log* vsl, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
+const char* riscv_update(VRT_CTX, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
 {
 	/* ELF loader will not be run for empty binary */
 	if (UNLIKELY(data == nullptr || len == 0)) {
@@ -17,8 +20,33 @@ const char* riscv_update(struct vsl_log* vsl, vmod_riscv_machine* vrm, const uin
 		/* Note: CTX is NULL here */
 		std::vector<uint8_t> binary {data, data + len};
 
+		/* If this throws an exception, we instantly fail the update */
 		auto inst = std::make_shared<MachineInstance>(std::move(binary), nullptr, vrm);
 		const auto& live_binary = inst->binary;
+
+		/* Check if self-test is present */
+		if (const auto selftest = inst->lookup("selftest");
+			selftest != 0x0)
+		{
+			/* Create a temporary tenant */
+			auto* temp = create_temporary_tenant(vrm);
+			try {
+				/* Create machine with VRT context */
+				temp->machine = std::make_shared<MachineInstance>(live_binary, ctx, temp);
+				/* Run the tenants self-test function manually.
+				   We want to propagate any exceptions to the client. */
+				auto& machine = temp->machine->script.machine();
+				machine.cpu.reset_stack_pointer();
+				machine.vmcall<2'000'000, true>(selftest);
+			} catch (...) {
+				delete_temporary_tenant(temp);
+				throw; /* Re-throw */
+			}
+			delete_temporary_tenant(temp);
+		} else {
+			VSLb(ctx->vsl, SLT_Debug, "Self-test was skipped (not found)");
+		}
+
 		/* Decrements reference when it goes out of scope.
 		   We need the *new* instance alive for access to the binary
 		   when writing it to disk. Don't *move*. See below. */
@@ -36,17 +64,20 @@ const char* riscv_update(struct vsl_log* vsl, vmod_riscv_machine* vrm, const uin
 			char buffer[800];
 			const int len = snprintf(buffer, sizeof(buffer),
 				"Could not write '%s'", vrm->config.filename.c_str());
-			VSLb(vsl, SLT_Error, "%.*s", len, buffer);
+			VSLb(ctx->vsl, SLT_Error, "%.*s", len, buffer);
 			return strdup(buffer);
 		}
 		return strdup("Update successful\n");
 	} catch (const riscv::MachineException& e) {
 		if (e.type() == riscv::OUT_OF_MEMORY) {
 			/* Pass helpful explanation when OOM */
-			return strdup("Binary ran out of memory during initialization");
+			return strdup("Program ran out of memory, update not applied");
 		}
 		/* Pass machine error back to the client */
-		return strdup(e.what());
+		char buffer[2048];
+		snprintf(buffer, sizeof(buffer),
+			"Machine exception: %s (data: %#x)\n", e.what(), e.data());
+		return strdup(buffer);
 	} catch (const std::exception& e) {
 		/* Pass unknown error back to the client */
 		return strdup(e.what());
