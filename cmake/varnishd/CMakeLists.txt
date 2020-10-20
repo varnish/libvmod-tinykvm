@@ -253,7 +253,7 @@ add_dependencies(varnishd vhp_gen_hufdec generate_builtin_vcl)
 target_link_libraries(varnishd vcc varnish vgz)
 target_link_libraries(varnishd config pthread ssl crypto dl)
 if (VARNISH_PLUS)
-    target_link_libraries(varnishd mse lmdb sslhelper jemalloc)
+    target_link_libraries(varnishd mse lmdb sslhelper jemalloc numa)
 endif()
 # build varnishd into the top binary folder
 set_target_properties(varnishd

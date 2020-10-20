@@ -17,6 +17,23 @@ sub vcl_init {
 
 sub vcl_recv {
 
+	if (req.url == "/file") {
+		set req.backend_hint = f.backend();
+		set req.url = req.url + "?node=" + utils.numa_node_id() + "?foo=" + utils.fast_random_int(100);
+		return (hash);
+	}
+	/* Easier to work with wrk */
+	if (req.url == "/x") {
+		set req.http.Host = "xpizza.com";
+		set req.url = req.url + "?node=" + utils.numa_node_id() + "?foo=" + utils.fast_random_int(100);
+	}
+	else if (req.url == "/y") {
+		set req.http.Host = "ypizza.com";
+	}
+	else if (req.url == "/z") {
+		set req.http.Host = "zpizza.com";
+	}
+
 	/* Determine tenant */
 	if (req.http.Host) {
 
@@ -26,23 +43,8 @@ sub vcl_recv {
 			std.cache_req_body(15MB);
 			return (pass);
 		}
-		/* Easier to work with wrk */
-		if (req.url == "/x") {
-			riscv.fork("xpizza.com");
-		}
-		else if (req.url == "/y") {
-			riscv.fork("ypizza.com");
-		}
-		else if (req.url == "/z") {
-			riscv.fork("zpizza.com");
-		}
-		else if (req.url == "/file") {
-			set req.backend_hint = f.backend();
-			set req.url = req.url + "?foo=" + utils.fast_random_int(100);
-			return (hash);
-		}
 		/* If fork fails, it's probably not a tenant */
-		else if (!riscv.fork(req.http.Host)) {
+		if (!riscv.fork(req.http.Host)) {
 			return (synth(403));
 		}
 
