@@ -19,13 +19,14 @@ sub vcl_recv {
 
 	if (req.url == "/file") {
 		set req.backend_hint = f.backend();
-		set req.url = req.url + "?node=" + utils.numa_node_id() + "?foo=" + utils.fast_random_int(100);
+		// NUMA: "?node=" + utils.numa_node_id() + 
+		set req.url = req.url + "?foo=" + utils.fast_random_int(100);
 		return (hash);
 	}
 	/* Easier to work with wrk */
 	if (req.url == "/x") {
 		set req.http.Host = "xpizza.com";
-		set req.url = req.url + "?node=" + utils.numa_node_id() + "?foo=" + utils.fast_random_int(100);
+		set req.url = req.url + "?foo=" + utils.fast_random_int(100);
 	}
 	else if (req.url == "/y") {
 		set req.http.Host = "ypizza.com";
