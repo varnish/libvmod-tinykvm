@@ -138,7 +138,7 @@ APICALL(print)
 	/* TODO: Use VSLb here or disable this completely */
 	printf(">>> %s: %.*s\n", get_script(machine).name().c_str(),
 		(int) string.size(), string.c_str());
-	return string.size();
+	machine.set_result(string.size());
 }
 APICALL(shm_log)
 {
@@ -149,16 +149,18 @@ APICALL(shm_log)
 	auto* data = script.rw_area.host_addr(string, len);
 	if (data) {
 		VSLb(ctx->vsl, SLT_VCL_Log, "%.*s", (int) len, data);
-		return len;
+		machine.set_result(len);
+		return;
 	}
 	/* Fallback (with potential slow-path) */
 	auto buffer = machine.memory.rvbuffer(string, len);
 	if (buffer.is_sequential()) {
 		VSLb(ctx->vsl, SLT_VCL_Log, "%.*s", (int) buffer.size(), buffer.c_str());
-		return len;
+		machine.set_result(len);
+		return;
 	}
 	// TODO: slow-path
-	return -1;
+	machine.set_result(-1);
 }
 
 APICALL(my_name)
@@ -167,7 +169,8 @@ APICALL(my_name)
 	const auto& name = script.name();
 	/* Put pointer, length in registers A0, A1 */
 	machine.cpu.reg(11) = name.size();
-	return push_data(machine, name.c_str(), name.size()+1); /* Zero-terminated */
+	machine.set_result( /* NOTE: Zero-terminated */
+		push_data(machine, name.c_str(), name.size()+1));
 }
 APICALL(set_decision)
 {
@@ -180,7 +183,6 @@ APICALL(set_decision)
 		script.set_result(result.to_string(), status, paused);
 	}
 	machine.stop();
-	return 0;
 }
 APICALL(ban)
 {
@@ -188,7 +190,6 @@ APICALL(ban)
 	auto* ctx = get_ctx(machine);
 
 	VRT_ban_string(ctx, buffer.c_str());
-	return 0;
 }
 APICALL(hash_data)
 {
@@ -199,11 +200,10 @@ APICALL(hash_data)
 		script.hash_buffer(buffer.c_str(), buffer.size());
 	else
 		script.hash_buffer(buffer.to_string().c_str(), buffer.size());
-	return 0;
 }
 APICALL(purge)
 {
-	return -1;
+	machine.set_result(-1);
 }
 
 APICALL(synth)
@@ -242,7 +242,7 @@ APICALL(synth)
 		TIMING_LOCATION(t1);
 		printf("Time spent in synth syscall: %ld ns\n", nanodiff(t0, t1));
 #endif
-		return 0;
+		return;
 	}
 	throw std::runtime_error(
 	    "Synth can only be used in vcl_synth or vcl_backend_error");
@@ -302,7 +302,7 @@ APICALL(foreach_header_field)
 		}
 	}
 
-	return acount;
+	machine.set_result(acount);
 }
 
 APICALL(http_find_name)
@@ -316,17 +316,21 @@ APICALL(http_find_name)
 		/* Find the header field by its name */
 		unsigned index
 			= http_findhdr(hp, fieldname.size(), fieldname.c_str());
-		if (index > 0)
-			return index;
+		if (index > 0) {
+			machine.set_result(index);
+			return;
+		}
 	} else {
 		/* Find the header field by its name */
 		unsigned index
 			= http_findhdr(hp, fieldname.size(), fieldname.to_string().c_str());
-		if (index > 0)
-			return index;
+		if (index > 0) {
+			machine.set_result(index);
+			return;
+		}
 	}
 	/* Not found -> invalid header field */
-	return HDR_INVALID;
+	machine.set_result(HDR_INVALID);
 }
 APICALL(http_copy_from)
 {
@@ -334,8 +338,10 @@ APICALL(http_copy_from)
 		= machine.sysargs<int, unsigned, int> ();
 	auto* ctx = get_ctx(machine);
 	/* Ignore invalid header fields?? */
-	if (is_invalid(index))
-		return HDR_INVALID;
+	if (is_invalid(index)) {
+		machine.set_result(HDR_INVALID);
+		return;
+	}
 
 	auto [hp_from, field_from] = get_field(ctx, (gethdr_e) where, index);
 	auto* hp_dest = get_http(ctx, (gethdr_e) dest);
@@ -345,12 +351,13 @@ APICALL(http_copy_from)
 	if (UNLIKELY(hp_dest->field_count >= hp_dest->fields_max)) {
 		VSLb(hp_dest->vsl, SLT_LostHeader,
 			"%.*s", (int) len, field_from.begin);
-		return -1;
+		machine.set_result(HDR_INVALID);
+		return;
 	}
 
 	const int idx_dest = hp_dest->field_count++;
 	http_SetH(hp_dest, idx_dest, field_from.begin);
-	return idx_dest;
+	machine.set_result(idx_dest);
 }
 
 APICALL(http_set_status)
@@ -360,8 +367,10 @@ APICALL(http_set_status)
 	auto* ctx = get_ctx(machine);
 	auto [hp, field] = get_field(ctx, where, 3);
 	/* Getter does not want to set status */
-	if (status < 0)
-		return hp->status;
+	if (status < 0) {
+		machine.set_result(hp->status);
+		return;
+	}
 	/* Do the workspace allocation before making changes */
 	const char* string = WS_Printf(ctx->ws, "%u", status);
 	if (UNLIKELY(!string))
@@ -370,7 +379,7 @@ APICALL(http_set_status)
 	/* We have to overwrite the header field too */
 	field.begin = string;
 	field.end = field.begin + strlen(string);
-	return status;
+	machine.set_result(status);
 }
 
 APICALL(http_unset_re)
@@ -392,7 +401,7 @@ APICALL(http_unset_re)
 			mcount ++;
 		}
 	}
-	return mcount;
+	machine.set_result(mcount);
 }
 
 APICALL(http_rollback)
@@ -402,12 +411,11 @@ APICALL(http_rollback)
 	auto* hp = get_http(ctx, (gethdr_e) where);
 
 	VRT_Rollback(ctx, hp);
-	return 0;
 }
 
 APICALL(header_field_get)
 {
-	return -1;
+	machine.set_result(-1);
 }
 
 APICALL(header_field_retrieve)
@@ -422,10 +430,12 @@ APICALL(header_field_retrieve)
 		const auto& field = hp->field_array[index];
 		const size_t len = field_length(field);
 		auto addr = push_data(machine, field.begin, len+1);
-		machine.cpu.reg(11) = addr + len;
-		return addr;
+		/* Return begin, end pointer */
+		machine.set_result(addr, addr + len);
+		return;
 	}
-	return 0;
+	/* Null pointers */
+	machine.set_result(0, 0);
 }
 
 APICALL(header_field_append)
@@ -442,12 +452,13 @@ APICALL(header_field_append)
 
 	if (UNLIKELY(hp->field_count >= hp->fields_max)) {
 		VSLb(hp->vsl, SLT_LostHeader, "%.*s", (int) len, val);
-		return HDR_INVALID;
+		machine.set_result(HDR_INVALID);
+		return;
 	}
 
 	const int idx = hp->field_count++;
 	http_SetH(hp, idx, val);
-	return idx;
+	machine.set_result(idx);
 }
 
 APICALL(header_field_set)
@@ -470,10 +481,12 @@ APICALL(header_field_set)
 
 		/* Apply it at the given index */
 		http_SetH(hp, index, val);
-		return buffer.size();
+		machine.set_result(buffer.size());
+		return;
 	}
 	else if (index == HDR_INVALID) {
-		return -1;
+		machine.set_result(-1);
+		return;
 	}
 	/* This will halt execution */
 	throw std::out_of_range("Header field index not in bounds");
@@ -496,17 +509,20 @@ APICALL(header_field_copy)
 
 			/* Apply it at the given index */
 			http_SetH(hp, index, src_field.begin);
-			return field_length(src_field);
+			machine.set_result(field_length(src_field));
+			return;
 		}
 		else /* In VCL you can unset a header field by assigning it
 			to a non-existing other header field. */
 		{
 			http_UnsetIdx(hp, index);
-			return HDR_INVALID;
+			machine.set_result(HDR_INVALID);
+			return;
 		}
 	}
 	else if (index == HDR_INVALID || src_index == HDR_INVALID) {
-		return HDR_INVALID;
+		machine.set_result(HDR_INVALID);
+		return;
 	}
 	/* This will halt execution */
 	throw std::out_of_range("Header field index not in bounds");
@@ -523,9 +539,12 @@ APICALL(header_field_unset)
 	if (is_valid_index(hp, index) && index >= HDR_FIRST)
 	{
 		http_UnsetIdx(hp, index);
-		return 0;
+		machine.set_result(index);
+		return;
 	} else if (index == HDR_INVALID) {
-		return -1; /* Silently ignored */
+		/* Silently ignored */
+		machine.set_result(HDR_INVALID);
+		return;
 	}
 	throw std::out_of_range("Header field index not in bounds");
 }
@@ -537,8 +556,10 @@ APICALL(regex_compile)
 
 	const uint32_t hash = crc32(pattern.c_str(), pattern.size());
 	const int idx = get_script(machine).regex_find(hash);
-	if (idx >= 0)
-		return idx;
+	if (idx >= 0) {
+		machine.set_result(idx);
+		return;
+	}
 
 	/* Compile new regex pattern */
 	const char* error = "";
@@ -550,8 +571,9 @@ APICALL(regex_compile)
 		throw std::runtime_error(
 			"The regex pattern did not compile: " + pattern);
 	}
-
-	return get_script(machine).regex_manage(re, hash);
+	/* Return the regex handle */
+	machine.set_result(
+		get_script(machine).regex_manage(re, hash));
 }
 APICALL(regex_match)
 {
@@ -561,8 +583,9 @@ APICALL(regex_match)
 	    int startoffset, int options, int *ovector, int ovecsize,
 	    const volatile struct vre_limits *lim) */
 	auto subject = buffer.to_string();
-	return VRE_exec(vre, subject.c_str(), subject.size(), 0,
-		0, nullptr, 0, nullptr) >= 0;
+	machine.set_result(
+		VRE_exec(vre, subject.c_str(), subject.size(), 0,
+		0, nullptr, 0, nullptr) >= 0);
 }
 APICALL(regex_subst)
 {
@@ -576,14 +599,17 @@ APICALL(regex_subst)
 	auto subst   = sbuffer.to_string();
 	auto * result =
 		VRT_regsub(get_ctx(machine), all, subject.c_str(), re, subst.c_str());
-	if (result == nullptr)
-		return -1;
+	if (result == nullptr) {
+		machine.set_result(-1);
+		return;
+	}
 
 	/* This call only supports dest buffer being in the RW area */
 	const size_t len =
 		std::min((size_t) maxlen & 0x7FFFFFFF, __builtin_strlen(result)+1);
 	machine.copy_to_guest(dst, result, len);
-	return len-1; /* The last byte is the zero, not reporting that */
+	/* The last byte is the zero, not reporting that */
+	machine.set_result(len-1);
 }
 APICALL(regex_subst_hdr)
 {
@@ -591,8 +617,10 @@ APICALL(regex_subst_hdr)
 		= machine.sysargs<uint32_t, int, uint32_t, riscv::Buffer, int> ();
 	auto* re = get_script(machine).regex_get(ridx);
 	auto* ctx = get_ctx(machine);
-	if (index == HDR_INVALID)
-		return -1;
+	if (index == HDR_INVALID) {
+		machine.set_result(-1);
+		return;
+	}
 	auto [hp, field] = get_field(ctx, (gethdr_e) where, index);
 
 	const char* result = nullptr;
@@ -603,17 +631,18 @@ APICALL(regex_subst_hdr)
 	} else {
 		result = VRT_regsub(ctx, all, field.begin, re, subst.to_string().c_str());
 	}
-	if (result == nullptr)
-		return -1;
+	if (result == nullptr) {
+		machine.set_result(-1);
+		return;
+	}
 
 	http_SetH(hp, index, result);
-	return __builtin_strlen(result);
+	machine.set_result(__builtin_strlen(result));
 }
 APICALL(regex_delete)
 {
 	auto [index] = machine.sysargs<uint32_t> ();
 	get_script(machine).regex_free((uint32_t) index);
-	return 0;
 }
 
 void Script::setup_syscall_interface(machine_t& machine)

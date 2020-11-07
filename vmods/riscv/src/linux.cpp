@@ -41,10 +41,9 @@ execute_riscv(void* workspace, set_header_t set_header, void* header,
 	// run the machine until potential break
 	bool break_used = false;
 	machine.install_syscall_handler(0,
-	[&break_used] (auto& machine) -> long {
+	[&break_used] (auto& machine) {
 		break_used = true;
 		machine.stop();
-		return 0;
 	});
 
 	// execute until we are inside main()
@@ -66,7 +65,7 @@ execute_riscv(void* workspace, set_header_t set_header, void* header,
 		try {
 			while (LIKELY(!machine.stopped())) {
 				machine.cpu.simulate();
-				if (UNLIKELY(machine.cpu.instruction_counter() >= instr_max))
+				if (UNLIKELY(machine.instruction_counter() >= instr_max))
 					break;
 				if (machine.cpu.registers().pc == main_address)
 					break;
@@ -79,21 +78,21 @@ execute_riscv(void* workspace, set_header_t set_header, void* header,
 		asm("" : : : "memory");
 		set_header(header, WS_Printf(workspace, "X-Startup-Time: %ld", st1 - st0));
 		set_header(header, WS_Printf(workspace, "X-Startup-Instructions: %lu",
-			machine.cpu.instruction_counter()));
+			machine.instruction_counter()));
 		// cache for 10 seconds (it's only the output of a program)
 		set_header(header, "Cache-Control: max-age=10");
 	}
 	if (machine.cpu.registers().pc == main_address)
 	{
 		// reset PC here for benchmarking
-		machine.cpu.reset_instruction_counter();
+		machine.reset_instruction_counter();
 		// continue executing main()
 		const uint64_t t0 = micros_now();
 		asm("" : : : "memory");
 
 		try {
 			machine.simulate(instr_max);
-			if (machine.cpu.instruction_counter() >= instr_max) {
+			if (machine.instruction_counter() >= instr_max) {
 				set_header(header, "X-Exception: Maximum instructions reached");
 			}
 		} catch (std::exception& e) {
@@ -107,7 +106,7 @@ execute_riscv(void* workspace, set_header_t set_header, void* header,
 		set_header(header, WS_Printf(workspace, "X-Exit-Code: %d", state.exit_code));
 		set_header(header, WS_Printf(workspace, "X-Runtime: %lu", t1 - t0));
 		set_header(header, WS_Printf(workspace, "X-Instruction-Count: %lu",
-			machine.cpu.instruction_counter()));
+			machine.instruction_counter()));
 		set_header(header, WS_Printf(workspace, "X-Binary-Size: %zu", len));
 		const size_t active_mem = machine.memory.pages_active() * 4096;
 		set_header(header, WS_Printf(workspace, "X-Memory-Usage: %zu", active_mem));

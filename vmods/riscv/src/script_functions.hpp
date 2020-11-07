@@ -8,7 +8,7 @@
 using machine_t = Script::machine_t;
 using gaddr_t = Script::gaddr_t;
 
-#define APICALL(func) static long func(machine_t& machine [[maybe_unused]])
+#define APICALL(func) static void func(machine_t& machine [[maybe_unused]])
 
 inline const auto* get_ctx(machine_t& m) {
 	return m.get_userdata<Script> ()->ctx();

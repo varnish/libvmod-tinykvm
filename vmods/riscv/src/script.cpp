@@ -89,7 +89,7 @@ void Script::machine_initialize()
 		throw;
 	}
 	// catch program timeouts
-	if (UNLIKELY(machine().cpu.instruction_counter() >= max_instructions())) {
+	if (UNLIKELY(machine().instruction_counter() >= max_instructions())) {
 		throw riscv::MachineTimeoutException(riscv::MAX_INSTRUCTIONS_REACHED,
 			"Maximum instruction counter reached", max_instructions());
 	}
