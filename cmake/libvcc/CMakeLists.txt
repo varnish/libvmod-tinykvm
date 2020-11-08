@@ -16,8 +16,7 @@ add_custom_command(
 )
 add_custom_target(libvcc_generate
     DEPENDS ${LIBVCC_GEN_SOURCES}
-            includes_generate
-    )
+)
 set_source_files_properties(${LIBVCC_GEN_SOURCES}
                             PROPERTIES GENERATED TRUE)
 

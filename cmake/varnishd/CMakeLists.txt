@@ -76,7 +76,6 @@ set(VARNISHD_SOURCES
 	${VD_PATH}/mgt/mgt_param_tbl.c
 	${VD_PATH}/mgt/mgt_param_tcp.c
 	${VD_PATH}/mgt/mgt_param_tweak.c
-	${VD_PATH}/mgt/mgt_pool.c
 	${VD_PATH}/mgt/mgt_shmem.c
 	${VD_PATH}/mgt/mgt_util.c
 	${VD_PATH}/mgt/mgt_vcc.c
@@ -117,6 +116,7 @@ if (VARNISH_PLUS)
 		${VD_PATH}/cache/cache_vst_access.c
 		${VD_PATH}/cache/cache_ykey.c
 		${VD_PATH}/common/common_vtls_sni.c
+		${VD_PATH}/mgt/mgt_pool.c
 		${VD_PATH}/storage/storage_ykey_mem.c
 		${VD_PATH}/storage/mse_book.c
 		${VD_PATH}/storage/mse_cache.c
@@ -178,7 +178,7 @@ add_custom_target(vhp_gen_hufdec ALL
 ## Generate the built-in VCL C-file ##
 add_custom_command(
         OUTPUT builtin_vcl.c
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/builtin_vcl.py ${VD_PATH}/builtin.vcl builtin_vcl.c
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/builtin_vcl.py ${VD_PATH}/builtin.vcl builtin_vcl.c
         DEPENDS ${VD_PATH}/builtin.vcl
     )
 add_custom_target(generate_builtin_vcl
@@ -247,7 +247,7 @@ endif()
 
 ## Varnish daemon ##
 add_executable(varnishd ${VARNISHD_SOURCES})
-target_include_directories(varnishd PRIVATE ${CMAKE_BINARY_DIR}/libvarnish)
+target_include_directories(varnishd PRIVATE ${CMAKE_BINARY_DIR}/cmake/libvarnish)
 target_include_directories(varnishd PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 add_dependencies(varnishd vhp_gen_hufdec generate_builtin_vcl)
 target_link_libraries(varnishd vcc varnish vgz)
@@ -304,11 +304,6 @@ if (LIBUNWIND)
 	target_compile_definitions(varnishd PRIVATE WITH_UNWIND=1 UNW_LOCAL_ONLY=1)
 endif()
 
-if (NOT SHARED_LIBRISCV)
+if (NOT SHARED_LIBRISCV AND VARNISH_PLUS)
 	target_link_libraries(varnishd -Wl,--whole-archive sandbox -Wl,--no-whole-archive)
-endif()
-
-if (USE_FASTER)
-	# faster experimental helper library
-	target_link_libraries(varnishd stdc++ faster)
 endif()

@@ -6,17 +6,15 @@ set(VMOD_DIR   "/opt/varnish/lib/varnish-plus/vmods" CACHE STRING "Default VMOD 
 set(VCL_DIR    "/opt/varnish/share/varnish-plus/vcl" CACHE STRING "Default VCL directory")
 
 # include/vcs_version.h include/vmod_abi.h
-add_custom_target(includes_generate)
 execute_process(COMMAND git rev-parse HEAD
 				WORKING_DIRECTORY ${VARNISH_PATH}
 				OUTPUT_VARIABLE GIT_REPO_VERSION
 				OUTPUT_STRIP_TRAILING_WHITESPACE)
-configure_file("vcs_version.h.in" "${CMAKE_CURRENT_BINARY_DIR}/vcs_version.h")
-configure_file("vmod_abi.h.in" "${CMAKE_CURRENT_BINARY_DIR}/vmod_abi.h")
+configure_file("vcs_version.h.in" "${CMAKE_BINARY_DIR}/vcs_version.h")
+configure_file("vmod_abi.h.in" "${CMAKE_BINARY_DIR}/vmod_abi.h")
 
 ## libvarnish library ##
 set (SOURCES
-	${LIBPATH}/libvarnish/binary_heap.c
 	${LIBPATH}/libvarnish/vas.c
 	${LIBPATH}/libvarnish/vav.c
 	${LIBPATH}/libvarnish/vcli_proto.c
@@ -45,9 +43,15 @@ set (SOURCES
 )
 if (NOT VARNISH_PLUS)
 	list (APPEND SOURCES
-        ${LIBPATH}/libvarnish/verrno.c
+#        ${LIBPATH}/libvarnish/verrno.c
+		${LIBPATH}/libvarnish/vbh.c
+		${LIBPATH}/libvarnish/venc.c
         ${LIBPATH}/libvarnish/vte.c
     )
+else()
+	list (APPEND SOURCES
+		${LIBPATH}/libvarnish/binary_heap.c
+	)
 endif()
 
 ## VSC generation (used by libvarnish) ##
@@ -92,7 +96,7 @@ add_library(varnish ${SOURCES} ${VSC_COMPILED})
 target_include_directories(varnish PUBLIC ${VARNISHD_PATH})
 target_include_directories(varnish PUBLIC ${VARNISH_PATH}/include)
 target_include_directories(varnish PUBLIC ${CONFIG_PATH})
-target_include_directories(varnish PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(varnish PUBLIC ${CMAKE_BINARY_DIR})
 target_compile_definitions(varnish PUBLIC _XOPEN_SOURCE=700)
 target_compile_definitions(varnish PUBLIC VARNISH_STATE_DIR="${VSTATE_DIR}")
 target_compile_definitions(varnish PUBLIC VARNISH_VMOD_DIR="${VMOD_DIR}")

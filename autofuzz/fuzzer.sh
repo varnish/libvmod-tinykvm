@@ -12,7 +12,7 @@
 VCP="ON"
 REPO_FOLDER="$PWD/.."
 BUILD_FOLDER="$REPO_FOLDER/autofuzz/${2:-build}"
-CMAKE_FOLDER="$REPO_FOLDER/cmake"
+CMAKE_FOLDER="$REPO_FOLDER"
 GIT_BRANCH="6.0-plus"
 export CC=$HOME/llvm/install/bin/clang-10
 export CXX=$HOME/llvm/install/bin/clang++-10

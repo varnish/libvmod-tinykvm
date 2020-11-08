@@ -46,7 +46,8 @@ set(SOURCES
 	)
 if (NOT VARNISH_PLUS)
 	set(SOURCES ${SOURCES}
-		${PATH}/vtc_gzip.c
+        ${PATH}/vtc_gzip.c
+		${PATH}/vtc_sess.c
 	)
 endif()
 add_executable(varnishtest ${SOURCES})
