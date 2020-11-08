@@ -307,6 +307,11 @@ std::string Script::symbol_name(gaddr_t address) const
 	return callsite.name;
 }
 
+void Script::dynamic_call(uint32_t hash)
+{
+	vrm()->dynamic_call(hash, *this);
+}
+
 int Script::regex_find(uint32_t hash) const
 {
 	for (unsigned idx = 0; idx < m_regex_cache.size(); idx++) {

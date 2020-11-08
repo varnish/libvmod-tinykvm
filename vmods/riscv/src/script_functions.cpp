@@ -162,6 +162,19 @@ APICALL(shm_log)
 	// TODO: slow-path
 	machine.set_result(-1);
 }
+APICALL(dynamic_call)
+{
+	auto [hash] = machine.template sysargs <uint32_t> ();
+	auto& regs = machine.cpu.registers();
+	// move down 6 integer registers
+	for (int i = 0; i < 6; i++) {
+		regs.get(10 + i) = regs.get(11 + i);
+	}
+	// call the handler
+	get_script(machine).dynamic_call(hash);
+	// we short-circuit the ret pseudo-instruction:
+	machine.cpu.jump(regs.get(riscv::RISCV::REG_RA) - 4);
+}
 
 APICALL(my_name)
 {
@@ -658,6 +671,7 @@ void Script::setup_syscall_interface(machine_t& machine)
 		FPTR(assertion_failed),
 		FPTR(print),
 		FPTR(shm_log),
+		FPTR(::dynamic_call),
 
 		FPTR(regex_compile),
 		FPTR(regex_match),

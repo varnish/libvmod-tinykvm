@@ -15,9 +15,18 @@ struct TenantConfig
 
 struct vmod_riscv_machine
 {
+	using ghandler_t = std::function<void(Script&)>;
+
 	int forkcall(VRT_CTX, Script::gaddr_t addr);
 	Script* vmfork(VRT_CTX);
 	bool no_program_loaded() const noexcept { return this->machine == nullptr; }
+
+	// Install a callback function using a string name
+	// Can be invoked from the guest using the same string name
+	void set_dynamic_call(const std::string& name, ghandler_t);
+	void set_dynamic_calls(std::vector<std::pair<std::string, ghandler_t>>);
+	void reset_dynamic_call(const std::string& name, ghandler_t = nullptr);
+	void dynamic_call(uint32_t hash, Script&) const;
 
 	inline Script::gaddr_t lookup(const char* name) const {
 		auto program = machine;
@@ -42,4 +51,6 @@ struct vmod_riscv_machine
 	const TenantConfig config;
 	/* Hot-swappable machine */
 	std::shared_ptr<MachineInstance> machine = nullptr;
+	/* Hash map of string hashes associated with dyncall handlers */
+	std::unordered_map<uint32_t, ghandler_t> m_dynamic_functions;
 };

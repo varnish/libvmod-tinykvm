@@ -1,5 +1,6 @@
 #include "sandbox.hpp"
 #include "varnish.hpp"
+#include "crc32.hpp"
 
 //#define ENABLE_TIMING
 #define TIMING_LOCATION(x) \
@@ -95,6 +96,41 @@ int vmod_riscv_machine::forkcall(VRT_CTX, Script::gaddr_t addr)
 	return ret;
 }
 
+void vmod_riscv_machine::set_dynamic_call(const std::string& name, ghandler_t handler)
+{
+	const uint32_t hash = crc32(name.c_str(), name.size());
+	auto it = m_dynamic_functions.find(hash);
+	if (it != m_dynamic_functions.end()) {
+		throw std::runtime_error("set_dynamic_call: Hash collision for " + name);
+	}
+	m_dynamic_functions.emplace(hash, std::move(handler));
+}
+void vmod_riscv_machine::reset_dynamic_call(const std::string& name, ghandler_t handler)
+{
+	const uint32_t hash = crc32(name.c_str(), name.size());
+	m_dynamic_functions.erase(hash);
+	if (handler != nullptr) {
+		set_dynamic_call(name, std::move(handler));
+	}
+}
+void vmod_riscv_machine::set_dynamic_calls(std::vector<std::pair<std::string, ghandler_t>> vec)
+{
+	for (const auto& pair : vec) {
+		set_dynamic_call(pair.first, std::move(pair.second));
+	}
+}
+void vmod_riscv_machine::dynamic_call(uint32_t hash, Script& script) const
+{
+	auto it = m_dynamic_functions.find(hash);
+	if (it != m_dynamic_functions.end()) {
+		it->second(script);
+	} else {
+		fprintf(stderr,
+			"Unable to find dynamic function with hash: 0x%08x\n",
+			hash);
+		throw std::runtime_error("Unable to find dynamic function");
+	}
+}
 
 #include <unistd.h>
 std::vector<uint8_t> file_loader(const std::string& filename)

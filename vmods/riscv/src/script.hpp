@@ -27,6 +27,8 @@ public:
 
 	inline long resume(uint64_t cycles);
 
+	void dynamic_call(uint32_t hash);
+
 	auto& machine() { return m_machine; }
 	const auto& machine() const { return m_machine; }
 
