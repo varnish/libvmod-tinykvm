@@ -30,7 +30,7 @@ void http_fuzzer(void* data, size_t len)
     const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n";
     int ret = write(cfd, req, strlen(req));
     if (ret < 0) {
-        //printf("Writing the request failed\n");
+        printf("Writing the request failed\n");
         close(cfd);
         return;
     }
@@ -47,7 +47,7 @@ void http_fuzzer(void* data, size_t len)
 	    }
 		buffer += bytes;
 		len    -= bytes;
-		
+
 		write(cfd, "\r\n\r\n", 4);
 	}
 

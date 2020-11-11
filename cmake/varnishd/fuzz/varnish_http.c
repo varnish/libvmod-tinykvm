@@ -15,7 +15,7 @@ int  varnishd_threadpool_stack = 128*1024;
 void varnishd_initialize(const char* vcl_path)
 {
 	// if proxy is enabled, add ,proxy to the -a option:
-	const char* portopts = 
+	const char* portopts =
 		(varnishd_proxy_mode) ? "%s,proxy" : "%s";
 
 	// create unix-domain socket for listener port
@@ -30,15 +30,15 @@ void varnishd_initialize(const char* vcl_path)
     snprintf(ti_buffer, sizeof(ti_buffer), "timeout_idle=0.001");
 	// the tiny workspace used by connections
     char ws_buffer[128];
-    snprintf(ws_buffer, sizeof(ws_buffer), 
+    snprintf(ws_buffer, sizeof(ws_buffer),
 			"workspace_session=512");
 	// threadpool min buffer
     char tpmin_buffer[128];
-    snprintf(tpmin_buffer, sizeof(tpmin_buffer), 
+    snprintf(tpmin_buffer, sizeof(tpmin_buffer),
 			"thread_pool_min=%d", varnishd_threadpool_size);
 	// threadpool max buffer
     char tpmax_buffer[128];
-    snprintf(tpmax_buffer, sizeof(tpmax_buffer), 
+    snprintf(tpmax_buffer, sizeof(tpmax_buffer),
 			"thread_pool_max=%d", varnishd_threadpool_size);
 	// vmod path
     char vmod_folder[512];
@@ -53,8 +53,8 @@ void varnishd_initialize(const char* vcl_path)
 	// debug flag single-process + workspace sanitizers
 	char feature_siproc[128];
 #ifndef VARNISH_PLUS
-	snprintf(feature_siproc, sizeof(feature_siproc), 
-		"debug=+single_proc,+wssan");
+	snprintf(feature_siproc, sizeof(feature_siproc),
+		"debug=+execute_mode");
 #else
 	snprintf(feature_siproc, sizeof(feature_siproc), "debug=none");
 #endif
