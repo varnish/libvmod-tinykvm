@@ -101,7 +101,7 @@ private:
 		uint32_t    hash = 0;
 		bool        non_owned = false;
 	};
-	std::vector<RegexCache> m_regex_cache;
+	eastl::fixed_vector<RegexCache, REGEX_MAX> m_regex_cache;
 
 	/* Delete this last */
 	std::shared_ptr<MachineInstance> m_inst_ref = nullptr;
