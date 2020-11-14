@@ -9,7 +9,9 @@ args="-DVCL_DIR=$PWD -DSYSTEM_OPENSSL=ON -DPython3_EXECUTABLE=/usr/bin/python3"
 vcp="OFF"
 do_build=false
 do_clean=false
+do_sanitize=false
 do_debug=false
+do_singleproc=false
 folder="build_vc"
 run=false
 set -e
@@ -59,24 +61,24 @@ case $i in
     --fuzz=*)
 	fuzzer="${i#*=}"
 	echo "Fuzzer enabled: $fuzzer"
-    args="$args -DSANITIZE=ON -DLIBFUZZER=ON -DFUZZER=$fuzzer"
+    args="$args -DLIBFUZZER=ON -DFUZZER=$fuzzer"
     shift # past argument and value
 	;;
 	--disable-fuzzer)
-	args="$args -DSANITIZE=OFF -DLIBFUZZER=OFF -UFUZZER"
+	args="$args -DLIBFUZZER=OFF -UFUZZER"
     shift
     ;;
     --sanitize)
-    args="$args -DSANITIZE=ON"
+	do_sanitize=true
     shift
     ;;
 	--debug)
-    args="$args -DCMAKE_BUILD_TYPE=Debug -DDEBUGGING=ON -DLTO_ENABLE=OFF -DNATIVE=OFF"
+    args="$args -DCMAKE_BUILD_TYPE=Debug -DLTO_ENABLE=OFF -DNATIVE=OFF"
 	do_debug=true
     shift
     ;;
 	--optimize)
-    args="$args -DCMAKE_BUILD_TYPE=Release -DDEBUGGING=OFF -DLTO_ENABLE=ON -DNATIVE=ON"
+    args="$args -DCMAKE_BUILD_TYPE=Release -DLTO_ENABLE=ON -DNATIVE=ON"
     shift
     ;;
 	--static-sandbox)
@@ -88,11 +90,11 @@ case $i in
     shift
     ;;
 	--mgt-process)
-	args="$args -DSINGLE_PROCESS=OFF"
+	do_singleproc=false
     shift
     ;;
 	--single-process)
-	args="$args -DSINGLE_PROCESS=ON"
+	do_singleproc=true
     shift
     ;;
 	--build)
@@ -133,6 +135,22 @@ case $i in
     ;;
 esac
 done
+
+if [ "$do_debug" = true ] ; then
+	args="$args -DDEBUGGING=ON"
+else
+	args="$args -DDEBUGGING=OFF"
+fi
+if [ "$do_sanitize" = true ] ; then
+	args="$args -DSANITIZE=ON"
+else
+	args="$args -DSANITIZE=OFF"
+fi
+if [ "$do_singleproc" = true ] ; then
+	args="$args -DSINGLE_PROCESS=ON"
+else
+	args="$args -DSINGLE_PROCESS=OFF"
+fi
 
 setup_build
 if [ "$do_clean" = true ] ; then
