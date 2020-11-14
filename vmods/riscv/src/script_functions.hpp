@@ -10,12 +10,12 @@ using gaddr_t = Script::gaddr_t;
 
 #define APICALL(func) static void func(machine_t& machine [[maybe_unused]])
 
-inline const auto* get_ctx(machine_t& m) {
-	return m.get_userdata<Script> ()->ctx();
+inline Script& get_script(machine_t& m) noexcept {
+	return *m.get_userdata<Script> ();
 }
 
-inline auto& get_script(machine_t& m) {
-	return *m.get_userdata<Script> ();
+inline const auto* get_ctx(machine_t& m) noexcept {
+	return get_script(m).ctx();
 }
 
 template <typename... T>

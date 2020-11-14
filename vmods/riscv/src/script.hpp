@@ -2,7 +2,6 @@
 #include <cassert>
 #include <functional>
 #include <libriscv/machine.hpp>
-#include <EASTL/fixed_vector.h>
 #include "memarea.hpp"
 struct vrt_ctx;
 struct vmod_riscv_machine;
@@ -17,6 +16,7 @@ public:
 	static constexpr gaddr_t RO_AREA_END   = 0x11000;
 	static constexpr gaddr_t RW_AREA_BEGIN = 0x12000;
 	static constexpr gaddr_t RW_AREA_END   = 0x13000;
+	static constexpr size_t  REGEX_MAX   = 64;
 
 	// call any script function, with any parameters
 	template <typename... Args>
@@ -61,7 +61,7 @@ public:
 	int    regex_find(uint32_t hash) const;
 	size_t regex_manage(struct vre*, uint32_t hash);
 	void   regex_free(size_t);
-	struct vre* regex_get(size_t idx) { return m_regex_cache.at(idx).re; }
+	struct vre* regex_get(size_t idx);
 
 	std::string symbol_name(gaddr_t address) const;
 	gaddr_t resolve_address(const char* name) const;
@@ -101,7 +101,7 @@ private:
 		uint32_t    hash = 0;
 		bool        non_owned = false;
 	};
-	eastl::fixed_vector<RegexCache, 16> m_regex_cache;
+	std::vector<RegexCache> m_regex_cache;
 
 	/* Delete this last */
 	std::shared_ptr<MachineInstance> m_inst_ref = nullptr;

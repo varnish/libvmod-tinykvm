@@ -312,6 +312,10 @@ void Script::dynamic_call(uint32_t hash)
 	vrm()->dynamic_call(hash, *this);
 }
 
+struct vre* Script::regex_get(size_t idx)
+{
+	return m_regex_cache.at(idx).re;
+}
 int Script::regex_find(uint32_t hash) const
 {
 	for (unsigned idx = 0; idx < m_regex_cache.size(); idx++) {
@@ -321,8 +325,12 @@ int Script::regex_find(uint32_t hash) const
 }
 size_t Script::regex_manage(struct vre* ptr, uint32_t hash)
 {
-	m_regex_cache.push_back({ptr, hash});
-	return m_regex_cache.size() - 1;
+	if (m_regex_cache.size() < REGEX_MAX)
+	{
+		m_regex_cache.push_back({ptr, hash});
+		return m_regex_cache.size() - 1;
+	}
+	throw std::out_of_range("Too many regex expressions");
 }
 void Script::regex_free(size_t idx)
 {
