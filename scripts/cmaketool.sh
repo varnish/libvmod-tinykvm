@@ -9,6 +9,7 @@ args="-DVCL_DIR=$PWD -DSYSTEM_OPENSSL=ON -DPython3_EXECUTABLE=/usr/bin/python3"
 vcp="OFF"
 do_build=false
 do_clean=false
+do_debug=false
 folder="build_vc"
 run=false
 set -e
@@ -69,8 +70,13 @@ case $i in
     args="$args -DSANITIZE=ON"
     shift
     ;;
+	--debug)
+    args="$args -DCMAKE_BUILD_TYPE=Debug -DDEBUGGING=ON -DLTO_ENABLE=OFF -DNATIVE=OFF"
+	do_debug=true
+    shift
+    ;;
 	--optimize)
-    args="$args -DCMAKE_BUILD_TYPE=Release -DLTO_ENABLE=ON -DNATIVE=ON -DMINIMAL=OFF"
+    args="$args -DCMAKE_BUILD_TYPE=Release -DDEBUGGING=OFF -DLTO_ENABLE=ON -DNATIVE=ON"
     shift
     ;;
 	--static-sandbox)
@@ -93,7 +99,7 @@ case $i in
 	do_build=true
     shift
     ;;
-	--build)
+	--clean)
 	do_clean=true
     shift
     ;;
@@ -137,6 +143,11 @@ if [ "$do_build" = true ] ; then
 fi
 if [ "$run" = true ] ; then
 	pushd $BUILD_PATH/$folder
-	./varnishd "$@"
+
+	if [ "$do_debug" = true ] ; then
+		gdb --args ./varnishd "$@"
+	else
+		./varnishd "$@"
+	fi
 	popd
 fi
