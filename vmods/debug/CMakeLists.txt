@@ -13,6 +13,7 @@ add_vmod(vmod_debug ${VMOD_VCC} "Debug VMOD"
 	${PATH}/vmod_debug.c
 	${PATH}/vmod_debug_dyn.c
 	${PATH}/vmod_debug_obj.c
+	${PATH}/vmod_debug_vfp.c
 )
 add_vmod_vsc(vmod_debug ${PATH}/VSC_debug.vsc)
 

@@ -51,8 +51,6 @@ endif()
 set(VMODTOOL "${VTOOLDIR}/vmodtool.py")
 set(VSCTOOL  "${VTOOLDIR}/vsctool.py")
 
-find_package(Threads)
-
 # Example: vmod_debug vmod_debug.vcc
 function(add_vmod LIBNAME VCCNAME comment)
 	# write empty config.h for autocrap
@@ -96,7 +94,6 @@ function(add_vmod LIBNAME VCCNAME comment)
 	target_include_directories(${LIBNAME} PRIVATE ${CMAKE_BINARY_DIR})
 	target_include_directories(${LIBNAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 	target_include_directories(${LIBNAME} PUBLIC ${VINCLUDE})
-	target_link_libraries(${LIBNAME} Threads::Threads)
 	#target_compile_options(${LIBNAME} PRIVATE "-fno-lto") # LTO discards too much
 	target_compile_definitions(${LIBNAME} PRIVATE VMOD=1 HAVE_CONFIG_H _GNU_SOURCE)
 	if (VARNISH_PLUS)

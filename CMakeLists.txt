@@ -20,4 +20,5 @@ option(LIBCPP       "Enable compiling with libc++ and linking with LLD" OFF)
 option(USE_LLD      "Always link with LLD" OFF)
 option(SINGLE_PROCESS "Disable fork() and run in single-process mode" OFF)
 
+enable_testing()
 add_subdirectory(cmake)

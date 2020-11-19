@@ -8,7 +8,7 @@ vcl 4.1;
 	backend default none;
 
 	sub vcl_init {
-		new riscv_backend = riscv.init(max_instructions = 2000000);
+		new rv_backend = riscv.backend();
 	}
 
 	sub vcl_recv {
@@ -17,7 +17,7 @@ vcl 4.1;
 	}
 
 	sub vcl_backend_fetch {
-		set bereq.backend = riscv_backend.from_body();
+		set bereq.backend = rv_backend.from_body();
 		return (fetch);
 	}
 } -start
