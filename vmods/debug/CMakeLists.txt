@@ -15,7 +15,7 @@ add_vmod(vmod_debug ${VMOD_VCC} "Debug VMOD"
 	${PATH}/vmod_debug_obj.c
 )
 if (VARNISH_PLUS)
-	target_sources(vmod_debug
+	target_sources(vmod_debug PUBLIC
 		${PATH}/vmod_debug_vfp.c
 	)
 endif()
