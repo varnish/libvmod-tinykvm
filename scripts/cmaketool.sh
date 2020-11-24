@@ -1,7 +1,7 @@
 #!/bin/bash
 export CC="ccache clang-10"
 export CXX="ccache clang++-10"
-BUILD_PATH="/tmp"
+BUILD_PATH="$PWD"
 SOURCE_DIR="$PWD"
 
 # TODO: scrutinize me
@@ -113,8 +113,8 @@ case $i in
     *)
       # unknown option
 	  echo "$0"
-	  echo "--vc	[build folder]"
-	  echo "--vcp	[build folder]"
+	  echo "--vc=[build folder]"
+	  echo "--vcp=[build folder]"
 	  echo "--edit		Show CMake TUI"
 	  echo "--build		Build with ninja"
 	  echo "--clean		Clean build folder (ninja clean)"
