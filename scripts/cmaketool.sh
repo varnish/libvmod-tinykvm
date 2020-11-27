@@ -5,6 +5,7 @@ BUILD_PATH="$PWD"
 SOURCE_DIR="$PWD"
 
 # TODO: scrutinize me
+preargs=
 args="-DVCL_DIR=$PWD -DSYSTEM_OPENSSL=ON -DPython3_EXECUTABLE=/usr/bin/python3"
 vcp="OFF"
 do_build=false
@@ -97,6 +98,10 @@ case $i in
 	do_singleproc=true
     shift
     ;;
+	--disable-numa)
+	preargs="numactl -N 0 $preargs"
+    shift
+    ;;
 	--build)
 	do_build=true
     shift
@@ -124,6 +129,7 @@ case $i in
 	  echo "--shared-sandbox	Build sandbox as a shared library"
 	  echo "--mgt-process		Run child in subprocess (default)"
 	  echo "--single-process	Run child in same process as mgt"
+	  echo "--disable-numa		Force varnishd to run on NUMA node 0"
 	  echo "--run	[args...]	Start varnishd with arguments"
 	  echo "--fuzz	[subsystem]"
 	  echo "	Subsystems: HTTP, HTTP2, RANDOM, RESPONSE_H1, RESPONSE_H2"
@@ -165,7 +171,7 @@ if [ "$run" = true ] ; then
 	if [ "$do_debug" = true ] ; then
 		gdb --args ./varnishd "$@"
 	else
-		./varnishd "$@"
+		$preargs ./varnishd "$@"
 	fi
 	popd
 fi
