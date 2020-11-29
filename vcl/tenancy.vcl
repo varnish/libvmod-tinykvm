@@ -10,16 +10,16 @@ backend default {
 }
 
 sub vcl_init {
-	new f = file.init("/home/gonzo");
-	riscv.load_tenants(
-		"/home/gonzo/github/varnish_autoperf/vcl/tenants.json");
+	new f = file.init(std.getenv("HOME"));
+	riscv.load_tenants(std.getenv("HOME") +
+		"/github/varnish_autoperf/vcl/tenants.json");
 }
 
 sub vcl_recv {
 
 	if (req.url == "/file") {
 		set req.backend_hint = f.backend();
-		// NUMA: "?node=" + utils.numa_node_id() + 
+		// NUMA: "?node=" + utils.numa_node_id() +
 		set req.url = req.url + "?foo=" + utils.fast_random_int(100);
 		return (hash);
 	}
