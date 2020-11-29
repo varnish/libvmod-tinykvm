@@ -5,7 +5,8 @@ set (LIBVCC_GEN_SOURCES
 	${VCC_PATH}/vcc_fixed_token.c
 	${VCC_PATH}/vcc_obj.c
 	${VARNISH_PATH}/include/vcl.h
-	${VARNISH_PATH}/include/tbl/vcc_types.h
+	${VARNISH_PATH}/include/vrt_obj.h
+	${VARNISH_PATH}/include/tbl/vcl_returns.h
 	${VARNISH_PATH}/include/tbl/vrt_stv_var.h
 )
 add_custom_command(

@@ -50,16 +50,10 @@ endif()
 
 set(VMODTOOL "${VTOOLDIR}/vmodtool.py")
 set(VSCTOOL  "${VTOOLDIR}/vsctool.py")
+set(VMOD_CMAKE_PATH ${CMAKE_CURRENT_LIST_DIR})
 
 # Example: vmod_debug vmod_debug.vcc
 function(add_vmod LIBNAME VCCNAME comment)
-	# write empty config.h for autocrap
-	file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/config.h
-		"#define HAVE_OBJITERATE_F\n"
-		"#define HAVE_GETPEEREID 1\n"
-		"#define HAVE_SETPPRIV 1\n"
-		"#define HAVE_CACHE_CACHE_VARNISHD_H 1\n"
-	)
 	# generate VCC .c and .h
 	if (EXISTS "${VCCNAME}" OR IS_ABSOLUTE "${VCCNAME}")
 		set(VCCFILE "${VCCNAME}")
@@ -81,6 +75,7 @@ function(add_vmod LIBNAME VCCNAME comment)
 	)
 	# create VMOD shared object
 	add_library(${LIBNAME} SHARED ${ARGN} ${OUTFILES})
+	target_include_directories(${LIBNAME} PUBLIC ${VMOD_CMAKE_PATH}/include)
 	if (VMOD_USE_LOCAL_VC)
 		if (TARGET varnishapi)
 			target_link_libraries(${LIBNAME} varnishapi)
