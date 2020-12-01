@@ -10,10 +10,11 @@ set (LIBVCC_GEN_SOURCES
 	${VARNISH_PATH}/include/tbl/vrt_stv_var.h
 )
 add_custom_command(
-    COMMAND ${Python3_EXECUTABLE} ${VARNISH_PATH}/lib/libvcc/generate.py ${VARNISH_PATH} ${VARNISH_PATH}
-    OUTPUT  ${LIBVCC_GEN_SOURCES}
-    DEPENDS ${VARNISH_PATH}/lib/libvcc/generate.py
-    COMMENT "Generating VCL compiler headers and sources"
+	COMMAND ${Python3_EXECUTABLE} ${VARNISH_PATH}/lib/libvcc/generate.py ${VARNISH_PATH} ${VARNISH_PATH}
+	OUTPUT  ${LIBVCC_GEN_SOURCES}
+	DEPENDS ${VARNISH_PATH}/lib/libvcc/generate.py
+	        ${VARNISH_PATH}/doc/sphinx/reference/vcl_var.rst
+	COMMENT "Generating VCL compiler headers and sources"
 )
 add_custom_target(libvcc_generate
     DEPENDS ${LIBVCC_GEN_SOURCES}
