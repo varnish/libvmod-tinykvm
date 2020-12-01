@@ -10,6 +10,7 @@ args="-DVCL_DIR=$PWD -DSYSTEM_OPENSSL=ON -DPython3_EXECUTABLE=/usr/bin/python3"
 vcp="OFF"
 do_build=false
 do_clean=false
+do_gprof=false
 do_sanitize=false
 do_debug=false
 do_singleproc=false
@@ -71,6 +72,10 @@ case $i in
     ;;
     --sanitize)
 	do_sanitize=true
+    shift
+    ;;
+	--gprof)
+	do_gprof=true
     shift
     ;;
 	--debug)
@@ -146,6 +151,11 @@ if [ "$do_debug" = true ] ; then
 	args="$args -DDEBUGGING=ON"
 else
 	args="$args -DDEBUGGING=OFF"
+fi
+if [ "$do_gprof" = true ] ; then
+	args="$args -DGPROF=ON"
+else
+	args="$args -DGPROF=OFF"
 fi
 if [ "$do_sanitize" = true ] ; then
 	args="$args -DSANITIZE=ON"
