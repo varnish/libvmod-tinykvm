@@ -17,6 +17,7 @@ public:
 	static constexpr gaddr_t RW_AREA_BEGIN = 0x12000;
 	static constexpr gaddr_t RW_AREA_END   = 0x13000;
 	static constexpr size_t  REGEX_MAX   = 64;
+	static constexpr size_t  RESULTS_MAX = 2;
 
 	// call any script function, with any parameters
 	template <typename... Args>
@@ -42,9 +43,12 @@ public:
 	const std::string& name() const noexcept;
 	const std::string& group() const noexcept;
 	auto* want_result() const noexcept { return m_want_result.c_str(); }
-	gaddr_t want_value() const noexcept { return m_want_value; }
+	const auto& want_values() const noexcept { return m_want_values; }
 	void set_result(const std::string& res, gaddr_t value, bool p) {
-		m_want_result = res; m_want_value = value; m_is_paused = p;
+		m_want_result = res; m_want_values[0] = value; m_is_paused = p;
+	}
+	void set_results(const std::string& res, std::array<gaddr_t, RESULTS_MAX> values) {
+		m_want_result = res; m_want_values = values;
 	}
 	bool is_paused() const noexcept { return m_is_paused; }
 
@@ -92,7 +96,7 @@ private:
 	gaddr_t     m_shm_address = RO_AREA_END; /* It's a stack */
 
 	std::string m_want_result;
-	gaddr_t     m_want_value = 403;
+	std::array<gaddr_t, RESULTS_MAX> m_want_values = {403, 0};
 	bool        m_is_paused = false;
 	struct VSHA256Context* m_sha_ctx = nullptr;
 

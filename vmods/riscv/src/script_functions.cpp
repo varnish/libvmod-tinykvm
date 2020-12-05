@@ -197,6 +197,14 @@ APICALL(set_decision)
 	}
 	machine.stop();
 }
+APICALL(backend_decision)
+{
+	auto [func, farg] =
+		machine.sysargs<gaddr_t, gaddr_t> ();
+	auto& script = get_script(machine);
+	script.set_results("backend", {func, farg});
+	machine.stop();
+}
 APICALL(ban)
 {
 	auto [buffer] = machine.sysargs<std::string> ();
@@ -681,6 +689,7 @@ void Script::setup_syscall_interface(machine_t& machine)
 
 		FPTR(my_name),
 		FPTR(set_decision),
+		FPTR(backend_decision),
 		FPTR(ban),
 		FPTR(hash_data),
 		FPTR(purge),

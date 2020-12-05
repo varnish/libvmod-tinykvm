@@ -41,5 +41,6 @@ struct vmod_riscv_response
 	const void*    priv_key;
 	struct vmod_riscv_machine *machine;
 	uint64_t funcaddr;
+	uint64_t funcarg;
 	uint64_t max_response_size;
 };

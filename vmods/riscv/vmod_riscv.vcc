@@ -122,11 +122,16 @@ $Function INT     want_status()
 - Returns the status code that the guest wants to use, if relevant.
 - Returns zero (0) if no status has been set.
 
+$Function INT     result_value(INT index)
+
+- Returns the a special result value that the guest VM can set.
+- Returns zero (0) if no status has been set.
+
 $Function BOOL    want_resume()
 
 - Returns true if the machine was paused, and may be resumed.
 
-$Function BACKEND vm_backend(STRING func)
+$Function BACKEND vm_backend(STRING func, STRING arg = "")
 
 - Returns a backend that will call into the current machine to produce a response.
 - Produces 500 server error if there is no active machine, or an error happens.

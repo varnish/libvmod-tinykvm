@@ -18,7 +18,7 @@ extern long riscv_current_resume(VRT_CTX);
 extern const char* riscv_current_name(VRT_CTX);
 extern const char* riscv_current_group(VRT_CTX);
 extern const char* riscv_current_result(VRT_CTX);
-extern long riscv_current_result_status(VRT_CTX);
+extern long riscv_current_result_value(VRT_CTX, size_t);
 extern int  riscv_current_is_paused(VRT_CTX);
 extern int  riscv_current_apply_hash(VRT_CTX);
 
@@ -104,7 +104,13 @@ VCL_INT vmod_want_status(VRT_CTX)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
-	return riscv_current_result_status(ctx);
+	return riscv_current_result_value(ctx, 0);
+}
+VCL_INT vmod_result_value(VRT_CTX, VCL_INT idx)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	return riscv_current_result_value(ctx, idx);
 }
 VCL_BOOL vmod_want_resume(VRT_CTX)
 {

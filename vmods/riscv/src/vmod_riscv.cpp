@@ -231,11 +231,11 @@ const char* riscv_current_result(VRT_CTX)
 	return nullptr;
 }
 extern "C"
-long riscv_current_result_status(VRT_CTX)
+long riscv_current_result_value(VRT_CTX, size_t idx)
 {
 	auto* script = get_machine(ctx);
-	if (script)
-		return script->want_value();
+	if (script && idx < Script::RESULTS_MAX)
+		return script->want_values().at(idx);
 	return 503;
 }
 extern "C"
@@ -280,7 +280,7 @@ inline const char* optional_copy(VRT_CTX, const riscv::Buffer& buffer)
 }
 
 extern "C"
-struct backend_buffer riscv_backend_call(VRT_CTX, const void* key, long func)
+struct backend_buffer riscv_backend_call(VRT_CTX, const void* key, long func, long farg)
 {
 	auto* script = get_machine(ctx, key);
 	if (script) {
@@ -292,7 +292,7 @@ struct backend_buffer riscv_backend_call(VRT_CTX, const void* key, long func)
 			/* Use backend ctx which can write to beresp */
 			script->set_ctx(ctx);
 			/* Call the backend response function */
-			script->machine().vmcall(func);
+			script->machine().vmcall(func, (Script::gaddr_t) farg);
 			/* Restore old ctx for backend_response */
 			script->set_ctx(old_ctx);
 

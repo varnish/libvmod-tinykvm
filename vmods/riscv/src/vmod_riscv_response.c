@@ -9,7 +9,7 @@
 
 extern long riscv_current_result_status(VRT_CTX);
 extern struct vmod_riscv_machine* riscv_current_machine(VRT_CTX);
-extern struct backend_buffer riscv_backend_call(VRT_CTX, const void*, long);
+extern struct backend_buffer riscv_backend_call(VRT_CTX, const void*, long, long);
 extern uint64_t riscv_resolve_name(struct vmod_riscv_machine*, const char*);
 
 static void v_matchproto_(vdi_panic_f)
@@ -98,7 +98,7 @@ riscvbe_gethdrs(const struct director *dir,
 		.http_beresp = bo->beresp,
 	};
 	struct backend_buffer output =
-		riscv_backend_call(&ctx, rvr->priv_key, rvr->funcaddr);
+		riscv_backend_call(&ctx, rvr->priv_key, rvr->funcaddr, rvr->funcarg);
 
 	if (output.data == NULL || output.type == NULL)
 	{
@@ -143,7 +143,7 @@ static void setup_response_director(struct director *dir, struct vmod_riscv_resp
 	dir->panic   = riscvbe_panic;
 }
 
-VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING func)
+VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING func, VCL_STRING farg)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
@@ -164,6 +164,7 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING func)
 
 	if (func) {
 		rvr->funcaddr = atoi(func);
+		rvr->funcarg  = atoi(farg);
 		/* If it's not an address, lookup as a public function */
 		if (rvr->funcaddr == 0x0) {
 			rvr->funcaddr = riscv_resolve_name(rvr->machine, func);

@@ -62,8 +62,9 @@ sub vcl_recv {
 		return (synth(riscv.want_status()));
 	}
 	else if (riscv.want_result() == "backend") {
-		set req.http.X-Backend = riscv.want_status();
-		return (hash);
+		set req.http.X-Backend-Func = riscv.result_value(0);
+		set req.http.X-Backend-Arg  = riscv.result_value(1);
+		return (pass);
 	}
 
 	return (synth(403));
@@ -89,8 +90,10 @@ sub vcl_synth {
 sub vcl_backend_fetch {
 	if (riscv.fork(bereq.http.Host)) {
 		riscv.fastcall(ON_BACKEND_FETCH);
-		if (bereq.http.X-Backend) {
-			set bereq.backend = riscv.vm_backend(bereq.http.X-Backend);
+		if (bereq.http.X-Backend-Func) {
+			set bereq.backend = riscv.vm_backend(
+					bereq.http.X-Backend-Func,
+					bereq.http.X-Backend-Arg);
 			unset bereq.http.X-Decision;
 		}
 	}
