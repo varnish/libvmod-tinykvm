@@ -4,9 +4,6 @@ include(../vmod.cmake vmod)
 
 set (PATH ${VARNISH_SOURCE_DIR}/lib/libvmod_goto)
 
-# get rid of this dependency
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/VSC_main.h" "")
-
 add_vmod(vmod_goto ${PATH}/vmod_goto.vcc "Goto VMOD"
 	${PATH}/vmod_goto.c
 	${PATH}/goto_store.c
@@ -17,6 +14,7 @@ add_vmod(vmod_goto ${PATH}/vmod_goto.vcc "Goto VMOD"
 	${PATH}/dns_srv/dns_test.c
 )
 target_compile_definitions(vmod_goto PRIVATE _DNS_SRV_STANDALONE=1)
+target_include_directories(vmod_goto PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(vmod_goto resolv)
 
 # VCL import name is "goto"
