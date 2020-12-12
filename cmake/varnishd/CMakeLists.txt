@@ -112,11 +112,12 @@ if (VARNISH_PLUS)
 		${VD_PATH}/cache/cache_governor.c
 		${VD_PATH}/cache/cache_tcp_oper.c
 		${VD_PATH}/cache/cache_vcl_vrt.c
-		${VD_PATH}/cache/cache_vrt_ykey.c
-		${VD_PATH}/cache/cache_vst_access.c
+		${VD_PATH}/cache/cache_vst.c
+		${VD_PATH}/cache/cache_vpi_ykey.c
 		${VD_PATH}/cache/cache_ykey.c
 		${VD_PATH}/common/common_vtls_sni.c
 		${VD_PATH}/mgt/mgt_pool.c
+		${VD_PATH}/mgt/mgt_tls_client_cert.c
 		${VD_PATH}/storage/storage_ykey_mem.c
 		${VD_PATH}/storage/mse_book.c
 		${VD_PATH}/storage/mse_cache.c
@@ -135,6 +136,7 @@ if (VARNISH_PLUS)
 		${VD_PATH}/tls/cache_backend_ssl.c
 		${VD_PATH}/tls/cache_client_ssl.c
 		${VD_PATH}/tls/cache_tls.c
+		${VD_PATH}/tls/cache_tls_client_cert.c
 		${VD_PATH}/vmod_util/brotli_util.c
 		${VD_PATH}/vmod_util/crypto_util.c
 		${VD_PATH}/vmod_util/edgestash_util.c
