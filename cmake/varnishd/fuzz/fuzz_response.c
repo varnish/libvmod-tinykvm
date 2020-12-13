@@ -17,8 +17,7 @@ void response_fuzzer(void* data, size_t len, int version)
     static bool init = false;
     if (init == false) {
         init = true;
-        varnishd_initialize(
-			"/home/gonzo/github/varnish_autoperf/vcl/response.vcl");
+        varnishd_initialize("vcl/response.vcl");
     }
     if (len == 0) return;
 
@@ -39,10 +38,10 @@ void response_fuzzer(void* data, size_t len, int version)
 			"Content-Encoding: gzip\r\n"
 			"\r\n\x1f\x8b");
 	}
-	
+
     char drit[200];
     int dritlen = snprintf(drit, sizeof(drit),
-            "POST / HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-length: %zu\r\n\r\n",
+            "POST / HTTP/1.0\r\nHost: 127.0.0.1\r\nContent-length: %zu\r\n\r\n",
             len + gbuffer_len);
     if (dritlen <= 0) {
         close(cfd);
@@ -63,7 +62,7 @@ void response_fuzzer(void* data, size_t len, int version)
         	return;
     	}
 	}
-	
+
     ret = write(cfd, data, len);
     if (ret < 0) {
         close(cfd);
