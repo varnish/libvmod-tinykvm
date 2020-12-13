@@ -29,6 +29,7 @@ static inline int enum_to_idx(VCL_ENUM e)
 	if (e == vmod_enum_ON_SYNTH)   return 3;
 	if (e == vmod_enum_ON_BACKEND_FETCH) return 4;
 	if (e == vmod_enum_ON_BACKEND_RESPONSE) return 5;
+	if (e == vmod_enum_ON_DELIVER) return 6;
 	return -1;
 }
 

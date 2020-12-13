@@ -9,7 +9,7 @@ struct MachineInstance;
 
 class Script {
 public:
-	static constexpr int MARCH = riscv::RISCV64;
+	static constexpr int MARCH = riscv::RISCV32;
 	using gaddr_t = riscv::address_type<MARCH>;
 	using machine_t = riscv::Machine<MARCH>;
 	static constexpr gaddr_t RO_AREA_BEGIN = 0x10000;
@@ -47,8 +47,8 @@ public:
 	void set_result(const std::string& res, gaddr_t value, bool p) {
 		m_want_result = res; m_want_values[0] = value; m_is_paused = p;
 	}
-	void set_results(const std::string& res, std::array<gaddr_t, RESULTS_MAX> values) {
-		m_want_result = res; m_want_values = values;
+	void set_results(const std::string& res, std::array<gaddr_t, RESULTS_MAX> values, bool p) {
+		m_want_result = res; m_want_values = values; m_is_paused = p;
 	}
 	bool is_paused() const noexcept { return m_is_paused; }
 

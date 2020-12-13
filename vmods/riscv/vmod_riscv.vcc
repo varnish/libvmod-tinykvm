@@ -84,8 +84,14 @@ $Function INT     call(STRING function)
 
 - Calls the given function in the currently active machine.
 
-$Function INT     fastcall(ENUM {ON_REQUEST, ON_HASH, ON_SYNTH,
-		ON_BACKEND_FETCH, ON_BACKEND_RESPONSE} index = "ON_REQUEST")
+$Function INT     fastcall(ENUM {
+		ON_REQUEST,
+		ON_HASH,
+		ON_SYNTH,
+		ON_BACKEND_FETCH,
+		ON_BACKEND_RESPONSE,
+		ON_DELIVER
+		} index = "ON_REQUEST")
 
 - Calls the given function at index in order added by add_known_function
   (starting at zero), in the currently active machine.

@@ -6,7 +6,8 @@ std::vector<const char*> riscv_lookup_wishlist {
 	"on_hash",
 	"on_synth",
 	"on_backend_fetch",
-	"on_backend_response"
+	"on_backend_response",
+	"on_deliver"
 };
 
 MachineInstance::MachineInstance(

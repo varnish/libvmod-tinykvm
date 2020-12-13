@@ -108,3 +108,12 @@ sub vcl_backend_response {
 		}
 	}
 }
+
+sub vcl_deliver {
+	if (riscv.active()) {
+		if (riscv.want_resume()) {
+			riscv.resume();
+		}
+		riscv.fastcall(ON_DELIVER);
+	}
+}

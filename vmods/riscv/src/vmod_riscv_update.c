@@ -4,7 +4,6 @@
 #include <malloc.h>
 #include "vcl.h"
 #include "vcc_if.h"
-#include "vmod_util.h"
 
 extern const char* riscv_update(VRT_CTX, struct vmod_riscv_machine*, const uint8_t*, size_t);
 extern const struct vmod_riscv_machine* riscv_current_machine(VRT_CTX);
@@ -55,10 +54,9 @@ static const struct vfp riscv_fetch_processor = {
 	.pull = pull,
 };
 
-static void v_matchproto_(sbe_vfp_init_cb_f)
+static void
 vfp_init(struct busyobj *bo)
 {
-	CHECK_OBJ_NOTNULL(bo, BUSYOBJ_MAGIC);
 	CHECK_OBJ_NOTNULL(bo->vfc, VFP_CTX_MAGIC);
 	CHECK_OBJ_NOTNULL(bo->htc, HTTP_CONN_MAGIC);
 
@@ -85,17 +83,6 @@ aggregate_body(void *priv, int flush, int last, const void *ptr, ssize_t len)
 	return (0);
 }
 
-static void v_matchproto_(vmod_priv_free_f)
-destroy_vsb(void *priv)
-{
-	struct vsb *vsb;
-
-	AN(priv);
-	CAST_OBJ_NOTNULL(vsb, priv, VSB_MAGIC);
-
-	VSB_destroy(&vsb);
-}
-
 static int v_matchproto_(vdi_gethdrs_f)
 riscvbe_gethdrs(const struct director *dir,
 	struct worker *wrk, struct busyobj *bo)
@@ -117,13 +104,8 @@ riscvbe_gethdrs(const struct director *dir,
 		    0, 0, -1);
 	VSB_finish(vsb);
 
-	/* cleanup for vsb */
-	struct vmod_priv *priv = vmod_util_get_priv_task(NULL, bo, dir);
-	priv->priv = vsb;
-	priv->free = destroy_vsb;
-
 	/* Get the ELF binary */
-	const uint8_t *result_data = (const uint8_t *) VSB_data(vsb);
+	const uint8_t *result_data = (uint8_t *) VSB_data(vsb);
 	const size_t   result_len = VSB_len(vsb);
 
 	/* Update this machine */
@@ -134,8 +116,10 @@ riscvbe_gethdrs(const struct director *dir,
 	{
 		/* finish the backend request */
 		bo->htc = WS_Alloc(bo->ws, sizeof *bo->htc);
-		if (bo->htc == NULL)
+		if (bo->htc == NULL) {
+			VSB_destroy(&vsb);
 			return (-1);
+		}
 		INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
 
 		const struct vrt_ctx ctx = {
@@ -161,19 +145,19 @@ riscvbe_gethdrs(const struct director *dir,
 		/* The zero-length string that can be returned is .rodata */
 		if (output != NULL && output[0] != 0)
 			free((void*) output);
-		if (bo->htc->priv == NULL)
+		if (bo->htc->priv == NULL) {
+			VSB_destroy(&vsb);
 			return (-1);
+		}
 
-		/* We need to call this function specifically, otherwise
-		   nobody will call our VFP functions */
-		typedef void sbe_vfp_init_cb_f(struct busyobj *bo);
-		extern void sbe_util_set_vfp_cb(struct busyobj *, sbe_vfp_init_cb_f *);
-		sbe_util_set_vfp_cb(bo, vfp_init);
+		vfp_init(bo);
+		VSB_destroy(&vsb);
 		return (0);
-	} else {
-		http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
-		return (-1);
 	}
+
+	http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
+	VSB_destroy(&vsb);
+	return (-1);
 }
 
 VCL_BACKEND vmod_live_update(VRT_CTX, VCL_STRING tenant, VCL_BYTES max_size)
