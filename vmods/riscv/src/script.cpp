@@ -21,7 +21,7 @@ static constexpr int STACK_PAGENO  = HEAP_PAGENO - 1;
 
 Script::Script(
 	const Script& source, const vrt_ctx* ctx,
-	const vmod_riscv_machine* vrm, const MachineInstance& inst)
+	const vmod_riscv_machine* vrm, MachineInstance& inst)
 	: m_machine(source.machine().memory.binary(), {
 		.memory_max = 0,
 		.owning_machine = &source.machine()
@@ -42,7 +42,7 @@ Script::Script(
 
 Script::Script(
 	const std::vector<uint8_t>& binary, const vrt_ctx* ctx,
-	const vmod_riscv_machine* vrm, const MachineInstance& inst)
+	const vmod_riscv_machine* vrm, MachineInstance& inst)
 	: m_machine(binary, { .memory_max = vrm->config.max_memory }),
 	  m_ctx(ctx), m_vrm(vrm), m_inst(inst)
 {

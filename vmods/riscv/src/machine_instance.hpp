@@ -1,6 +1,7 @@
 #pragma once
 #include "script.hpp"
 #include <atomic>
+#include <mutex>
 
 struct MachineInstance
 {
@@ -16,6 +17,8 @@ struct MachineInstance
 
 	const std::vector<uint8_t> binary;
 	Script   script;
+	Script   storage;
+	std::mutex storage_mtx;
 	/* Lookup tree for ELF symbol names */
 	eastl::string_map<Script::gaddr_t,
 			eastl::str_less<const char*>,

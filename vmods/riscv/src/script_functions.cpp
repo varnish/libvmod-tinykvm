@@ -1,5 +1,6 @@
 #include "script_functions.hpp"
 #include "machine/include_api.hpp"
+#include "machine_instance.hpp"
 #include "varnish.hpp"
 
 //#define ENABLE_TIMING
@@ -174,6 +175,34 @@ APICALL(dynamic_call)
 	get_script(machine).dynamic_call(hash);
 	// we short-circuit the ret pseudo-instruction:
 	machine.cpu.jump(regs.get(riscv::RISCV::REG_RA) - 4);
+}
+APICALL(remote_call)
+{
+	auto [func] = machine.template sysargs <gaddr_t> ();
+	auto& instance = get_script(machine).instance();
+	auto& remote = instance.storage;
+	// Copy 6 integer & float registers
+	auto& myregs = machine.cpu.registers();
+	auto& stregs = remote.machine().cpu.registers();
+
+	// === Serialized access to storage === //
+	instance.storage_mtx.lock();
+	for (int i = 0; i < 6; i++) {
+		// Integer registers
+		stregs.get(10 + i) = myregs.get(11 + i);
+		// Floating-point registers
+		stregs.getfl(10 + i).i64 = myregs.getfl(10 + i).i64;
+	}
+	remote.call(func);
+	instance.storage_mtx.unlock();
+	// === Serialized access to storage === //
+
+	for (int i = 0; i < 6; i++) {
+		myregs.get(10 + i) = stregs.get(10 + i);
+		myregs.getfl(10 + i).i64 = stregs.getfl(10 + i).i64;
+	}
+	// Short-circuit the ret pseudo-instruction:
+	machine.cpu.jump(machine.cpu.reg(riscv::RISCV::REG_RA) - 4);
 }
 
 APICALL(my_name)
@@ -680,6 +709,7 @@ void Script::setup_syscall_interface(machine_t& machine)
 		FPTR(print),
 		FPTR(shm_log),
 		FPTR(::dynamic_call),
+		FPTR(remote_call),
 
 		FPTR(regex_compile),
 		FPTR(regex_match),

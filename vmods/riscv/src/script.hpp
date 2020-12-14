@@ -35,7 +35,8 @@ public:
 
 	const auto* ctx() const noexcept { return m_ctx; }
 	const auto* vrm() const noexcept { return m_vrm; }
-	const auto& instance() const noexcept { return m_inst; }
+	auto& instance() { return m_inst; }
+	const auto& instance() const { return m_inst; }
 	void set_ctx(VRT_CTX) { m_ctx = ctx; }
 	void assign_instance(std::shared_ptr<MachineInstance>& ref) { m_inst_ref = std::move(ref); }
 
@@ -75,8 +76,8 @@ public:
 
 	bool reset(); // true if the reset was successful
 
-	Script(const std::vector<uint8_t>&, const vrt_ctx*, const vmod_riscv_machine*, const MachineInstance&);
-	Script(const Script& source, const vrt_ctx*, const vmod_riscv_machine*, const MachineInstance&);
+	Script(const std::vector<uint8_t>&, const vrt_ctx*, const vmod_riscv_machine*, MachineInstance&);
+	Script(const Script& source, const vrt_ctx*, const vmod_riscv_machine*, MachineInstance&);
 	~Script();
 
 private:
@@ -91,7 +92,7 @@ private:
 	machine_t m_machine;
 	const vrt_ctx* m_ctx;
 	const struct vmod_riscv_machine* m_vrm = nullptr;
-	const MachineInstance& m_inst;
+	MachineInstance& m_inst;
 	void*       m_arena = nullptr;
 	gaddr_t     m_shm_address = RO_AREA_END; /* It's a stack */
 
