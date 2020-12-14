@@ -1,11 +1,12 @@
 #include "vmod_riscv.h"
 #include "vmod_riscv_sandbox.h"
+#include "update_result.h"
 
 #include <malloc.h>
 #include "vcl.h"
 #include "vcc_if.h"
 
-extern const char* riscv_update(VRT_CTX, struct vmod_riscv_machine*, const uint8_t*, size_t);
+extern struct update_result riscv_update(VRT_CTX, struct vmod_riscv_machine*, const uint8_t*, size_t);
 extern const struct vmod_riscv_machine* riscv_current_machine(VRT_CTX);
 extern struct vmod_riscv_machine* tenant_find(VRT_CTX, const char*);
 
@@ -132,19 +133,20 @@ riscvbe_gethdrs(const struct director *dir,
 			.http_bereq  = bo->bereq,
 			.http_beresp = bo->beresp,
 		};
-		const char* output = riscv_update(&ctx, rvu->machine, result_data, result_len);
+		struct update_result result =
+			riscv_update(&ctx, rvu->machine, result_data, result_len);
 
-		const size_t output_len = __builtin_strlen(output);
 		http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
-		http_PrintfHeader(bo->beresp, "Content-Length: %zu", output_len);
+		http_PrintfHeader(bo->beresp, "Content-Length: %zu", result.len);
 
 		/* store the output in workspace and free result */
-		bo->htc->content_length = output_len;
-		bo->htc->priv = WS_Copy(bo->ws, output, output_len);
+		bo->htc->content_length = result.len;
+		bo->htc->priv = WS_Copy(bo->ws, result.output, result.len);
 		bo->htc->body_status = BS_LENGTH;
-		/* The zero-length string that can be returned is .rodata */
-		if (output != NULL && output[0] != 0)
-			free((void*) output);
+		/* Delete the result */
+		if (result.destructor)
+			result.destructor(&result);
+
 		if (bo->htc->priv == NULL) {
 			VSB_destroy(&vsb);
 			return (-1);

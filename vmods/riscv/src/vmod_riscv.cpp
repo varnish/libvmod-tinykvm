@@ -1,17 +1,31 @@
 #include "sandbox.hpp"
 #include "varnish.hpp"
+extern "C" {
+#  include "update_result.h"
+}
 static bool file_writer(const std::string& file, const std::vector<uint8_t>&);
 static const size_t TOO_SMALL = 3; // vmcalls that can be skipped
 
 extern vmod_riscv_machine* create_temporary_tenant(const vmod_riscv_machine*);
 extern void delete_temporary_tenant(const vmod_riscv_machine*);
 
+constexpr update_result
+static_result(const char* text) {
+	return { text, __builtin_strlen(text), nullptr };
+}
+static update_result
+dynamic_result(const char* text) {
+	return { strdup(text), __builtin_strlen(text),
+		[] (update_result* res) { free((void*) res->output); } };
+}
+
 extern "C"
-const char* riscv_update(VRT_CTX, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
+struct update_result
+riscv_update(VRT_CTX, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
 {
 	/* ELF loader will not be run for empty binary */
 	if (UNLIKELY(data == nullptr || len == 0)) {
-		return strdup("Empty file received");
+		return static_result("Empty file received");
 	}
 	try {
 	#ifdef ENABLE_TIMING
@@ -65,22 +79,22 @@ const char* riscv_update(VRT_CTX, vmod_riscv_machine* vrm, const uint8_t* data, 
 			const int len = snprintf(buffer, sizeof(buffer),
 				"Could not write '%s'", vrm->config.filename.c_str());
 			VSLb(ctx->vsl, SLT_Error, "%.*s", len, buffer);
-			return strdup(buffer);
+			return dynamic_result(buffer);
 		}
-		return strdup("Update successful\n");
+		return static_result("Update successful\n");
 	} catch (const riscv::MachineException& e) {
 		if (e.type() == riscv::OUT_OF_MEMORY) {
 			/* Pass helpful explanation when OOM */
-			return strdup("Program ran out of memory, update not applied");
+			return static_result("Program ran out of memory, update not applied");
 		}
 		/* Pass machine error back to the client */
 		char buffer[2048];
 		snprintf(buffer, sizeof(buffer),
 			"Machine exception: %s (data: %#x)\n", e.what(), e.data());
-		return strdup(buffer);
+		return dynamic_result(buffer);
 	} catch (const std::exception& e) {
 		/* Pass unknown error back to the client */
-		return strdup(e.what());
+		return dynamic_result(e.what());
 	}
 }
 
