@@ -50,7 +50,6 @@ riscv_update(VRT_CTX, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
 				/* Run the tenants self-test function manually.
 				   We want to propagate any exceptions to the client. */
 				auto& machine = temp->machine->script.machine();
-				machine.cpu.reset_stack_pointer();
 				machine.vmcall<2'000'000, true>(selftest);
 			} catch (...) {
 				delete_temporary_tenant(temp);
@@ -65,6 +64,35 @@ riscv_update(VRT_CTX, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
 		   We need the *new* instance alive for access to the binary
 		   when writing it to disk. Don't *move*. See below. */
 		auto old = std::atomic_exchange(&vrm->machine, inst);
+
+		if (const auto luaddr = old->lookup("on_live_update");
+			luaddr != 0x0)
+		{
+			const auto resaddr = inst->lookup("on_resume_update");
+			if (resaddr != 0x0)
+			{
+				/* Serialize data in the old machine */
+				auto& old_machine = old->storage;
+				old_machine.call(luaddr);
+				/* Get serialized data */
+				auto [data_addr, data_len] =
+					old_machine.machine().sysargs<Script::gaddr_t, unsigned> ();
+				/* Allocate room for serialized data in new machine */
+				auto& new_machine = inst->storage;
+				auto dst_data = new_machine.guest_alloc(data_len);
+				new_machine.machine().memory.memcpy(
+					dst_data,
+					old_machine.machine(), data_addr, data_len);
+				/* Deserialize data in the new machine */
+				new_machine.call(resaddr, dst_data, data_len);
+			} else {
+				VSLb(ctx->vsl, SLT_Debug,
+					"Live-update deserialization skipped (new binary lacks resume)");
+			}
+		} else {
+			VSLb(ctx->vsl, SLT_Debug,
+				"Live-update skipped (old binary lacks serializer)");
+		}
 
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);

@@ -7,7 +7,10 @@ std::vector<const char*> riscv_lookup_wishlist {
 	"on_synth",
 	"on_backend_fetch",
 	"on_backend_response",
-	"on_deliver"
+	"on_deliver",
+
+	"on_live_update",
+	"on_resume_update"
 };
 
 MachineInstance::MachineInstance(
@@ -17,6 +20,9 @@ MachineInstance::MachineInstance(
 	  script{binary, ctx, vrm, *this},
 	  storage{binary, ctx, vrm, *this}
 {
+	// Use a different stack for the storage machine
+	storage.machine().memory.set_stack_initial(0x40000000 - 0x100000);
+
 	extern std::vector<const char*> riscv_lookup_wishlist;
 	for (const auto* func : riscv_lookup_wishlist) {
 		/* NOTE: We can't check if addr is 0 here, because

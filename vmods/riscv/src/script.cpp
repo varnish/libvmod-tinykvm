@@ -10,8 +10,6 @@ inline long nanodiff(timespec start_time, timespec end_time);
 
 static const bool TRUSTED_CALLS = true;
 static constexpr bool VERBOSE_ERRORS = true;
-static constexpr int HEAP_PAGENO   = 0x40000000 >> riscv::Page::SHIFT;
-static constexpr int STACK_PAGENO  = HEAP_PAGENO - 1;
 
 //#define ENABLE_TIMING
 #define TIMING_LOCATION(x) \
