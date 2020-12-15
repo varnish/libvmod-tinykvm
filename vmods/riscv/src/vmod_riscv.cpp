@@ -308,17 +308,12 @@ inline backend_buffer backend_error() {
 }
 inline const char* optional_copy(VRT_CTX, const riscv::Buffer& buffer)
 {
-	if (buffer.is_sequential())
-		return buffer.c_str();
-	else {
-		/* This buffer is fragmented, so we need to copy
-		   it piecewise into a memory allocation. */
-		char* data = (char*) WS_Alloc(ctx->ws, buffer.size());
-		if (data == nullptr)
-			throw std::runtime_error("Out of workspace");
-		buffer.copy_to(data, buffer.size());
-		return data;
-	}
+	char* data = (char*) WS_Alloc(ctx->ws, buffer.size());
+	// TODO: move to heap
+	if (data == nullptr)
+		throw std::runtime_error("Out of workspace");
+	buffer.copy_to(data, buffer.size());
+	return data;
 }
 
 extern "C"
