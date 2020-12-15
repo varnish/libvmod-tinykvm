@@ -196,10 +196,13 @@ APICALL(my_name)
 {
 	const auto [buffer, len] =
 		machine.sysargs<gaddr_t, uint32_t> ();
-	auto& script = get_script(machine);
-	const auto& name = script.name();
-	machine.copy_to_guest(buffer, name.c_str(), name.size()+1);
-	machine.set_result(name.size());
+	const auto& name = get_script(machine).name();
+	if (len >= name.size()+1) {
+		machine.copy_to_guest(buffer, name.c_str(), name.size()+1);
+		machine.set_result(name.size());
+		return;
+	}
+	machine.set_result(-1);
 }
 APICALL(set_decision)
 {

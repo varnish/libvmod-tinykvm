@@ -5,7 +5,6 @@
 #include <vtim.h>
 #include "vcl.h"
 #include "vcc_if.h"
-#include "vmod_util.h"
 
 extern long riscv_current_result_status(VRT_CTX);
 extern struct vmod_riscv_machine* riscv_current_machine(VRT_CTX);
@@ -57,10 +56,9 @@ static const struct vfp riscv_fetch_processor = {
 	.pull = pull,
 };
 
-static void v_matchproto_(sbe_vfp_init_cb_f)
+static void
 vfp_init(struct busyobj *bo)
 {
-	CHECK_OBJ_NOTNULL(bo, BUSYOBJ_MAGIC);
 	CHECK_OBJ_NOTNULL(bo->vfc, VFP_CTX_MAGIC);
 	CHECK_OBJ_NOTNULL(bo->htc, HTTP_CONN_MAGIC);
 
@@ -124,11 +122,7 @@ riscvbe_gethdrs(const struct director *dir,
 	bo->htc->priv = (void *)output.data;
 	bo->htc->body_status = BS_LENGTH;
 
-	/* We need to call this function specifically, otherwise
-	   nobody will call our VFP functions */
-	typedef void sbe_vfp_init_cb_f(struct busyobj *bo);
-	extern void sbe_util_set_vfp_cb(struct busyobj *, sbe_vfp_init_cb_f *);
-	sbe_util_set_vfp_cb(bo, vfp_init);
+	vfp_init(bo);
 	return (0);
 }
 
