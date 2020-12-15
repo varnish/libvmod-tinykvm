@@ -52,6 +52,7 @@ public:
 	bool is_paused() const noexcept { return m_is_paused; }
 
 	gaddr_t guest_alloc(size_t len);
+	void    guest_free(gaddr_t addr);
 
 	void init_sha256();
 	void hash_buffer(const char* buffer, int len);

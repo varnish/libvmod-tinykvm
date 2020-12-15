@@ -194,12 +194,12 @@ APICALL(remote_call)
 
 APICALL(my_name)
 {
+	const auto [buffer, len] =
+		machine.sysargs<gaddr_t, uint32_t> ();
 	auto& script = get_script(machine);
 	const auto& name = script.name();
-	/* Put pointer, length in registers A0, A1 */
-	machine.cpu.reg(11) = name.size();
-	machine.set_result( /* NOTE: Zero-terminated */
-		push_data(machine, name.c_str(), name.size()+1));
+	machine.copy_to_guest(buffer, name.c_str(), name.size()+1);
+	machine.set_result(name.size());
 }
 APICALL(set_decision)
 {
@@ -294,7 +294,8 @@ APICALL(foreach_header_field)
 
 	auto& script = get_script(machine);
 
-	const gaddr_t first = push_data(machine);
+	const gaddr_t first = script.guest_alloc(hp->field_count * sizeof(guest_header_field));
+	gaddr_t iterator = first;
 	int acount = 0;
 
 	/* Iterate each header field */
@@ -306,12 +307,13 @@ APICALL(foreach_header_field)
 			continue;
 
 		push_data<guest_header_field>(machine,
+			iterator,
 			{(gethdr_e) where, idx, false, true});
 		acount ++; /* Actual */
 	}
 
 	/* Call into the machine using pre-emption */
-	script.preempt((gaddr_t) func, (gaddr_t) data, (gaddr_t) first, (int) acount);
+	script.preempt((gaddr_t) func, (gaddr_t) iterator, (gaddr_t) first, (int) acount);
 
 	/* Check if any were deleted */
 	int dcount = 0;
@@ -330,6 +332,7 @@ APICALL(foreach_header_field)
 		}
 	}
 
+	script.guest_free(first);
 	machine.set_result(acount);
 }
 
@@ -448,8 +451,8 @@ APICALL(header_field_get)
 
 APICALL(header_field_retrieve)
 {
-	const auto [where, index, fdata]
-		= machine.sysargs<int, uint32_t, gaddr_t> ();
+	const auto [where, index, buffer, buflen]
+		= machine.sysargs<int, uint32_t, gaddr_t, uint32_t> ();
 
 	const auto* hp = get_http(get_ctx(machine), (gethdr_e) where);
 
@@ -457,13 +460,19 @@ APICALL(header_field_retrieve)
 	{
 		const auto& field = hp->field_array[index];
 		const size_t len = field_length(field);
-		auto addr = push_data(machine, field.begin, len+1);
-		/* Return begin, end pointer */
-		machine.set_result(addr, addr + len);
+		if (buffer == 0 && buflen == 0) {
+			machine.set_result(len);
+			return;
+		} else if (len > buflen) {
+			machine.set_result(-1);
+			return;
+		}
+		machine.copy_to_guest(buffer, field.begin, len);
+		machine.set_result(len);
 		return;
 	}
 	/* Null pointers */
-	machine.set_result(0, 0);
+	machine.set_result(-1);
 }
 
 APICALL(header_field_append)
