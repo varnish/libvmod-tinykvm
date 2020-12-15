@@ -3,6 +3,7 @@
 #include "machine_instance.hpp"
 #include "shm.hpp"
 #include "varnish.hpp"
+static const uint64_t REMOTE_CALL_COST = 4000;
 
 //#define ENABLE_TIMING
 #define TIMING_LOCATION(x) \
@@ -180,7 +181,13 @@ APICALL(remote_call)
 		// Floating-point registers
 		stregs.getfl(10 + i).i64 = myregs.getfl(10 + i).i64;
 	}
-	remote.call(func);
+	// mount some stack pages, if necessary
+	// then make a VM function call
+	auto insn = mirror_stack_call(machine, remote, func);
+	// accumulate instruction counting from the remote machine
+	// plus some extra because remote calls are expensive
+	machine.increment_counter(REMOTE_CALL_COST + insn);
+
 	instance.storage_mtx.unlock();
 	// === Serialized access to storage === //
 
