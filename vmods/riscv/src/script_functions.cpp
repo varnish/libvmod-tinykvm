@@ -1,6 +1,7 @@
 #include "script_functions.hpp"
 #include "machine/include_api.hpp"
 #include "machine_instance.hpp"
+#include "shm.hpp"
 #include "varnish.hpp"
 
 //#define ENABLE_TIMING
@@ -100,13 +101,6 @@ inline uint32_t field_length(const txt& field)
 	return field.end - field.begin;
 }
 
-inline gaddr_t push_data(machine_t& machine, const char* data, size_t len)
-{
-	/* Allocate the string on the shared memory area */
-	SharedMemoryArea shm {get_script(machine)};
-	return shm.push(data, len);
-}
-
 /**
  *  These are all system call handlers, which get called by the guest,
  *  and so they have to maintain the integrity of Varnish by checking
@@ -146,13 +140,6 @@ APICALL(shm_log)
 	auto [string, len] = machine.sysargs<gaddr_t, uint32_t> ();
 	const auto* ctx = get_ctx(machine);
 
-	auto& script = get_script(machine);
-	auto* data = script.rw_area.host_addr(string, len);
-	if (data) {
-		VSLb(ctx->vsl, SLT_VCL_Log, "%.*s", (int) len, data);
-		machine.set_result(len);
-		return;
-	}
 	/* Fallback (with potential slow-path) */
 	auto buffer = machine.memory.rvbuffer(string, len);
 	if (buffer.is_sequential()) {
@@ -306,15 +293,8 @@ APICALL(foreach_header_field)
 	auto* hp = get_http(ctx, (gethdr_e) where);
 
 	auto& script = get_script(machine);
-	/* Push the field struct as well as the string on hidden stack */
-	SharedMemoryArea shm {script};
 
-	/* Make room for worst case number of fields */
-	const size_t  pcount = hp->field_count - HDR_FIRST;
-	gaddr_t field_addr = shm.address() - pcount * sizeof(guest_header_field);
-
-	const gaddr_t first = field_addr;
-	SharedMemoryArea shm_fields {script, field_addr};
+	const gaddr_t first = push_data(machine);
 	int acount = 0;
 
 	/* Iterate each header field */
@@ -325,12 +305,10 @@ APICALL(foreach_header_field)
 		if (len == 0)
 			continue;
 
-		shm_fields.write<guest_header_field>(
+		push_data<guest_header_field>(machine,
 			{(gethdr_e) where, idx, false, true});
 		acount ++; /* Actual */
 	}
-	/* This will prevent other pushes to interfere with this */
-	shm.set(first);
 
 	/* Call into the machine using pre-emption */
 	script.preempt((gaddr_t) func, (gaddr_t) data, (gaddr_t) first, (int) acount);

@@ -15,7 +15,7 @@ std::vector<const char*> riscv_lookup_wishlist {
 
 MachineInstance::MachineInstance(
 	std::vector<uint8_t> elf,
-	VRT_CTX, vmod_riscv_machine* vrm)
+	const vrt_ctx* ctx, vmod_riscv_machine* vrm)
 	: binary{std::move(elf)},
 	  script{binary, ctx, vrm, *this},
 	  storage{binary, ctx, vrm, *this}

@@ -2,7 +2,7 @@
 #include <cassert>
 #include <functional>
 #include <libriscv/machine.hpp>
-#include "memarea.hpp"
+
 struct vrt_ctx;
 struct vmod_riscv_machine;
 struct MachineInstance;
@@ -12,10 +12,6 @@ public:
 	static constexpr int MARCH = riscv::RISCV32;
 	using gaddr_t = riscv::address_type<MARCH>;
 	using machine_t = riscv::Machine<MARCH>;
-	static constexpr gaddr_t RO_AREA_BEGIN = 0x10000;
-	static constexpr gaddr_t RO_AREA_END   = 0x11000;
-	static constexpr gaddr_t RW_AREA_BEGIN = 0x12000;
-	static constexpr gaddr_t RW_AREA_END   = 0x13000;
 	static constexpr gaddr_t HEAP_PAGENO   = 0x40000000 >> riscv::Page::SHIFT;
 	static constexpr gaddr_t STACK_PAGENO  = HEAP_PAGENO - 1;
 	static constexpr size_t  REGEX_MAX   = 64;
@@ -39,7 +35,7 @@ public:
 	const auto* vrm() const noexcept { return m_vrm; }
 	auto& instance() { return m_inst; }
 	const auto& instance() const { return m_inst; }
-	void set_ctx(VRT_CTX) { m_ctx = ctx; }
+	void set_ctx(const vrt_ctx* ctx) { m_ctx = ctx; }
 	void assign_instance(std::shared_ptr<MachineInstance>& ref) { m_inst_ref = std::move(ref); }
 
 	uint64_t max_instructions() const noexcept;
@@ -56,10 +52,6 @@ public:
 	bool is_paused() const noexcept { return m_is_paused; }
 
 	gaddr_t guest_alloc(size_t len);
-	auto& shm_address() { return m_shm_address; }
-
-	MemArea<MARCH> ro_area;
-	MemArea<MARCH> rw_area;
 
 	void init_sha256();
 	void hash_buffer(const char* buffer, int len);
@@ -96,7 +88,6 @@ private:
 	const struct vmod_riscv_machine* m_vrm = nullptr;
 	MachineInstance& m_inst;
 	void*       m_arena = nullptr;
-	gaddr_t     m_shm_address = RO_AREA_END; /* It's a stack */
 
 	std::string m_want_result;
 	std::array<gaddr_t, RESULTS_MAX> m_want_values = {403, 0};

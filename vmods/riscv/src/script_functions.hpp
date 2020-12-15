@@ -3,7 +3,6 @@
 
 #include <type_traits>
 #include "crc32.hpp"
-#include "shm.hpp"
 
 using machine_t = Script::machine_t;
 using gaddr_t = Script::gaddr_t;

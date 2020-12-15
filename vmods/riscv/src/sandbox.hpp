@@ -17,8 +17,8 @@ struct vmod_riscv_machine
 {
 	using ghandler_t = std::function<void(Script&)>;
 
-	int forkcall(VRT_CTX, Script::gaddr_t addr);
-	Script* vmfork(VRT_CTX);
+	int forkcall(const vrt_ctx*, Script::gaddr_t addr);
+	Script* vmfork(const vrt_ctx*);
 	bool no_program_loaded() const noexcept { return this->machine == nullptr; }
 
 	// Install a callback function using a string name
@@ -44,7 +44,7 @@ struct vmod_riscv_machine
 		return decltype(program->script.callsite(0)) {};
 	}
 
-	vmod_riscv_machine(VRT_CTX, const TenantConfig&);
+	vmod_riscv_machine(const vrt_ctx*, const TenantConfig&);
 
 	/* Initialized during vcl_init */
 	const uint64_t magic = 0xb385716f486938e6;

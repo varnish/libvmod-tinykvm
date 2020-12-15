@@ -1,6 +1,8 @@
 #include "sandbox.hpp"
+#include "varnish.hpp"
 #include <EASTL/string_map.h>
 #include <nlohmann/json.hpp>
+
 using json = nlohmann::json;
 extern std::vector<uint8_t> file_loader(const std::string& filename);
 

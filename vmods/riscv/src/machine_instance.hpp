@@ -5,7 +5,7 @@
 
 struct MachineInstance
 {
-	MachineInstance(std::vector<uint8_t>, VRT_CTX, vmod_riscv_machine*);
+	MachineInstance(std::vector<uint8_t>, const vrt_ctx*, vmod_riscv_machine*);
 	~MachineInstance();
 
 	inline Script::gaddr_t lookup(const char* name) const {
