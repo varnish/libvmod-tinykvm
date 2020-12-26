@@ -191,7 +191,7 @@ APICALL(remote_call)
 	instance.storage_mtx.unlock();
 	// === Serialized access to storage === //
 
-	for (int i = 0; i < 6; i++) {
+	for (int i = 0; i < 8; i++) {
 		myregs.get(10 + i) = stregs.get(10 + i);
 		myregs.getfl(10 + i).i64 = stregs.getfl(10 + i).i64;
 	}

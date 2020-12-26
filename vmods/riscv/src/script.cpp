@@ -228,8 +228,8 @@ void Script::handle_timeout(gaddr_t address)
 {
 	if constexpr (VERBOSE_ERRORS) {
 		auto callsite = machine().memory.lookup(address);
-		fprintf(stderr, "Script hit max instructions for: %s\n",
-			callsite.name.c_str());
+		fprintf(stderr, "Script hit max instructions (%zu) for: %s\n",
+			max_instructions(), callsite.name.c_str());
 	}
 	VRT_fail(m_ctx, "Script for '%s' timed out", name().c_str());
 }
