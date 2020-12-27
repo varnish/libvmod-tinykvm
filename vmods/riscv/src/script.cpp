@@ -40,9 +40,9 @@ Script::Script(
 
 Script::Script(
 	const std::vector<uint8_t>& binary, const vrt_ctx* ctx,
-	const vmod_riscv_machine* vrm, MachineInstance& inst)
+	const vmod_riscv_machine* vrm, MachineInstance& inst, bool storage)
 	: m_machine(binary, { .memory_max = vrm->config.max_memory }),
-	  m_ctx(ctx), m_vrm(vrm), m_inst(inst)
+	  m_ctx(ctx), m_vrm(vrm), m_inst(inst), m_is_storage(storage)
 {
 	this->machine_initialize();
 }
@@ -155,7 +155,7 @@ void Script::machine_setup(machine_t& machine, bool init)
 			throw std::runtime_error("The binary is missing a public exit function!");
 		// Full Linux-compatible stack
 		machine.setup_linux(
-			{ name() },
+			{ name(), m_is_storage ? "1" : "0" },
 			{ "LC_CTYPE=C", "LC_ALL=C", "USER=groot" });
 	}
 

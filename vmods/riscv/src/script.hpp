@@ -71,7 +71,7 @@ public:
 
 	bool reset(); // true if the reset was successful
 
-	Script(const std::vector<uint8_t>&, const vrt_ctx*, const vmod_riscv_machine*, MachineInstance&);
+	Script(const std::vector<uint8_t>&, const vrt_ctx*, const vmod_riscv_machine*, MachineInstance&, bool storage);
 	Script(const Script& source, const vrt_ctx*, const vmod_riscv_machine*, MachineInstance&);
 	~Script();
 
@@ -93,6 +93,7 @@ private:
 	std::string m_want_result;
 	std::array<gaddr_t, RESULTS_MAX> m_want_values = {403, 0};
 	bool        m_is_paused = false;
+	bool        m_is_storage = false;
 	struct VSHA256Context* m_sha_ctx = nullptr;
 
 	struct RegexCache {

@@ -17,8 +17,8 @@ MachineInstance::MachineInstance(
 	std::vector<uint8_t> elf,
 	const vrt_ctx* ctx, vmod_riscv_machine* vrm)
 	: binary{std::move(elf)},
-	  script{binary, ctx, vrm, *this},
-	  storage{binary, ctx, vrm, *this}
+	  script{binary, ctx, vrm, *this, false},
+	  storage{binary, ctx, vrm, *this, true}
 {
 	// Use a different stack for the storage machine
 	storage.machine().memory.set_stack_initial(0x40000000 - 0x100000);
