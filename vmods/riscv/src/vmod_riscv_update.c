@@ -148,6 +148,7 @@ riscvbe_gethdrs(const struct director *dir,
 			result.destructor(&result);
 
 		if (bo->htc->priv == NULL) {
+			http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
 			VSB_destroy(&vsb);
 			return (-1);
 		}

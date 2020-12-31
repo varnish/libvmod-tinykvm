@@ -65,12 +65,12 @@ riscv_update(VRT_CTX, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
 		   when writing it to disk. Don't *move*. See below. */
 		auto old = std::atomic_exchange(&vrm->machine, inst);
 
-		if (const auto luaddr = old->lookup("on_live_update");
-			luaddr != 0x0)
-		{
-			const auto resaddr = inst->lookup("on_resume_update");
-			if (resaddr != 0x0)
-			{
+		if (old != nullptr) {
+			const auto luaddr = old->lookup("on_live_update");
+			if (luaddr != 0x0) {
+				const auto resaddr = inst->lookup("on_resume_update");
+				if (resaddr != 0x0)
+				{
 				/* Serialize data in the old machine */
 				auto& old_machine = old->storage;
 				old_machine.call(luaddr);
@@ -85,14 +85,15 @@ riscv_update(VRT_CTX, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
 					old_machine.machine(), data_addr, data_len);
 				/* Deserialize data in the new machine */
 				new_machine.call(resaddr, dst_data, data_len);
+				} else {
+					VSLb(ctx->vsl, SLT_Debug,
+						"Live-update deserialization skipped (new binary lacks resume)");
+				}
 			} else {
 				VSLb(ctx->vsl, SLT_Debug,
-					"Live-update deserialization skipped (new binary lacks resume)");
+					"Live-update skipped (old binary lacks serializer)");
 			}
-		} else {
-			VSLb(ctx->vsl, SLT_Debug,
-				"Live-update skipped (old binary lacks serializer)");
-		}
+		} // old != null
 
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);
