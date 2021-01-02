@@ -60,6 +60,10 @@ void Script::setup_virtual_memory(bool init)
 	using namespace riscv;
 	auto& mem = machine().memory;
 	mem.set_stack_initial(STACK_PAGENO * Page::size());
+	// Use a different stack for the storage machine
+	if (this->m_is_storage) {
+		mem.set_stack_initial(mem.stack_initial() - 0x100000);
+	}
 	// this separates heap and stack
 	mem.install_shared_page(STACK_PAGENO, Page::guard_page());
 }

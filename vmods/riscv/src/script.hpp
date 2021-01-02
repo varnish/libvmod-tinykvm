@@ -50,6 +50,7 @@ public:
 		m_want_result = res; m_want_values = values; m_is_paused = p;
 	}
 	bool is_paused() const noexcept { return m_is_paused; }
+	bool is_storage() const noexcept { return m_is_storage; }
 
 	gaddr_t guest_alloc(size_t len);
 	void    guest_free(gaddr_t addr);

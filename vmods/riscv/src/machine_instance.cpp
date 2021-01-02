@@ -17,12 +17,9 @@ MachineInstance::MachineInstance(
 	std::vector<uint8_t> elf,
 	const vrt_ctx* ctx, vmod_riscv_machine* vrm)
 	: binary{std::move(elf)},
-	  script{binary, ctx, vrm, *this, false},
-	  storage{binary, ctx, vrm, *this, true}
+	  storage{binary, ctx, vrm, *this, true},
+	  script{binary, ctx, vrm, *this, false}
 {
-	// Use a different stack for the storage machine
-	storage.machine().memory.set_stack_initial(0x40000000 - 0x100000);
-
 	extern std::vector<const char*> riscv_lookup_wishlist;
 	for (const auto* func : riscv_lookup_wishlist) {
 		/* NOTE: We can't check if addr is 0 here, because

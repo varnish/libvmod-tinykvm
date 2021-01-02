@@ -348,11 +348,16 @@ struct backend_buffer riscv_backend_call(VRT_CTX, const void* key, long func, lo
 			printf("Time spent in backend_call(): %ld ns\n", nanodiff(t1, t2));
 		#endif
 			return result;
+		} catch (const riscv::MachineException& e) {
+			fprintf(stderr, "Backend VM exception: %s (data: 0x%lX)\n", e.what(), (long) e.data());
+			VSLb(ctx->vsl, SLT_Error,
+				"Backend VM exception: %s (data: 0x%lX)\n",
+				e.what(), (long) e.data());
 		} catch (const std::exception& e) {
-			printf("VM backend exception: %s\n", e.what());
+			fprintf(stderr, "Backend VM exception: %s\n", e.what());
 			VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
-			script->set_ctx(old_ctx);
 		}
+		script->set_ctx(old_ctx);
 	}
 	return backend_error();
 }

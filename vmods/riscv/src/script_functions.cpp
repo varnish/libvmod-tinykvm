@@ -174,7 +174,7 @@ APICALL(remote_call)
 	auto& stregs = remote.machine().cpu.registers();
 
 	// === Serialized access to storage === //
-	instance.storage_mtx.lock();
+	std::scoped_lock lock(instance.storage_mtx);
 	for (int i = 0; i < 6; i++) {
 		// Integer registers
 		stregs.get(10 + i) = myregs.get(11 + i);
@@ -188,15 +188,68 @@ APICALL(remote_call)
 	// plus some extra because remote calls are expensive
 	machine.increment_counter(REMOTE_CALL_COST + insn);
 
-	instance.storage_mtx.unlock();
-	// === Serialized access to storage === //
-
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < 2; i++) {
 		myregs.get(10 + i) = stregs.get(10 + i);
 		myregs.getfl(10 + i).i64 = stregs.getfl(10 + i).i64;
 	}
 	// Short-circuit the ret pseudo-instruction:
 	machine.cpu.jump(machine.cpu.reg(riscv::RISCV::REG_RA) - 4);
+}
+APICALL(remote_strcall)
+{
+	auto [tramp, func, data, len] =
+		machine.template sysargs <gaddr_t, gaddr_t, gaddr_t, int> ();
+	//printf("Remote stringcall: tramp=0x%X func=0x%X data=0x%X len=%d\n",
+	//	tramp, func, data, len);
+	auto& script = get_script(machine);
+	auto& instance = script.instance();
+	auto& remote = instance.storage;
+
+	// All arguments have to be valid, and we
+	// can't call this from the storage machine
+	if (script.is_storage() || tramp == 0 || data == 0 || len < 0) {
+		gaddr_t resdata = script.guest_alloc(1);
+		script.machine().memory.write<uint8_t> (resdata, 0);
+		machine.set_result(resdata, 0);
+		return;
+	}
+
+	// === Serialized access to storage === //
+	std::scoped_lock lock(instance.storage_mtx);
+
+	gaddr_t gaddr = remote.guest_alloc(len+1);
+	if (gaddr == 0) {
+		throw riscv::MachineException(riscv::OUT_OF_MEMORY,
+			"Remote call: Remote machine out of memory");
+	}
+	// copy the string to the remote machine
+	remote.machine().memory.memcpy(gaddr, machine, data, len+1);
+
+	// Storage VM function call
+	remote.machine().reset_instruction_counter();
+	remote.machine().vmcall((gaddr_t) tramp, (gaddr_t) func, (gaddr_t) gaddr, (int) len);
+	// accumulate instruction counting from the remote machine
+	// plus some extra because remote calls are expensive
+	machine.increment_counter(REMOTE_CALL_COST + remote.machine().instruction_counter());
+	remote.guest_free(gaddr);
+
+	// copy a result string back
+	auto [raddr] = remote.machine().sysargs<gaddr_t> ();
+	if (raddr == 0) {
+		throw std::runtime_error(
+			"Null-pointer returned from remote during remote call");
+	}
+	size_t rlen = remote.machine().memory.strlen(raddr);
+	// speculate that the returned value may be heap allocated
+	remote.guest_free(raddr);
+
+	gaddr_t resdata = script.guest_alloc(rlen+1);
+	if (resdata == 0) {
+		throw riscv::MachineException(riscv::OUT_OF_MEMORY,
+			"Remote call: Tenant machine out of memory");
+	}
+	machine.memory.memcpy(resdata, remote.machine(), raddr, rlen+1);
+	machine.set_result(resdata, rlen);
 }
 
 APICALL(my_name)
@@ -707,6 +760,7 @@ void Script::setup_syscall_interface(machine_t& machine)
 		FPTR(shm_log),
 		FPTR(::dynamic_call),
 		FPTR(remote_call),
+		FPTR(remote_strcall),
 
 		FPTR(regex_compile),
 		FPTR(regex_match),
