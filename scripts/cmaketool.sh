@@ -87,6 +87,10 @@ case $i in
     args="$args -DCMAKE_BUILD_TYPE=Release -DLTO_ENABLE=ON -DNATIVE=ON"
     shift
     ;;
+	--no-optimize)
+    args="$args -DCMAKE_BUILD_TYPE=\"\" -DLTO_ENABLE=OFF -DNATIVE=OFF"
+    shift
+    ;;
 	--static-sandbox)
 	args="$args -DSHARED_LIBRISCV=OFF"
     shift
