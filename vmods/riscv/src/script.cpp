@@ -266,9 +266,9 @@ Script::gaddr_t Script::guest_alloc(size_t len)
 {
 	return arena_malloc((sas_alloc::Arena*) m_arena, len);
 }
-void Script::guest_free(gaddr_t addr)
+bool Script::guest_free(gaddr_t addr)
 {
-	arena_free((sas_alloc::Arena*) m_arena, addr);
+	return (arena_free((sas_alloc::Arena*) m_arena, addr) == 0);
 }
 
 

@@ -53,7 +53,7 @@ public:
 	bool is_storage() const noexcept { return m_is_storage; }
 
 	gaddr_t guest_alloc(size_t len);
-	void    guest_free(gaddr_t addr);
+	bool    guest_free(gaddr_t addr);
 
 	void init_sha256();
 	void hash_buffer(const char* buffer, int len);

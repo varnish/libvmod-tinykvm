@@ -227,29 +227,37 @@ APICALL(remote_strcall)
 
 	// Storage VM function call
 	remote.machine().reset_instruction_counter();
-	remote.machine().vmcall((gaddr_t) tramp, (gaddr_t) func, (gaddr_t) gaddr, (int) len);
-	// accumulate instruction counting from the remote machine
-	// plus some extra because remote calls are expensive
-	machine.increment_counter(REMOTE_CALL_COST + remote.machine().instruction_counter());
-	remote.guest_free(gaddr);
+	remote.call((gaddr_t) tramp, (gaddr_t) func, (gaddr_t) gaddr, (int) len);
 
 	// copy a result string back
-	auto [raddr] = remote.machine().sysargs<gaddr_t> ();
+	const auto [raddr, rlen] = remote.machine().sysargs<gaddr_t, unsigned> ();
 	if (raddr == 0) {
 		throw std::runtime_error(
 			"Null-pointer returned from remote during remote call");
 	}
-	size_t rlen = remote.machine().memory.strlen(raddr);
-	// speculate that the returned value may be heap allocated
-	remote.guest_free(raddr);
 
-	gaddr_t resdata = script.guest_alloc(rlen+1);
+	// copy over the data returned from storage
+	const gaddr_t resdata = script.guest_alloc(rlen+1);
 	if (resdata == 0) {
 		throw riscv::MachineException(riscv::OUT_OF_MEMORY,
 			"Remote call: Tenant machine out of memory");
 	}
 	machine.memory.memcpy(resdata, remote.machine(), raddr, rlen+1);
+	// set result now, even if there's an exception in storage
+	// we have already gotten our result
 	machine.set_result(resdata, rlen);
+
+	// Finish up: let the guest destroy stuff on its own
+	// We set aside a few thousand instructions for cleanup
+	// NOTE: They will still count against the totals
+	remote.resume(64000);
+	// free string passed to storage
+	remote.guest_free(gaddr);
+	//printf("Resume completed  gaddr=0x%X  raddr=0x%X  instr=%zu\n",
+	//	gaddr, raddr, remote.machine().instruction_counter());
+	// accumulate instruction counting from the remote machine
+	// plus some extra because remote calls are expensive
+	machine.increment_counter(REMOTE_CALL_COST + remote.machine().instruction_counter());
 }
 
 APICALL(my_name)
