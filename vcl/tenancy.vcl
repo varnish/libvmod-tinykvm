@@ -62,9 +62,13 @@ sub vcl_recv {
 		return (synth(riscv.want_status()));
 	}
 	else if (riscv.want_result() == "backend") {
-		set req.http.X-Backend-Func = riscv.result_value(0);
-		set req.http.X-Backend-Arg  = riscv.result_value(1);
-		return (pass);
+		set req.http.X-Backend-Func = riscv.result_value(1);
+		set req.http.X-Backend-Arg  = riscv.result_value(2);
+		if (riscv.result_value(0) == 0) {
+			return (pass);
+		} else {
+			return (hash);
+		}
 	}
 
 	return (synth(403));

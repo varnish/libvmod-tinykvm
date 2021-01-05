@@ -15,7 +15,7 @@ public:
 	static constexpr gaddr_t HEAP_PAGENO   = 0x40000000 >> riscv::Page::SHIFT;
 	static constexpr gaddr_t STACK_PAGENO  = HEAP_PAGENO - 1;
 	static constexpr size_t  REGEX_MAX   = 64;
-	static constexpr size_t  RESULTS_MAX = 2;
+	static constexpr size_t  RESULTS_MAX = 3;
 
 	// call any script function, with any parameters
 	template <typename... Args>
