@@ -6,3 +6,9 @@ struct update_result {
 	const size_t len;
 	void(*destructor) (struct update_result*);
 };
+
+typedef struct {
+	int idx;
+	int arg1;
+	int arg2;
+} vcall_info;

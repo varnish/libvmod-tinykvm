@@ -84,7 +84,7 @@ $Function INT     call(STRING function)
 
 - Calls the given function in the currently active machine.
 
-$Function INT     fastcall(ENUM {
+$Function INT     vcall(ENUM {
 		ON_REQUEST,
 		ON_HASH,
 		ON_SYNTH,
@@ -95,6 +95,7 @@ $Function INT     fastcall(ENUM {
 
 - Calls the given function at index in order added by add_known_function
   (starting at zero), in the currently active machine.
+  Req/resp HTTP index arguments are added to the call.
 
 $Function INT     resume()
 

@@ -6,6 +6,7 @@
 
 #include "vcc_if.h"
 #include "vmod_util.h"
+#include "update_result.h" // vcall_info
 
 extern void init_tenants(VRT_CTX, const char*);
 
@@ -13,7 +14,7 @@ extern void* riscv_fork(VRT_CTX, const char*);
 // Functions operating on a machine already forked, which
 // is accessible through a priv_task.
 extern long riscv_current_call(VRT_CTX, const char*);
-extern long riscv_current_call_idx(VRT_CTX, int);
+extern long riscv_current_call_idx(VRT_CTX, vcall_info);
 extern long riscv_current_resume(VRT_CTX);
 extern const char* riscv_current_name(VRT_CTX);
 extern const char* riscv_current_group(VRT_CTX);
@@ -22,15 +23,16 @@ extern long riscv_current_result_value(VRT_CTX, size_t);
 extern int  riscv_current_is_paused(VRT_CTX);
 extern int  riscv_current_apply_hash(VRT_CTX);
 
-static inline int enum_to_idx(VCL_ENUM e)
+#define HDR_INVALID   UINT32_MAX
+static inline vcall_info enum_to_idx(VCL_ENUM e)
 {
-	if (e == vmod_enum_ON_REQUEST) return 1;
-	if (e == vmod_enum_ON_HASH)    return 2;
-	if (e == vmod_enum_ON_SYNTH)   return 3;
-	if (e == vmod_enum_ON_BACKEND_FETCH) return 4;
-	if (e == vmod_enum_ON_BACKEND_RESPONSE) return 5;
-	if (e == vmod_enum_ON_DELIVER) return 6;
-	return -1;
+	if (e == vmod_enum_ON_REQUEST) return (vcall_info){1, HDR_REQ, HDR_RESP};
+	if (e == vmod_enum_ON_HASH)    return (vcall_info){2, HDR_INVALID, HDR_INVALID};
+	if (e == vmod_enum_ON_SYNTH)   return (vcall_info){3, HDR_REQ, HDR_RESP};
+	if (e == vmod_enum_ON_BACKEND_FETCH) return (vcall_info){4, HDR_BEREQ, HDR_BERESP};
+	if (e == vmod_enum_ON_BACKEND_RESPONSE) return (vcall_info){5, HDR_BEREQ, HDR_BERESP};
+	if (e == vmod_enum_ON_DELIVER) return (vcall_info){6, HDR_RESP, HDR_INVALID};
+	return (vcall_info){-1, HDR_INVALID, HDR_INVALID};
 }
 
 /* Load tenant information from a JSON file */
@@ -66,7 +68,7 @@ VCL_INT vmod_call(VRT_CTX, VCL_STRING function)
 
 	return riscv_current_call(ctx, function);
 }
-VCL_INT vmod_fastcall(VRT_CTX, VCL_ENUM e)
+VCL_INT vmod_vcall(VRT_CTX, VCL_ENUM e)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 

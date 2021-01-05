@@ -55,7 +55,7 @@ sub vcl_recv {
 	}
 
 	/* Call into VM */
-	riscv.fastcall(ON_REQUEST);
+	riscv.vcall(ON_REQUEST);
 
 	/* Make decision */
 	if (riscv.want_result() == "synth") {
@@ -81,7 +81,7 @@ sub vcl_synth {
 		if (riscv.want_resume()) {
 			riscv.resume();
 		} else {
-			riscv.fastcall(ON_SYNTH);
+			riscv.vcall(ON_SYNTH);
 		}
 		return (deliver);
 	}
@@ -89,7 +89,7 @@ sub vcl_synth {
 
 sub vcl_backend_fetch {
 	if (riscv.fork(bereq.http.Host)) {
-		riscv.fastcall(ON_BACKEND_FETCH);
+		riscv.vcall(ON_BACKEND_FETCH);
 		if (bereq.http.X-Backend-Func) {
 			set bereq.backend = riscv.vm_backend(
 					bereq.http.X-Backend-Func,
@@ -104,7 +104,7 @@ sub vcl_backend_response {
 		if (riscv.want_resume()) {
 			riscv.resume();
 		} else {
-			riscv.fastcall(ON_BACKEND_RESPONSE);
+			riscv.vcall(ON_BACKEND_RESPONSE);
 		}
 	}
 }
@@ -114,6 +114,6 @@ sub vcl_deliver {
 		if (riscv.want_resume()) {
 			riscv.resume();
 		}
-		riscv.fastcall(ON_DELIVER);
+		riscv.vcall(ON_DELIVER);
 	}
 }

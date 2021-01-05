@@ -196,17 +196,17 @@ long riscv_current_call(VRT_CTX, const char* func)
 	return -1;
 }
 extern "C"
-long riscv_current_call_idx(VRT_CTX, int index)
+long riscv_current_call_idx(VRT_CTX, vcall_info info)
 {
 	auto* script = get_machine(ctx);
 	if (script) {
-		if (index >= 0 && index < script->instance().sym_vector.size())
+		if (info.idx >= 0 && info.idx < script->instance().sym_vector.size())
 		{
-			auto& entry = script->instance().sym_vector[index];
+			auto& entry = script->instance().sym_vector[info.idx];
 			if (UNLIKELY(entry.addr == 0)) {
 				VSLb(ctx->vsl, SLT_Error,
 					"VM call '%s' failed: The function at index %d is not availble",
-					entry.func, index);
+					entry.func, info.idx);
 				return -1;
 			}
 			if (UNLIKELY(entry.size <= TOO_SMALL)) {
@@ -218,14 +218,14 @@ long riscv_current_call_idx(VRT_CTX, int index)
 		#ifdef ENABLE_TIMING
 			TIMING_LOCATION(t1);
 		#endif
-			int ret = script->call(entry.addr);
+			int ret = script->call(entry.addr, (int) info.arg1, (int) info.arg2);
 		#ifdef ENABLE_TIMING
 			TIMING_LOCATION(t2);
 			printf("Time spent in forkcall(): %ld ns\n", nanodiff(t1, t2));
 		#endif
 			return ret;
 		}
-		VRT_fail(ctx, "VM call failed (invalid index given: %d)", index);
+		VRT_fail(ctx, "VM call failed (invalid index given: %d)", info.idx);
 		return -1;
 	}
 	VRT_fail(ctx, "current_call_idx() failed (no running machine)");
