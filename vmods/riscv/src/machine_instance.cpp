@@ -2,7 +2,7 @@
 // functions available to all machines created during init
 std::vector<const char*> riscv_lookup_wishlist {
 	"on_init",
-	"on_client_request",
+	"on_recv",
 	"on_hash",
 	"on_synth",
 	"on_backend_fetch",
