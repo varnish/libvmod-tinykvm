@@ -753,6 +753,8 @@ APICALL(regex_delete)
 	get_script(machine).regex_free((uint32_t) index);
 }
 
+void sha256(machine_t&);
+
 void Script::setup_syscall_interface(machine_t& machine)
 {
 	#define FPTR(x) machine_t::syscall_fptr_t { x }
@@ -796,7 +798,9 @@ void Script::setup_syscall_interface(machine_t& machine)
 		FPTR(http_copy_from),
 		FPTR(http_set_status),
 		FPTR(http_unset_re),
-		FPTR(http_find_name)
+		FPTR(http_find_name),
+
+		FPTR(sha256)
 	};
 	machine.install_syscall_handler_range(SYSCALL_BASE, handlers);
 }

@@ -12,6 +12,7 @@ list(APPEND RISCV_SOURCES
 	src/sandbox.cpp
 	src/script.cpp
 	src/script_functions.cpp
+	src/script_sha256.cpp
 	src/tenancy.cpp
 	src/vmod_riscv.cpp
 	src/varnish_interface.c
