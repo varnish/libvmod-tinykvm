@@ -167,7 +167,8 @@ APICALL(dynamic_call)
 APICALL(remote_call)
 {
 	auto [func] = machine.template sysargs <gaddr_t> ();
-	auto& instance = get_script(machine).instance();
+	auto& script = get_script(machine);
+	auto& instance = script.instance();
 	auto& remote = instance.storage;
 	// Copy 6 integer & float registers
 	auto& myregs = machine.cpu.registers();
@@ -181,6 +182,21 @@ APICALL(remote_call)
 		// Floating-point registers
 		stregs.getfl(10 + i).i64 = myregs.getfl(10 + i).i64;
 	}
+	remote.machine().memory.set_page_readf_handler(
+		[&machine] (const auto&, size_t pageno) -> const riscv::Page& {
+			return machine.memory.get_pageno(pageno);
+		});
+	remote.machine().memory.set_page_fault_handler(
+		[&script] (auto& mem, const size_t pageno) -> riscv::Page&
+		{
+			const gaddr_t addr = pageno * riscv::Page::size();
+			if (addr >= script.arena_base() && addr < script.arena_base() + script.heap_size()) {
+				auto& p = script.machine().memory.create_page(pageno);
+				mem.invalidate_page(pageno, p);
+				return p;
+			}
+			return mem.allocate_page(pageno);
+		});
 	// mount some stack pages, if necessary
 	// then make a VM function call
 	auto insn = mirror_stack_call(machine, remote, func);
@@ -192,6 +208,7 @@ APICALL(remote_call)
 		myregs.get(10 + i) = stregs.get(10 + i);
 		myregs.getfl(10 + i).i64 = stregs.getfl(10 + i).i64;
 	}
+	remote.machine().memory.reset_page_readf_handler();
 	// Short-circuit the ret pseudo-instruction:
 	machine.cpu.jump(machine.cpu.reg(riscv::RISCV::REG_RA) - 4);
 }

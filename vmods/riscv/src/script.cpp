@@ -59,13 +59,14 @@ void Script::setup_virtual_memory(bool init)
 {
 	using namespace riscv;
 	auto& mem = machine().memory;
-	mem.set_stack_initial(STACK_PAGENO * Page::size());
+	mem.set_stack_initial(stack_base());
 	// Use a different stack for the storage machine
 	if (this->m_is_storage) {
 		mem.set_stack_initial(mem.stack_initial() - 0x100000);
 	}
 	// this separates heap and stack
-	mem.install_shared_page(STACK_PAGENO, Page::guard_page());
+	mem.install_shared_page(
+		stack_base() >> riscv::Page::SHIFT, Page::guard_page());
 }
 
 void Script::machine_initialize()
@@ -131,8 +132,9 @@ void Script::machine_setup(machine_t& machine, bool init)
 	}
 	else {
 		machine.memory.set_page_fault_handler(
-			[] (auto& mem, size_t pageno) -> riscv::Page& {
+			[this] (auto& mem, size_t pageno) -> riscv::Page& {
 				bool dont_fork = false;
+				const size_t STACK_PAGENO = arena_base() >> riscv::Page::SHIFT;
 				if (pageno >= STACK_PAGENO-128 && pageno < STACK_PAGENO) {
 					dont_fork = true;
 				}
@@ -170,12 +172,13 @@ void Script::machine_setup(machine_t& machine, bool init)
 	if (init == false)
 	{
 		this->m_arena = setup_native_heap_syscalls<MARCH>(
-			machine, vrm()->config.max_heap, [this] (size_t size) {
+			machine, arena_base(), vrm()->config.max_heap,
+			[this] (size_t size) -> void* {
 				return WS_Alloc(m_ctx->ws, size);
 			});
 	} else {
-		this->m_arena =
-			setup_native_heap_syscalls<MARCH>(machine, vrm()->config.max_heap);
+		this->m_arena = setup_native_heap_syscalls<MARCH>(
+			machine, arena_base(), vrm()->config.max_heap);
 	}
 
 #ifdef ENABLE_TIMING
@@ -260,6 +263,10 @@ const std::string& Script::name() const noexcept
 const std::string& Script::group() const noexcept
 {
 	return vrm()->config.group;
+}
+size_t Script::heap_size() const noexcept
+{
+	return vrm()->config.max_heap;
 }
 
 Script::gaddr_t Script::guest_alloc(size_t len)

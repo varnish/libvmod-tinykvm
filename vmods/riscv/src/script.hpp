@@ -12,8 +12,8 @@ public:
 	static constexpr int MARCH = riscv::RISCV32;
 	using gaddr_t = riscv::address_type<MARCH>;
 	using machine_t = riscv::Machine<MARCH>;
-	static constexpr gaddr_t HEAP_PAGENO   = 0x40000000 >> riscv::Page::SHIFT;
-	static constexpr gaddr_t STACK_PAGENO  = HEAP_PAGENO - 1;
+	static constexpr gaddr_t CHEAP_BASE  = 0x40000000;
+	static constexpr gaddr_t SHEAP_BASE  = 0x80000000;
 	static constexpr size_t  REGEX_MAX   = 64;
 	static constexpr size_t  RESULTS_MAX = 3;
 
@@ -52,6 +52,9 @@ public:
 	bool is_paused() const noexcept { return m_is_paused; }
 	bool is_storage() const noexcept { return m_is_storage; }
 
+	gaddr_t arena_base() const noexcept { return is_storage() ? SHEAP_BASE : CHEAP_BASE; }
+	gaddr_t stack_base() const noexcept { return arena_base() - 4096; /* guard page */ }
+	size_t  heap_size() const noexcept;
 	gaddr_t guest_alloc(size_t len);
 	bool    guest_free(gaddr_t addr);
 
