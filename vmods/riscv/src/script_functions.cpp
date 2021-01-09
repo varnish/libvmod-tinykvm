@@ -18,6 +18,10 @@ extern "C" {
 	void http_UnsetIdx(struct http *hp, unsigned idx);
 	unsigned http_findhdr(const struct http *hp, unsigned l, const char *hdr);
 	void http_PrintfHeader(struct http *to, const char *fmt, ...);
+	void riscv_SetCacheable(VRT_CTX, bool a);
+	bool riscv_GetCacheable(VRT_CTX);
+	void riscv_SetTTL(VRT_CTX, float ttl);
+	float riscv_GetTTL(VRT_CTX);
 	struct txt {
 		const char* begin;
 		const char* end;
@@ -372,6 +376,34 @@ APICALL(synth)
 	throw std::runtime_error(
 	    "Synth can only be used in vcl_synth or vcl_backend_error");
 }
+APICALL(cacheable)
+{
+	const auto* ctx = get_ctx(machine);
+	if (ctx->method == VCL_MET_BACKEND_RESPONSE)
+	{
+		auto [set, val] = machine.sysargs<int, int> ();
+		if (set) {
+			riscv_SetCacheable(ctx, val);
+		}
+		machine.set_result(!riscv_GetCacheable(ctx));
+		return;
+	}
+	machine.set_result(0);
+}
+APICALL(ttl)
+{
+	const auto* ctx = get_ctx(machine);
+	if (ctx->method == VCL_MET_BACKEND_RESPONSE)
+	{
+		auto [set, val] = machine.sysargs<int, float> ();
+		if (set) {
+			riscv_SetTTL(ctx, val);
+		}
+		machine.set_result(riscv_GetTTL(ctx));
+		return;
+	}
+	machine.set_result(0.0f);
+}
 
 APICALL(foreach_header_field)
 {
@@ -394,14 +426,14 @@ APICALL(foreach_header_field)
 		if (len == 0)
 			continue;
 
-		push_data<guest_header_field>(machine,
-			iterator,
-			{(gethdr_e) where, idx, false, true});
+		const guest_header_field gf {(gethdr_e) where, idx, false, true};
+		machine.copy_to_guest(iterator, &gf, sizeof(gf));
+		iterator += sizeof(gf);
 		acount ++; /* Actual */
 	}
 
 	/* Call into the machine using pre-emption */
-	script.preempt((gaddr_t) func, (gaddr_t) iterator, (gaddr_t) first, (int) acount);
+	script.preempt((gaddr_t) func, (gaddr_t) data, (gaddr_t) first, (int) acount);
 
 	/* Check if any were deleted */
 	int dcount = 0;
@@ -802,6 +834,8 @@ void Script::setup_syscall_interface(machine_t& machine)
 		FPTR(hash_data),
 		FPTR(purge),
 		FPTR(synth),
+		FPTR(cacheable),
+		FPTR(ttl),
 
 		FPTR(foreach_header_field),
 		FPTR(header_field_get),

@@ -107,6 +107,7 @@ riscvbe_gethdrs(const struct director *dir,
 	http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
 	http_PrintfHeader(bo->beresp, "Content-Type: %.*s",
 		(int) output.tsize, output.type);
+	http_PrintfHeader(bo->beresp, "Content-Length: %zu", output.size);
 
 	char timestamp[VTIM_FORMAT_SIZE];
 	VTIM_format(VTIM_real(), timestamp);
