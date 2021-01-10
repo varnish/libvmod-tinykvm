@@ -263,6 +263,9 @@ const std::string& Script::name() const noexcept {
 const std::string& Script::group() const noexcept {
 	return vrm()->config.group;
 }
+Script::gaddr_t Script::max_memory() const noexcept {
+	return vrm()->config.max_memory;
+}
 Script::gaddr_t Script::stack_base() const noexcept {
 	return stack_begin() - stack_size();
 }

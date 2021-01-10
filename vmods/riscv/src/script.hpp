@@ -52,6 +52,7 @@ public:
 	bool is_paused() const noexcept { return m_is_paused; }
 	bool is_storage() const noexcept { return m_is_storage; }
 
+	gaddr_t max_memory() const noexcept;
 	gaddr_t stack_begin() const noexcept { return arena_base() - 4096; /* guard page */ }
 	gaddr_t stack_base() const noexcept;
 	size_t  stack_size() const noexcept;

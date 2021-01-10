@@ -174,7 +174,7 @@ APICALL(remote_call)
 	auto& script = get_script(machine);
 	auto& instance = script.instance();
 	auto& remote = instance.storage;
-	// Copy 6 integer & float registers
+	// Get machine registers
 	auto& myregs = machine.cpu.registers();
 	auto& stregs = remote.machine().cpu.registers();
 
@@ -186,19 +186,25 @@ APICALL(remote_call)
 	}
 	// Page-sharing mechanisms
 	remote.machine().memory.set_page_readf_handler(
-		[&machine] (const auto&, size_t pageno) -> const riscv::Page& {
-			return machine.memory.get_pageno(pageno);
+		[&m = machine.memory] (const auto&, size_t pageno) -> const auto& {
+			// This works because the default return value for
+			// missing pages is a CoW zero-page (in both machines).
+			return m.get_pageno(pageno);
 		});
 	remote.machine().memory.set_page_fault_handler(
-		[&script] (auto& mem, const size_t pageno) -> riscv::Page&
-		{
+		[&s = script] (auto& mem, const size_t pageno) -> auto& {
 			const gaddr_t addr = pageno * riscv::Page::size();
-			if (script.within_heap(addr) || script.within_stack(addr)) {
-				auto& p = script.machine().memory.create_page(pageno);
-				mem.invalidate_page(pageno, p);
-				return p;
+			if (s.within_heap(addr) || s.within_stack(addr)) {
+				auto& pg = s.machine().memory.create_page(pageno);
+				mem.invalidate_page(pageno, pg);
+				return pg;
 			}
-			return mem.allocate_page(pageno);
+			// Check memory limits before allocating new page
+			if (LIKELY(mem.pages_active() < s.max_memory() / riscv::Page::size())) {
+				return mem.allocate_page(pageno);
+			}
+			throw riscv::MachineException(riscv::OUT_OF_MEMORY,
+				"Out of memory", s.max_memory());
 		});
 	// Reset instruction counter
 	remote.machine().reset_instruction_counter();

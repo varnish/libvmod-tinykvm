@@ -119,7 +119,7 @@ riscv_update(VRT_CTX, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
 		/* Pass machine error back to the client */
 		char buffer[2048];
 		snprintf(buffer, sizeof(buffer),
-			"Machine exception: %s (data: %#x)\n", e.what(), e.data());
+			"Machine exception: %s (data: 0x%lX)\n", e.what(), e.data());
 		return dynamic_result(buffer);
 	} catch (const std::exception& e) {
 		/* Pass unknown error back to the client */
@@ -349,10 +349,11 @@ struct backend_buffer riscv_backend_call(VRT_CTX, const void* key, long func, lo
 		#endif
 			return result;
 		} catch (const riscv::MachineException& e) {
-			fprintf(stderr, "Backend VM exception: %s (data: 0x%lX)\n", e.what(), (long) e.data());
+			fprintf(stderr, "Backend VM exception: %s (data: 0x%lX)\n",
+				e.what(), e.data());
 			VSLb(ctx->vsl, SLT_Error,
 				"Backend VM exception: %s (data: 0x%lX)\n",
-				e.what(), (long) e.data());
+				e.what(), e.data());
 		} catch (const std::exception& e) {
 			fprintf(stderr, "Backend VM exception: %s\n", e.what());
 			VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
