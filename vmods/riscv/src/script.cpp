@@ -59,14 +59,16 @@ void Script::setup_virtual_memory(bool init)
 {
 	using namespace riscv;
 	auto& mem = machine().memory;
-	mem.set_stack_initial(stack_base());
+	this->m_heap_base = is_storage() ? SHEAP_BASE : CHEAP_BASE;
+
+	mem.set_stack_initial(stack_begin());
 	// Use a different stack for the storage machine
 	if (this->m_is_storage) {
-		mem.set_stack_initial(mem.stack_initial() - 0x100000);
+		mem.set_stack_initial(mem.stack_initial() - stack_size());
 	}
 	// this separates heap and stack
 	mem.install_shared_page(
-		stack_base() >> riscv::Page::SHIFT, Page::guard_page());
+		stack_begin() >> riscv::Page::SHIFT, Page::guard_page());
 }
 
 void Script::machine_initialize()
@@ -252,20 +254,22 @@ void Script::print_backtrace(const gaddr_t addr)
 			origin.offset, origin.name.c_str());
 }
 
-uint64_t Script::max_instructions() const noexcept
-{
+uint64_t Script::max_instructions() const noexcept {
 	return vrm()->config.max_instructions;
 }
-const std::string& Script::name() const noexcept
-{
+const std::string& Script::name() const noexcept {
 	return vrm()->config.name;
 }
-const std::string& Script::group() const noexcept
-{
+const std::string& Script::group() const noexcept {
 	return vrm()->config.group;
 }
-size_t Script::heap_size() const noexcept
-{
+Script::gaddr_t Script::stack_base() const noexcept {
+	return stack_begin() - stack_size();
+}
+size_t  Script::stack_size() const noexcept {
+	return 0x100000;
+}
+size_t Script::heap_size() const noexcept {
 	return vrm()->config.max_heap;
 }
 

@@ -180,12 +180,11 @@ APICALL(remote_call)
 
 	// === Serialized access to storage === //
 	std::scoped_lock lock(instance.storage_mtx);
-	for (int i = 0; i < 6; i++) {
+	for (int i = 0; i < 4; i++) {
 		// Integer registers
 		stregs.get(10 + i) = myregs.get(11 + i);
-		// Floating-point registers
-		stregs.getfl(10 + i).i64 = myregs.getfl(10 + i).i64;
 	}
+	// Page-sharing mechanisms
 	remote.machine().memory.set_page_readf_handler(
 		[&machine] (const auto&, size_t pageno) -> const riscv::Page& {
 			return machine.memory.get_pageno(pageno);
@@ -194,23 +193,24 @@ APICALL(remote_call)
 		[&script] (auto& mem, const size_t pageno) -> riscv::Page&
 		{
 			const gaddr_t addr = pageno * riscv::Page::size();
-			if (addr >= script.arena_base() && addr < script.arena_base() + script.heap_size()) {
+			if (script.within_heap(addr) || script.within_stack(addr)) {
 				auto& p = script.machine().memory.create_page(pageno);
 				mem.invalidate_page(pageno, p);
 				return p;
 			}
 			return mem.allocate_page(pageno);
 		});
-	// mount some stack pages, if necessary
-	// then make a VM function call
-	auto insn = mirror_stack_call(machine, remote, func);
-	// accumulate instruction counting from the remote machine
+	// Reset instruction counter
+	remote.machine().reset_instruction_counter();
+	// Make storage VM function call
+	remote.call(func);
+	// Accumulate instruction counting from the remote machine
 	// plus some extra because remote calls are expensive
-	machine.increment_counter(REMOTE_CALL_COST + insn);
+	machine.increment_counter(REMOTE_CALL_COST
+		+ remote.machine().instruction_counter());
 
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < 4; i++) {
 		myregs.get(10 + i) = stregs.get(10 + i);
-		myregs.getfl(10 + i).i64 = stregs.getfl(10 + i).i64;
 	}
 	remote.machine().memory.reset_page_readf_handler();
 	// Short-circuit the ret pseudo-instruction:

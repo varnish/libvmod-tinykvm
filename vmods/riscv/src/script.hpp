@@ -52,9 +52,13 @@ public:
 	bool is_paused() const noexcept { return m_is_paused; }
 	bool is_storage() const noexcept { return m_is_storage; }
 
-	gaddr_t arena_base() const noexcept { return is_storage() ? SHEAP_BASE : CHEAP_BASE; }
-	gaddr_t stack_base() const noexcept { return arena_base() - 4096; /* guard page */ }
+	gaddr_t stack_begin() const noexcept { return arena_base() - 4096; /* guard page */ }
+	gaddr_t stack_base() const noexcept;
+	size_t  stack_size() const noexcept;
+	bool    within_stack(gaddr_t addr) const noexcept { return addr >= stack_base() && addr < stack_begin(); }
+	gaddr_t arena_base() const noexcept { return m_heap_base; }
 	size_t  heap_size() const noexcept;
+	bool    within_heap(gaddr_t addr) const noexcept { return addr >= arena_base() && addr < arena_base() + heap_size(); }
 	gaddr_t guest_alloc(size_t len);
 	bool    guest_free(gaddr_t addr);
 
@@ -93,6 +97,7 @@ private:
 	const struct vmod_riscv_machine* m_vrm = nullptr;
 	MachineInstance& m_inst;
 	void*       m_arena = nullptr;
+	gaddr_t     m_heap_base = 0;
 
 	std::string m_want_result;
 	std::array<gaddr_t, RESULTS_MAX> m_want_values = {403, 0};
