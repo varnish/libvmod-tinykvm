@@ -32,6 +32,12 @@ target_compile_definitions(sandbox PRIVATE
 	NATIVE_SYSCALLS_BASE=80
 )
 
+
+option(RISCV_EXPERIMENTAL "" ON)
+option(RISCV_SHARED_PT "" ON)
+option(RISCV_EXT_C "" OFF)
+option(RISCV_BINARY_TRANSLATION "" ON)
+
 add_subdirectory(libriscv/lib)
 target_compile_definitions(riscv PUBLIC
 	RISCV_EBREAK_MEANS_STOP=1

@@ -212,7 +212,8 @@ void Script::handle_exception(gaddr_t address)
 	}
 	catch (const riscv::MachineException& e) {
 		if constexpr (VERBOSE_ERRORS) {
-		fprintf(stderr, "Script exception: %s (data: %#x)\n", e.what(), e.data());
+		fprintf(stderr, "Script exception: %s (data: 0x%lX)\n",
+			e.what(), e.data());
 		fprintf(stderr, ">>> Machine registers:\n[PC\t%08lX] %s\n",
 			(long) machine().cpu.pc(),
 			machine().cpu.registers().to_string().c_str());
