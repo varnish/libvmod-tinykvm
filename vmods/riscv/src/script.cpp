@@ -7,8 +7,6 @@
 extern "C" void riscv_SetHash(struct req*, VSHA256_CTX*);
 inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
-
-static const bool TRUSTED_CALLS = true;
 static constexpr bool VERBOSE_ERRORS = true;
 
 //#define ENABLE_TIMING
@@ -55,7 +53,7 @@ Script::~Script()
 			VRE_free(&entry.re);
 }
 
-void Script::setup_virtual_memory(bool init)
+void Script::setup_virtual_memory(bool /*init*/)
 {
 	using namespace riscv;
 	auto& mem = machine().memory;
@@ -100,7 +98,6 @@ void Script::machine_setup(machine_t& machine, bool init)
 		machine.memory.set_page_fault_handler(
 		[this] (auto& mem, size_t pageno) -> riscv::Page& {
 			/* Pages are allocated from workspace */
-			//printf("Creating page %zu @ 0x%X\n", pageno, pageno * 4096);
 			auto* data =
 				(riscv::PageData*) WS_Alloc(m_ctx->ws, riscv::Page::size());
 			if (LIKELY(data != nullptr)) {
@@ -186,7 +183,7 @@ void Script::machine_setup(machine_t& machine, bool init)
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t1);
 #endif
-	setup_native_memory_syscalls<MARCH>(machine, TRUSTED_CALLS);
+	setup_native_memory_syscalls<MARCH>(machine, true);
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t2);
 #endif
@@ -218,6 +215,7 @@ void Script::handle_exception(gaddr_t address)
 			(long) machine().cpu.pc(),
 			machine().cpu.registers().to_string().c_str());
 		}
+		VRT_fail(m_ctx, "Script exception: %s", e.what());
 	}
 	catch (const std::exception& e) {
 		if constexpr (VERBOSE_ERRORS) {
