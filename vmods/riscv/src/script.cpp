@@ -20,7 +20,12 @@ Script::Script(
 	const vmod_riscv_machine* vrm, MachineInstance& inst)
 	: m_machine(source.machine().memory.binary(), {
 		.memory_max = 0,
-		.owning_machine = &source.machine()
+		.owning_machine = &source.machine(),
+#ifdef RISCV_BINARY_TRANSLATION
+		// Time-saving translator options
+		.forward_jumps = false,
+		.translate_blocks_max = (TIME_SAVING) ? 0 : 4000,
+#endif
 	  }),
 	  m_ctx(ctx), m_vrm(vrm), m_inst(inst)
 {
@@ -39,7 +44,14 @@ Script::Script(
 Script::Script(
 	const std::vector<uint8_t>& binary, const vrt_ctx* ctx,
 	const vmod_riscv_machine* vrm, MachineInstance& inst, bool storage)
-	: m_machine(binary, { .memory_max = vrm->config.max_memory }),
+	: m_machine(binary, {
+		.memory_max = vrm->config.max_memory,
+#ifdef RISCV_BINARY_TRANSLATION
+		// Time-saving translator options
+		.forward_jumps = false,
+		.translate_blocks_max = (TIME_SAVING) ? 0 : 4000,
+#endif
+	  }),
 	  m_ctx(ctx), m_vrm(vrm), m_inst(inst), m_is_storage(storage)
 {
 	this->machine_initialize();

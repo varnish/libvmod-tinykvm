@@ -92,7 +92,6 @@ int vmod_riscv_machine::forkcall(VRT_CTX, Script::gaddr_t addr)
 	TIMING_LOCATION(t3);
 	printf("Time spent in forkcall(): %ld ns\n", nanodiff(t2, t3));
 #endif
-	//printf("Machine pages: %zu\n", script->machine().memory.pages_total());
 	return ret;
 }
 

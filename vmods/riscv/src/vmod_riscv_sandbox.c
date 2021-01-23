@@ -63,10 +63,11 @@ VCL_BOOL vmod_active(VRT_CTX)
 VCL_INT vmod_call(VRT_CTX, VCL_STRING function)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	if (function == NULL)
-		return (-1); /* ??? */
+	if (function != NULL)
+		return riscv_current_call(ctx, function);
 
-	return riscv_current_call(ctx, function);
+	VRT_fail(ctx, "Null was passed to vmod_call");
+	return (-1); /* ??? */
 }
 VCL_INT vmod_vcall(VRT_CTX, VCL_ENUM e)
 {
