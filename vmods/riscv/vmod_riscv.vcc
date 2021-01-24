@@ -61,7 +61,7 @@ $Function VOID load_tenants(STRING json_filepath)
   accessible to Varnish. When a tenant sends a new program
   to Varnish, it will try to write to that location.
 
-$Function BOOL    fork(STRING tenant)
+$Function BOOL    fork(STRING tenant, STRING debug = 0)
 
 - Tenant names are the object names in the JSON configuration file.
 - Quickly create a new tenant machine forked from a previously
@@ -74,6 +74,12 @@ $Function BACKEND live_update(STRING tenant, BYTES max_size = 2097152)
   current request. If the machine fails to load, the old machine
   will be kept running.
 - Tenant name must be specified to avoid accidents.
+
+$Function BACKEND live_debug(STRING tenant, BYTES max_size = 2097152)
+
+- Receive a binary suitable for debugging, then
+  open a port for GDB remote debugging.
+- A temporary tenant name is returned in the response.
 
 
 $Function BOOL    active()

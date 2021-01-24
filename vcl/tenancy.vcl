@@ -26,7 +26,7 @@ sub vcl_recv {
 	/* Easier to work with wrk */
 	if (req.url == "/x") {
 		set req.http.Host = "xpizza.com";
-		#set req.url = req.url + "?foo=" + utils.fast_random_int(100);
+		set req.url = req.url + "?foo=" + utils.fast_random_int(100);
 	}
 	else if (req.url == "/y") {
 		set req.http.Host = "ypizza.com";
@@ -40,12 +40,18 @@ sub vcl_recv {
 
 		/* Live update mechanism */
 		if (req.method == "POST") {
-			set req.backend_hint = riscv.live_update(req.http.Host, 15MB);
+			if (req.url == "/") {
+				set req.backend_hint = riscv.live_update(req.http.Host, 15MB);
+			} else if (req.url == "/debug") {
+				set req.backend_hint = riscv.live_debug(req.http.Host, 15MB);
+			} else {
+				return (synth(403));
+			}
 			std.cache_req_body(15MB);
 			return (pass);
 		}
 		/* If fork fails, it's probably not a tenant */
-		if (!riscv.fork(req.http.Host)) {
+		if (!riscv.fork(req.http.Host, req.http.X-Debug)) {
 			return (synth(403));
 		}
 
@@ -92,7 +98,7 @@ sub vcl_synth {
 }
 
 sub vcl_backend_fetch {
-	if (riscv.fork(bereq.http.Host)) {
+	if (riscv.fork(bereq.http.Host, bereq.http.X-Debug)) {
 		riscv.vcall(ON_BACKEND_FETCH);
 		if (bereq.http.X-Backend-Func) {
 			set bereq.backend = riscv.vm_backend(

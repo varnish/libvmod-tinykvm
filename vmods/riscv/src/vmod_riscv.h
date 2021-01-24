@@ -25,6 +25,8 @@ struct vmod_riscv_updater
 
 	uint64_t max_binary_size;
 	struct vmod_riscv_machine *machine;
+	int16_t  is_debug;
+	uint16_t debug_port;
 };
 
 struct backend_buffer {

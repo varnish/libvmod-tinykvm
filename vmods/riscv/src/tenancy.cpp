@@ -43,12 +43,13 @@ vmod_riscv_machine* tenant_find(VRT_CTX, const char* name)
 	return nullptr;
 }
 
-vmod_riscv_machine* create_temporary_tenant(const vmod_riscv_machine* vrm)
+vmod_riscv_machine* create_temporary_tenant(
+	const vmod_riscv_machine* vrm, const std::string& name)
 {
 	/* Create a new tenant with a temporary name,
 	   and no program file to load. */
 	TenantConfig config{vrm->config};
-	config.name.append("_temporary");
+	config.name = name;
 	config.filename = "";
 	auto it = temporaries.try_emplace(
 		strdup(config.name.c_str()),

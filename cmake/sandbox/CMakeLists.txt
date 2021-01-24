@@ -11,6 +11,7 @@ list(APPEND RISCV_SOURCES
 	src/machine_instance.cpp
 	src/sandbox.cpp
 	src/script.cpp
+	src/script_debug.cpp
 	src/script_functions.cpp
 	src/script_sha256.cpp
 	src/tenancy.cpp

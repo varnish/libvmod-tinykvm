@@ -10,7 +10,7 @@
 
 extern void init_tenants(VRT_CTX, const char*);
 
-extern void* riscv_fork(VRT_CTX, const char*);
+extern void* riscv_fork(VRT_CTX, const char* ten, int dbg);
 // Functions operating on a machine already forked, which
 // is accessible through a priv_task.
 extern long riscv_current_call(VRT_CTX, const char*);
@@ -45,11 +45,11 @@ VCL_VOID vmod_load_tenants(VRT_CTX, VCL_STRING filename)
 
 /* Fork into a new VM. The VM is freed when the
    request (priv_task) ends. */
-VCL_BOOL vmod_fork(VRT_CTX, VCL_STRING tenant)
+VCL_BOOL vmod_fork(VRT_CTX, VCL_STRING tenant, VCL_STRING debug)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
-	return riscv_fork(ctx, tenant) != NULL;
+	return riscv_fork(ctx, tenant, debug != NULL) != NULL;
 }
 
 /* Check if there is a VM currently for this request. */

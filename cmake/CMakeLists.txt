@@ -1,6 +1,10 @@
 set(CMAKE_C_FLAGS "-Wall -Wextra -std=c11 -O2 -g -fstack-protector-strong")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fdiagnostics-color")
 
+#set(CMAKE_C_CLANG_TIDY clang-tidy-11 -checks=-*,readability-*)
+#set(CMAKE_CXX_CLANG_TIDY clang-tidy-11 -checks=-*,readability-*)
+
+
 if (LTO_ENABLE)
     if ("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto")

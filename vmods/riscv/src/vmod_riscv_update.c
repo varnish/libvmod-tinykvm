@@ -6,7 +6,7 @@
 #include "vcl.h"
 #include "vcc_if.h"
 
-extern struct update_result riscv_update(VRT_CTX, struct vmod_riscv_machine*, const uint8_t*, size_t);
+extern struct update_result riscv_update(VRT_CTX, struct vmod_riscv_machine*, const struct update_params*);
 extern const struct vmod_riscv_machine* riscv_current_machine(VRT_CTX);
 extern struct vmod_riscv_machine* tenant_find(VRT_CTX, const char*);
 
@@ -133,8 +133,13 @@ riscvbe_gethdrs(const struct director *dir,
 			.http_bereq  = bo->bereq,
 			.http_beresp = bo->beresp,
 		};
+		const struct update_params uparams = {
+			.data = result_data,
+			.len  = result_len,
+			.is_debug = rvu->is_debug,
+		};
 		struct update_result result =
-			riscv_update(&ctx, rvu->machine, result_data, result_len);
+			riscv_update(&ctx, rvu->machine, &uparams);
 
 		http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
 		http_PrintfHeader(bo->beresp, "Content-Length: %zu", result.len);
@@ -163,6 +168,18 @@ riscvbe_gethdrs(const struct director *dir,
 	return (-1);
 }
 
+static inline void rvu_director(
+	struct director *dir, struct vmod_riscv_updater *rvu)
+{
+	INIT_OBJ(dir, DIRECTOR_MAGIC);
+	dir->priv = rvu;
+	dir->name = "VM updater director";
+	dir->vcl_name = "vmod_machine_update";
+	dir->gethdrs = riscvbe_gethdrs;
+	dir->finish  = riscvbe_finish;
+	dir->panic   = riscvbe_panic;
+}
+
 VCL_BACKEND vmod_live_update(VRT_CTX, VCL_STRING tenant, VCL_BYTES max_size)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
@@ -183,14 +200,36 @@ VCL_BACKEND vmod_live_update(VRT_CTX, VCL_STRING tenant, VCL_BYTES max_size)
 	INIT_OBJ(rvu, RISCV_BACKEND_MAGIC);
 	rvu->max_binary_size = max_size;
 	rvu->machine = rvm;
+	rvu->is_debug = 0;
+	rvu_director(&rvu->dir, rvu);
 
-	INIT_OBJ(&rvu->dir, DIRECTOR_MAGIC);
-	rvu->dir.priv = rvu;
-	rvu->dir.name = "VM updater director";
-	rvu->dir.vcl_name = "vmod_machine_update";
-	rvu->dir.gethdrs = riscvbe_gethdrs;
-	rvu->dir.finish  = riscvbe_finish;
-	rvu->dir.panic   = riscvbe_panic;
+	return &rvu->dir;
+}
+
+VCL_BACKEND vmod_live_debug(
+	VRT_CTX, VCL_STRING tenant, VCL_BYTES max_size)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	struct vmod_riscv_machine *rvm = tenant_find(ctx, tenant);
+	if (rvm == NULL) {
+		VRT_fail(ctx, "Could not find tenant: %s", tenant);
+		return NULL;
+	}
+
+	struct vmod_riscv_updater *rvu;
+	rvu = WS_Alloc(ctx->ws, sizeof(struct vmod_riscv_updater));
+	if (rvu == NULL) {
+		VRT_fail(ctx, "Unable to allocate memory for update");
+		return NULL;
+	}
+
+	INIT_OBJ(rvu, RISCV_BACKEND_MAGIC);
+	rvu->max_binary_size = max_size;
+	rvu->machine = rvm;
+	rvu->is_debug   = 1;
+	rvu->debug_port = 0;
+	rvu_director(&rvu->dir, rvu);
 
 	return &rvu->dir;
 }

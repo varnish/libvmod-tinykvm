@@ -2,10 +2,14 @@
 #include "script.hpp"
 #include <atomic>
 #include <mutex>
+namespace riscv {
+	template <int W> struct RSPClient;
+}
 
 struct MachineInstance
 {
-	MachineInstance(std::vector<uint8_t>, const vrt_ctx*, vmod_riscv_machine*);
+	MachineInstance(std::vector<uint8_t>,
+		const vrt_ctx*, vmod_riscv_machine*, bool = false);
 	~MachineInstance();
 
 	inline Script::gaddr_t lookup(const char* name) const {
@@ -19,6 +23,9 @@ struct MachineInstance
 	Script   storage;
 	Script   script;
 	std::mutex storage_mtx;
+	riscv::RSPClient<Script::MARCH>* rspclient = nullptr;
+	Script* rsp_script = nullptr;
+	std::mutex rsp_mtx;
 	/* Lookup tree for ELF symbol names */
 	eastl::string_map<Script::gaddr_t,
 			eastl::str_less<const char*>,

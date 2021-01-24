@@ -1,6 +1,12 @@
 #pragma once
 #include <stddef.h>
 
+struct update_params {
+	const uint8_t* data;
+	const size_t len;
+	const int is_debug;
+};
+
 struct update_result {
 	const char* output;
 	const size_t len;

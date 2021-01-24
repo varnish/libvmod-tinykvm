@@ -6,7 +6,7 @@ extern "C" {
 static bool file_writer(const std::string& file, const std::vector<uint8_t>&);
 static const size_t TOO_SMALL = 3; // vmcalls that can be skipped
 
-extern vmod_riscv_machine* create_temporary_tenant(const vmod_riscv_machine*);
+extern vmod_riscv_machine* create_temporary_tenant(const vmod_riscv_machine*, const std::string&);
 extern void delete_temporary_tenant(const vmod_riscv_machine*);
 
 constexpr update_result
@@ -21,10 +21,10 @@ dynamic_result(const char* text) {
 
 extern "C"
 struct update_result
-riscv_update(VRT_CTX, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
+riscv_update(VRT_CTX, vmod_riscv_machine* vrm, struct update_params *params)
 {
 	/* ELF loader will not be run for empty binary */
-	if (UNLIKELY(data == nullptr || len == 0)) {
+	if (UNLIKELY(params->data == nullptr || params->len == 0)) {
 		return static_result("Empty file received");
 	}
 	try {
@@ -32,10 +32,11 @@ riscv_update(VRT_CTX, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
 		TIMING_LOCATION(t0);
 	#endif
 		/* Note: CTX is NULL here */
-		std::vector<uint8_t> binary {data, data + len};
+		std::vector<uint8_t> binary {params->data, params->data + params->len};
 
 		/* If this throws an exception, we instantly fail the update */
-		auto inst = std::make_shared<MachineInstance>(std::move(binary), nullptr, vrm);
+		auto inst = std::make_shared<MachineInstance>(
+			std::move(binary), nullptr, vrm, params->is_debug);
 		const auto& live_binary = inst->binary;
 
 		/* Check if self-test is present */
@@ -43,7 +44,8 @@ riscv_update(VRT_CTX, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
 			selftest != 0x0)
 		{
 			/* Create a temporary tenant */
-			auto* temp = create_temporary_tenant(vrm);
+			auto* temp = create_temporary_tenant(
+				vrm, vrm->config.name + "_temporary");
 			try {
 				/* Create machine with VRT context */
 				temp->machine = std::make_shared<MachineInstance>(live_binary, ctx, temp);
@@ -60,10 +62,18 @@ riscv_update(VRT_CTX, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
 			VSLb(ctx->vsl, SLT_Debug, "Self-test was skipped (not found)");
 		}
 
-		/* Decrements reference when it goes out of scope.
-		   We need the *new* instance alive for access to the binary
-		   when writing it to disk. Don't *move*. See below. */
-		auto old = std::atomic_exchange(&vrm->machine, inst);
+		std::shared_ptr<MachineInstance> old;
+		if (!params->is_debug)
+		{
+			/* Decrements reference when it goes out of scope.
+			   We need the *new* instance alive for access to the binary
+			   when writing it to disk. Don't *move*. See below. */
+			old = std::atomic_exchange(&vrm->machine, inst);
+
+		} else {
+			/* Live-debugging temporary tenant */
+			old = std::atomic_exchange(&vrm->debug_machine, inst);
+		}
 
 		if (old != nullptr) {
 			const auto luaddr = old->lookup("on_live_update");
@@ -99,16 +109,19 @@ riscv_update(VRT_CTX, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
 		TIMING_LOCATION(t1);
 		printf("Time spent updating: %ld ns\n", nanodiff(t0, t1));
 	#endif
-		/* If we arrive here, the initialization was successful,
-		   and we can proceed to store the program to disk. */
-		bool ok = file_writer(vrm->config.filename, live_binary);
-		if (!ok) {
-			/* Writing the tenant program to file failed */
-			char buffer[800];
-			const int len = snprintf(buffer, sizeof(buffer),
-				"Could not write '%s'", vrm->config.filename.c_str());
-			VSLb(ctx->vsl, SLT_Error, "%.*s", len, buffer);
-			return dynamic_result(buffer);
+		if (!params->is_debug)
+		{
+			/* If we arrive here, the initialization was successful,
+			   and we can proceed to store the program to disk. */
+			bool ok = file_writer(vrm->config.filename, live_binary);
+			if (!ok) {
+				/* Writing the tenant program to file failed */
+				char buffer[800];
+				const int len = snprintf(buffer, sizeof(buffer),
+					"Could not write '%s'", vrm->config.filename.c_str());
+				VSLb(ctx->vsl, SLT_Error, "%.*s", len, buffer);
+				return dynamic_result(buffer);
+			}
 		}
 		return static_result("Update successful\n");
 	} catch (const riscv::MachineException& e) {
@@ -128,14 +141,14 @@ riscv_update(VRT_CTX, vmod_riscv_machine* vrm, const uint8_t* data, size_t len)
 }
 
 extern "C"
-Script* riscv_fork(VRT_CTX, const char* tenant)
+Script* riscv_fork(VRT_CTX, const char* tenant, int debug)
 {
 	extern vmod_riscv_machine* tenant_find(VRT_CTX, const char* name);
 	auto* vrm = tenant_find(ctx, tenant);
 	if (UNLIKELY(vrm == nullptr))
 		return nullptr;
 
-	auto* script = vrm->vmfork(ctx);
+	auto* script = vrm->vmfork(ctx, debug);
 	if (UNLIKELY(script == nullptr))
 		return nullptr;
 

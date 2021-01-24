@@ -28,7 +28,7 @@ vmod_riscv_machine::vmod_riscv_machine(VRT_CTX, const TenantConfig& conf)
 	}
 }
 
-Script* vmod_riscv_machine::vmfork(VRT_CTX)
+Script* vmod_riscv_machine::vmfork(VRT_CTX, bool debug)
 {
 	auto* priv_task = VRT_priv_task(ctx, ctx);
 	if (!priv_task->priv)
@@ -36,7 +36,11 @@ Script* vmod_riscv_machine::vmfork(VRT_CTX)
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t0);
 	#endif
-		auto program = this->machine;
+		std::shared_ptr<MachineInstance> program;
+		if (!debug)
+			program = this->machine;
+		else
+			program = this->debug_machine;
 		/* First-time tenants could have no program */
 		if (UNLIKELY(program == nullptr))
 			return nullptr;
@@ -49,6 +53,8 @@ Script* vmod_riscv_machine::vmfork(VRT_CTX)
 
 		try {
 			new (script) Script{program->script, ctx, this, *program};
+			/* This creates a self-reference, which ensures that any
+			   open Script instances will keep the VRM instance alive. */
 			script->assign_instance(program);
 
 		} catch (std::exception& e) {
@@ -75,24 +81,6 @@ Script* vmod_riscv_machine::vmfork(VRT_CTX)
 		};
 	}
 	return (Script*) priv_task->priv;
-}
-
-int vmod_riscv_machine::forkcall(VRT_CTX, Script::gaddr_t addr)
-{
-	auto* script = this->vmfork(ctx);
-	if (UNLIKELY(script == nullptr))
-		return -1;
-
-	/* Call into the virtual machine */
-#ifdef ENABLE_TIMING
-	TIMING_LOCATION(t2);
-#endif
-	int ret = script->call(addr);
-#ifdef ENABLE_TIMING
-	TIMING_LOCATION(t3);
-	printf("Time spent in forkcall(): %ld ns\n", nanodiff(t2, t3));
-#endif
-	return ret;
 }
 
 void vmod_riscv_machine::set_dynamic_call(const std::string& name, ghandler_t handler)

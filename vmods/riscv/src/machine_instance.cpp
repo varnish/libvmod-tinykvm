@@ -15,10 +15,11 @@ std::vector<const char*> riscv_lookup_wishlist {
 
 MachineInstance::MachineInstance(
 	std::vector<uint8_t> elf,
-	const vrt_ctx* ctx, vmod_riscv_machine* vrm)
+	const vrt_ctx* ctx, vmod_riscv_machine* vrm,
+	bool debug)
 	: binary{std::move(elf)},
-	  storage{binary, ctx, vrm, *this, true},
-	  script{binary, ctx, vrm, *this, false}
+	  storage{binary, ctx, vrm, *this, true, debug},
+	  script{binary, ctx, vrm, *this, false, debug}
 {
 	extern std::vector<const char*> riscv_lookup_wishlist;
 	for (const auto* func : riscv_lookup_wishlist) {

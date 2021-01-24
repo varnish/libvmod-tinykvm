@@ -21,6 +21,8 @@ public:
 	// call any script function, with any parameters
 	template <typename... Args>
 	inline long call(gaddr_t addr, Args&&...);
+	template <typename... Args>
+	inline long debugcall(gaddr_t addr, Args&&...);
 
 	template <typename... Args>
 	inline long preempt(gaddr_t addr, Args&&...);
@@ -52,6 +54,7 @@ public:
 	}
 	bool is_paused() const noexcept { return m_is_paused; }
 	bool is_storage() const noexcept { return m_is_storage; }
+	bool is_debug() const noexcept { return m_is_debug; }
 
 	gaddr_t max_memory() const noexcept;
 	gaddr_t stack_begin() const noexcept { return arena_base() - 4096; /* guard page */ }
@@ -81,7 +84,7 @@ public:
 
 	bool reset(); // true if the reset was successful
 
-	Script(const std::vector<uint8_t>&, const vrt_ctx*, const vmod_riscv_machine*, MachineInstance&, bool storage);
+	Script(const std::vector<uint8_t>&, const vrt_ctx*, const vmod_riscv_machine*, MachineInstance&, bool sto, bool dbg);
 	Script(const Script& source, const vrt_ctx*, const vmod_riscv_machine*, MachineInstance&);
 	~Script();
 
@@ -105,6 +108,7 @@ private:
 	std::array<gaddr_t, RESULTS_MAX> m_want_values = {403, 0};
 	bool        m_is_paused = false;
 	bool        m_is_storage = false;
+	bool        m_is_debug = false;
 	struct VSHA256Context* m_sha_ctx = nullptr;
 
 	struct RegexCache {
@@ -113,6 +117,11 @@ private:
 		bool        non_owned = false;
 	};
 	eastl::fixed_vector<RegexCache, REGEX_MAX> m_regex_cache;
+
+	/* GDB RSP client */
+	long resume_debugger();
+	long finish_debugger();
+	void stop_debugger();
 
 	/* Delete this last */
 	std::shared_ptr<MachineInstance> m_inst_ref = nullptr;
@@ -126,6 +135,9 @@ inline long Script::call(gaddr_t address, Args&&... args)
 		machine().cpu.reset_stack_pointer();
 		// setup calling convention
 		machine().setup_call(address, std::forward<Args>(args)...);
+		// GDB debugger attachment
+		if (UNLIKELY(is_debug()))
+			return resume_debugger();
 		// execute function
 		machine().simulate<true>(max_instructions());
 		// address-sized integer return value
@@ -163,6 +175,9 @@ inline long Script::preempt(gaddr_t address, Args&&... args)
 inline long Script::resume(uint64_t cycles)
 {
 	try {
+		// GDB debugger attachment
+		if (UNLIKELY(is_debug()))
+			return resume_debugger();
 		machine().simulate<false>(cycles);
 		return machine().cpu.reg(10);
 	}

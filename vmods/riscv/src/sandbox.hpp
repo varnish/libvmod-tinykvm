@@ -17,8 +17,7 @@ struct vmod_riscv_machine
 {
 	using ghandler_t = std::function<void(Script&)>;
 
-	int forkcall(const vrt_ctx*, Script::gaddr_t addr);
-	Script* vmfork(const vrt_ctx*);
+	Script* vmfork(const vrt_ctx*, bool debug);
 	bool no_program_loaded() const noexcept { return this->machine == nullptr; }
 
 	// Install a callback function using a string name
@@ -51,6 +50,8 @@ struct vmod_riscv_machine
 	const TenantConfig config;
 	/* Hot-swappable machine */
 	std::shared_ptr<MachineInstance> machine = nullptr;
+	/* Machine for debugging */
+	std::shared_ptr<MachineInstance> debug_machine = nullptr;
 	/* Hash map of string hashes associated with dyncall handlers */
 	std::unordered_map<uint32_t, ghandler_t> m_dynamic_functions;
 };

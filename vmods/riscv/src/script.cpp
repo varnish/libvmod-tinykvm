@@ -20,14 +20,10 @@ Script::Script(
 	const vmod_riscv_machine* vrm, MachineInstance& inst)
 	: m_machine(source.machine().memory.binary(), {
 		.memory_max = 0,
-		.owning_machine = &source.machine(),
-#ifdef RISCV_BINARY_TRANSLATION
-		// Time-saving translator options
-		.forward_jumps = false,
-		.translate_blocks_max = (TIME_SAVING) ? 0 : 4000,
-#endif
+		.owning_machine = &source.machine()
 	  }),
-	  m_ctx(ctx), m_vrm(vrm), m_inst(inst)
+	  m_ctx(ctx), m_vrm(vrm), m_inst(inst),
+	  m_is_debug(source.is_debug())
 {
 	/* No initialization */
 	this->machine_setup(machine(), false);
@@ -43,16 +39,18 @@ Script::Script(
 
 Script::Script(
 	const std::vector<uint8_t>& binary, const vrt_ctx* ctx,
-	const vmod_riscv_machine* vrm, MachineInstance& inst, bool storage)
+	const vmod_riscv_machine* vrm, MachineInstance& inst,
+	bool storage, bool debug)
 	: m_machine(binary, {
 		.memory_max = vrm->config.max_memory,
 #ifdef RISCV_BINARY_TRANSLATION
 		// Time-saving translator options
+		.translate_blocks_max = (debug ? 0u : 4000u),
 		.forward_jumps = false,
-		.translate_blocks_max = (TIME_SAVING) ? 0 : 4000,
 #endif
 	  }),
-	  m_ctx(ctx), m_vrm(vrm), m_inst(inst), m_is_storage(storage)
+	  m_ctx(ctx), m_vrm(vrm), m_inst(inst),
+	  m_is_storage(storage), m_is_debug(debug)
 {
 	this->machine_initialize();
 }
@@ -63,6 +61,9 @@ Script::~Script()
 	for (auto& entry : m_regex_cache)
 		if (entry.re && !entry.non_owned)
 			VRE_free(&entry.re);
+	if (this->is_debug()) {
+		this->stop_debugger();
+	}
 }
 
 void Script::setup_virtual_memory(bool /*init*/)
@@ -172,7 +173,7 @@ void Script::machine_setup(machine_t& machine, bool init)
 			throw std::runtime_error("The binary is missing a public exit function!");
 		// Full Linux-compatible stack
 		machine.setup_linux(
-			{ name(), m_is_storage ? "1" : "0" },
+			{ name(), m_is_storage ? "1" : "0", is_debug() ? "1" : "0" },
 			{ "LC_CTYPE=C", "LC_ALL=C", "USER=groot" });
 	}
 
