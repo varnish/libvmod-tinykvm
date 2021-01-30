@@ -1,6 +1,6 @@
 #!/bin/bash
-export CC="ccache clang-10"
-export CXX="ccache clang++-10"
+export CC="ccache clang-11"
+export CXX="ccache clang++-11"
 BUILD_PATH="$PWD"
 SOURCE_DIR="$PWD"
 

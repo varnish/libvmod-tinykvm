@@ -11,7 +11,7 @@ add_vmod(vmod_goto ${PATH}/vmod_goto.vcc "Goto VMOD"
 	${PATH}/dns_srv/dns_local_search.c
 	${PATH}/dns_srv/dns_nsswitch.c
 	${PATH}/dns_srv/dns_query.c
-	${PATH}/dns_srv/dns_test.c
+#	${PATH}/dns_srv/dns_test.c
 )
 target_compile_definitions(vmod_goto PRIVATE _DNS_SRV_STANDALONE=1)
 target_include_directories(vmod_goto PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

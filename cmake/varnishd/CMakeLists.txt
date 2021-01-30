@@ -140,8 +140,6 @@ if (VARNISH_PLUS)
 		${VD_PATH}/vmod_util/brotli_util.c
 		${VD_PATH}/vmod_util/crypto_util.c
 		${VD_PATH}/vmod_util/edgestash_util.c
-		${VD_PATH}/vmod_util/file_util.c
-		${VD_PATH}/vmod_util/synthbackend_util.c
 		${VD_PATH}/vmod_util/vcp_vfp.c
 		${VD_PATH}/vmod_util/vmod_util.c
 		${VD_PATH}/vmod_util/waf_util.c

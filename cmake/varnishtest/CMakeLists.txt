@@ -4,28 +4,30 @@ project(varnishtest C)
 set (PATH ${VARNISH_PATH}/bin/varnishtest)
 
 add_custom_command(
-    COMMAND awk -f ${PATH}/gensequences ${PATH}/sequences > teken_state.h
-    OUTPUT  teken_state.h
-    DEPENDS ${PATH}/sequences ${PATH}/gensequences
-    COMMENT "Generating teken_state header for varnishtest"
+	COMMAND awk -f ${PATH}/gensequences ${PATH}/sequences > teken_state.h
+	OUTPUT  teken_state.h
+	DEPENDS ${PATH}/sequences ${PATH}/gensequences
+	COMMENT "Generating teken_state header for varnishtest"
 )
 add_custom_target(teken_generate
-    DEPENDS teken_state.h
+	DEPENDS teken_state.h
 )
 
 add_custom_command(
-    COMMAND ${Python3_EXECUTABLE} ${PATH}/huffman_gen.py ${VARNISH_PATH}/include/tbl/vhp_huffman.h > vtc_h2_dectbl.h
-    OUTPUT  vtc_h2_dectbl.h
-    DEPENDS ${VARNISH_PATH}/include/tbl/vhp_huffman.h
-    COMMENT "Generating vtc_h2_dectbl header for varnishtest"
+	COMMAND ${Python3_EXECUTABLE} ${PATH}/huffman_gen.py ${VARNISH_PATH}/include/tbl/vhp_huffman.h > vtc_h2_dectbl.h
+	OUTPUT  vtc_h2_dectbl.h
+	DEPENDS ${VARNISH_PATH}/include/tbl/vhp_huffman.h
+	COMMENT "Generating vtc_h2_dectbl header for varnishtest"
 )
 add_custom_target(vtc_h2_dectbl_generate
-    DEPENDS vtc_h2_dectbl.h
+	DEPENDS vtc_h2_dectbl.h
 )
 
 set(SOURCES
 		${PATH}/teken.c
 		${PATH}/vtc_client.c
+		${PATH}/vtc_dns.c
+		${PATH}/vtc_file.c
 		${PATH}/vtc_haproxy.c
 		${PATH}/vtc_log.c
 		${PATH}/vtc_misc.c
@@ -46,7 +48,7 @@ set(SOURCES
 	)
 if (NOT VARNISH_PLUS)
 	set(SOURCES ${SOURCES}
-        ${PATH}/vtc_gzip.c
+		${PATH}/vtc_gzip.c
 		${PATH}/vtc_sess.c
 	)
 endif()
@@ -56,7 +58,7 @@ target_include_directories(varnishtest PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_compile_definitions(varnishtest PUBLIC VTEST_WITH_VTC_VARNISH=1)
 target_compile_definitions(varnishtest PUBLIC VTEST_WITH_VTC_LOGEXPECT=1)
 
-target_link_libraries(varnishtest vapi_static varnish pthread vgz)
+target_link_libraries(varnishtest vapi_static varnish resolv pthread vgz)
 if (VARNISH_PLUS)
 	target_link_libraries(varnishtest mse)
 endif()
