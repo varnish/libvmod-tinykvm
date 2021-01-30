@@ -3,7 +3,6 @@ project (vmod C CXX)
 include(../vmod.cmake vmod)
 
 set (RISCV_SOURCES
-	src/vmod_riscv_exec.c
 	src/vmod_riscv_response.c
 	src/vmod_riscv_sandbox.c
 	src/vmod_riscv_update.c

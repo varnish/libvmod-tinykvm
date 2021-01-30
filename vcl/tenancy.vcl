@@ -12,7 +12,7 @@ backend default {
 sub vcl_init {
 	new f = file.init(std.getenv("HOME"));
 	riscv.load_tenants(std.getenv("HOME") +
-		"/github/varnish_autoperf/vcl/tenants.json");
+		"/git/varnish_autoperf/vcl/tenants.json");
 }
 
 sub vcl_recv {
@@ -26,7 +26,9 @@ sub vcl_recv {
 	/* Easier to work with wrk */
 	if (req.url == "/x") {
 		set req.http.Host = "xpizza.com";
-		set req.url = req.url + "?foo=" + utils.fast_random_int(100);
+		set req.url = req.url + "?foo=" + utils.cpu_id();
+		//set req.url = req.url + "?foo=" + utils.thread_id();
+		//set req.url = req.url + "?foo=" + utils.fast_random_int(100);
 	}
 	else if (req.url == "/y") {
 		set req.http.Host = "ypizza.com";

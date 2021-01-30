@@ -154,25 +154,3 @@ $Function BACKEND vm_backend(STRING func, STRING arg = "")
 		set bereq.backend = riscv.vm_backend();
 		return (hash);
 	}
-
-
-SIMPLE EXECUTION
-================
-
-These functions allows for simple execution of RISC-V machine code.
-The backend variant will take body bytes and try to execute it, then return
-the output from the machine in the response. Both functions set quite a few
-headers which all give information on how the execution went.
-
-$Function STRING exec(HTTP req, INT max_instructions, BLOB elf)
-
-Execute the given ELF binary, running its main function to completion or runs out of instructions limited by max_instructions. This will also initialize the machine, and may call destructors before exiting.
-
-- All measurements are stored in several HTTP header fields
-- Errors are stored in a X-Exception header field.
-- If an error occurs the return value is null (empty).
-- On success the machine output is returned.
-
-$Object backend(INT max_instructions = 2000000, STRANDS arguments = 0)
-
-$Method BACKEND .from_body()

@@ -7,7 +7,6 @@ option(SHARED_LIBRISCV "Build the libriscv sandbox PIC" ON)
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++20 -O2 -g")
 
 list(APPEND RISCV_SOURCES
-	src/linux.cpp
 	src/machine_instance.cpp
 	src/sandbox.cpp
 	src/script.cpp
@@ -18,8 +17,6 @@ list(APPEND RISCV_SOURCES
 	src/vmod_riscv.cpp
 	src/varnish_interface.c
 	libriscv/emulator/syscalls/src/syscalls.cpp
-	libriscv/emulator/syscalls/src/threads.cpp
-	libriscv/emulator/syscalls/src/posix_threads.cpp
 	libriscv/emulator/syscalls/src/native_libc.cpp
 	libriscv/emulator/syscalls/src/native_threads.cpp
 )

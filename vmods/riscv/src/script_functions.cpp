@@ -1,9 +1,9 @@
 #include "script_functions.hpp"
 #include "machine/include_api.hpp"
 #include "machine_instance.hpp"
-#include "shm.hpp"
 #include "varnish.hpp"
 static const uint64_t REMOTE_CALL_COST = 4000;
+static const uint16_t DEBUG_PORT = 2159;
 
 //#define ENABLE_TIMING
 #define TIMING_LOCATION(x) \
@@ -154,6 +154,21 @@ APICALL(shm_log)
 	}
 	// TODO: slow-path
 	machine.set_result(-1);
+}
+APICALL(breakpoint)
+{
+	auto& script = get_script(machine);
+	auto* ctx = script.ctx();
+	if (script.is_debug()) {
+		VSLb(ctx->vsl, SLT_Debug,
+			"VM breakpoint at 0x%lX", (long) machine.cpu.pc());
+		script.open_debugger(DEBUG_PORT);
+	} else {
+		printf("Not opening debugger\n");
+		VSLb(ctx->vsl, SLT_Debug,
+			"Skipped VM breakpoint at 0x%lX (debug not enabled)",
+			(long) machine.cpu.pc());
+	}
 }
 APICALL(dynamic_call)
 {
@@ -823,6 +838,7 @@ void Script::setup_syscall_interface(machine_t& machine)
 		FPTR(assertion_failed),
 		FPTR(print),
 		FPTR(shm_log),
+		FPTR(breakpoint),
 		FPTR(::dynamic_call),
 		FPTR(remote_call),
 		FPTR(remote_strcall),

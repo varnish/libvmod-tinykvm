@@ -81,6 +81,7 @@ public:
 	auto    callsite(gaddr_t addr) const { return machine().memory.lookup(addr); }
 
 	void print_backtrace(const gaddr_t addr);
+	void open_debugger(uint16_t);
 
 	bool reset(); // true if the reset was successful
 
@@ -109,6 +110,7 @@ private:
 	bool        m_is_paused = false;
 	bool        m_is_storage = false;
 	bool        m_is_debug = false;
+	bool        m_currently_debugging = false;
 	struct VSHA256Context* m_sha_ctx = nullptr;
 
 	struct RegexCache {
@@ -122,6 +124,7 @@ private:
 	long resume_debugger();
 	long finish_debugger();
 	void stop_debugger();
+	void run_debugger_loop();
 
 	/* Delete this last */
 	std::shared_ptr<MachineInstance> m_inst_ref = nullptr;
