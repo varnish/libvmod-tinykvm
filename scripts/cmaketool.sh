@@ -88,7 +88,7 @@ case $i in
     shift
     ;;
 	--no-optimize)
-    args="$args -DCMAKE_BUILD_TYPE=\"\" -DLTO_ENABLE=OFF -DNATIVE=OFF"
+    args="$args -DCMAKE_BUILD_TYPE= -DLTO_ENABLE=OFF -DNATIVE=OFF"
     shift
     ;;
 	--static-sandbox)
