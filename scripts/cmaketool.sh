@@ -1,6 +1,11 @@
 #!/bin/bash
-export CC="ccache clang-11"
-export CXX="ccache clang++-11"
+if ! command -v "clang-11" &> /dev/null; then
+	export CC="ccache clang-10"
+	export CXX="ccache clang++-10"
+else
+	export CC="ccache clang-11"
+	export CXX="ccache clang++-11"
+fi
 BUILD_PATH="$PWD"
 SOURCE_DIR="$PWD"
 

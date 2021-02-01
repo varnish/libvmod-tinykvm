@@ -1,0 +1,36 @@
+version: 2
+jobs:
+  cmake_builds:
+    docker:
+      - image: cimg/base:2020.01
+    steps:
+      #- run: git clone --recursive --depth 1 "$CIRCLE_REPOSITORY_URL" --branch "$CIRCLE_BRANCH"
+      - run:
+          name: Update ssh config for github.com to use several keys
+          command: |
+            mkdir -p ~/.ssh
+            echo  'Host github.com' >  ~/.ssh/config
+            echo  '    IdentitiesOnly no' >>  ~/.ssh/config
+            git config --global url."ssh://git@github.com".insteadOf "https://github.com" || true
+            git config --global gc.auto 0 || true
+      - checkout
+      - add_ssh_keys:
+          fingerprints:
+            - "92:09:b8:08:d4:00:ac:ad:9b:b6:e5:68:9e:7f:08:3e"
+      - run:
+          name: Checkout submodules
+          command: |
+            ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+            ssh-add -D
+            ssh-add ~/.ssh/id_rsa_9209b808d400acad9bb6e5689e7f083e
+            export REVISION=$CIRCLE_BRANCH
+            export VERSION=$CIRCLE_SHA1
+      - run: bash ./scripts/install_deps.sh
+      - run: bash ./scripts/vcp_riscv_setup.sh
+      - run: bash ./scripts/cmaketool.sh --vcp=build --no-optimize --build
+
+workflows:
+  version: 2
+  cmake_build_system:
+    jobs:
+      - cmake_builds
