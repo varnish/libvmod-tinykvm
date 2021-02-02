@@ -69,11 +69,10 @@ void delete_temporary_tenant(const vmod_riscv_machine* vrm)
 	throw std::runtime_error("Could not delete temporary tenant");
 }
 
-extern "C"
-void init_tenants(VRT_CTX, const char* filename)
+static void init_tenants(VRT_CTX,
+	const std::vector<uint8_t>& vec, const char* source)
 {
 	try {
-		const auto vec = file_loader(filename);
 		const json j = json::parse(vec.begin(), vec.end());
 
 		std::map<std::string, TenantConfig> groups;
@@ -114,7 +113,7 @@ void init_tenants(VRT_CTX, const char* filename)
 					};
 				} else {
 					VRT_fail(ctx, "Tenancy JSON %s: group '%s' has missing fields",
-						filename, it.key().c_str());
+						source, it.key().c_str());
 					return;
 				}
 			}
@@ -122,9 +121,23 @@ void init_tenants(VRT_CTX, const char* filename)
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
 			"Exception '%s' when loading tenants from: %s",
-			e.what(), filename);
+			e.what(), source);
 		/* TODO: VRT_fail here? */
 		VRT_fail(ctx, "Exception '%s' when loading tenants from: %s",
-			e.what(), filename);
+			e.what(), source);
 	}
+}
+
+extern "C"
+void init_tenants_str(VRT_CTX, const char* str)
+{
+	std::vector<uint8_t> json { str, str + strlen(str) };
+	init_tenants(ctx, json, "string");
+}
+
+extern "C"
+void init_tenants_file(VRT_CTX, const char* filename)
+{
+	const auto json = file_loader(filename);
+	init_tenants(ctx, json, filename);
 }

@@ -18,5 +18,6 @@ endif()
 
 # VCL import name is "riscv"
 add_vmod_tests(vmod_riscv riscv
-	tests/startup.vtc
+	tests/empty.vtc
+	tests/hello_world.vtc
 )

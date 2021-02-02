@@ -34,7 +34,7 @@ target_compile_definitions(sandbox PRIVATE
 option(RISCV_EXPERIMENTAL "" ON)
 option(RISCV_SHARED_PT "" ON)
 option(RISCV_EXT_C "" OFF)
-option(RISCV_BINARY_TRANSLATION "" ON)
+#option(RISCV_BINARY_TRANSLATION "" ON)
 
 add_subdirectory(libriscv/lib)
 target_compile_definitions(riscv PUBLIC

@@ -18,7 +18,19 @@ unique, however it's intended to be used by CDNs who know what they are doing.
 Example:
 	sub vcl_init {
 		/* Initialize some tenants from JSON */
-		riscv.load_tenants("/path/to/tenants.json");
+		riscv.embed_tenants("""
+			{
+				"default": {
+					"max_instructions": 2000000,
+					"max_memory": 42000000,
+					"max_heap":  4194304
+				},
+				"xpizza.com": {
+					"filename": "/tmp/my_program",
+					"group": "default"
+				}
+			}
+		""");
 	}
 
 	sub vcl_recv {
@@ -42,6 +54,10 @@ Example:
 
 API
 ===
+
+$Function VOID embed_tenants(STRING json)
+
+- Load tenants directly from embedded JSON. See below.
 
 $Function VOID load_tenants(STRING json_filepath)
 

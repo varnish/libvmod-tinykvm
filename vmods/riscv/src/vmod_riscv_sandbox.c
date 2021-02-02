@@ -8,7 +8,8 @@
 #include "vmod_util.h"
 #include "update_result.h" // vcall_info
 
-extern void init_tenants(VRT_CTX, const char*);
+extern void init_tenants_str(VRT_CTX, const char*);
+extern void init_tenants_file(VRT_CTX, const char*);
 
 extern void* riscv_fork(VRT_CTX, const char* ten, int dbg);
 // Functions operating on a machine already forked, which
@@ -35,12 +36,19 @@ static inline vcall_info enum_to_idx(VCL_ENUM e)
 	return (vcall_info){-1, HDR_INVALID, HDR_INVALID};
 }
 
+/* Load tenant information from a JSON string */
+VCL_VOID vmod_embed_tenants(VRT_CTX, VCL_STRING str)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	init_tenants_str(ctx, str);
+}
 /* Load tenant information from a JSON file */
 VCL_VOID vmod_load_tenants(VRT_CTX, VCL_STRING filename)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
-	init_tenants(ctx, filename);
+	init_tenants_file(ctx, filename);
 }
 
 /* Fork into a new VM. The VM is freed when the

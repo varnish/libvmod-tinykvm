@@ -164,6 +164,11 @@ void Script::machine_setup(machine_t& machine, bool init)
 	// stack
 	machine.cpu.reset_stack_pointer();
 
+#ifdef RISCV_DEBUG
+	machine.verbose_instructions = true;
+	machine.verbose_registers = true;
+#endif
+
 	if (init)
 	{
 		const auto exit_addr = machine.address_of("exit");
