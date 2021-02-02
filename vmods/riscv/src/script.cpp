@@ -171,10 +171,7 @@ void Script::machine_setup(machine_t& machine, bool init)
 
 	if (init)
 	{
-		const auto exit_addr = machine.address_of("exit");
-		if (exit_addr)
-			machine.memory.set_exit_address(exit_addr);
-		else
+		if (machine.memory.exit_address() == 0)
 			throw std::runtime_error("The binary is missing a public exit function!");
 		// Full Linux-compatible stack
 		machine.setup_linux(
