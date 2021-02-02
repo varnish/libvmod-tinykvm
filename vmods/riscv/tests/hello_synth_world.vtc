@@ -1,0 +1,56 @@
+varnishtest "RISC-V Hello World Synth"
+
+shell {
+	clang-10 -O1 -Wall -Wextra -target riscv32 -march=rv32imfd -ffreestanding -nostdlib -c ${testdir}/hello_synth_world.cpp -o /tmp/hello_synth_world.o
+	ld.lld-10 -Ttext=0x120000 --undefined=on_recv /tmp/hello_synth_world.o -o /tmp/hello_synth_world
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import riscv;
+	import std;
+
+	backend default none;
+
+	sub vcl_init {
+		riscv.embed_tenants("""
+			{
+				"default": {
+					"max_instructions": 2000000,
+					"max_memory": 42000000,
+					"max_heap":  4194304
+				},
+				"xpizza.com": {
+					"filename": "/tmp/hello_synth_world",
+					"group": "default"
+				}
+			}
+		""");
+	}
+
+	sub vcl_recv {
+		if (!riscv.fork(req.http.Host, req.http.X-Debug)) {
+			return (synth(403));
+		}
+
+		/* Call into VM */
+		riscv.vcall(ON_REQUEST);
+
+		if (riscv.want_result() == "synth") {
+			return (synth(riscv.want_status()));
+		}
+
+		return (synth(400));
+	}
+} -start
+
+client c1 {
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	#expect resp.body == "Hello World"
+	expect resp.status == 404
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	#expect resp.body == "Hello World"
+	expect resp.status == 404
+} -run

@@ -1,8 +1,8 @@
 varnishtest "RISC-V Hello World Backend"
 
 shell {
-	clang-10 -O1 -Wall -Wextra -target riscv32 -march=rv32imfd -ffreestanding -nostdlib -c ${testdir}/hello_world.cpp -o /tmp/hello_world.o
-	ld.lld-10 -Ttext=0x120000 --undefined=on_recv /tmp/hello_world.o -o /tmp/hello_world
+	clang-10 -O1 -Wall -Wextra -target riscv32 -march=rv32imfd -ffreestanding -nostdlib -c ${testdir}/hello_backend_world.cpp -o /tmp/hello_backend_world.o
+	ld.lld-10 -Ttext=0x120000 --undefined=on_recv /tmp/hello_backend_world.o -o /tmp/hello_backend_world
 }
 
 varnish v1 -vcl+backend {
@@ -21,7 +21,7 @@ vcl 4.1;
 					"max_heap":  4194304
 				},
 				"xpizza.com": {
-					"filename": "/tmp/hello_world",
+					"filename": "/tmp/hello_backend_world",
 					"group": "default"
 				}
 			}
@@ -45,7 +45,8 @@ vcl 4.1;
 				return (hash);
 			}
 		}
-		return (hash);
+
+		return (synth(400));
 	}
 
 	sub vcl_backend_fetch {
@@ -55,7 +56,6 @@ vcl 4.1;
 				set bereq.backend = riscv.vm_backend(
 						bereq.http.X-Backend-Func,
 						bereq.http.X-Backend-Arg);
-				unset bereq.http.X-Decision;
 			}
 		}
 	}

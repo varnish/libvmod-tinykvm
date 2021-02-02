@@ -1,4 +1,5 @@
 #include "../src/machine/syscalls.h"
+#include <stddef.h>
 #define  NOT_CACHED  0
 #define  CACHED      1
 
@@ -37,6 +38,17 @@ inline void forge_response(const char* arg0, long arg1, const char* arg2, long a
 	__builtin_unreachable();
 }
 
+inline void decision(const char* dec, size_t declen, int status)
+{
+	register long a0 asm("a0") = (long) dec;
+	register long a1 asm("a1") = declen;
+	register long a2 asm("a2") = status;
+	register long a3 asm("a3") = 0;
+	register long syscall_id asm("a7") = ECALL_SET_DECISION;
+
+	asm volatile ("scall" : : "r"(a0), "r"(a1), "r"(a2), "r"(a3), "r"(syscall_id) : "memory");
+}
+
 inline void forge(int c, void(*func)())
 {
 	register long a0 asm("a0") = c;
@@ -45,6 +57,18 @@ inline void forge(int c, void(*func)())
 	register long syscall_id asm("a7") = ECALL_BACKEND_DECISION;
 
 	asm volatile ("scall" : "+r"(a0) : "r"(a1), "r"(a2), "r"(syscall_id) : "memory");
+}
+
+inline void synth(const char* ctype, size_t clen, const char* data, size_t dlen)
+{
+	register long a0 asm("a0") = (long) ctype;
+	register long a1 asm("a1") = clen;
+	register long a2 asm("a2") = (long) data;
+	register long a3 asm("a3") = dlen;
+	register long syscall_id asm("a7") = ECALL_SYNTH;
+
+	asm volatile ("scall" : : "r"(a0), "r"(a1), "r"(a2), "r"(a3), "r"(syscall_id) : "memory");
+	__builtin_unreachable();
 }
 
 extern "C" __attribute__((used))
