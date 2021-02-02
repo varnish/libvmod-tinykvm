@@ -3,8 +3,8 @@ jobs:
   cmake_builds:
     docker:
       - image: cimg/base:2020.01
+    working_directory: ~/project
     steps:
-      #- run: git clone --recursive --depth 1 "$CIRCLE_REPOSITORY_URL" --branch "$CIRCLE_BRANCH"
       - run:
           name: Update ssh config for github.com to use several keys
           command: |
@@ -25,12 +25,32 @@ jobs:
             ssh-add ~/.ssh/id_rsa_9209b808d400acad9bb6e5689e7f083e
             export REVISION=$CIRCLE_BRANCH
             export VERSION=$CIRCLE_SHA1
-      - run: bash ./scripts/install_deps.sh
+      - run: bash ./scripts/install_build_deps.sh
       - run: bash ./scripts/vcp_riscv_setup.sh
       - run: bash ./scripts/cmaketool.sh --vcp=build --no-optimize --build
+      - persist_to_workspace:
+          root: .
+          paths: build ext scripts vmods
+  sandbox_tests:
+      docker:
+          - image: cimg/base:2020.01
+      working_directory: ~/project
+      steps:
+          - attach_workspace:
+              at: .
+          - run:
+              name: "Test dependencies"
+              command: bash ./scripts/install_runtime_deps.sh
+          - run:
+              name: "Sandbox tests"
+              working_directory: build
+              command: "ctest --verbose -R vmod_riscv_ ."
 
 workflows:
   version: 2
   cmake_build_system:
     jobs:
       - cmake_builds
+      - sandbox_tests:
+            requires:
+                - cmake_builds

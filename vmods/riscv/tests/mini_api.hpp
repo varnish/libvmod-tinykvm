@@ -1,4 +1,4 @@
-#define  ECALL_BACKEND_DECISION  25
+#include "../src/machine/syscalls.h"
 #define  NOT_CACHED  0
 #define  CACHED      1
 
