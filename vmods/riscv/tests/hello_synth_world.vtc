@@ -59,15 +59,21 @@ vcl 4.1;
 
 		return (synth(400));
 	}
+	sub vcl_synth {
+		if (riscv.active()) {
+			riscv.vcall(ON_SYNTH);
+			return (deliver);
+		}
+	}
 } -start
 
 client c1 {
 	txreq -url "/" -hdr "Host: xpizza.com"
 	rxresp
-	#expect resp.body == "Hello World"
+	expect resp.body == "Hello World"
 	expect resp.status == 404
 	txreq -url "/" -hdr "Host: xpizza.com"
 	rxresp
-	#expect resp.body == "Hello World"
+	expect resp.body == "Hello World"
 	expect resp.status == 404
 } -run

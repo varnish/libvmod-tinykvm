@@ -50,4 +50,4 @@ client c1 {
 	txreq -url "/" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.status == 503
-} -run
+} -repeat 15 -keepalive

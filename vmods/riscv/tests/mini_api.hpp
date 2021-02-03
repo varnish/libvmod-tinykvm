@@ -73,6 +73,8 @@ inline void synth(const char* ctype, size_t clen, const char* data, size_t dlen)
 
 extern "C" __attribute__((used))
 void on_recv();
+extern "C" __attribute__((used))
+void on_synth();
 
 // 1. wrangle with argc and argc
 // 2. initialize the global pointer to __global_pointer
