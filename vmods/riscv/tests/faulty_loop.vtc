@@ -1,8 +1,19 @@
 varnishtest "RISC-V Faulty Loop Test"
 
 shell {
-clang-10 -O1 -Wall -Wextra -target riscv32 -march=rv32imfd -ffreestanding -nostdlib -c ${testdir}/${testname}.cpp -o /tmp/${testname}.o
-ld.lld-10 -Ttext=0x120000 --undefined=on_recv /tmp/${testname}.o -o /tmp/${testname}
+cat >${tmpdir}/${testname}.cpp <<-EOF
+#include "mini_api.hpp"
+
+void start(int argc, char** argv) {
+	exit(0);
+}
+
+void on_recv()
+{
+	while(1);
+}
+EOF
+bash ${testdir}/build.sh ${tmpdir}/${testname}.cpp ${testdir} ${tmpdir}/${testname}
 }
 
 varnish v1 -vcl+backend {
@@ -16,7 +27,7 @@ vcl 4.1;
 		riscv.embed_tenants("""
 			{
 				"xpizza.com": {
-					"filename": "/tmp/${testname}",
+					"filename": "${tmpdir}/${testname}",
 					"group": "test"
 				}
 			}
