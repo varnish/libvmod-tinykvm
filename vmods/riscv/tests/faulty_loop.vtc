@@ -1,4 +1,4 @@
-varnishtest "RISC-V Hello World Synth"
+varnishtest "RISC-V Faulty Loop Test"
 
 shell {
 clang-10 -O1 -Wall -Wextra -target riscv32 -march=rv32imfd -ffreestanding -nostdlib -c ${testdir}/${testname}.cpp -o /tmp/${testname}.o
@@ -28,12 +28,8 @@ vcl 4.1;
 			return (synth(403));
 		}
 
-		/* Call into VM */
+		# Infinite loop will cause 503
 		riscv.vcall(ON_REQUEST);
-
-		if (riscv.want_result() == "synth") {
-			return (synth(riscv.want_status()));
-		}
 
 		return (synth(400));
 	}
@@ -42,10 +38,5 @@ vcl 4.1;
 client c1 {
 	txreq -url "/" -hdr "Host: xpizza.com"
 	rxresp
-	#expect resp.body == "Hello World"
-	expect resp.status == 404
-	txreq -url "/" -hdr "Host: xpizza.com"
-	rxresp
-	#expect resp.body == "Hello World"
-	expect resp.status == 404
+	expect resp.status == 503
 } -run

@@ -21,4 +21,5 @@ add_vmod_tests(vmod_riscv riscv
 	tests/empty.vtc
 	tests/hello_backend_world.vtc
 	tests/hello_synth_world.vtc
+	tests/faulty_loop.vtc
 )

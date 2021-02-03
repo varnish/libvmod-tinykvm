@@ -1,6 +1,5 @@
 #include "mini_api.hpp"
 
-extern "C" __attribute__((visibility("hidden"), used))
 void start(int argc, char** argv)
 {
 	exit(0);

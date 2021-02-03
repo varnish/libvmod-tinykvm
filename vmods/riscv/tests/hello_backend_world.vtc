@@ -1,8 +1,8 @@
 varnishtest "RISC-V Hello World Backend"
 
 shell {
-	clang-10 -O1 -Wall -Wextra -target riscv32 -march=rv32imfd -ffreestanding -nostdlib -c ${testdir}/hello_backend_world.cpp -o /tmp/hello_backend_world.o
-	ld.lld-10 -Ttext=0x120000 --undefined=on_recv /tmp/hello_backend_world.o -o /tmp/hello_backend_world
+clang-10 -O1 -Wall -Wextra -target riscv32 -march=rv32imfd -ffreestanding -nostdlib -c ${testdir}/${testname}.cpp -o /tmp/${testname}.o
+ld.lld-10 -Ttext=0x120000 --undefined=on_recv /tmp/${testname}.o -o /tmp/${testname}
 }
 
 varnish v1 -vcl+backend {
@@ -15,14 +15,9 @@ vcl 4.1;
 	sub vcl_init {
 		riscv.embed_tenants("""
 			{
-				"default": {
-					"max_instructions": 2000000,
-					"max_memory": 42000000,
-					"max_heap":  4194304
-				},
 				"xpizza.com": {
-					"filename": "/tmp/hello_backend_world",
-					"group": "default"
+					"filename": "/tmp/${testname}",
+					"group": "test"
 				}
 			}
 		""");

@@ -76,6 +76,11 @@ static void init_tenants(VRT_CTX,
 		const json j = json::parse(vec.begin(), vec.end());
 
 		std::map<std::string, TenantConfig> groups;
+		groups["test"] = TenantConfig{
+			.max_instructions = 256000,
+			.max_memory = 1 * 1024 * 1024,
+			.max_heap   = 1 * 1024 * 1024
+		};
 
 		for (const auto& it : j.items())
 		{

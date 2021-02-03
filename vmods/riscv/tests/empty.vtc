@@ -3,18 +3,12 @@ varnishtest "RISC-V Empty tenant returns 403"
 varnish v1 -vcl+backend {
 vcl 4.1;
 	import riscv;
-	import std;
 
 	backend default none;
 
 	sub vcl_init {
 		riscv.embed_tenants("""
 			{
-				"default": {
-					"max_instructions": 2000000,
-					"max_memory": 42000000,
-					"max_heap":  4194304
-				},
 				"xpizza.com": {
 					"filename": "/tmp/nothing",
 					"group": "default"

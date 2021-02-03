@@ -90,3 +90,6 @@ _start:                         \t\n\
 	.option pop					\t\n\
 	call start					\t\n\
 ");
+
+extern "C" __attribute__((visibility("hidden"), used))
+void start(int, char**);
