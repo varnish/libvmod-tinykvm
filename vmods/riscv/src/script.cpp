@@ -17,7 +17,7 @@ static constexpr bool VERBOSE_ERRORS = true;
 
 Script::Script(
 	const Script& source, const vrt_ctx* ctx,
-	const vmod_riscv_machine* vrm, MachineInstance& inst)
+	const SandboxTenant* vrm, MachineInstance& inst)
 	: m_machine(source.machine().memory.binary(), {
 		.memory_max = 0,
 		.owning_machine = &source.machine()
@@ -31,18 +31,17 @@ Script::Script(
 	/* Transfer data from the old arena, to fully replicate heap */
 	arena_transfer((sas_alloc::Arena*) source.m_arena, (sas_alloc::Arena*) m_arena);
 	/* Load the compiled regexes of the source */
-	for (auto& regex : source.m_regex_cache) {
-		m_regex_cache.push_back(regex);
-		m_regex_cache.back().non_owned = true;
-	}
+	m_regex.loan_from(source.m_regex);
+	/* Load the directors of the source */
+	m_directors.loan_from(source.m_directors);
 }
 
 Script::Script(
 	const std::vector<uint8_t>& binary, const vrt_ctx* ctx,
-	const vmod_riscv_machine* vrm, MachineInstance& inst,
+	const SandboxTenant* vrm, MachineInstance& inst,
 	bool storage, bool debug)
 	: m_machine(binary, {
-		.memory_max = vrm->config.max_memory,
+		.memory_max = vrm->config.max_memory(),
 #ifdef RISCV_BINARY_TRANSLATION
 		// Time-saving translator options
 		.translate_blocks_max = (debug ? 0u : 4000u),
@@ -57,10 +56,11 @@ Script::Script(
 
 Script::~Script()
 {
-	// free any unfreed regex pointers
-	for (auto& entry : m_regex_cache)
-		if (entry.re && !entry.non_owned)
-			VRE_free(&entry.re);
+	// free any owned regex pointers
+	m_regex.foreach_owned(
+		[] (auto& entry) {
+			VRE_free(&entry.item);
+		});
 	if (this->is_debug()) {
 		this->stop_debugger();
 	}
@@ -186,13 +186,13 @@ void Script::machine_setup(machine_t& machine, bool init)
 	if (init == false)
 	{
 		this->m_arena = setup_native_heap_syscalls<MARCH>(
-			machine, arena_base(), vrm()->config.max_heap,
+			machine, arena_base(), vrm()->config.max_heap(),
 			[this] (size_t size) -> void* {
 				return WS_Alloc(m_ctx->ws, size);
 			});
 	} else {
 		this->m_arena = setup_native_heap_syscalls<MARCH>(
-			machine, arena_base(), vrm()->config.max_heap);
+			machine, arena_base(), vrm()->config.max_heap());
 	}
 
 #ifdef ENABLE_TIMING
@@ -269,16 +269,16 @@ void Script::print_backtrace(const gaddr_t addr)
 }
 
 uint64_t Script::max_instructions() const noexcept {
-	return vrm()->config.max_instructions;
+	return vrm()->config.max_instructions();
 }
 const std::string& Script::name() const noexcept {
 	return vrm()->config.name;
 }
 const std::string& Script::group() const noexcept {
-	return vrm()->config.group;
+	return vrm()->config.group.name;
 }
 Script::gaddr_t Script::max_memory() const noexcept {
-	return vrm()->config.max_memory;
+	return vrm()->config.max_memory();
 }
 Script::gaddr_t Script::stack_base() const noexcept {
 	return stack_begin() - stack_size();
@@ -287,7 +287,7 @@ size_t  Script::stack_size() const noexcept {
 	return 0x100000;
 }
 size_t Script::heap_size() const noexcept {
-	return vrm()->config.max_heap;
+	return vrm()->config.max_heap();
 }
 
 Script::gaddr_t Script::guest_alloc(size_t len)
@@ -337,31 +337,6 @@ std::string Script::symbol_name(gaddr_t address) const
 void Script::dynamic_call(uint32_t hash)
 {
 	vrm()->dynamic_call(hash, *this);
-}
-
-struct vre* Script::regex_get(size_t idx)
-{
-	return m_regex_cache.at(idx).re;
-}
-int Script::regex_find(uint32_t hash) const
-{
-	for (unsigned idx = 0; idx < m_regex_cache.size(); idx++) {
-		if (m_regex_cache[idx].hash == hash) return idx;
-	}
-	return -1;
-}
-size_t Script::regex_manage(struct vre* ptr, uint32_t hash)
-{
-	if (m_regex_cache.size() < REGEX_MAX)
-	{
-		m_regex_cache.push_back({ptr, hash});
-		return m_regex_cache.size() - 1;
-	}
-	throw std::out_of_range("Too many regex expressions");
-}
-void Script::regex_free(size_t idx)
-{
-	m_regex_cache.at(idx) = { nullptr, 0 };
 }
 
 #ifdef ENABLE_TIMING

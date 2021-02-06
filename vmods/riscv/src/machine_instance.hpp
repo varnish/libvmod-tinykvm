@@ -9,7 +9,7 @@ namespace riscv {
 struct MachineInstance
 {
 	MachineInstance(std::vector<uint8_t>,
-		const vrt_ctx*, vmod_riscv_machine*, bool = false);
+		const vrt_ctx*, SandboxTenant*, bool = false);
 	~MachineInstance();
 
 	inline Script::gaddr_t lookup(const char* name) const {

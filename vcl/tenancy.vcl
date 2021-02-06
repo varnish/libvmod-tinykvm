@@ -1,5 +1,6 @@
 vcl 4.1;
 import file;
+import goto;
 import riscv;
 import std;
 import utils;
@@ -66,7 +67,10 @@ sub vcl_recv {
 	riscv.vcall(ON_REQUEST);
 
 	/* Make decision */
-	if (riscv.want_result() == "synth") {
+	if (riscv.want_result() == "hash") {
+		return (hash);
+	}
+	else if (riscv.want_result() == "synth") {
 		return (synth(riscv.want_status()));
 	}
 	else if (riscv.want_result() == "backend") {

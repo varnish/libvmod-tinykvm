@@ -2,9 +2,10 @@
 #include <cassert>
 #include <functional>
 #include <libriscv/machine.hpp>
+#include "script_cache.hpp"
 
 struct vrt_ctx;
-struct vmod_riscv_machine;
+struct SandboxTenant;
 struct MachineInstance;
 
 class Script {
@@ -12,11 +13,12 @@ public:
 	static constexpr int MARCH = riscv::RISCV32;
 	using gaddr_t = riscv::address_type<MARCH>;
 	using machine_t = riscv::Machine<MARCH>;
-	static constexpr bool    TIME_SAVING = true;
-	static constexpr gaddr_t CHEAP_BASE  = 0x40000000;
-	static constexpr gaddr_t SHEAP_BASE  = 0x80000000;
-	static constexpr size_t  REGEX_MAX   = 64;
-	static constexpr size_t  RESULTS_MAX = 3;
+	static constexpr bool    TIME_SAVING  = true;
+	static constexpr gaddr_t CHEAP_BASE   = 0x40000000;
+	static constexpr gaddr_t SHEAP_BASE   = 0x80000000;
+	static constexpr size_t  REGEX_MAX    = 64;
+	static constexpr size_t  DIRECTOR_MAX = 32;
+	static constexpr size_t  RESULTS_MAX  = 3;
 
 	// call any script function, with any parameters
 	template <typename... Args>
@@ -30,6 +32,9 @@ public:
 	inline long resume(uint64_t cycles);
 
 	void dynamic_call(uint32_t hash);
+
+	auto& regex() { return m_regex; }
+	auto& directors() { return m_directors; }
 
 	auto& machine() { return m_machine; }
 	const auto& machine() const { return m_machine; }
@@ -71,11 +76,6 @@ public:
 	void hash_buffer(const char* buffer, int len);
 	bool apply_hash();
 
-	int    regex_find(uint32_t hash) const;
-	size_t regex_manage(struct vre*, uint32_t hash);
-	void   regex_free(size_t);
-	struct vre* regex_get(size_t idx);
-
 	std::string symbol_name(gaddr_t address) const;
 	gaddr_t resolve_address(const char* name) const;
 	auto    callsite(gaddr_t addr) const { return machine().memory.lookup(addr); }
@@ -83,11 +83,10 @@ public:
 	void print_backtrace(const gaddr_t addr);
 	void open_debugger(uint16_t);
 
-	bool reset(); // true if the reset was successful
-
-	Script(const std::vector<uint8_t>&, const vrt_ctx*, const vmod_riscv_machine*, MachineInstance&, bool sto, bool dbg);
-	Script(const Script& source, const vrt_ctx*, const vmod_riscv_machine*, MachineInstance&);
+	Script(const std::vector<uint8_t>&, const vrt_ctx*, const SandboxTenant*, MachineInstance&, bool sto, bool dbg);
+	Script(const Script& source, const vrt_ctx*, const SandboxTenant*, MachineInstance&);
 	~Script();
+	bool reset(); // true if the reset was successful
 
 private:
 	void handle_exception(gaddr_t);
@@ -100,7 +99,7 @@ private:
 
 	machine_t m_machine;
 	const vrt_ctx* m_ctx;
-	const struct vmod_riscv_machine* m_vrm = nullptr;
+	const struct SandboxTenant* m_vrm = nullptr;
 	MachineInstance& m_inst;
 	void*       m_arena = nullptr;
 	gaddr_t     m_heap_base = 0;
@@ -113,12 +112,8 @@ private:
 	bool        m_currently_debugging = false;
 	struct VSHA256Context* m_sha_ctx = nullptr;
 
-	struct RegexCache {
-		struct vre* re   = nullptr;
-		uint32_t    hash = 0;
-		bool        non_owned = false;
-	};
-	eastl::fixed_vector<RegexCache, REGEX_MAX> m_regex_cache;
+	Cache<struct vre, REGEX_MAX> m_regex;
+	Cache<const struct director, DIRECTOR_MAX> m_directors;
 
 	/* GDB RSP client */
 	long resume_debugger();

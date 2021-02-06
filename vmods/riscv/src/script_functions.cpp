@@ -18,6 +18,7 @@ extern "C" {
 	void http_UnsetIdx(struct http *hp, unsigned idx);
 	unsigned http_findhdr(const struct http *hp, unsigned l, const char *hdr);
 	void http_PrintfHeader(struct http *to, const char *fmt, ...);
+	void VRT_l_req_backend_hint(VRT_CTX, VCL_BACKEND);
 	void riscv_SetCacheable(VRT_CTX, bool a);
 	bool riscv_GetCacheable(VRT_CTX);
 	void riscv_SetTTL(VRT_CTX, float ttl);
@@ -164,7 +165,6 @@ APICALL(breakpoint)
 			"VM breakpoint at 0x%lX", (long) machine.cpu.pc());
 		script.open_debugger(DEBUG_PORT);
 	} else {
-		printf("Not opening debugger\n");
 		VSLb(ctx->vsl, SLT_Debug,
 			"Skipped VM breakpoint at 0x%lX (debug not enabled)",
 			(long) machine.cpu.pc());
@@ -325,6 +325,13 @@ APICALL(set_decision)
 		script.set_result(result.to_string(), status, paused);
 	}
 	machine.stop();
+}
+APICALL(set_backend)
+{
+	auto [be] = machine.template sysargs<int> ();
+	auto& script = get_script(machine);
+	auto* dir = script.directors().get(be);
+	VRT_l_req_backend_hint(script.ctx(), dir);
 }
 APICALL(backend_decision)
 {
@@ -557,7 +564,7 @@ APICALL(http_set_status)
 APICALL(http_unset_re)
 {
 	const auto [where, index] = machine.sysargs<int, int> ();
-	auto* vre = get_script(machine).regex_get(index);
+	auto* vre = get_script(machine).regex().get(index);
 
 	auto* ctx = get_ctx(machine);
 	auto* hp = get_http(ctx, (gethdr_e) where);
@@ -732,8 +739,8 @@ APICALL(regex_compile)
 	auto [pbuffer] = machine.sysargs<riscv::Buffer> ();
 	auto pattern = pbuffer.to_string();
 
-	const uint32_t hash = crc32(pattern.c_str(), pattern.size());
-	const int idx = get_script(machine).regex_find(hash);
+	const uint32_t hash = riscv::crc32(pattern.c_str(), pattern.size());
+	const int idx = get_script(machine).regex().find(hash);
 	if (idx >= 0) {
 		machine.set_result(idx);
 		return;
@@ -751,12 +758,12 @@ APICALL(regex_compile)
 	}
 	/* Return the regex handle */
 	machine.set_result(
-		get_script(machine).regex_manage(re, hash));
+		get_script(machine).regex().manage(re, hash));
 }
 APICALL(regex_match)
 {
 	auto [index, buffer] = machine.sysargs<uint32_t, riscv::Buffer> ();
-	auto* vre = get_script(machine).regex_get(index);
+	auto* vre = get_script(machine).regex().get(index);
 	/* VRE_exec(const vre_t *code, const char *subject, int length,
 	    int startoffset, int options, int *ovector, int ovecsize,
 	    const volatile struct vre_limits *lim) */
@@ -769,7 +776,7 @@ APICALL(regex_subst)
 {
 	auto [index, tbuffer, sbuffer, dst, maxlen]
 		= machine.sysargs<uint32_t, riscv::Buffer, riscv::Buffer, gaddr_t, uint32_t> ();
-	auto* re = get_script(machine).regex_get(index);
+	auto* re = get_script(machine).regex().get(index);
 
 	/* Run the regsub using existing 're' */
 	const bool all = (maxlen & 0x80000000);
@@ -793,7 +800,7 @@ APICALL(regex_subst_hdr)
 {
 	auto [ridx, where, index, subst, all]
 		= machine.sysargs<uint32_t, int, uint32_t, riscv::Buffer, int> ();
-	auto* re = get_script(machine).regex_get(ridx);
+	auto* re = get_script(machine).regex().get(ridx);
 	auto* ctx = get_ctx(machine);
 	if (index == HDR_INVALID) {
 		machine.set_result(-1);
@@ -820,7 +827,7 @@ APICALL(regex_subst_hdr)
 APICALL(regex_delete)
 {
 	auto [index] = machine.sysargs<uint32_t> ();
-	get_script(machine).regex_free((uint32_t) index);
+	get_script(machine).regex().free((uint32_t) index);
 }
 
 void sha256(machine_t&);
@@ -851,6 +858,7 @@ void Script::setup_syscall_interface(machine_t& machine)
 
 		FPTR(my_name),
 		FPTR(set_decision),
+		FPTR(set_backend),
 		FPTR(backend_decision),
 		FPTR(ban),
 		FPTR(hash_data),

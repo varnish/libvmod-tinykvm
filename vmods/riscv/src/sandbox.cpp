@@ -1,6 +1,7 @@
 #include "sandbox.hpp"
 #include "varnish.hpp"
-#include "crc32.hpp"
+#include <libriscv/util/crc32.hpp>
+using riscv::crc32;
 
 //#define ENABLE_TIMING
 #define TIMING_LOCATION(x) \
@@ -13,9 +14,10 @@ inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
 std::vector<uint8_t> file_loader(const std::string& file);
 
-vmod_riscv_machine::vmod_riscv_machine(VRT_CTX, const TenantConfig& conf)
+SandboxTenant::SandboxTenant(VRT_CTX, const TenantConfig& conf)
 	: config{conf}
 {
+	init_vmods(ctx);
 	try {
 		auto elf = file_loader(conf.filename);
 		this->machine =
@@ -28,7 +30,7 @@ vmod_riscv_machine::vmod_riscv_machine(VRT_CTX, const TenantConfig& conf)
 	}
 }
 
-Script* vmod_riscv_machine::vmfork(VRT_CTX, bool debug)
+Script* SandboxTenant::vmfork(VRT_CTX, bool debug)
 {
 	auto* priv_task = VRT_priv_task(ctx, ctx);
 	if (!priv_task->priv)
@@ -83,7 +85,7 @@ Script* vmod_riscv_machine::vmfork(VRT_CTX, bool debug)
 	return (Script*) priv_task->priv;
 }
 
-void vmod_riscv_machine::set_dynamic_call(const std::string& name, ghandler_t handler)
+void SandboxTenant::set_dynamic_call(const std::string& name, ghandler_t handler)
 {
 	const uint32_t hash = crc32(name.c_str(), name.size());
 	auto it = m_dynamic_functions.find(hash);
@@ -92,7 +94,7 @@ void vmod_riscv_machine::set_dynamic_call(const std::string& name, ghandler_t ha
 	}
 	m_dynamic_functions.emplace(hash, std::move(handler));
 }
-void vmod_riscv_machine::reset_dynamic_call(const std::string& name, ghandler_t handler)
+void SandboxTenant::reset_dynamic_call(const std::string& name, ghandler_t handler)
 {
 	const uint32_t hash = crc32(name.c_str(), name.size());
 	m_dynamic_functions.erase(hash);
@@ -100,13 +102,13 @@ void vmod_riscv_machine::reset_dynamic_call(const std::string& name, ghandler_t 
 		set_dynamic_call(name, std::move(handler));
 	}
 }
-void vmod_riscv_machine::set_dynamic_calls(std::vector<std::pair<std::string, ghandler_t>> vec)
+void SandboxTenant::set_dynamic_calls(std::vector<std::pair<std::string, ghandler_t>> vec)
 {
 	for (const auto& pair : vec) {
 		set_dynamic_call(pair.first, std::move(pair.second));
 	}
 }
-void vmod_riscv_machine::dynamic_call(uint32_t hash, Script& script) const
+void SandboxTenant::dynamic_call(uint32_t hash, Script& script) const
 {
 	auto it = m_dynamic_functions.find(hash);
 	if (it != m_dynamic_functions.end()) {

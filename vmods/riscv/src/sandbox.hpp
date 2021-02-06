@@ -1,19 +1,11 @@
 #pragma once
 #include "script.hpp"
+#include "tenant.hpp"
 #include "machine_instance.hpp"
 #define SCRIPT_MAGIC 0x83e59fa5
 
-struct TenantConfig
-{
-	std::string    name;
-	std::string    group;
-	std::string    filename;
-	uint64_t max_instructions;
-	uint64_t max_memory;
-	uint64_t max_heap;
-};
 
-struct vmod_riscv_machine
+struct SandboxTenant
 {
 	using ghandler_t = std::function<void(Script&)>;
 
@@ -43,7 +35,8 @@ struct vmod_riscv_machine
 		return decltype(program->script.callsite(0)) {};
 	}
 
-	vmod_riscv_machine(const vrt_ctx*, const TenantConfig&);
+	SandboxTenant(const vrt_ctx*, const TenantConfig&);
+	void init_vmods(const vrt_ctx*);
 
 	/* Initialized during vcl_init */
 	const uint64_t magic = 0xb385716f486938e6;

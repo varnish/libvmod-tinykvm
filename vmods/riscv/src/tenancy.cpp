@@ -1,12 +1,13 @@
 #include "sandbox.hpp"
 #include "varnish.hpp"
 #include <EASTL/string_map.h>
+#include <libriscv/util/crc32.hpp>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 extern std::vector<uint8_t> file_loader(const std::string& filename);
 
-using MapType = eastl::string_map<struct vmod_riscv_machine*>;
+using MapType = eastl::string_map<struct SandboxTenant*>;
 static MapType temporaries;
 
 inline MapType& tenants(VRT_CTX)
@@ -21,7 +22,7 @@ inline void load_tenant(VRT_CTX, TenantConfig&& config)
 	try {
 		tenants(ctx).try_emplace(
 			strdup(config.name.c_str()),
-			new vmod_riscv_machine(ctx, config));
+			new SandboxTenant(ctx, config));
 	} catch (const std::exception& e) {
 		VRT_fail(ctx, "Exception when creating machine '%s': %s",
 			config.name.c_str(), e.what());
@@ -29,7 +30,7 @@ inline void load_tenant(VRT_CTX, TenantConfig&& config)
 }
 
 extern "C"
-vmod_riscv_machine* tenant_find(VRT_CTX, const char* name)
+SandboxTenant* tenant_find(VRT_CTX, const char* name)
 {
 	auto& map = tenants(ctx);
 	// regular tenants
@@ -43,8 +44,8 @@ vmod_riscv_machine* tenant_find(VRT_CTX, const char* name)
 	return nullptr;
 }
 
-vmod_riscv_machine* create_temporary_tenant(
-	const vmod_riscv_machine* vrm, const std::string& name)
+SandboxTenant* create_temporary_tenant(
+	const SandboxTenant* vrm, const std::string& name)
 {
 	/* Create a new tenant with a temporary name,
 	   and no program file to load. */
@@ -53,10 +54,10 @@ vmod_riscv_machine* create_temporary_tenant(
 	config.filename = "";
 	auto it = temporaries.try_emplace(
 		strdup(config.name.c_str()),
-		new vmod_riscv_machine(nullptr, config));
+		new SandboxTenant(nullptr, config));
 	return it.first->second;
 }
-void delete_temporary_tenant(const vmod_riscv_machine* vrm)
+void delete_temporary_tenant(const SandboxTenant* vrm)
 {
 	auto it = temporaries.find(vrm->config.name.c_str());
 	if (it != temporaries.end())
@@ -75,11 +76,13 @@ static void init_tenants(VRT_CTX,
 	try {
 		const json j = json::parse(vec.begin(), vec.end());
 
-		std::map<std::string, TenantConfig> groups;
-		groups["test"] = TenantConfig{
-			.max_instructions = 256000,
-			.max_memory = 1 * 1024 * 1024,
-			.max_heap   = 1 * 1024 * 1024
+		std::map<std::string, TenantGroup> groups {
+			{"test", TenantGroup{
+				"test",
+				256000,
+				1 * 1024 * 1024,
+				1 * 1024 * 1024
+			}}
 		};
 
 		for (const auto& it : j.items())
@@ -99,23 +102,21 @@ static void init_tenants(VRT_CTX,
 				const auto& group = grit->second;
 				/* Use the group data except filename */
 				load_tenant(ctx, TenantConfig{
-					.name     = it.key(),
-					.group    = obj["group"],
-					.filename = obj["filename"],
-					.max_instructions = group.max_instructions,
-					.max_memory = group.max_memory,
-					.max_heap   = group.max_heap
+					it.key(), obj["filename"], group,
 				});
 			} else {
 				if (obj.contains("max_instructions") &&
 					obj.contains("max_memory") &&
 					obj.contains("max_heap"))
 				{
-					groups[it.key()] = TenantConfig{
-						.max_instructions = obj["max_instructions"],
-						.max_memory = obj["max_memory"],
-						.max_heap   = obj["max_heap"]
-					};
+					groups.emplace(std::piecewise_construct,
+						std::forward_as_tuple(it.key()),
+						std::forward_as_tuple(
+							it.key(),
+							obj["max_instructions"],
+							obj["max_memory"],
+							obj["max_heap"]
+						));
 				} else {
 					VRT_fail(ctx, "Tenancy JSON %s: group '%s' has missing fields",
 						source, it.key().c_str());

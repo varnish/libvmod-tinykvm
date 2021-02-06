@@ -6,8 +6,8 @@ extern "C" {
 static bool file_writer(const std::string& file, const std::vector<uint8_t>&);
 static const size_t TOO_SMALL = 3; // vmcalls that can be skipped
 
-extern vmod_riscv_machine* create_temporary_tenant(const vmod_riscv_machine*, const std::string&);
-extern void delete_temporary_tenant(const vmod_riscv_machine*);
+extern SandboxTenant* create_temporary_tenant(const SandboxTenant*, const std::string&);
+extern void delete_temporary_tenant(const SandboxTenant*);
 
 constexpr update_result
 static_result(const char* text) {
@@ -21,7 +21,7 @@ dynamic_result(const char* text) {
 
 extern "C"
 struct update_result
-riscv_update(VRT_CTX, vmod_riscv_machine* vrm, struct update_params *params)
+riscv_update(VRT_CTX, SandboxTenant* vrm, struct update_params *params)
 {
 	/* ELF loader will not be run for empty binary */
 	if (UNLIKELY(params->data == nullptr || params->len == 0)) {
@@ -143,7 +143,7 @@ riscv_update(VRT_CTX, vmod_riscv_machine* vrm, struct update_params *params)
 extern "C"
 Script* riscv_fork(VRT_CTX, const char* tenant, int debug)
 {
-	extern vmod_riscv_machine* tenant_find(VRT_CTX, const char* name);
+	extern SandboxTenant* tenant_find(VRT_CTX, const char* name);
 	auto* vrm = tenant_find(ctx, tenant);
 	if (UNLIKELY(vrm == nullptr))
 		return nullptr;
@@ -156,7 +156,7 @@ Script* riscv_fork(VRT_CTX, const char* tenant, int debug)
 }
 
 extern "C"
-uint64_t riscv_resolve_name(struct vmod_riscv_machine* vrm, const char* symb)
+uint64_t riscv_resolve_name(struct SandboxTenant* vrm, const char* symb)
 {
 	return vrm->lookup(symb);
 }
@@ -176,7 +176,7 @@ inline Script* get_machine(VRT_CTX)
 }
 
 extern "C"
-const struct vmod_riscv_machine* riscv_current_machine(VRT_CTX)
+const struct SandboxTenant* riscv_current_machine(VRT_CTX)
 {
 	auto* script = get_machine(ctx);
 	if (script) {

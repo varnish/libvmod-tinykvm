@@ -2,7 +2,7 @@
 #include "script.hpp"
 
 #include <type_traits>
-#include "crc32.hpp"
+#include <libriscv/util/crc32.hpp>
 
 using machine_t = Script::machine_t;
 using gaddr_t = Script::gaddr_t;
