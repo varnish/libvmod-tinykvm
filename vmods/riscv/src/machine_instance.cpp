@@ -18,8 +18,8 @@ MachineInstance::MachineInstance(
 	const vrt_ctx* ctx, SandboxTenant* vrm,
 	bool debug)
 	: binary{std::move(elf)},
-	  storage{binary, ctx, vrm, *this, true, debug},
-	  script{binary, ctx, vrm, *this, false, debug}
+	  script{binary, ctx, vrm, *this, false, debug},
+	  storage{binary, ctx, vrm, *this, true, debug}
 {
 	extern std::vector<const char*> riscv_lookup_wishlist;
 	for (const auto* func : riscv_lookup_wishlist) {

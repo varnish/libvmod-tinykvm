@@ -40,7 +40,7 @@ public:
 	const auto& machine() const { return m_machine; }
 
 	const auto* ctx() const noexcept { return m_ctx; }
-	const auto* vrm() const noexcept { return m_vrm; }
+	const auto* vrm() const noexcept { return m_tenant; }
 	auto& instance() { return m_inst; }
 	const auto& instance() const { return m_inst; }
 	void set_ctx(const vrt_ctx* ctx) { m_ctx = ctx; }
@@ -99,7 +99,7 @@ private:
 
 	machine_t m_machine;
 	const vrt_ctx* m_ctx;
-	const struct SandboxTenant* m_vrm = nullptr;
+	const struct SandboxTenant* m_tenant = nullptr;
 	MachineInstance& m_inst;
 	void*       m_arena = nullptr;
 	gaddr_t     m_heap_base = 0;
@@ -112,8 +112,8 @@ private:
 	bool        m_currently_debugging = false;
 	struct VSHA256Context* m_sha_ctx = nullptr;
 
-	Cache<struct vre, REGEX_MAX> m_regex;
-	Cache<const struct director, DIRECTOR_MAX> m_directors;
+	Cache<struct vre> m_regex;
+	Cache<const struct director> m_directors;
 
 	/* GDB RSP client */
 	long resume_debugger();

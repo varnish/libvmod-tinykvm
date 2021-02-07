@@ -30,7 +30,6 @@ bash ${testdir}/build.sh ${tmpdir}/${testname}.cpp ${testdir} ${tmpdir}/${testna
 varnish v1 -vcl+backend {
 vcl 4.1;
 	import riscv;
-	import std;
 
 	backend default none;
 

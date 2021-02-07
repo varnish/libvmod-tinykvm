@@ -14,6 +14,8 @@ struct TenantGroup {
 	uint64_t max_instructions;
 	uint64_t max_memory;
 	uint64_t max_heap;
+	size_t   max_backends = 8;
+	size_t   max_regex    = 32;
 
 	vmods_t vmods;
 
@@ -31,6 +33,8 @@ struct TenantConfig
 	uint64_t max_instructions() const noexcept { return group.max_instructions; }
 	uint64_t max_memory() const noexcept { return group.max_memory; }
 	uint64_t max_heap() const noexcept { return group.max_heap; }
+	size_t   max_regex() const noexcept { return group.max_regex; }
+	size_t   max_backends() const noexcept { return group.max_backends; }
 
 	TenantConfig(std::string n, std::string f, TenantGroup g)
 		: name(n), filename(f), group{std::move(g)} {}

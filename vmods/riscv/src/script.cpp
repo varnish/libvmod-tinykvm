@@ -22,9 +22,14 @@ Script::Script(
 		.memory_max = 0,
 		.owning_machine = &source.machine()
 	  }),
-	  m_ctx(ctx), m_vrm(vrm), m_inst(inst),
-	  m_is_debug(source.is_debug())
+	  m_ctx(ctx), m_tenant(vrm), m_inst(inst),
+	  m_is_debug(source.is_debug()),
+	  m_regex     {vrm->config.max_regex()},
+	  m_directors {vrm->config.max_backends()}
 {
+#ifdef ENABLE_TIMING
+	TIMING_LOCATION(t0);
+#endif
 	/* No initialization */
 	this->machine_setup(machine(), false);
 
@@ -34,6 +39,10 @@ Script::Script(
 	m_regex.loan_from(source.m_regex);
 	/* Load the directors of the source */
 	m_directors.loan_from(source.m_directors);
+#ifdef ENABLE_TIMING
+	TIMING_LOCATION(t1);
+	printf("Total time in Script constr body: %ldns\n", nanodiff(t0, t1));
+#endif
 }
 
 Script::Script(
@@ -48,8 +57,10 @@ Script::Script(
 		.forward_jumps = false,
 #endif
 	  }),
-	  m_ctx(ctx), m_vrm(vrm), m_inst(inst),
-	  m_is_storage(storage), m_is_debug(debug)
+	  m_ctx(ctx), m_tenant(vrm), m_inst(inst),
+	  m_is_storage(storage), m_is_debug(debug),
+	  m_regex     {vrm->config.max_regex()},
+	  m_directors {vrm->config.max_backends()}
 {
 	this->machine_initialize();
 }
@@ -96,14 +107,12 @@ void Script::machine_initialize()
 		handle_exception(machine().cpu.pc());
 		throw;
 	}
-	// catch program timeouts
-	if (UNLIKELY(machine().instruction_counter() >= max_instructions())) {
-		throw riscv::MachineTimeoutException(riscv::MAX_INSTRUCTIONS_REACHED,
-			"Maximum instruction counter reached", max_instructions());
-	}
 }
 void Script::machine_setup(machine_t& machine, bool init)
 {
+#ifdef ENABLE_TIMING
+	TIMING_LOCATION(t0);
+#endif
 	machine.set_userdata<Script>(this);
 
 	if (init == false)
@@ -159,10 +168,11 @@ void Script::machine_setup(machine_t& machine, bool init)
 			});
 	}
 
+#ifdef ENABLE_TIMING
+	TIMING_LOCATION(t1);
+#endif
 	// page protections and "hidden" stacks
 	this->setup_virtual_memory(init);
-	// stack
-	machine.cpu.reset_stack_pointer();
 
 #ifdef RISCV_DEBUG
 	machine.verbose_instructions = true;
@@ -174,6 +184,7 @@ void Script::machine_setup(machine_t& machine, bool init)
 		if (machine.memory.exit_address() == 0)
 			throw std::runtime_error("The binary is missing a public exit function!");
 		// Full Linux-compatible stack
+		machine.cpu.reset_stack_pointer(); // DONT TOUCH (YES YOU)
 		machine.setup_linux(
 			{ name(), m_is_storage ? "1" : "0", is_debug() ? "1" : "0" },
 			{ "LC_CTYPE=C", "LC_ALL=C", "USER=groot" });
@@ -181,7 +192,7 @@ void Script::machine_setup(machine_t& machine, bool init)
 
 	// add system call interface
 #ifdef ENABLE_TIMING
-	TIMING_LOCATION(t0);
+	TIMING_LOCATION(t2);
 #endif
 	if (init == false)
 	{
@@ -196,11 +207,11 @@ void Script::machine_setup(machine_t& machine, bool init)
 	}
 
 #ifdef ENABLE_TIMING
-	TIMING_LOCATION(t1);
+	TIMING_LOCATION(t3);
 #endif
 	setup_native_memory_syscalls<MARCH>(machine, true);
 #ifdef ENABLE_TIMING
-	TIMING_LOCATION(t2);
+	TIMING_LOCATION(t4);
 #endif
 	setup_syscall_interface(machine);
 
@@ -211,9 +222,9 @@ void Script::machine_setup(machine_t& machine, bool init)
 			printf("VM unhandled system call: %d\n", number);
 		});
 #ifdef ENABLE_TIMING
-	TIMING_LOCATION(t3);
-	printf("Time spent setting up arena: %ld ns, nat.mem: %ld ns, syscalls: %ld ns\n",
-		nanodiff(t0, t1), nanodiff(t1, t2), nanodiff(t2, t3));
+	TIMING_LOCATION(t5);
+	printf("[Constr] pagetbl: %ldns, vmem: %ldns, arena: %ldns, nat.mem: %ldns, syscalls: %ldns\n",
+		nanodiff(t0, t1), nanodiff(t1, t2), nanodiff(t2, t3), nanodiff(t3, t4), nanodiff(t4, t5));
 #endif
 }
 

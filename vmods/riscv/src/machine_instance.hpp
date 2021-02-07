@@ -20,8 +20,9 @@ struct MachineInstance
 	}
 
 	const std::vector<uint8_t> binary;
-	Script   storage;
 	Script   script;
+
+	Script   storage;
 	std::mutex storage_mtx;
 	riscv::RSPClient<Script::MARCH>* rspclient = nullptr;
 	Script* rsp_script = nullptr;

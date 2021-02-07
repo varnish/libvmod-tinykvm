@@ -1,6 +1,6 @@
 #include <EASTL/fixed_vector.h>
 
-template <typename T, size_t ENTRY_MAX>
+template <typename T>
 struct Cache {
 	struct Entry {
 		T*       item   = nullptr;
@@ -19,7 +19,7 @@ struct Cache {
 	}
 	size_t manage(T* ptr, uint32_t hash)
 	{
-		if (cache.size() < ENTRY_MAX)
+		if (cache.size() < max_entries)
 		{
 			cache.push_back({ptr, hash});
 			return cache.size() - 1;
@@ -46,5 +46,8 @@ struct Cache {
 		}
 	}
 
-	eastl::fixed_vector<Entry, ENTRY_MAX> cache;
+	Cache(size_t max) : max_entries(max) {}
+
+	eastl::vector<Entry> cache;
+	const size_t max_entries;
 };

@@ -4,14 +4,12 @@
 using riscv::crc32;
 
 //#define ENABLE_TIMING
-#define TIMING_LOCATION(x) \
-	asm("" ::: "memory"); \
-	auto x = time_now();  \
-	asm("" ::: "memory");
+#ifdef ENABLE_TIMING
+#include "timing.hpp"
+static Timing timing_constr {"constructor"};
+static Timing timing_destr {"destructor"};
+#endif
 
-
-inline timespec time_now();
-inline long nanodiff(timespec start_time, timespec end_time);
 std::vector<uint8_t> file_loader(const std::string& file);
 
 SandboxTenant::SandboxTenant(VRT_CTX, const TenantConfig& conf)
@@ -55,8 +53,8 @@ Script* SandboxTenant::vmfork(VRT_CTX, bool debug)
 
 		try {
 			new (script) Script{program->script, ctx, this, *program};
-			/* This creates a self-reference, which ensures that any
-			   open Script instances will keep the VRM instance alive. */
+			/* This creates a self-reference, which ensures that open
+			   Script instances will keep the machine instance alive. */
 			script->assign_instance(program);
 
 		} catch (std::exception& e) {
@@ -66,7 +64,7 @@ Script* SandboxTenant::vmfork(VRT_CTX, bool debug)
 		}
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);
-		printf("Time spent in initialization: %ld ns\n", nanodiff(t0, t1));
+		timing_constr.add(t0, t1);
 	#endif
 
 		priv_task->priv = script;
@@ -78,7 +76,7 @@ Script* SandboxTenant::vmfork(VRT_CTX, bool debug)
 			((Script*) script)->~Script(); /* call destructor */
 		#ifdef ENABLE_TIMING
 			TIMING_LOCATION(t3);
-			printf("Time spent in destructor: %ld ns\n", nanodiff(t2, t3));
+			timing_destr.add(t2, t3);
 		#endif
 		};
 	}
@@ -140,16 +138,4 @@ std::vector<uint8_t> file_loader(const std::string& filename)
     }
     fclose(f);
     return result;
-}
-
-timespec time_now()
-{
-	timespec t;
-	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t);
-	return t;
-}
-long nanodiff(timespec start_time, timespec end_time)
-{
-	assert(end_time.tv_sec == 0); /* We should never use seconds */
-	return end_time.tv_nsec - start_time.tv_nsec;
 }
