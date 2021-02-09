@@ -32,23 +32,15 @@ extern "C" {
 	void* VMOD_Handle(struct vmod *);
 }
 
-/*
-extern VCL_ENUM vmod_enum_abide;
-extern VCL_ENUM vmod_enum_all;
-extern VCL_ENUM vmod_enum_force;
-extern VCL_ENUM vmod_enum_ipv4;
-extern VCL_ENUM vmod_enum_ipv6;
-extern VCL_ENUM vmod_enum_lessthan;
-extern VCL_ENUM vmod_enum_morethan;
-extern VCL_ENUM vmod_enum_never;
-extern VCL_ENUM vmod_enum_onempty;
-extern VCL_ENUM vmod_enum_onerror;
-*/
-
 #define vlookup(handle, t, x) \
 	auto x = (t) dlsym(handle, #x)
-#define vlookupa(handle, t, x) \
-	(t) dlsym(handle, #x)
+inline auto* validate_deref(const char** ptr, const char* s) {
+	if (ptr != nullptr)
+		return *ptr;
+	throw std::runtime_error("Invalid pointer for enum: " + std::string(s));
+}
+#define vmod_enum(handle, x) \
+	validate_deref((const char **)dlsym(handle, #x), #x)
 
 void SandboxTenant::init_vmods(VRT_CTX)
 {
@@ -70,9 +62,31 @@ void SandboxTenant::init_vmods(VRT_CTX)
 
 	vlookup(handle, td_goto_dns_director__init*, vmod_dns_director__init);
 	vlookup(handle, td_goto_dns_director_backend*, vmod_dns_director_backend);
-	printf("*** Goto ENABLED\n");
 
-	const std::array<const char*, 3> ip_version { "all", "ipv4", "ipv6" };
+	const std::array<const char*, 3> ip_version {
+		vmod_enum(handle, vmod_enum_all),
+		vmod_enum(handle, vmod_enum_ipv4),
+		vmod_enum(handle, vmod_enum_ipv6),
+	};
+
+	const std::array<const char*, 4> ttl_rule {
+		vmod_enum(handle, vmod_enum_abide),
+		vmod_enum(handle, vmod_enum_force),
+		vmod_enum(handle, vmod_enum_morethan),
+		vmod_enum(handle, vmod_enum_lessthan),
+	};
+
+	const std::array<const char*, 3> ignore_update {
+		vmod_enum(handle, vmod_enum_onerror),
+		vmod_enum(handle, vmod_enum_onempty),
+		vmod_enum(handle, vmod_enum_never),
+	};
+
+	const std::array<const char*, 2> port_rule {
+		vmod_enum(handle, vmod_enum_abide),
+		vmod_enum(handle, vmod_enum_force),
+	};
+	printf("*** Goto ENABLED\n");
 
 	set_dynamic_call("goto.dns",
 		[=] (auto& script)
@@ -97,11 +111,11 @@ void SandboxTenant::init_vmods(VRT_CTX)
 	          0,
 	          ip_version.at(ipv),
 	          10,
-	          "force",
+	          ttl_rule.at(1),      // force
 	          0,
-	          "never",
+	          ignore_update.at(2), // never
 	          "",
-	          "abide"
+	          port_rule.at(0)      // abide
 	        );
 			if (vo_d != nullptr) {
 				const auto* dir = vmod_dns_director_backend(script.ctx(), vo_d);
