@@ -767,6 +767,12 @@ APICALL(regex_match)
 	/* VRE_exec(const vre_t *code, const char *subject, int length,
 	    int startoffset, int options, int *ovector, int ovecsize,
 	    const volatile struct vre_limits *lim) */
+	if (buffer.is_sequential()) {
+		machine.set_result(
+			VRE_exec(vre, buffer.c_str(), buffer.size(), 0,
+			0, nullptr, 0, nullptr) >= 0);
+		return;
+	}
 	auto subject = buffer.to_string();
 	machine.set_result(
 		VRE_exec(vre, subject.c_str(), subject.size(), 0,
@@ -776,14 +782,21 @@ APICALL(regex_subst)
 {
 	auto [index, tbuffer, sbuffer, dst, maxlen]
 		= machine.sysargs<uint32_t, riscv::Buffer, riscv::Buffer, gaddr_t, uint32_t> ();
-	auto* re = get_script(machine).regex().get(index);
+	auto& script = get_script(machine);
+	auto* re = script.regex().get(index);
 
 	/* Run the regsub using existing 're' */
 	const bool all = (maxlen & 0x80000000);
-	auto subject = tbuffer.to_string();
-	auto subst   = sbuffer.to_string();
-	auto * result =
-		VRT_regsub(get_ctx(machine), all, subject.c_str(), re, subst.c_str());
+	const char* result;
+	if (tbuffer.is_sequential() && sbuffer.is_sequential()) {
+		result =
+			VRT_regsub(script.ctx(), all, tbuffer.c_str(), re, sbuffer.c_str());
+	} else {
+		auto subject = tbuffer.to_string();
+		auto subst   = sbuffer.to_string();
+		result =
+			VRT_regsub(script.ctx(), all, subject.c_str(), re, subst.c_str());
+	}
 	if (result == nullptr) {
 		machine.set_result(-1);
 		return;

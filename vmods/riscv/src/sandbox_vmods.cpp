@@ -47,6 +47,8 @@ extern VCL_ENUM vmod_enum_onerror;
 
 #define vlookup(handle, t, x) \
 	auto x = (t) dlsym(handle, #x)
+#define vlookupa(handle, t, x) \
+	(t) dlsym(handle, #x)
 
 void SandboxTenant::init_vmods(VRT_CTX)
 {
@@ -68,17 +70,16 @@ void SandboxTenant::init_vmods(VRT_CTX)
 
 	vlookup(handle, td_goto_dns_director__init*, vmod_dns_director__init);
 	vlookup(handle, td_goto_dns_director_backend*, vmod_dns_director_backend);
-	vlookup(handle, VCL_ENUM, vmod_enum_all);
-	vlookup(handle, VCL_ENUM, vmod_enum_force);
-	vlookup(handle, VCL_ENUM, vmod_enum_never);
-	vlookup(handle, VCL_ENUM, vmod_enum_abide);
 	printf("*** Goto ENABLED\n");
+
+	const std::array<const char*, 3> ip_version { "all", "ipv4", "ipv6" };
 
 	set_dynamic_call("goto.dns",
 		[=] (auto& script)
 		{
-			auto [host] = script.machine().template sysargs<std::string> ();
-			printf("Goto: %s\n", host.c_str());
+			auto [host, ipv]
+				= script.machine().template sysargs<std::string, int> ();
+			printf("Goto: %s (ipv=%s)\n", host.c_str(), ip_version.at(ipv));
 			struct vmod_goto_dns_director *vo_d;
 			vmod_dns_director__init(script.ctx(), &vo_d, "d",
 	          priv,
@@ -94,13 +95,13 @@ void SandboxTenant::init_vmods(VRT_CTX)
 	          1,
 	          1,
 	          0,
-	          vmod_enum_all,
+	          ip_version.at(ipv),
 	          10,
-	          vmod_enum_force,
+	          "force",
 	          0,
-	          vmod_enum_never,
+	          "never",
 	          "",
-	          vmod_enum_abide
+	          "abide"
 	        );
 			if (vo_d != nullptr) {
 				const auto* dir = vmod_dns_director_backend(script.ctx(), vo_d);

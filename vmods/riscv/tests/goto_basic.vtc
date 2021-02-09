@@ -18,8 +18,14 @@ void on_recv()
 
 void on_backend_fetch()
 {
+	enum {
+		GOTO_IPV_ALL  = 0,
+		GOTO_IPV_IPv4 = 1,
+		GOTO_IPV_IPv6 = 2
+	};
 	constexpr Call goto_dns("goto.dns");
-	long be = goto_dns("docs.varnish-software.com");
+
+	long be = goto_dns("docs.varnish-software.com", GOTO_IPV_IPv4);
 	syscall(ECALL_SET_BACKEND, be);
 }
 
