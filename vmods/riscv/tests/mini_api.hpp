@@ -1,8 +1,19 @@
 #include "../src/machine/syscalls.h"
-#include <stddef.h>
+#include "../src/machine/crc32_embedded.hpp"
+#include <stdint.h>
 #define  NOT_CACHED  0
+#define  PASS        0
 #define  CACHED      1
 
+inline long syscall(long n, long arg0)
+{
+	register long a0 asm("a0") = arg0;
+	register long syscall_id asm("a7") = n;
+
+	asm volatile ("scall" : "+r"(a0) : "r"(syscall_id));
+
+	return a0;
+}
 inline long syscall(long n, long arg0, long arg1, long arg2)
 {
 	register long a0 asm("a0") = arg0;
@@ -14,7 +25,6 @@ inline long syscall(long n, long arg0, long arg1, long arg2)
 
 	return a0;
 }
-
 
 extern "C" __attribute__((noreturn))
 void exit(int code)
@@ -71,10 +81,28 @@ inline void synth(const char* ctype, size_t clen, const char* data, size_t dlen)
 	__builtin_unreachable();
 }
 
+extern "C" void (*dyncall_helper) ();
+struct Call {
+	const uint32_t hash;
+
+	constexpr Call(const char* f) : hash(crc32(f)) {}
+	constexpr Call(uint32_t h) : hash(h) {}
+
+	template <typename... Args>
+	long operator() (Args... args) const {
+		using FCH = long(*)(uint32_t, Args...);
+
+		auto fch = reinterpret_cast<FCH> (&dyncall_helper);
+		return fch(hash, args...);
+	}
+};
+
 extern "C" __attribute__((used))
 void on_recv();
 extern "C" __attribute__((used))
 void on_synth();
+extern "C" __attribute__((used))
+void on_backend_fetch();
 
 // 1. wrangle with argc and argc
 // 2. initialize the global pointer to __global_pointer
@@ -92,6 +120,14 @@ _start:                         \t\n\
 	.option pop					\t\n\
 	call start					\t\n\
 ");
+
+#define HELPER_FUNCTION(isr, name) \
+	asm(".global " #name "\n" \
+	#name ":\n" \
+	"	li a7, " #isr "\n" \
+	"	ecall\n" \
+	"   ret\n");
+HELPER_FUNCTION(15, dyncall_helper)
 
 extern "C" __attribute__((visibility("hidden"), used))
 void start(int, char**);

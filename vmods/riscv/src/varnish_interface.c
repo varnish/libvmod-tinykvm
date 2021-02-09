@@ -47,3 +47,15 @@ float riscv_GetTTL(VRT_CTX) {
 	CHECK_OBJ_NOTNULL(oc, OBJCORE_MAGIC);
 	return oc->ttl;
 }
+
+long riscv_SetBackend(VRT_CTX, VCL_BACKEND dir)
+{
+	if (ctx->req != NULL) {
+		ctx->req->director_hint = dir;
+		return 0;
+	} else if (ctx->bo != NULL) {
+		ctx->bo->director_req = dir;
+		return 0;
+	}
+	return -1;
+}

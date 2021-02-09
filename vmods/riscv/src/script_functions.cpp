@@ -18,11 +18,11 @@ extern "C" {
 	void http_UnsetIdx(struct http *hp, unsigned idx);
 	unsigned http_findhdr(const struct http *hp, unsigned l, const char *hdr);
 	void http_PrintfHeader(struct http *to, const char *fmt, ...);
-	void VRT_l_req_backend_hint(VRT_CTX, VCL_BACKEND);
 	void riscv_SetCacheable(VRT_CTX, bool a);
 	bool riscv_GetCacheable(VRT_CTX);
 	void riscv_SetTTL(VRT_CTX, float ttl);
 	float riscv_GetTTL(VRT_CTX);
+	long riscv_SetBackend(VRT_CTX, VCL_BACKEND);
 	struct txt {
 		const char* begin;
 		const char* end;
@@ -331,7 +331,7 @@ APICALL(set_backend)
 	auto [be] = machine.template sysargs<int> ();
 	auto& script = get_script(machine);
 	auto* dir = script.directors().get(be);
-	VRT_l_req_backend_hint(script.ctx(), dir);
+	machine.set_result(riscv_SetBackend(script.ctx(), dir));
 }
 APICALL(backend_decision)
 {
