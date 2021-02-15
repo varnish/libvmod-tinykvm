@@ -86,6 +86,7 @@ Script* SandboxTenant::vmfork(VRT_CTX, bool debug)
 void SandboxTenant::set_dynamic_call(const std::string& name, ghandler_t handler)
 {
 	const uint32_t hash = crc32(name.c_str(), name.size());
+	printf("*** DynCall %s is registered as 0x%X\n", name.c_str(), hash);
 	auto it = m_dynamic_functions.find(hash);
 	if (it != m_dynamic_functions.end()) {
 		throw std::runtime_error("set_dynamic_call: Hash collision for " + name);

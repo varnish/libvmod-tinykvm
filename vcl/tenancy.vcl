@@ -104,6 +104,10 @@ sub vcl_synth {
 }
 
 sub vcl_backend_fetch {
+	if (bereq.method == "POST") {
+		return (fetch);
+	}
+
 	if (riscv.fork(bereq.http.Host, bereq.http.X-Debug)) {
 		riscv.vcall(ON_BACKEND_FETCH);
 		if (bereq.http.X-Backend-Func) {
