@@ -25,11 +25,11 @@ sub vcl_recv {
 		return (hash);
 	}
 	/* Easier to work with wrk */
-	if (req.url == "/x") {
+	if (req.url ~ "/x") {
 		set req.http.Host = "xpizza.com";
 		//set req.url = req.url + "?foo=" + utils.cpu_id();
 		//set req.url = req.url + "?foo=" + utils.thread_id();
-		set req.url = req.url + "?foo=" + utils.fast_random_int(100);
+		//set req.url = req.url + "?foo=" + utils.fast_random_int(100);
 	}
 	else if (req.url == "/y") {
 		set req.http.Host = "ypizza.com";

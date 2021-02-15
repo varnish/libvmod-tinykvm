@@ -343,7 +343,8 @@ struct backend_buffer riscv_backend_call(VRT_CTX, const void* key, long func, lo
 			/* Use backend ctx which can write to beresp */
 			script->set_ctx(ctx);
 			/* Call the backend response function */
-			script->machine().vmcall(func, (Script::gaddr_t) farg);
+			script->machine().vmcall(func,
+				(Script::gaddr_t) farg, (int) HDR_BEREQ, (int) HDR_BERESP);
 			/* Restore old ctx for backend_response */
 			script->set_ctx(old_ctx);
 
