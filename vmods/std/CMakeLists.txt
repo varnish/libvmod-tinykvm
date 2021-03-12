@@ -2,10 +2,11 @@ cmake_minimum_required (VERSION 3.0.2)
 project (vmod C)
 include(../vmod.cmake vmod)
 
-set (PATH ${VARNISH_SOURCE_DIR}/lib/libvmod_std)
 if (VARNISH_PLUS)
+	set (PATH ${VARNISH_SOURCE_DIR}/lib/libvmod_std)
 	set (VMOD_VCC "${PATH}/vmod.vcc")
 else()
+	set (PATH ${VARNISH_SOURCE_DIR}/vmod)
 	set (VMOD_VCC "${PATH}/vmod_std.vcc")
 endif()
 

@@ -119,11 +119,11 @@ void vmod_fuzzer(uint8_t* data, size_t len)
     if (init == false) {
         init = true;
 #ifdef VARNISH_PLUS
-        varnishd_initialize(FUZZING_DIRECTORY "/../vcl/fuzz_vcp_vmod.vcl");
+        varnishd_initialize(FUZZING_DIRECTORY "/vcl/fuzz_vcp_vmod.vcl");
 		//fprintf(stderr, "%s\n", jwt_private_key);
 		init_rsa_key(jwt_private_key);
 #else
-		varnishd_initialize(FUZZING_DIRECTORY "/../vcl/fuzz_vc_vmod.vcl");
+		varnishd_initialize(FUZZING_DIRECTORY "/vcl/fuzz_vc_vmod.vcl");
 #endif
     }
 	if (len == 0) return;
@@ -173,7 +173,7 @@ void vmod_fuzzer(uint8_t* data, size_t len)
 		CLOSE_IT();
 		return;
 	}
-	
+
 	req = " HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
 	ret = write(cfd, req, strlen(req));
 	if (ret < 0) {
@@ -250,7 +250,7 @@ void vmod_fuzzer(uint8_t* data, size_t len)
 		return;
 	}
 #else
-	const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nVary: ";
+	const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nInput: ";
 	int ret = write(cfd, req, strlen(req));
 	if (ret < 0) {
 		CLOSE_IT();

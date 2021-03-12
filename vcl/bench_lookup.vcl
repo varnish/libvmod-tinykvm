@@ -1,14 +1,20 @@
 vcl 4.1;
-import std;
-import utils;
+import file;
 
 backend default {
-        .host = "127.0.0.1";
-        .port = "8008";
+	.host = "127.0.0.1";
+	.port = "8000";
 }
-sub vcl_backend_response {
-    //set beresp.do_esi = true;
+
+sub vcl_init {
+	new f = file.init("/tmp");
 }
+
 sub vcl_recv {
-        set req.url = req.url + "?foo=" + std.integer(std.random(1, 10000), 1);
+//	set req.backend_hint = f.backend();
+	return (pass);
+}
+
+sub vcl_backend_response {
+	set beresp.transit_buffer = 1KB;
 }

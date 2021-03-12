@@ -33,7 +33,6 @@ set(VARNISHD_SOURCES
 	${VD_PATH}/cache/cache_rfc2616.c
 	${VD_PATH}/cache/cache_session.c
 	${VD_PATH}/cache/cache_shmlog.c
-	${VD_PATH}/cache/cache_tcp_pool.c
 	${VD_PATH}/cache/cache_vary.c
 	${VD_PATH}/cache/cache_vcl.c
 	${VD_PATH}/cache/cache_vrt.c
@@ -110,6 +109,7 @@ if (VARNISH_PLUS)
 		${VD_PATH}/cache/cache_brotli_vfp.c
 		${VD_PATH}/cache/cache_brotli_vdp.c
 		${VD_PATH}/cache/cache_governor.c
+		${VD_PATH}/cache/cache_tcp_pool.c
 		${VD_PATH}/cache/cache_tcp_oper.c
 		${VD_PATH}/cache/cache_vcl_vrt.c
 		${VD_PATH}/cache/cache_vst.c
@@ -147,6 +147,7 @@ if (VARNISH_PLUS)
     )
 else()
 	list (APPEND VARNISHD_SOURCES
+		${VD_PATH}/cache/cache_conn_pool.c
         ${VD_PATH}/cache/cache_vrt_filter.c
         ${VD_PATH}/cache/cache_vrt_vcl.c
         ${VD_PATH}/cache/cache_vpi.c

@@ -1,10 +1,9 @@
 vcl 4.1;
 
-import accept;
 import std;
-import blob;
-import cookie;
-import debug;
+//import blob;
+//import cookie;
+//import debug;
 import header;
 
 backend default {
@@ -13,7 +12,7 @@ backend default {
 }
 
 sub vcl_init {
-	new myblob   = blob.blob(BASE64, "Zm9vYmFy");
+	//new myblob   = blob.blob(BASE64, "Zm9vYmFy");
 }
 
 sub test_vmod_std {
@@ -23,12 +22,12 @@ sub test_vmod_std {
 	set req.http.x-real = std.real(req.http.Input, 1.0);
 	set req.http.x-sort = std.querysort(req.http.Input);
 	std.fnmatch("/foo/[!0-9]", req.http.Input);
-	set req.http.x-ip = std.ip(req.http.Input, "1.1.1.1");
+	//set req.http.x-ip = std.ip(req.http.Input, "1.1.1.1");
 	set req.http.x-integer = std.integer(req.http.Input, 1);
 	std.timestamp(req.http.Input);
 	return (hash);
 }
-sub test_vmod_header {
+/*sub test_vmod_header {
 	set req.http.X = header.get(req.http.Set-Cookie, req.http.Input);
 	header.append(req.http.Set-Cookie, req.http.Input);
 	header.regsub(req, req.http.Input, req.http.Input);
@@ -58,18 +57,30 @@ sub test_vmod_blob {
 	set req.http.Base64-Encoded = blob.encode(BASE64,
 		blob=blob.decode(HEX, encoded=req.http.Input));
 	return (hash);
-}
+}*/
 
 sub vcl_recv {
 	#f.write("crash.bin", req.http.Input);
 	# x/64bs 0x6310002328d8
 	if (false) {
+		//call test_vmod_header;
+		//call test_vmod_blob;
+		//call test_vmod_cookie;
 		call test_vmod_std;
-		call test_vmod_header;
-		call test_vmod_blob;
 	}
 
-	call test_vmod_cookie;
+	//set req.http.X = header.get(req.http.Set-Cookie, req.http.Input);
+	//header.append(req.http.Set-Cookie, req.http.Input);
+	//header.regsub(req, req.http.Input, req.http.Input);
+	//header.remove(req.http.Set-Cookie, req.http.Input);
+
+	header.append(req.http.Input, req.http.Input);
+	//header.remove(req.http.Input, "/foo/[!0-9]");
+	//header.copy(req.http.Input, req.http.Input);
+
+	//std.cache_req_body(1KB);
+	//std.late_100_continue(false);
+	//std.ban(req.http.Input);
 
 	return (hash);
 }
@@ -79,5 +90,5 @@ sub vcl_miss {
 }
 
 sub vcl_backend_response {
-	
+
 }

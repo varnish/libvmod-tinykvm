@@ -3,7 +3,7 @@ project (vmod C)
 include(../vmod.cmake vmod)
 
 add_vmod(vmod_header vmod_header.vcc "Header VMOD"
-	vmod_header.c
+	src/vmod_header.c
 )
 # VCL import name is "header"
 add_vmod_tests(vmod_header header
