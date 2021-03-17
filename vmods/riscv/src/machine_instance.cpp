@@ -1,4 +1,5 @@
 #include "machine_instance.hpp"
+#include <libriscv/rsp_server.hpp>
 // functions available to all machines created during init
 std::vector<const char*> riscv_lookup_wishlist {
 	"on_init",
@@ -19,14 +20,15 @@ MachineInstance::MachineInstance(
 	bool debug)
 	: binary{std::move(elf)},
 	  script{binary, ctx, vrm, *this, false, debug},
-	  storage{binary, ctx, vrm, *this, true, debug}
+	  storage{binary, ctx, vrm, *this, true, debug},
+	  rspclient{nullptr}
 {
 	extern std::vector<const char*> riscv_lookup_wishlist;
 	for (const auto* func : riscv_lookup_wishlist) {
 		/* NOTE: We can't check if addr is 0 here, because
 		   the wishlist applies to ALL machines. */
 		const auto addr = lookup(func);
-		sym_lookup.emplace(strdup(func), addr);
+		sym_lookup.emplace(func, addr);
 		const auto callsite = script.callsite(addr);
 		sym_vector.push_back({func, addr, callsite.size});
 	}

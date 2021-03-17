@@ -24,13 +24,11 @@ struct MachineInstance
 
 	Script   storage;
 	std::mutex storage_mtx;
-	riscv::RSPClient<Script::MARCH>* rspclient = nullptr;
+	std::unique_ptr<riscv::RSPClient<Script::MARCH>> rspclient;
 	Script* rsp_script = nullptr;
 	std::mutex rsp_mtx;
 	/* Lookup tree for ELF symbol names */
-	eastl::string_map<Script::gaddr_t,
-			eastl::str_less<const char*>,
-			eastl::allocator_malloc> sym_lookup;
+	std::map<std::string, Script::gaddr_t> sym_lookup;
 	/* Index vector for ELF symbol names, used by call_index(..) */
 	struct Lookup {
 		const char* func;

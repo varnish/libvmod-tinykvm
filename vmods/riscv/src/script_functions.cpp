@@ -181,7 +181,7 @@ APICALL(dynamic_call)
 	// call the handler
 	get_script(machine).dynamic_call(hash);
 	// we short-circuit the ret pseudo-instruction:
-	machine.cpu.jump(regs.get(riscv::RISCV::REG_RA) - 4);
+	machine.cpu.jump(regs.get(riscv::REG_RA) - 4);
 }
 APICALL(remote_call)
 {
@@ -235,7 +235,7 @@ APICALL(remote_call)
 	}
 	remote.machine().memory.reset_page_readf_handler();
 	// Short-circuit the ret pseudo-instruction:
-	machine.cpu.jump(machine.cpu.reg(riscv::RISCV::REG_RA) - 4);
+	machine.cpu.jump(machine.cpu.reg(riscv::REG_RA) - 4);
 }
 APICALL(remote_strcall)
 {

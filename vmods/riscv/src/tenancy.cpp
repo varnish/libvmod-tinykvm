@@ -1,13 +1,13 @@
 #include "sandbox.hpp"
 #include "varnish.hpp"
-#include <EASTL/string_map.h>
 #include <libriscv/util/crc32.hpp>
 #include <nlohmann/json.hpp>
+#include <stdexcept>
 
 using json = nlohmann::json;
 extern std::vector<uint8_t> file_loader(const std::string& filename);
 
-using MapType = eastl::string_map<struct SandboxTenant*>;
+using MapType = std::unordered_map<std::string, struct SandboxTenant*>;
 static MapType temporaries;
 
 inline MapType& tenants(VRT_CTX)
@@ -21,7 +21,7 @@ inline void load_tenant(VRT_CTX, TenantConfig&& config)
 {
 	try {
 		tenants(ctx).try_emplace(
-			strdup(config.name.c_str()),
+			config.name,
 			new SandboxTenant(ctx, config));
 	} catch (const std::exception& e) {
 		VRT_fail(ctx, "Exception when creating machine '%s': %s",
@@ -53,13 +53,13 @@ SandboxTenant* create_temporary_tenant(
 	config.name = name;
 	config.filename = "";
 	auto it = temporaries.try_emplace(
-		strdup(config.name.c_str()),
+		config.name,
 		new SandboxTenant(nullptr, config));
 	return it.first->second;
 }
 void delete_temporary_tenant(const SandboxTenant* vrm)
 {
-	auto it = temporaries.find(vrm->config.name.c_str());
+	auto it = temporaries.find(vrm->config.name);
 	if (it != temporaries.end())
 	{
 		assert(vrm == it->second);

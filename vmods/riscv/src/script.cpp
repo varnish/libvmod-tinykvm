@@ -18,9 +18,8 @@ static constexpr bool VERBOSE_ERRORS = true;
 Script::Script(
 	const Script& source, const vrt_ctx* ctx,
 	const SandboxTenant* vrm, MachineInstance& inst)
-	: m_machine(source.machine().memory.binary(), {
+	: m_machine(source.machine(), {
 		.memory_max = 0,
-		.owning_machine = &source.machine()
 	  }),
 	  m_ctx(ctx), m_tenant(vrm), m_inst(inst),
 	  m_is_debug(source.is_debug()),
@@ -270,8 +269,8 @@ void Script::handle_timeout(gaddr_t address)
 void Script::print_backtrace(const gaddr_t addr)
 {
 	machine().memory.print_backtrace(
-		[] (const char* buffer, size_t len) {
-			printf("-> %.*s\n", (int)len, buffer);
+		[] (std::string_view line) {
+			printf("-> %.*s\n", (int)line.size(), line.begin());
 		});
 	auto origin = machine().memory.lookup(addr);
 	printf("-> [-] 0x%08lx + 0x%.3x: %s\n",

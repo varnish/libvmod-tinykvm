@@ -1,6 +1,6 @@
 #include <cstdint>
 #include <string>
-#include <EASTL/unordered_map.h>
+#include <unordered_map>
 
 struct TenantVMOD {
 	std::string name;
@@ -8,7 +8,7 @@ struct TenantVMOD {
 };
 
 struct TenantGroup {
-	using vmods_t = eastl::unordered_map<uint32_t, TenantVMOD>;
+	using vmods_t = std::unordered_map<uint32_t, TenantVMOD>;
 
 	std::string name;
 	uint64_t max_instructions;
