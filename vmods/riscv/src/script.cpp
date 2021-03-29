@@ -23,6 +23,7 @@ Script::Script(
 	  }),
 	  m_ctx(ctx), m_tenant(vrm), m_inst(inst),
 	  m_is_debug(source.is_debug()),
+	  m_sighandler{source.m_sighandler},
 	  m_regex     {vrm->config.max_regex()},
 	  m_directors {vrm->config.max_backends()}
 {
@@ -256,6 +257,17 @@ void Script::handle_exception(gaddr_t address)
 		fprintf(stderr, "Function call: %s\n", callsite.name.c_str());
 		this->print_backtrace(address);
 	}
+	if (this->m_sighandler != 0) {
+		auto handler = this->m_sighandler;
+		//machine().stack_push(machine().cpu.pc());
+		machine().stack_push(machine().cpu.reg(riscv::REG_RA));
+		machine().cpu.reg(riscv::REG_RA) = machine().cpu.pc();
+		machine().cpu.reg(riscv::REG_ARG0) = 11; /* SIGSEGV */
+		machine().cpu.jump(handler);
+		this->m_sighandler = 0;
+		this->resume(60'000);
+		this->m_sighandler = handler;
+	}
 }
 void Script::handle_timeout(gaddr_t address)
 {
@@ -276,6 +288,10 @@ void Script::print_backtrace(const gaddr_t addr)
 	printf("-> [-] 0x%08lx + 0x%.3x: %s\n",
 			(long) origin.address,
 			origin.offset, origin.name.c_str());
+}
+void Script::set_sigaction(int, gaddr_t handler)
+{
+	this->m_sighandler = handler;
 }
 
 uint64_t Script::max_instructions() const noexcept {

@@ -80,6 +80,7 @@ public:
 	gaddr_t resolve_address(const char* name) const;
 	auto    callsite(gaddr_t addr) const { return machine().memory.lookup(addr); }
 
+	void set_sigaction(int sig, gaddr_t handler);
 	void print_backtrace(const gaddr_t addr);
 	void open_debugger(uint16_t);
 
@@ -110,6 +111,7 @@ private:
 	bool        m_is_storage = false;
 	bool        m_is_debug = false;
 	bool        m_currently_debugging = false;
+	gaddr_t     m_sighandler = 0;
 	struct VSHA256Context* m_sha_ctx = nullptr;
 
 	Cache<struct vre> m_regex;
