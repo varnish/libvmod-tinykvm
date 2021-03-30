@@ -1,5 +1,5 @@
-#include "sandbox.hpp"
-#include "varnish.hpp"
+#include "../sandbox.hpp"
+#include "../varnish.hpp"
 #include <libriscv/util/crc32.hpp>
 typedef struct oaref oaref_t;
 extern "C" {
@@ -91,6 +91,11 @@ void SandboxTenant::init_vmods(VRT_CTX)
 	set_dynamic_call("goto.dns",
 		[=] (Script& script)
 		{
+			if (UNLIKELY(script.ctx() == nullptr)) {
+				printf("Goto: Can't create backend during initialization\n");
+				script.machine().set_result(-1);
+				return;
+			}
 			auto [host, ipv]
 				= script.machine().sysargs<std::string, int> ();
 			printf("Goto: %s (ipv=%s)\n", host.c_str(), ip_version.at(ipv));
