@@ -329,10 +329,13 @@ bool Script::guest_free(gaddr_t addr)
 
 inline void Script::init_sha256()
 {
+	if (ctx()->req == nullptr) {
+		throw std::runtime_error("SHA256 not available during initialization");
+	}
 	this->m_sha_ctx =
 		(VSHA256_CTX*) WS_Alloc(ctx()->ws, sizeof(VSHA256_CTX));
 	if (!this->m_sha_ctx)
-		throw std::runtime_error("Out of workspace");
+		throw std::runtime_error("SHA256: Out of workspace");
 	VSHA256_Init(this->m_sha_ctx);
 }
 void Script::hash_buffer(const char* buffer, int len)
@@ -345,7 +348,7 @@ void Script::hash_buffer(const char* buffer, int len)
 }
 bool Script::apply_hash()
 {
-	if (m_sha_ctx && ctx()) {
+	if (m_sha_ctx && ctx()->req) {
 		riscv_SetHash(ctx()->req, m_sha_ctx);
 		return true;
 	}
