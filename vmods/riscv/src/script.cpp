@@ -7,6 +7,7 @@
 extern "C" void riscv_SetHash(struct req*, VSHA256_CTX*);
 inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
+static constexpr uint64_t SIGHANDLER_INSN = 60'000;
 static constexpr bool VERBOSE_ERRORS = true;
 
 //#define ENABLE_TIMING
@@ -265,7 +266,7 @@ void Script::handle_exception(gaddr_t address)
 		machine().cpu.reg(riscv::REG_ARG0) = 11; /* SIGSEGV */
 		machine().cpu.jump(handler);
 		this->m_sighandler = 0;
-		this->resume(60'000);
+		this->resume(SIGHANDLER_INSN);
 		this->m_sighandler = handler;
 	}
 }
