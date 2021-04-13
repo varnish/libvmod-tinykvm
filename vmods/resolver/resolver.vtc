@@ -1,0 +1,73 @@
+varnishtest "Test ua-device-handler.vcl"
+
+server s1 {
+	# rxreq and txresp pr. request
+	rxreq
+	txresp
+	rxreq
+	txresp
+	rxreq
+	txresp
+	rxreq
+	txresp
+	rxreq
+	txresp
+	rxreq
+	txresp
+	rxreq
+	txresp
+	rxreq
+	txresp
+	rxreq
+	txresp
+	rxreq
+	txresp
+	rxreq
+	txresp
+	rxreq
+	txresp
+	rxreq
+	txresp
+} -start
+
+# vcc_err_unref is set to false as we're not including all procedures which exists in the sub_strip_queryparams.vcl
+varnish v1 -arg "-p vcc_err_unref=false" -vcl+backend  {
+	import resolver;
+	import rewrite;
+	import kvstore;
+	import std;
+#	include "common/veribot_customized.vcl";
+
+	sub vcl_init {
+		vb_ua_filter.add_rules(string = {"
+			"(?i)(google|bing)bot"
+		"});
+		vb_domain_rules.add_rules(string = {"
+			".googlebot.com" "allow"
+			".google.com" "allow"
+			".bingbot.com" "allow"
+		"});
+	}
+
+	sub vcl_recv {
+		if(req.http.User-Agent ~ "(?i)(Googlebot|Feedfetcher-Google|bingbot)"){
+            call vb_check_client;
+        }
+	}
+
+	sub vcl_deliver {
+		if(req.http.vb-error){
+			set resp.http.vb-error = req.http.vb-error;
+		}
+	}
+
+} -start
+
+# Example in how to test the behaviour of a sub procedure only
+# Verify that expected header is set by device detection
+client c1 {
+    # Desktop
+    txreq -url "/osloby/i/opapym/fire-til-legevakt-etter-brann-i-garasjeanlegg-i-oslo" -hdr "Host:www.aftenposten.no" -hdr "X-int:true" -hdr "X-Forwarded-Proto:https" -hdr "X-SCH-Client-IP:66.249.66.220" -hdr "User-Agent:Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+        rxresp
+        expect resp.http.vb-error == "VB: Resolve failed with: RSV: Reverse DNS lookup failed"
+} -run
