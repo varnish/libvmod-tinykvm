@@ -10,6 +10,7 @@ import std;
 import str;
 import synthbackend;
 //import urlplus;
+import uri;
 
 
 backend default {
@@ -81,18 +82,48 @@ sub vcl_recv {
 	set req.http.x-dir = urlplus.get_dirname();
 	set req.http.x-url = urlplus.as_string();
 	set req.http.x-query = urlplus.query_get("query");
-	urlplus.write();*/
+	urlplus.write();
 
-	if (false) {
-		call test_headerplus;
-	}
-	set req.http.str1 = str.split(req.http.Input, 2, ", ");
+    set req.http.str1 = str.split(req.http.Input, 2, ", ");
 	set req.http.str2 = str.split(req.http.Input, 2, req.http.Input);
 	set req.http.str3 = str.substr(req.http.Input, 20);
 
     #set req.http.r1 = jwt_reader.parse(req.http.Input);
 	#set req.http.r2 = jwt_reader.set_key("my secret");
     #set req.http.r3 = jwt_reader.verify("HS256");
+*/
+
+	if (false) {
+		call test_headerplus;
+	}
+
+    uri.parse(req.http.Input);
+
+    set req.http.location = uri.as_string();
+    set req.http.s1 = uri.get_scheme();
+    set req.http.s2 = uri.get_userinfo();
+    set req.http.s3 = uri.get_host();
+    set req.http.s4 = uri.get_port();
+    set req.http.s5 = uri.get_path();
+    set req.http.s6 = uri.get_query();
+    set req.http.s7 = uri.get_fragment();
+
+    uri.set_scheme(req.http.Input);
+    uri.set_userinfo(req.http.Input);
+    uri.set_host(req.http.Input);
+    uri.set_port(req.http.Input);
+    uri.set_path(req.http.Input);
+    uri.set_query(req.http.Input);
+    uri.set_fragment(req.http.Input);
+    uri.set_port();
+
+    set req.http.Host = uri.as_string();
+    uri.write();
+    set req.http.Host = req.http.Input;
+    uri.write();
+
+    uri.reset();
+
 	return (hash);
 }
 
