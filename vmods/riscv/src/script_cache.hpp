@@ -1,4 +1,6 @@
-#include <EASTL/fixed_vector.h>
+#pragma once
+#include <vector>
+#include <stdexcept>
 
 template <typename T>
 struct Cache {
@@ -48,6 +50,6 @@ struct Cache {
 
 	Cache(size_t max) : max_entries(max) {}
 
-	eastl::vector<Entry> cache;
+	std::vector<Entry> cache;
 	const size_t max_entries;
 };

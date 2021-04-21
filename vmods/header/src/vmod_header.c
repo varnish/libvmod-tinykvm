@@ -1,8 +1,11 @@
 /*-
  * Copyright (c) 2011-2016 Varnish Software
+ * Copyright 2019 UPLEX - Nils Goroll Systemoptimierung
  * All rights reserved.
  *
- * Author: Kristian Lyngstol <kristian@bohemians.org>
+ * Authors: Kristian Lyngstol <kristian@bohemians.org>
+ *          Geoffrey <geoffrey.simmons@uplex.de>
+ *          Nils Goroll <nils.goroll@uplex.de>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,36 +34,11 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
-#include <cache/cache.h>
-#include "vre.h"
+#include "cache/cache.h"
 
-#include "vcc_if.h"
-
-/*
- * This mutex is used to avoid having two threads that initializes the same
- * regex at the same time. While it means that there's a single, global
- * lock for all libvmod-header actions dealing with regular expressions,
- * the contention only applies on the first request that calls that
- * specific function.
- */
-pthread_mutex_t header_mutex;
-
-/*
- * Initialize the regex *s on priv, if it hasn't already been done.
- */
-static void
-header_init_re(struct vmod_priv *priv, const char *s)
-{
-	if (priv->priv == NULL) {
-		AZ(pthread_mutex_lock(&header_mutex));
-		if (priv->priv == NULL) {
-			VRT_re_init(&priv->priv, s);
-			priv->free = VRT_re_fini;
-		}
-		AZ(pthread_mutex_unlock(&header_mutex));
-	}
-}
+#include "vcc_header_if.h"
 
 /*
  * Returns true if the *hdr header is the one pointed to by *hh.
@@ -89,7 +67,7 @@ header_http_IsHdr(const txt *hh, const char *hdr)
  * header, a match is returned.
  */
 static int
-header_http_match(VRT_CTX, const struct http *hp, unsigned u, void *re,
+header_http_match(VRT_CTX, const struct http *hp, unsigned u, VCL_REGEX re,
     const char *hdr)
 {
 	const char *start;
@@ -124,11 +102,10 @@ header_http_match(VRT_CTX, const struct http *hp, unsigned u, void *re,
 
 /*
  * Returns the (first) header named as *hdr that also matches the regular
- * expression *re.
+ * expression re.
  */
 static unsigned
-header_http_findhdr(VRT_CTX, const struct http *hp, const char *hdr,
-    void *re)
+header_http_findhdr(VRT_CTX, const struct http *hp, const char *hdr, VCL_REGEX re)
 {
         unsigned u;
 
@@ -141,10 +118,10 @@ header_http_findhdr(VRT_CTX, const struct http *hp, const char *hdr,
 
 /*
  * Removes all copies of the header that matches *hdr with content that
- * matches *re. Same as http_Unset(), plus regex.
+ * matches re. Same as http_Unset(), plus regex.
  */
 static void
-header_http_Unset(VRT_CTX, struct http *hp, const char *hdr, void *re)
+header_http_Unset(VRT_CTX, struct http *hp, const char *hdr, VCL_REGEX re)
 {
 	unsigned u, v;
 
@@ -176,6 +153,9 @@ header_http_cphdr(VRT_CTX, const struct http *hp, const char *hdr,
 {
         unsigned u;
 	const char *p;
+	struct strands s;
+
+	s.n = 1;
 
         for (u = HTTP_HDR_FIRST; u < hp->nhd; u++) {
 		if (!header_http_match(ctx, hp, u, NULL, hdr))
@@ -184,64 +164,46 @@ header_http_cphdr(VRT_CTX, const struct http *hp, const char *hdr,
 		p = hp->hd[u].b + hdr[0];
 		while (*p == ' ' || *p == '\t')
 			p++;
-                vmod_append(ctx, dst, p, vrt_magic_string_end);
+		s.p = &p;
+                vmod_append(ctx, dst, &s);
         }
 }
 
-/*
- * vmod entrypoint. Sets up the header mutex.
- */
-int
-#ifdef VARNISH_PLUS
-event_function
-#else
-vmod_event_function
-#endif
-	(VRT_CTX, struct vmod_priv *priv, enum vcl_event_e e)
-{
-	(void)ctx;
-	(void)priv;
-
-	if (e != VCL_EVENT_LOAD)
-		return (0);
-	AZ(pthread_mutex_init(&header_mutex, NULL));
-	return (0);
-}
-
 VCL_VOID
-vmod_append(VRT_CTX, VCL_HEADER hdr, const char *fmt, ...)
+vmod_append(VRT_CTX, VCL_HEADER hdr, VCL_STRANDS s)
 {
-	va_list ap;
 	struct http *hp;
+	struct strands st[1];
+	const char *p[s->n + 2];
 	const char *b;
 
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	if (fmt == NULL)
-		return;
+
+	/* prefix the strand with $hdr_name + space */
+	p[0] = hdr->what + 1;
+	p[1] = " ";
+	AN(memcpy(p + 2, s->p, s->n * sizeof *s->p));
+	st->n = s->n + 2;
+	st->p = p;
+
+	b = VRT_StrandsWS(ctx->ws, NULL, st);
 
 	hp = VRT_selecthttp(ctx, hdr->where);
-	va_start(ap, fmt);
-	b = VRT_String(hp->ws, hdr->what + 1, fmt, ap);
-	if (b == NULL)
-		VSLb(ctx->vsl, SLT_LostHeader, "vmod_header: %s",
-		    hdr->what + 1);
-	else
- 		http_SetHeader(hp, b);
-	va_end(ap);
+	http_SetHeader(hp, b);
 }
 
 VCL_STRING
-vmod_get(VRT_CTX, struct vmod_priv *priv, VCL_HEADER hdr, VCL_STRING s)
+vmod_get(VRT_CTX, VCL_HEADER hdr, VCL_REGEX re)
 {
 	struct http *hp;
 	unsigned u;
 	const char *p;
 
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	header_init_re(priv, s);
+	AN(re);
 
 	hp = VRT_selecthttp(ctx, hdr->where);
-	u = header_http_findhdr(ctx, hp, hdr->what, priv->priv);
+	u = header_http_findhdr(ctx, hp, hdr->what, re);
 	if (u == 0)
 		return (NULL);
 	p = hp->hd[u].b + hdr->what[0];
@@ -262,15 +224,15 @@ vmod_copy(VRT_CTX, VCL_HEADER src, VCL_HEADER dst)
 }
 
 VCL_VOID
-vmod_remove(VRT_CTX, struct vmod_priv *priv, VCL_HEADER hdr, VCL_STRING s)
+vmod_remove(VRT_CTX, VCL_HEADER hdr, VCL_REGEX re)
 {
 	struct http *hp;
 
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	header_init_re(priv, s);
+	AN(re);
 
 	hp = VRT_selecthttp(ctx, hdr->where);
-	header_http_Unset(ctx, hp, hdr->what, priv->priv);
+	header_http_Unset(ctx, hp, hdr->what, re);
 }
 
 /* XXX: http_VSLH() and http_VSLH_del() copied from cache_http.c */
@@ -306,33 +268,13 @@ http_VSLH_del(const struct http *hp, unsigned hdr)
 }
 
 VCL_VOID
-vmod_regsub(VRT_CTX, struct vmod_priv *priv, VCL_HTTP hp, VCL_STRING regex,
+vmod_regsub(VRT_CTX, VCL_HTTP hp, VCL_REGEX re,
     VCL_STRING sub, VCL_BOOL all)
 {
-	vre_t *re;
-
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	CHECK_OBJ_NOTNULL(hp, HTTP_MAGIC);
-	AN(priv);
+	AN(re);
 
-	if (regex == NULL) {
-		VRT_fail(ctx, "header.regsub(): regex is NULL");
-		return;
-	}
-	if (priv->priv == NULL) {
-		const char *err;
-		int erroffset;
-
-		if (VRE_compile(regex, 0, &err, &erroffset) == NULL) {
-			VRT_fail(ctx, "header.regsub(): cannot compile '%s': "
-			    "%s (offset %d)", regex, err, erroffset);
-			return;
-		}
-		header_init_re(priv, regex);
-	}
-
-	AN(priv->priv);
-	re = (vre_t *)priv->priv;
 	for (unsigned u = HTTP_HDR_FIRST; u < hp->nhd; u++) {
 		const char *hdr;
 		VCL_STRING rewrite;
@@ -349,4 +291,74 @@ vmod_regsub(VRT_CTX, struct vmod_priv *priv, VCL_HTTP hp, VCL_STRING regex,
 		hp->hd[u].e = strchr(rewrite, '\0');
 		http_VSLH(hp, u);
 	}
+}
+
+/* basically the inverse of VRT_selecthttp() */
+static enum gethdr_e
+selectwhere(VRT_CTX, VCL_HTTP hp)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(hp, HTTP_MAGIC);
+
+	if (hp == ctx->http_req)
+		return (HDR_REQ);
+	if (hp == ctx->http_req_top)
+		return (HDR_REQ_TOP);
+	if (hp == ctx->http_bereq)
+		return (HDR_BEREQ);
+	if (hp == ctx->http_beresp)
+		return (HDR_BERESP);
+	if (hp ==  ctx->http_resp)
+		return (HDR_RESP);
+	WRONG("impossible VCL_HTTP");
+}
+
+// XXX would need to know the limit
+const struct gethdr_s hdr_null[HDR_BERESP + 1] = {
+	[HDR_REQ]	= { HDR_REQ,		"\0"},
+	[HDR_REQ_TOP]	= { HDR_REQ_TOP,	"\0"},
+	[HDR_RESP]	= { HDR_RESP,		"\0"},
+	[HDR_OBJ]	= { HDR_OBJ,		"\0"},
+	[HDR_BEREQ]	= { HDR_BEREQ,		"\0"},
+	[HDR_BERESP]	= { HDR_BERESP,	"\0"}
+};
+
+
+VCL_HEADER
+vmod_dyn(VRT_CTX, VCL_HTTP hp, VCL_STRING name)
+{
+	// usual assertions are in selectwhere()
+	enum gethdr_e where = selectwhere(ctx, hp);
+	char *what;
+	const char *p;
+	struct gethdr_s *hdr;
+	size_t l;
+
+	if (name == NULL || *name == '\0')
+		return (&hdr_null[where]);
+
+	p = strchr(name, ':');
+	if (p != NULL)
+		l = p - name;
+	else
+		l = strlen(name);
+
+	assert(l <= CHAR_MAX);
+
+	hdr = WS_Alloc(ctx->ws, sizeof *hdr);
+	what = WS_Alloc(ctx->ws, l + 3);
+	if (hdr == NULL || what == NULL) {
+		VRT_fail(ctx, "out of workspace");
+		// avoid null check in caller
+		return (&hdr_null[where]);
+	}
+
+	what[0] = (char)l + 1;
+	(void) strncpy(&what[1], name, l);
+	what[l+1] = ':';
+	what[l+2] = '\0';
+
+	hdr->where = where;
+	hdr->what = what;
+	return (hdr);
 }

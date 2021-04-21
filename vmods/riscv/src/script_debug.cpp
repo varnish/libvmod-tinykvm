@@ -53,7 +53,7 @@ void Script::open_debugger(uint16_t port)
 	}
 
 	// Begin debugging (without locks)
-	auto* client = instance().rspclient;
+	auto& client = instance().rspclient;
 	client->set_machine(machine());
 	client->interrupt();
 	this->run_debugger_loop();
@@ -91,7 +91,7 @@ void Script::stop_debugger()
 				while (rspclient->process_one());
 			}
 			// Re-lock again to free and close
-			delete rspclient;
+			rspclient = nullptr;
 		} catch (...) {}
 		rspclient = nullptr;
 		// Make sure zeroing rsp_script is last
@@ -104,7 +104,7 @@ void Script::stop_debugger()
 }
 void Script::run_debugger_loop()
 {
-	auto* rspclient = instance().rspclient;
+	auto& rspclient = instance().rspclient;
 	// skip if we are not connected
 	if (rspclient != nullptr)
 	{

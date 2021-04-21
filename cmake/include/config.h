@@ -284,15 +284,14 @@
 # define _GNU_SOURCE 1
 #endif
 
-
 /* This is a Varnish Plus build */
 #define VARNISH_PLUS true
 
 /* C compiler command line for VCL code */
 #if defined(LIBFUZZER_ENABLED)
-#define VCC_CC "exec clang-10 -g -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -shared -fno-omit-frame-pointer -fsanitize=fuzzer,address,undefined -Wl,-x -o %o %s"
+#define VCC_CC "exec clang-11 -g -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -shared -fno-omit-frame-pointer -fsanitize=fuzzer,address,undefined -Wl,-x -o %o %s"
 #elif defined(SANITIZERS_ENABLED)
-#define VCC_CC "exec clang-10 -g -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -shared -fno-omit-frame-pointer -fsanitize=address,undefined -Wl,-x -o %o %s"
+#define VCC_CC "exec clang-11 -g -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -shared -fno-omit-frame-pointer -fsanitize=address,undefined -Wl,-x -o %o %s"
 #else
 #define VCC_CC "exec gcc -g -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -shared -Wl,-x -o %o %s"
 #endif

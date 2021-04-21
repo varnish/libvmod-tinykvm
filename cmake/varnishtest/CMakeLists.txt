@@ -26,8 +26,6 @@ add_custom_target(vtc_h2_dectbl_generate
 set(SOURCES
 		${PATH}/teken.c
 		${PATH}/vtc_client.c
-		${PATH}/vtc_dns.c
-		${PATH}/vtc_file.c
 		${PATH}/vtc_haproxy.c
 		${PATH}/vtc_log.c
 		${PATH}/vtc_misc.c
@@ -50,6 +48,11 @@ if (NOT VARNISH_PLUS)
 	set(SOURCES ${SOURCES}
 		${PATH}/vtc_gzip.c
 		${PATH}/vtc_sess.c
+	)
+else()
+	set(SOURCES ${SOURCES}
+		${PATH}/vtc_dns.c
+		${PATH}/vtc_file.c
 	)
 endif()
 add_executable(varnishtest ${SOURCES})

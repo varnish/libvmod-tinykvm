@@ -139,7 +139,7 @@ inline long Script::call(gaddr_t address, Args&&... args)
 		// execute function
 		machine().simulate<true>(max_instructions());
 		// address-sized integer return value
-		return machine().cpu.reg(riscv::RISCV::REG_ARG0);
+		return machine().cpu.reg(riscv::REG_ARG0);
 	}
 	catch (const riscv::MachineTimeoutException& e) {
 		this->handle_timeout(address);

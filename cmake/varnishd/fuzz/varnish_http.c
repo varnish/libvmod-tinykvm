@@ -49,7 +49,7 @@ void varnishd_initialize(const char* vcl_path)
     snprintf(vd_folder, sizeof(vd_folder), "/tmp/varnishd_%d", getpid());
 	// feature http2
 	char feature_http2[128];
-	snprintf(feature_http2, sizeof(feature_http2), "feature=+http2");
+	snprintf(feature_http2, sizeof(feature_http2), "feature=-http2");
 	// debug flag single-process + workspace sanitizers
 	char feature_siproc[128];
 #ifndef VARNISH_PLUS
