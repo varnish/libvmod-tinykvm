@@ -55,6 +55,36 @@ sub test_headerplus {
 	return (hash);
 }
 
+sub test_uri {
+    uri.parse(req.http.Input);
+
+    set req.http.location = uri.as_string();
+    set req.http.s1 = uri.get_scheme();
+    set req.http.s2 = uri.get_userinfo();
+    set req.http.s3 = uri.get_host();
+    set req.http.s4 = uri.get_port();
+    set req.http.s5 = uri.get_path();
+    set req.http.s6 = uri.get_query();
+    set req.http.s7 = uri.get_fragment();
+
+    uri.set_scheme(req.http.Input);
+    uri.set_userinfo(req.http.Input);
+    uri.set_host(req.http.Input);
+    uri.set_port(req.http.Input);
+    uri.set_path(req.http.Input);
+    uri.set_query(req.http.Input);
+    uri.set_fragment(req.http.Input);
+    uri.set_port();
+
+    set req.http.Host = req.http.Input;
+    uri.write();
+    set req.http.Host = uri.as_string();
+    uri.write();
+    uri.write();
+
+    return (hash);
+}
+
 sub vcl_recv {
 	#f.write("crash.bin", req.http.Input);
 	# x/64bs 0x6310002328d8
@@ -95,34 +125,9 @@ sub vcl_recv {
 
 	if (false) {
 		call test_headerplus;
+        call test_uri;
 	}
 
-    uri.parse(req.http.Input);
-
-    set req.http.location = uri.as_string();
-    set req.http.s1 = uri.get_scheme();
-    set req.http.s2 = uri.get_userinfo();
-    set req.http.s3 = uri.get_host();
-    set req.http.s4 = uri.get_port();
-    set req.http.s5 = uri.get_path();
-    set req.http.s6 = uri.get_query();
-    set req.http.s7 = uri.get_fragment();
-
-    uri.set_scheme(req.http.Input);
-    uri.set_userinfo(req.http.Input);
-    uri.set_host(req.http.Input);
-    uri.set_port(req.http.Input);
-    uri.set_path(req.http.Input);
-    uri.set_query(req.http.Input);
-    uri.set_fragment(req.http.Input);
-    uri.set_port();
-
-    set req.http.Host = uri.as_string();
-    uri.write();
-    set req.http.Host = req.http.Input;
-    uri.write();
-
-    uri.reset();
 
 	return (hash);
 }

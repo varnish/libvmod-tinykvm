@@ -16,7 +16,7 @@ inline long nanodiff(timespec start_time, timespec end_time);
 extern "C" {
 	void http_SetH(struct http *to, unsigned n, const char *fm);
 	void http_UnsetIdx(struct http *hp, unsigned idx);
-	unsigned http_findhdr(const struct http *hp, unsigned l, const char *hdr);
+	unsigned HTTP_FindHdr(const struct http *hp, unsigned l, const char *hdr);
 	void http_PrintfHeader(struct http *to, const char *fmt, ...);
 	void riscv_SetCacheable(VRT_CTX, bool a);
 	bool riscv_GetCacheable(VRT_CTX);
@@ -494,7 +494,7 @@ APICALL(http_find_name)
 	{
 		/* Find the header field by its name */
 		unsigned index
-			= http_findhdr(hp, fieldname.size(), fieldname.c_str());
+			= HTTP_FindHdr(hp, fieldname.size(), fieldname.c_str());
 		if (index > 0) {
 			machine.set_result(index);
 			return;
@@ -502,7 +502,7 @@ APICALL(http_find_name)
 	} else {
 		/* Find the header field by its name */
 		unsigned index
-			= http_findhdr(hp, fieldname.size(), fieldname.to_string().c_str());
+			= HTTP_FindHdr(hp, fieldname.size(), fieldname.to_string().c_str());
 		if (index > 0) {
 			machine.set_result(index);
 			return;
