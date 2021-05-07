@@ -250,6 +250,8 @@ endif()
 add_executable(varnishd ${VARNISHD_SOURCES})
 target_include_directories(varnishd PRIVATE ${CMAKE_BINARY_DIR}/cmake/libvarnish)
 target_include_directories(varnishd PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_compile_definitions(varnishd PRIVATE
+	HAVE_EBPF=1 HAVE_REUSEPORT=1 HAVE_EBPF_NUMA=1)
 add_dependencies(varnishd vhp_gen_hufdec generate_builtin_vcl)
 target_link_libraries(varnishd vcc varnish vgz)
 target_link_libraries(varnishd config pthread ssl crypto dl)
