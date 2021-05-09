@@ -190,7 +190,8 @@ if [ "$run" = true ] ; then
 	if [ "$do_debug" = true ] ; then
 		gdb --args ./varnishd "$@"
 	else
-		$preargs ./varnishd "$@"
+		[ "$VERBOSE" ] && echo "$preargs ./varnishd $@"
+		sudo -E $preargs ./varnishd "$@"
 	fi
 	popd
 fi
