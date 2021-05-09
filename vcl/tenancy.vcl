@@ -13,7 +13,7 @@ backend default {
 sub vcl_init {
 	new f = file.init(std.getenv("HOME"));
 	riscv.load_tenants(std.getenv("HOME") +
-		"/github/varnish_autoperf/vcl/tenants.json");
+		"/git/varnish_autoperf/vcl/tenants.json");
 }
 
 sub vcl_recv {
