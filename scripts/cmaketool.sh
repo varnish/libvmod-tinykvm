@@ -191,7 +191,7 @@ if [ "$run" = true ] ; then
 		gdb --args ./varnishd "$@"
 	else
 		[ "$VERBOSE" ] && echo "$preargs ./varnishd $@"
-		sudo -E $preargs ./varnishd "$@"
+		$preargs ./varnishd "$@"
 	fi
 	popd
 fi
