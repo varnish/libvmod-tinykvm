@@ -170,18 +170,17 @@ APICALL(breakpoint)
 			(long) machine.cpu.pc());
 	}
 }
+APICALL(signal)
+{
+	auto [sig, handler] = machine.sysargs<int, gaddr_t> ();
+	get_script(machine).set_sigaction(sig, handler);
+}
 APICALL(dynamic_call)
 {
-	auto [hash] = machine.template sysargs <uint32_t> ();
-	auto& regs = machine.cpu.registers();
-	// move down 6 integer registers
-	for (int i = 0; i < 6; i++) {
-		regs.get(10 + i) = regs.get(11 + i);
-	}
-	// call the handler
-	get_script(machine).dynamic_call(hash);
+	// call the handler using hash from T0
+	get_script(machine).dynamic_call(machine.cpu.reg(riscv::REG_T0));
 	// we short-circuit the ret pseudo-instruction:
-	machine.cpu.jump(regs.get(riscv::REG_RA) - 4);
+	//machine.cpu.jump(machine.cpu.reg(riscv::REG_RA) - 4);
 }
 APICALL(remote_call)
 {
@@ -859,6 +858,7 @@ void Script::setup_syscall_interface(machine_t& machine)
 		FPTR(print),
 		FPTR(shm_log),
 		FPTR(breakpoint),
+		FPTR(signal),
 		FPTR(::dynamic_call),
 		FPTR(remote_call),
 		FPTR(remote_strcall),

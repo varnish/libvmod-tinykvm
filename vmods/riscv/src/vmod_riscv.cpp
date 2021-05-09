@@ -36,7 +36,7 @@ riscv_update(VRT_CTX, SandboxTenant* vrm, struct update_params *params)
 
 		/* If this throws an exception, we instantly fail the update */
 		auto inst = std::make_shared<MachineInstance>(
-			std::move(binary), nullptr, vrm, params->is_debug);
+			std::move(binary), ctx, vrm, params->is_debug);
 		const auto& live_binary = inst->binary;
 
 		/* Check if self-test is present */

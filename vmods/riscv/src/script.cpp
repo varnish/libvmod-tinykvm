@@ -7,6 +7,7 @@
 extern "C" void riscv_SetHash(struct req*, VSHA256_CTX*);
 inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
+static constexpr uint64_t SIGHANDLER_INSN = 60'000;
 static constexpr bool VERBOSE_ERRORS = true;
 
 //#define ENABLE_TIMING
@@ -23,6 +24,7 @@ Script::Script(
 	  }),
 	  m_ctx(ctx), m_tenant(vrm), m_inst(inst),
 	  m_is_debug(source.is_debug()),
+	  m_sighandler{source.m_sighandler},
 	  m_regex     {vrm->config.max_regex()},
 	  m_directors {vrm->config.max_backends()}
 {
@@ -256,6 +258,17 @@ void Script::handle_exception(gaddr_t address)
 		fprintf(stderr, "Function call: %s\n", callsite.name.c_str());
 		this->print_backtrace(address);
 	}
+	if (this->m_sighandler != 0) {
+		auto handler = this->m_sighandler;
+		//machine().stack_push(machine().cpu.pc());
+		machine().stack_push(machine().cpu.reg(riscv::REG_RA));
+		machine().cpu.reg(riscv::REG_RA) = machine().cpu.pc();
+		machine().cpu.reg(riscv::REG_ARG0) = 11; /* SIGSEGV */
+		machine().cpu.jump(handler);
+		this->m_sighandler = 0;
+		this->resume(SIGHANDLER_INSN);
+		this->m_sighandler = handler;
+	}
 }
 void Script::handle_timeout(gaddr_t address)
 {
@@ -276,6 +289,10 @@ void Script::print_backtrace(const gaddr_t addr)
 	printf("-> [-] 0x%08lx + 0x%.3x: %s\n",
 			(long) origin.address,
 			origin.offset, origin.name.c_str());
+}
+void Script::set_sigaction(int, gaddr_t handler)
+{
+	this->m_sighandler = handler;
 }
 
 uint64_t Script::max_instructions() const noexcept {
@@ -312,10 +329,13 @@ bool Script::guest_free(gaddr_t addr)
 
 inline void Script::init_sha256()
 {
+	if (ctx()->req == nullptr) {
+		throw std::runtime_error("SHA256 not available during initialization");
+	}
 	this->m_sha_ctx =
 		(VSHA256_CTX*) WS_Alloc(ctx()->ws, sizeof(VSHA256_CTX));
 	if (!this->m_sha_ctx)
-		throw std::runtime_error("Out of workspace");
+		throw std::runtime_error("SHA256: Out of workspace");
 	VSHA256_Init(this->m_sha_ctx);
 }
 void Script::hash_buffer(const char* buffer, int len)
@@ -328,7 +348,7 @@ void Script::hash_buffer(const char* buffer, int len)
 }
 bool Script::apply_hash()
 {
-	if (m_sha_ctx && ctx()) {
+	if (m_sha_ctx && ctx()->req) {
 		riscv_SetHash(ctx()->req, m_sha_ctx);
 		return true;
 	}

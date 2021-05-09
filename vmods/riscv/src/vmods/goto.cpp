@@ -1,5 +1,5 @@
-#include "sandbox.hpp"
-#include "varnish.hpp"
+#include "../sandbox.hpp"
+#include "../varnish.hpp"
 #include <libriscv/util/crc32.hpp>
 typedef struct oaref oaref_t;
 extern "C" {
@@ -89,10 +89,10 @@ void SandboxTenant::init_vmods(VRT_CTX)
 	printf("*** Goto ENABLED\n");
 
 	set_dynamic_call("goto.dns",
-		[=] (auto& script)
+		[=] (Script& script)
 		{
 			auto [host, ipv]
-				= script.machine().template sysargs<std::string, int> ();
+				= script.machine().sysargs<std::string, int> ();
 			printf("Goto: %s (ipv=%s)\n", host.c_str(), ip_version.at(ipv));
 			struct vmod_goto_dns_director *vo_d;
 			vmod_dns_director__init(script.ctx(), &vo_d, "d",

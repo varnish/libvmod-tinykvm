@@ -9,7 +9,6 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++20 -O2 -g")
 list(APPEND RISCV_SOURCES
 	src/machine_instance.cpp
 	src/sandbox.cpp
-	src/sandbox_vmods.cpp
 	src/script.cpp
 	src/script_debug.cpp
 	src/script_functions.cpp
@@ -17,6 +16,7 @@ list(APPEND RISCV_SOURCES
 	src/tenancy.cpp
 	src/vmod_riscv.cpp
 	src/varnish_interface.c
+	src/vmods/goto.cpp
 	libriscv/emulator/syscalls/src/syscalls.cpp
 	libriscv/emulator/syscalls/src/native_libc.cpp
 	libriscv/emulator/syscalls/src/native_threads.cpp

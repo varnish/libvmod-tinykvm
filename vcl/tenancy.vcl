@@ -13,7 +13,7 @@ backend default {
 sub vcl_init {
 	new f = file.init(std.getenv("HOME"));
 	riscv.load_tenants(std.getenv("HOME") +
-		"/git/varnish_autoperf/vcl/tenants.json");
+		"/github/varnish_autoperf/vcl/tenants.json");
 }
 
 sub vcl_recv {
@@ -55,12 +55,12 @@ sub vcl_recv {
 		}
 		/* If fork fails, it's probably not a tenant */
 		if (!riscv.fork(req.http.Host, req.http.X-Debug)) {
-			return (synth(403));
+			return (synth(403, "No such tenant"));
 		}
 
 	} else {
 		/* No 'Host: tenant' specified */
-		return (synth(403));
+		return (synth(403, "Missing Host header field"));
 	}
 
 	/* Call into VM */
@@ -83,7 +83,7 @@ sub vcl_recv {
 		}
 	}
 
-	return (synth(403));
+	return (synth(403, "No decision made"));
 }
 
 sub vcl_hash {
