@@ -11,6 +11,7 @@ if (VARNISH_PLUS)
 	add_subdirectory(aclplus)
 	add_subdirectory(bodyaccess)
 	add_subdirectory(brotli)
+	add_subdirectory(crypto)
 	add_subdirectory(file)
 	add_subdirectory(goto)
 
