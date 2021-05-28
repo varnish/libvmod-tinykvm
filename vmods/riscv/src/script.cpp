@@ -34,7 +34,7 @@ Script::Script(
 	/* No initialization */
 	this->machine_setup(machine(), false);
 
-	/* Transfer data from the old arena, to fully replicate heap */
+	/* Transfer allocations from the source machine, to fully replicate heap */
 	arena_transfer((sas_alloc::Arena*) source.m_arena, (sas_alloc::Arena*) m_arena);
 	/* Load the compiled regexes of the source */
 	m_regex.loan_from(source.m_regex);
@@ -54,6 +54,7 @@ Script::Script(
 		.memory_max = vrm->config.max_memory(),
 #ifdef RISCV_BINARY_TRANSLATION
 		// Time-saving translator options
+		// NOTE: 0 means translator is disabled (for debugging)
 		.translate_blocks_max = (debug ? 0u : 4000u),
 		.forward_jumps = false,
 #endif
