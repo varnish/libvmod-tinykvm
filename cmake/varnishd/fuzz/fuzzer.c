@@ -20,6 +20,8 @@ extern void proxy_fuzzer(void* data, size_t len, int version);
 extern void hpack_fuzzer(void* data, size_t len);
 extern void vmod_fuzzer(void* data, size_t len);
 
+// varnishd has many many leaks.. can't enable this
+int __lsan_is_turned_off() { return 1; }
 // abort on errors ASAP
 void __asan_on_error() {
 	void abort(void) __attribute__((noreturn));
