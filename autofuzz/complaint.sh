@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-EMAIL=tech@varnish-software.com
+EMAIL=alf@varnish-software.com
 FILEBIN="https://filebin.varnish-software.com"
 # Generate BIN postfix
 ID="$(hostname)-$(date +'%Y-%m-%d')"
