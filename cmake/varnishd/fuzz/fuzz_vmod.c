@@ -56,7 +56,7 @@ extern int  open_varnishd_connection();
 //#define VMOD_URLPLUS
 //#define VMOD_WAF
 //#define VMOD_JWT
-#define VMOD_HEADERPLUS
+//#define VMOD_HEADERPLUS
 #define REMAIN_OPEN
 #ifdef VARNISH_PLUS
 static const size_t JWT_MAX = 9000;
@@ -121,7 +121,7 @@ void vmod_fuzzer(uint8_t* data, size_t len)
 #ifdef VARNISH_PLUS
         varnishd_initialize(FUZZING_DIRECTORY "/vcl/fuzz_vcp_vmod.vcl");
 		//fprintf(stderr, "%s\n", jwt_private_key);
-		init_rsa_key(jwt_private_key);
+		//init_rsa_key(jwt_private_key);
 #else
 		varnishd_initialize(FUZZING_DIRECTORY "/vcl/fuzz_vc_vmod.vcl");
 #endif

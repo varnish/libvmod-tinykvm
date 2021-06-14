@@ -46,8 +46,8 @@ if (NOT VARNISH_PLUS)
 #        ${LIBPATH}/libvarnish/verrno.c
 		${LIBPATH}/libvarnish/vbh.c
 		${LIBPATH}/libvarnish/venc.c
-        ${LIBPATH}/libvarnish/vte.c
-    )
+		${LIBPATH}/libvarnish/vte.c
+	)
 else()
 	list (APPEND SOURCES
 		${LIBPATH}/libvarnish/binary_heap.c
@@ -66,25 +66,27 @@ set(VSC_SOURCES
 	VSC_vbe.vsc
 )
 if (VARNISH_PLUS)
-    list(APPEND VSC_SOURCES
+	list(APPEND VSC_SOURCES
+		VSC_accg.vsc
+		VSC_accg_diag.vsc
 		VSC_brotli.vsc
-        VSC_mse.vsc
-    	VSC_mse_book.vsc
-    	VSC_mse_store.vsc
-    )
+		VSC_mse.vsc
+		VSC_mse_book.vsc
+		VSC_mse_store.vsc
+	)
 endif()
 function(build_vsc_file NAME)
-    get_filename_component(VSC_FILE ${NAME} NAME_WE)
-    add_custom_command(
-            OUTPUT ${VSC_FILE}.c ${VSC_FILE}.h
-            COMMAND python3 ${LIBPATH}/libvcc/vsctool.py -ch ${NAME}
-            DEPENDS ${NAME}
-        )
+	get_filename_component(VSC_FILE ${NAME} NAME_WE)
+	add_custom_command(
+			OUTPUT ${VSC_FILE}.c ${VSC_FILE}.h
+			COMMAND python3 ${LIBPATH}/libvcc/vsctool.py -ch ${NAME}
+			DEPENDS ${NAME}
+		)
 endfunction()
 foreach(VSC_FILE ${VSC_SOURCES})
-    build_vsc_file(${VARNISHD_PATH}/${VSC_FILE})
-    get_filename_component(VSC_WEFILE ${VSC_FILE} NAME_WE)
-    list(APPEND VSC_COMPILED
+	build_vsc_file(${VARNISHD_PATH}/${VSC_FILE})
+	get_filename_component(VSC_WEFILE ${VSC_FILE} NAME_WE)
+	list(APPEND VSC_COMPILED
 		${CMAKE_CURRENT_BINARY_DIR}/${VSC_WEFILE}.c
 		${CMAKE_CURRENT_BINARY_DIR}/${VSC_WEFILE}.h
 	)
@@ -107,11 +109,11 @@ target_link_libraries(varnish brotlidec brotlienc pcre m)
 #set_property(TARGET varnish PROPERTY POSITION_INDEPENDENT_CODE 1)
 
 if (LIBFUZZER)
-    if (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
-        message(FATAL_ERROR "You can only use Clang when libfuzzer is enabled")
-    endif()
+	if (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
+		message(FATAL_ERROR "You can only use Clang when libfuzzer is enabled")
+	endif()
 	target_compile_definitions(varnish PUBLIC LIBFUZZER_ENABLED=1)
-    target_compile_options(varnish PRIVATE ${FUZZER_CFLAGS})
+	target_compile_options(varnish PRIVATE ${FUZZER_CFLAGS})
 elseif (SANITIZE)
 	target_compile_definitions(varnish PUBLIC SANITIZERS_ENABLED=1)
 	target_compile_options(varnish PUBLIC "${SANITIZE_FLAGS}")
