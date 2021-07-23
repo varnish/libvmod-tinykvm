@@ -1,0 +1,23 @@
+$Module kvm 3 "High-Performance KVM Sandbox For VCL"
+
+DESCRIPTION
+===========
+
+vmod_kvm allows creating low overhead virtual machines
+per request directly from VCL, that runs native x86 machine code.
+Each machine lives in complete separation and cannot affect any other.
+Machines communicate with Varnish using a system call API that covers
+all the basic tasks that tenants want to perform.
+
+
+API
+===
+
+$Function BACKEND vm_backend(STRING tenant, STRING func, STRING arg = "")
+
+- Returns a backend that will call into the current machine to produce a response.
+- Produces 500 server error if there is no active machine, or an error happens.
+- Call with no function specified if tenant has made a "backend" decision.
+
+	set bereq.backend = kvm.vm_backend("xpizza.com", "my_backend");
+	return (hash);

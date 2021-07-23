@@ -25,3 +25,9 @@
 [submodule "cmake/sandbox/ext/json"]
 	path = cmake/sandbox/ext/json
 	url = https://github.com/nlohmann/json.git
+[submodule "vmods/kvm/tinykvm"]
+	path = vmods/kvm/tinykvm
+	url = git@github.com:fwsGonzo/tinykvm.git
+[submodule "vmods/kvm/ext/json"]
+	path = vmods/kvm/ext/json
+	url = https://github.com/nlohmann/json.git
