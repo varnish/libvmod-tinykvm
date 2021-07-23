@@ -1,5 +1,6 @@
 #include "tenant_instance.hpp"
 #include "varnish.hpp"
+using namespace kvm;
 
 MachineInstance* get_machine(VRT_CTX, const void* key)
 {
@@ -25,8 +26,8 @@ uint64_t kvm_resolve_name(MachineInstance* inst, const char* func)
 extern "C"
 MachineInstance* kvm_fork_machine(const vrt_ctx *ctx, const char *tenant, bool debug)
 {
-	extern TenantInstance* tenant_find(VRT_CTX, const char *);
-	auto* ten = tenant_find(ctx, tenant);
+	extern TenantInstance* kvm_tenant_find(VRT_CTX, const char *);
+	auto* ten = kvm_tenant_find(ctx, tenant);
 	if (UNLIKELY(ten == nullptr))
 		return nullptr;
 

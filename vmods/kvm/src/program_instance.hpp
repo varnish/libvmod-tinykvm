@@ -7,6 +7,8 @@ namespace tinykvm {
 }
 #define KVM_PROGRAM_MAGIC 0x50ba93c7
 
+namespace kvm {
+
 struct ProgramInstance
 {
 	using gaddr_t = MachineInstance::gaddr_t;
@@ -33,3 +35,5 @@ struct ProgramInstance
 	/* Lookup tree for ELF symbol names */
 	std::map<std::string, gaddr_t> sym_lookup;
 };
+
+} // kvm

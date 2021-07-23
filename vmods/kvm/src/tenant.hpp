@@ -2,6 +2,8 @@
 #include <map>
 #include <string>
 
+namespace kvm {
+
 struct TenantVMOD {
 	std::string name;
 	bool        access;
@@ -13,14 +15,13 @@ struct TenantGroup {
 	std::string name;
 	uint64_t max_time; /* milliseconds */
 	uint64_t max_memory;
-	uint64_t max_heap;
 	size_t   max_backends = 8;
 	size_t   max_regex    = 32;
 
 	vmods_t vmods;
 
-	TenantGroup(std::string n, uint64_t mi, uint64_t mm, uint64_t mh, vmods_t&& vm = vmods_t{})
-		: name{n}, max_time(mi), max_memory(mm), max_heap(mh),
+	TenantGroup(std::string n, uint64_t mi, uint64_t mm, vmods_t&& vm = vmods_t{})
+		: name{n}, max_time(mi), max_memory(mm),
 		  vmods{std::move(vm)}  {}
 };
 
@@ -32,10 +33,11 @@ struct TenantConfig
 
 	uint64_t max_time() const noexcept { return group.max_time; }
 	uint64_t max_memory() const noexcept { return group.max_memory; }
-	uint64_t max_heap() const noexcept { return group.max_heap; }
 	size_t   max_regex() const noexcept { return group.max_regex; }
 	size_t   max_backends() const noexcept { return group.max_backends; }
 
 	TenantConfig(std::string n, std::string f, TenantGroup g)
 		: name(n), filename(f), group{std::move(g)} {}
 };
+
+}

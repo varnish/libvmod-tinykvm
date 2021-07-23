@@ -1,6 +1,7 @@
 #include "machine_instance.hpp"
 #include "tenant_instance.hpp"
 #include "varnish.hpp"
+extern void setup_kvm_system_calls();
 static constexpr uint64_t SIGHANDLER_INSN = 60'000;
 static constexpr bool VERBOSE_ERRORS = true;
 
@@ -10,34 +11,13 @@ static constexpr bool VERBOSE_ERRORS = true;
 	auto x = time_now();  \
 	asm("" ::: "memory");
 
-MachineInstance::MachineInstance(
-	const MachineInstance& source, const vrt_ctx* ctx,
-	const TenantInstance* ten, ProgramInstance& inst)
-	: m_machine(source.machine(), {
-		.max_mem = 0,
-	  }),
-	  m_ctx(ctx), m_tenant(ten), m_inst(inst),
-	  m_is_debug(source.is_debug()),
-	  m_sighandler{source.m_sighandler},
-	  m_regex     {ten->config.max_regex()},
-	  m_directors {ten->config.max_backends()}
-{
-#ifdef ENABLE_TIMING
-	TIMING_LOCATION(t0);
-#endif
-	/* No initialization */
-	machine().setup_linux(
-		{"vmod_kvm", "Hello KVM World!\n"},
-		{"LC_TYPE=C", "LC_ALL=C", "USER=root"});
+namespace kvm {
 
-	/* Load the compiled regexes of the source */
-	m_regex.loan_from(source.m_regex);
-	/* Load the directors of the source */
-	m_directors.loan_from(source.m_directors);
-#ifdef ENABLE_TIMING
-	TIMING_LOCATION(t1);
-	printf("Total time in MachineInstance constr body: %ldns\n", nanodiff(t0, t1));
-#endif
+__attribute__((constructor))
+void MachineInstance::kvm_initialize()
+{
+	tinykvm::Machine::init();
+	setup_kvm_system_calls();
 }
 
 MachineInstance::MachineInstance(
@@ -52,6 +32,43 @@ MachineInstance::MachineInstance(
 	  m_regex     {ten->config.max_regex()},
 	  m_directors {ten->config.max_backends()}
 {
+	try {
+		machine().setup_linux(
+			{"vmod_kvm", "Hello KVM World!\n"},
+			{"LC_TYPE=C", "LC_ALL=C", "USER=root"});
+		/* Run through main() */
+		machine().run();
+		/* Make forkable */
+		machine().prepare_copy_on_write();
+		printf("Machine %s loaded\n", name().c_str());
+	} catch (...) {
+		fprintf(stderr, "Error: Machine not initialized properly: %s\n", name().c_str());
+	}
+}
+
+MachineInstance::MachineInstance(
+	const MachineInstance& source, const vrt_ctx* ctx,
+	const TenantInstance* ten, ProgramInstance& inst)
+	: m_machine(source.machine(), {
+		.max_mem = ten->config.max_memory(),
+	  }),
+	  m_ctx(ctx), m_tenant(ten), m_inst(inst),
+	  m_is_debug(source.is_debug()),
+	  m_sighandler{source.m_sighandler},
+	  m_regex     {ten->config.max_regex()},
+	  m_directors {ten->config.max_backends()}
+{
+#ifdef ENABLE_TIMING
+	TIMING_LOCATION(t0);
+#endif
+	/* Load the compiled regexes of the source */
+	m_regex.loan_from(source.m_regex);
+	/* Load the directors of the source */
+	m_directors.loan_from(source.m_directors);
+#ifdef ENABLE_TIMING
+	TIMING_LOCATION(t1);
+	printf("Total time in MachineInstance constr body: %ldns\n", nanodiff(t0, t1));
+#endif
 }
 
 MachineInstance::~MachineInstance()
@@ -66,14 +83,6 @@ MachineInstance::~MachineInstance()
 	}
 }
 
-__attribute__((constructor))
-void MachineInstance::kvm_initialize()
-{
-	tinykvm::Machine::init();
-	extern void setup_kvm_system_calls();
-	setup_kvm_system_calls();
-}
-
 uint64_t MachineInstance::max_time() const noexcept {
 	return tenant().config.max_time();
 }
@@ -83,3 +92,5 @@ const std::string& MachineInstance::name() const noexcept {
 const std::string& MachineInstance::group() const noexcept {
 	return tenant().config.group.name;
 }
+
+} // kvm

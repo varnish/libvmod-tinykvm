@@ -3,19 +3,20 @@
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
+using namespace kvm;
 extern std::vector<uint8_t> file_loader(const std::string& filename);
 
-using MapType = std::unordered_map<std::string, struct TenantInstance*>;
+using MapType = std::unordered_map<std::string, kvm::TenantInstance*>;
 static MapType temporaries;
 
-inline MapType& tenants(VRT_CTX)
+static inline MapType& tenants(VRT_CTX)
 {
 	(void) ctx;
 	static MapType t;
 	return t;
 }
 
-inline void load_tenant(VRT_CTX, TenantConfig&& config)
+static inline void kvm_load_tenant(VRT_CTX, kvm::TenantConfig&& config)
 {
 	try {
 		tenants(ctx).try_emplace(
@@ -28,7 +29,7 @@ inline void load_tenant(VRT_CTX, TenantConfig&& config)
 }
 
 extern "C"
-TenantInstance* tenant_find(VRT_CTX, const char* name)
+kvm::TenantInstance* kvm_tenant_find(VRT_CTX, const char* name)
 {
 	auto& map = tenants(ctx);
 	// regular tenants
@@ -42,7 +43,7 @@ TenantInstance* tenant_find(VRT_CTX, const char* name)
 	return nullptr;
 }
 
-TenantInstance* create_temporary_tenant(
+TenantInstance* kvm_create_temporary_tenant(
 	const TenantInstance* vrm, const std::string& name)
 {
 	/* Create a new tenant with a temporary name,
@@ -55,7 +56,7 @@ TenantInstance* create_temporary_tenant(
 		new TenantInstance(nullptr, config));
 	return it.first->second;
 }
-void delete_temporary_tenant(const TenantInstance* vrm)
+void kvm_delete_temporary_tenant(const TenantInstance* vrm)
 {
 	auto it = temporaries.find(vrm->config.name);
 	if (it != temporaries.end())
@@ -68,18 +69,17 @@ void delete_temporary_tenant(const TenantInstance* vrm)
 	throw std::runtime_error("Could not delete temporary tenant");
 }
 
-static void init_tenants(VRT_CTX,
+static void kvm_init_tenants(VRT_CTX,
 	const std::vector<uint8_t>& vec, const char* source)
 {
 	try {
 		const json j = json::parse(vec.begin(), vec.end());
 
-		std::map<std::string, TenantGroup> groups {
-			{"test", TenantGroup{
+		std::map<std::string, kvm::TenantGroup> groups {
+			{"test", kvm::TenantGroup{
 				"test",
-				256000,
-				1 * 1024 * 1024,
-				1 * 1024 * 1024
+				256, /* Milliseconds */
+				256 * 1024 * 1024
 			}}
 		};
 
@@ -99,21 +99,19 @@ static void init_tenants(VRT_CTX,
 				}
 				const auto& group = grit->second;
 				/* Use the group data except filename */
-				load_tenant(ctx, TenantConfig{
+				kvm_load_tenant(ctx, kvm::TenantConfig{
 					it.key(), obj["filename"], group,
 				});
 			} else {
 				if (obj.contains("max_time") &&
-					obj.contains("max_memory") &&
-					obj.contains("max_heap"))
+					obj.contains("max_memory"))
 				{
 					groups.emplace(std::piecewise_construct,
 						std::forward_as_tuple(it.key()),
 						std::forward_as_tuple(
 							it.key(),
 							obj["max_time"],
-							obj["max_memory"],
-							obj["max_heap"]
+							obj["max_memory"]
 						));
 				} else {
 					VRT_fail(ctx, "Tenancy JSON %s: group '%s' has missing fields",
@@ -133,15 +131,15 @@ static void init_tenants(VRT_CTX,
 }
 
 extern "C"
-void init_tenants_str(VRT_CTX, const char* str)
+void kvm_init_tenants_str(VRT_CTX, const char* str)
 {
-	std::vector<uint8_t> json { str, str + strlen(str) };
-	init_tenants(ctx, json, "string");
+	const std::vector<uint8_t> json { str, str + strlen(str) };
+	kvm_init_tenants(ctx, json, "string");
 }
 
 extern "C"
-void init_tenants_file(VRT_CTX, const char* filename)
+void kvm_init_tenants_file(VRT_CTX, const char* filename)
 {
 	const auto json = file_loader(filename);
-	init_tenants(ctx, json, filename);
+	kvm_init_tenants(ctx, json, filename);
 }

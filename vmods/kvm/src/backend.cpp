@@ -1,5 +1,6 @@
 #include "tenant_instance.hpp"
 #include "varnish.hpp"
+using namespace kvm;
 extern MachineInstance* get_machine(VRT_CTX, const void* key);
 
 struct backend_buffer {
@@ -29,11 +30,12 @@ struct backend_buffer kvm_backend_call(VRT_CTX, MachineInstance* machine, long f
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);
 	#endif
+		printf("Calling VM backend function: 0x%lX\n", func);
 		/* Use backend ctx which can write to beresp */
 		machine->set_ctx(ctx);
 		/* Call the backend response function */
-		machine->machine().vmcall(func,
-			(uint64_t) farg, (int) HDR_BEREQ, (int) HDR_BERESP);
+		machine->machine().vmcall(func);
+			//(uint64_t) farg, (int) HDR_BEREQ, (int) HDR_BERESP);
 		/* Restore old ctx for backend_response */
 		machine->set_ctx(old_ctx);
 
@@ -62,4 +64,5 @@ struct backend_buffer kvm_backend_call(VRT_CTX, MachineInstance* machine, long f
 		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
 	}
 	machine->set_ctx(old_ctx);
+	return backend_error();
 }

@@ -15,6 +15,7 @@ add_vmod(vmod_kvm vmod_kvm.vcc "KVM Userspace Emulator VMOD"
 )
 
 add_subdirectory(tinykvm)
+target_compile_definitions(tinykvm PUBLIC ENABLE_GUEST_STDOUT=1)
 set_property(TARGET tinykvm PROPERTY POSITION_INDEPENDENT_CODE 1)
 target_link_libraries(vmod_kvm tinykvm)
 

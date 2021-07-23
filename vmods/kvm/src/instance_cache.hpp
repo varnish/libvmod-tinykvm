@@ -2,6 +2,8 @@
 #include <vector>
 #include <stdexcept>
 
+namespace kvm {
+
 template <typename T>
 struct Cache {
 	struct Entry {
@@ -53,3 +55,5 @@ struct Cache {
 	std::vector<Entry> cache;
 	const size_t max_entries;
 };
+
+} // kvm

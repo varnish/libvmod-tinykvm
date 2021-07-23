@@ -1,6 +1,7 @@
 vcl 4.1;
 import kvm;
 import std;
+import urlplus;
 import utils;
 
 backend default {
@@ -56,6 +57,6 @@ sub vcl_recv {
 sub vcl_backend_fetch {
 	set bereq.backend = kvm.vm_backend(
 			bereq.http.Host,
-			"my_backend",
+			urlplus.get_basename(),
 			"argument");
 }

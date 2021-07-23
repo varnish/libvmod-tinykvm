@@ -2,6 +2,8 @@
 #include "tenant.hpp"
 #include "program_instance.hpp"
 
+namespace kvm {
+
 struct TenantInstance
 {
 	using ghandler_t = std::function<void(MachineInstance&)>;
@@ -36,3 +38,5 @@ struct TenantInstance
 	/* Hash map of string hashes associated with dyncall handlers */
 	std::unordered_map<uint32_t, ghandler_t> m_dynamic_functions;
 };
+
+} // kvm

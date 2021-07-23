@@ -1,6 +1,8 @@
 #include "tenant_instance.hpp"
 #include "varnish.hpp"
-std::vector<uint8_t> file_loader(const std::string& file);
+
+namespace kvm {
+	std::vector<uint8_t> file_loader(const std::string& file);
 
 TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 	: config{conf}
@@ -140,3 +142,5 @@ std::vector<uint8_t> file_loader(const std::string& filename)
     fclose(f);
     return result;
 }
+
+} // kvm

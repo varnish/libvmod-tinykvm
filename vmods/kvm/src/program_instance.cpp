@@ -1,5 +1,8 @@
 #include "program_instance.hpp"
 #include <tinykvm/rsp_client.hpp>
+
+namespace kvm {
+
 /* Functions commonly exposed in all machines */
 std::vector<const char*> kvm_lookup_wishlist {
 	"on_init",
@@ -34,3 +37,5 @@ ProgramInstance::ProgramInstance(
 ProgramInstance::~ProgramInstance()
 {
 }
+
+} // kvm

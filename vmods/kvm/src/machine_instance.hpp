@@ -5,6 +5,12 @@
 #include "instance_cache.hpp"
 
 struct vrt_ctx;
+struct VSHA256Context;
+struct vre;
+struct director;
+
+namespace kvm {
+
 struct TenantInstance;
 struct ProgramInstance;
 
@@ -79,10 +85,10 @@ private:
 	bool        m_is_debug = false;
 	bool        m_currently_debugging = false;
 	gaddr_t     m_sighandler = 0;
-	struct VSHA256Context* m_sha_ctx = nullptr;
+	VSHA256Context* m_sha_ctx = nullptr;
 
-	Cache<struct vre> m_regex;
-	Cache<const struct director> m_directors;
+	Cache<vre> m_regex;
+	Cache<const director> m_directors;
 
 	/* Deref this last */
 	std::shared_ptr<ProgramInstance> m_inst_ref = nullptr;
@@ -98,3 +104,5 @@ inline void MachineInstance::call(gaddr_t address, Args&&... args)
 		this->handle_exception(address);
 	}
 }
+
+} // kvm

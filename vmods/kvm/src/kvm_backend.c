@@ -154,7 +154,7 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING tenant, VCL_STRING func, VCL_STR
 	kvmr->priv_key = ctx;
 	kvmr->machine = kvm_fork_machine(ctx, tenant, false);
 	if (kvmr->machine == NULL) {
-		VRT_fail(ctx, "KVM backend: No such tenant");
+		VRT_fail(ctx, "KVM backend says 'No such tenant': %s", tenant);
 		return NULL;
 	}
 
@@ -164,6 +164,11 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING tenant, VCL_STRING func, VCL_STR
 		/* If it's not an address, lookup as a public function */
 		if (kvmr->funcaddr == 0x0) {
 			kvmr->funcaddr = kvm_resolve_name(kvmr->machine, func);
+			if (kvmr->funcaddr == 0x0) {
+				VRT_fail(ctx,
+					"KVM backend says 'No such backend function': %s", func);
+				return NULL;
+			}
 		}
 	}
 	kvmr->max_response_size = 0;
