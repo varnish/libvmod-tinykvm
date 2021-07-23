@@ -1,8 +1,6 @@
 #include "sandbox.hpp"
 #include "varnish.hpp"
-#include <libriscv/util/crc32.hpp>
 #include <nlohmann/json.hpp>
-#include <stdexcept>
 
 using json = nlohmann::json;
 extern std::vector<uint8_t> file_loader(const std::string& filename);

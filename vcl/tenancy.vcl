@@ -12,8 +12,22 @@ backend default {
 
 sub vcl_init {
 	new f = file.init(std.getenv("HOME"));
-	riscv.load_tenants(std.getenv("HOME") +
-		"/git/varnish_autoperf/vcl/tenants.json");
+	riscv.embed_tenants("""
+		{
+			"xpizza.com": {
+				"filename": "/tmp/xpizza",
+				"group": "test"
+			},
+			"ypizza.com": {
+				"filename": "/tmp/ypizza",
+				"group": "test"
+			},
+			"zpizza.com": {
+				"filename": "/tmp/zpizza",
+				"group": "test"
+			}
+		}
+	""");
 }
 
 sub vcl_recv {
