@@ -18,6 +18,7 @@ void MachineInstance::kvm_initialize()
 {
 	tinykvm::Machine::init();
 	setup_kvm_system_calls();
+	setup_syscall_interface();
 }
 
 MachineInstance::MachineInstance(
@@ -34,7 +35,7 @@ MachineInstance::MachineInstance(
 {
 	try {
 		machine().setup_linux(
-			{"vmod_kvm", "Hello KVM World!\n"},
+			{"vmod_kvm", name().c_str()},
 			{"LC_TYPE=C", "LC_ALL=C", "USER=root"});
 		/* Run through main() */
 		machine().run();
@@ -42,7 +43,8 @@ MachineInstance::MachineInstance(
 		machine().prepare_copy_on_write();
 		printf("Machine %s loaded\n", name().c_str());
 	} catch (...) {
-		fprintf(stderr, "Error: Machine not initialized properly: %s\n", name().c_str());
+		fprintf(stderr,
+			"Error: Machine not initialized properly: %s\n", name().c_str());
 	}
 }
 

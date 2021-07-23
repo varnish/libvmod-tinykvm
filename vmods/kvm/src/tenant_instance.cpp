@@ -41,6 +41,11 @@ MachineInstance* TenantInstance::vmfork(const vrt_ctx* ctx, bool debug)
 		/* First-time tenants could have no program */
 		if (UNLIKELY(prog == nullptr))
 			return nullptr;
+		if (UNLIKELY(!prog->script.is_forkable())) {
+			VRT_fail(ctx, "vmfork: Cannot fork from %s. Not initialized?",
+				config.name.c_str());
+			return nullptr;
+		}
 		/* Allocate Script on workspace, and construct it in-place */
 		auto* inst = (MachineInstance*) WS_Alloc(ctx->ws, sizeof(MachineInstance));
 		if (UNLIKELY(inst == nullptr)) {

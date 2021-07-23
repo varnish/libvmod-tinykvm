@@ -37,10 +37,10 @@ public:
 	const auto& machine() const { return m_machine; }
 
 	const auto* ctx() const noexcept { return m_ctx; }
+	void set_ctx(const vrt_ctx* ctx) { m_ctx = ctx; }
 	const auto& tenant() const noexcept { return *m_tenant; }
 	auto& instance() { return m_inst; }
 	const auto& instance() const { return m_inst; }
-	void set_ctx(const vrt_ctx* ctx) { m_ctx = ctx; }
 	void assign_instance(std::shared_ptr<ProgramInstance>& ref) { m_inst_ref = std::move(ref); }
 
 	uint64_t max_time() const noexcept;
@@ -50,6 +50,7 @@ public:
 	bool is_paused() const noexcept { return m_is_paused; }
 	bool is_storage() const noexcept { return m_is_storage; }
 	bool is_debug() const noexcept { return m_is_debug; }
+	bool is_forkable() const noexcept { return machine().is_forkable(); }
 	gaddr_t max_memory() const noexcept;
 
 	void init_sha256();
@@ -70,10 +71,9 @@ public:
 
 private:
 	static void kvm_initialize();
+	static void setup_syscall_interface();
 	void handle_exception(gaddr_t);
 	void handle_timeout(gaddr_t);
-	bool install_binary(const std::string& file, bool shared = true);
-	void setup_syscall_interface(machine_t&);
 
 	machine_t m_machine;
 	const vrt_ctx* m_ctx;
