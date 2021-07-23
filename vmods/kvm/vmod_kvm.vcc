@@ -13,6 +13,20 @@ all the basic tasks that tenants want to perform.
 API
 ===
 
+$Function VOID embed_tenants(STRING json)
+
+- Load tenants directly from embedded JSON.
+- Example:
+	kvm.embed_tenants("""
+		{
+			"xpizza.com": {
+				"filename": "/tmp/xpizza",
+				"group": "test"
+			}
+		}
+	""");
+
+
 $Function BACKEND vm_backend(STRING tenant, STRING func, STRING arg = "")
 
 - Returns a backend that will call into the current machine to produce a response.
@@ -20,4 +34,3 @@ $Function BACKEND vm_backend(STRING tenant, STRING func, STRING arg = "")
 - Call with no function specified if tenant has made a "backend" decision.
 
 	set bereq.backend = kvm.vm_backend("xpizza.com", "my_backend");
-	return (hash);

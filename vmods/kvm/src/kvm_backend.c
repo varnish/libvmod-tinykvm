@@ -1,14 +1,15 @@
 #include "vmod_kvm.h"
 
 #include <malloc.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <vtim.h>
 #include "vcl.h"
 #include "vcc_if.h"
 
 extern long kvm_current_result_status(VRT_CTX);
-extern struct vmod_kvm_machine *kvm_get_machine(VRT_CTX, VCL_STRING);
-extern struct backend_buffer kvm_backend_call(VRT_CTX, const void *, long, long);
+extern struct vmod_kvm_machine *kvm_fork_machine(VRT_CTX, VCL_STRING, bool);
+extern struct backend_buffer kvm_backend_call(VRT_CTX, struct vmod_kvm_machine *, long, long);
 extern uint64_t kvm_resolve_name(struct vmod_kvm_machine *, const char*);
 
 static void v_matchproto_(vdi_panic_f)
@@ -96,7 +97,7 @@ kvmbe_gethdrs(const struct director *dir,
 		.http_beresp = bo->beresp,
 	};
 	struct backend_buffer output =
-		kvm_backend_call(&ctx, kvmr->priv_key, kvmr->funcaddr, kvmr->funcarg);
+		kvm_backend_call(&ctx, kvmr->machine, kvmr->funcaddr, kvmr->funcarg);
 
 	if (output.data == NULL || output.type == NULL)
 	{
@@ -151,9 +152,9 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING tenant, VCL_STRING func, VCL_STR
 
 	INIT_OBJ(kvmr, KVM_BACKEND_MAGIC);
 	kvmr->priv_key = ctx;
-	kvmr->machine = kvm_get_machine(ctx, tenant);
+	kvmr->machine = kvm_fork_machine(ctx, tenant, false);
 	if (kvmr->machine == NULL) {
-		VRT_fail(ctx, "VM backend: No active tenant");
+		VRT_fail(ctx, "KVM backend: No such tenant");
 		return NULL;
 	}
 

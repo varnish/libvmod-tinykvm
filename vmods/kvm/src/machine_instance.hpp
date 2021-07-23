@@ -31,7 +31,7 @@ public:
 	const auto& machine() const { return m_machine; }
 
 	const auto* ctx() const noexcept { return m_ctx; }
-	const auto* tenant() const noexcept { return m_tenant; }
+	const auto& tenant() const noexcept { return *m_tenant; }
 	auto& instance() { return m_inst; }
 	const auto& instance() const { return m_inst; }
 	void set_ctx(const vrt_ctx* ctx) { m_ctx = ctx; }
@@ -57,16 +57,16 @@ public:
 	void print_backtrace(const gaddr_t addr);
 	void open_debugger(uint16_t);
 
-	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, MachineInstance&, bool sto, bool dbg);
-	MachineInstance(const MachineInstance& source, const vrt_ctx*, const TenantInstance*, MachineInstance&);
+	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance&, bool sto, bool dbg);
+	MachineInstance(const MachineInstance& source, const vrt_ctx*, const TenantInstance*, ProgramInstance&);
 	~MachineInstance();
 	bool reset(); // true if the reset was successful
 
 private:
+	static void kvm_initialize();
 	void handle_exception(gaddr_t);
 	void handle_timeout(gaddr_t);
 	bool install_binary(const std::string& file, bool shared = true);
-	void machine_initialize();
 	void setup_syscall_interface(machine_t&);
 
 	machine_t m_machine;

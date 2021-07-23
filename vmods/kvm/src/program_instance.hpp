@@ -12,7 +12,7 @@ struct ProgramInstance
 	using gaddr_t = MachineInstance::gaddr_t;
 
 	ProgramInstance(std::vector<uint8_t>,
-		const vrt_ctx*, TenantInstance*, bool = false);
+		const vrt_ctx*, TenantInstance*, bool debug = false);
 	~ProgramInstance();
 
 	inline gaddr_t lookup(const char* name) const {
@@ -32,11 +32,4 @@ struct ProgramInstance
 	std::mutex rsp_mtx;
 	/* Lookup tree for ELF symbol names */
 	std::map<std::string, gaddr_t> sym_lookup;
-	/* Index vector for ELF symbol names, used by call_index(..) */
-	struct Lookup {
-		const char* func;
-		gaddr_t addr;
-		size_t size;
-	};
-	std::vector<Lookup> sym_vector;
 };

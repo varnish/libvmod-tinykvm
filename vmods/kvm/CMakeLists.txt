@@ -3,12 +3,19 @@ project (vmod C CXX)
 include(../vmod.cmake vmod)
 
 add_vmod(vmod_kvm vmod_kvm.vcc "KVM Userspace Emulator VMOD"
+	src/vmod_kvm.c
 	src/kvm_backend.c
+	src/kvm_vcc_api.cpp
+	src/backend.cpp
+	src/machine_instance.cpp
+	src/program_instance.cpp
 	src/tenant.cpp
-	src/fork.cpp
+	src/tenant_instance.cpp
+	tinykvm/src/functions.cpp
 )
 
 add_subdirectory(tinykvm)
+set_property(TARGET tinykvm PROPERTY POSITION_INDEPENDENT_CODE 1)
 target_link_libraries(vmod_kvm tinykvm)
 
 #add_subdirectory(ext/json json)
