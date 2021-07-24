@@ -1,7 +1,6 @@
 #include "tenant_instance.hpp"
 #include "varnish.hpp"
 using namespace kvm;
-extern MachineInstance* get_machine(VRT_CTX, const void* key);
 
 struct backend_buffer {
 	const char* type;
@@ -9,7 +8,7 @@ struct backend_buffer {
 	const char* data;
 	size_t      size;
 };
-inline backend_buffer backend_error() {
+static inline backend_buffer backend_error() {
 	return backend_buffer {nullptr, 0, nullptr, 0};
 }
 /*inline const char* optional_copy(VRT_CTX, const tinykvm::Buffer& buffer)
@@ -23,7 +22,7 @@ inline backend_buffer backend_error() {
 }*/
 
 extern "C"
-struct backend_buffer kvm_backend_call(VRT_CTX, MachineInstance* machine,
+struct backend_buffer kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
 	long func, const char *farg)
 {
 	auto* old_ctx = machine->ctx();

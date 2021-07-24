@@ -110,6 +110,7 @@ if (VARNISH_PLUS)
 	set(OPENSSL_BUILD_VERSION "1.1.1e" CACHE STRING "")
 	add_subdirectory(${CMAKE_SOURCE_DIR}/ext/openssl-cmake build_openssl)
 	add_subdirectory(sandbox)
+	add_subdirectory(kvm_sandbox)
 endif()
 
 add_subdirectory(varnishd    build_varnishd)

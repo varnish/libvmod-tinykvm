@@ -13,6 +13,11 @@ all the basic tasks that tenants want to perform.
 API
 ===
 
+$Function VOID load_tenants(STRING filename)
+
+- Load tenants from file
+- See below for example JSON
+
 $Function VOID embed_tenants(STRING json)
 
 - Load tenants directly from embedded JSON.

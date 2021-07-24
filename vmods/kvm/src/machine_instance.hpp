@@ -65,13 +65,13 @@ public:
 	void print_backtrace(const gaddr_t addr);
 	void open_debugger(uint16_t);
 
+	static void kvm_initialize();
 	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance&, bool sto, bool dbg);
 	MachineInstance(const MachineInstance& source, const vrt_ctx*, const TenantInstance*, ProgramInstance&);
 	~MachineInstance();
 	void reset_to(const vrt_ctx*, MachineInstance& master);
 
 private:
-	static void kvm_initialize();
 	static void setup_syscall_interface();
 	void handle_exception(gaddr_t);
 	void handle_timeout(gaddr_t);

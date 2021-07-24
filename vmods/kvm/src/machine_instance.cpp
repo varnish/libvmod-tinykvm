@@ -13,7 +13,6 @@ static constexpr bool VERBOSE_ERRORS = true;
 
 namespace kvm {
 
-__attribute__((constructor))
 void MachineInstance::kvm_initialize()
 {
 	tinykvm::Machine::init();

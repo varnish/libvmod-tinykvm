@@ -1,5 +1,6 @@
 #include "tenant_instance.hpp"
 #include "varnish.hpp"
+static constexpr bool FAST_RESET_METHOD = false;
 
 namespace kvm {
 	std::vector<uint8_t> file_loader(const std::string& file);
@@ -7,6 +8,11 @@ namespace kvm {
 TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 	: config{conf}
 {
+	static bool init = false;
+	if (!init) {
+		init = true;
+		MachineInstance::kvm_initialize();
+	}
 	init_vmods(ctx);
 	try {
 		auto elf = file_loader(conf.filename);
@@ -47,8 +53,14 @@ MachineInstance* TenantInstance::vmfork(const vrt_ctx* ctx, bool debug)
 			return nullptr;
 		}
 		try {
-			/* Get free instance through concurrent queue */
-			auto* inst = prog->workspace_fork(ctx, this, prog);
+			MachineInstance* inst;
+			if constexpr (FAST_RESET_METHOD) {
+				/* Get free instance through concurrent queue */
+				inst = prog->concurrent_fork(ctx, this, prog);
+			} else {
+				/* Create new instance on workspace by forking */
+				inst = prog->workspace_fork(ctx, this, prog);
+			}
 
 			priv_task->priv = inst;
 			priv_task->len  = KVM_PROGRAM_MAGIC;
@@ -57,7 +69,11 @@ MachineInstance* TenantInstance::vmfork(const vrt_ctx* ctx, bool debug)
 				TIMING_LOCATION(t2);
 			#endif
 				auto* mi = (MachineInstance *)inst;
-				mi->instance().workspace_free(mi);
+				if constexpr (FAST_RESET_METHOD) {
+					mi->instance().return_machine(mi);
+				} else {
+					mi->instance().workspace_free(mi);
+				}
 			#ifdef ENABLE_TIMING
 				TIMING_LOCATION(t3);
 				timing_destr.add(t2, t3);

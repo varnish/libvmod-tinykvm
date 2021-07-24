@@ -63,7 +63,7 @@ MachineInstance* ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 		/* When the queue is empty, just create a new machine instance */
 		auto* inst = new MachineInstance{this->script, ctx, tenant, *this};
 		/* This creates a self-reference, which ensures that open
-		   Script instances will keep the machine instance alive. */
+		   Machine instances will keep the program instance alive. */
 		inst->assign_instance(prog);
 		return inst;
 	}
