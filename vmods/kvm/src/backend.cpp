@@ -34,7 +34,7 @@ struct backend_buffer kvm_backend_call(VRT_CTX, MachineInstance* machine,
 		/* Use backend ctx which can write to beresp */
 		machine->set_ctx(ctx);
 		/* Call the backend response function */
-		machine->machine().vmcall(func, std::string(farg),
+		machine->machine().vmcall(func, farg,
 			(int) HDR_BEREQ, (int) HDR_BERESP);
 		/* Restore old ctx for backend_response */
 		machine->set_ctx(old_ctx);
@@ -67,6 +67,7 @@ struct backend_buffer kvm_backend_call(VRT_CTX, MachineInstance* machine,
 		printf("Time spent in backend_call(): %ld ns\n", nanodiff(t1, t2));
 	#endif
 		return result;
+
 	} catch (const tinykvm::MachineException& e) {
 		fprintf(stderr, "Backend VM exception: %s (data: 0x%lX)\n",
 			e.what(), e.data());

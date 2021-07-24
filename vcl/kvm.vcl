@@ -47,7 +47,7 @@ sub vcl_recv {
 
 	/* Determine tenant */
 	if (req.http.Host) {
-
+		return (pass);
 	} else {
 		/* No 'Host: tenant' specified */
 		return (synth(403, "Missing Host header field"));

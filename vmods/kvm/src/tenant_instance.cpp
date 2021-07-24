@@ -46,41 +46,32 @@ MachineInstance* TenantInstance::vmfork(const vrt_ctx* ctx, bool debug)
 				config.name.c_str());
 			return nullptr;
 		}
-		/* Allocate Script on workspace, and construct it in-place */
-		auto* inst = (MachineInstance*) WS_Alloc(ctx->ws, sizeof(MachineInstance));
-		if (UNLIKELY(inst == nullptr)) {
-			VRT_fail(ctx, "vmfork: Out of workspace");
-			return nullptr;
-		}
-
 		try {
-			new (inst) MachineInstance{prog->script, ctx, this, *prog};
-			/* This creates a self-reference, which ensures that open
-			   Script instances will keep the machine instance alive. */
-			inst->assign_instance(prog);
+			/* Get free instance through concurrent queue */
+			auto* inst = prog->workspace_fork(ctx, this, prog);
 
+			priv_task->priv = inst;
+			priv_task->len  = KVM_PROGRAM_MAGIC;
+			priv_task->free = [] (void* inst) {
+			#ifdef ENABLE_TIMING
+				TIMING_LOCATION(t2);
+			#endif
+				auto* mi = (MachineInstance *)inst;
+				mi->instance().workspace_free(mi);
+			#ifdef ENABLE_TIMING
+				TIMING_LOCATION(t3);
+				timing_destr.add(t2, t3);
+			#endif
+			};
 		} catch (std::exception& e) {
 			VRT_fail(ctx,
-				"VM '%s' exception: %s", inst->name().c_str(), e.what());
+				"VM '%s' exception: %s", config.name.c_str(), e.what());
 			return nullptr;
 		}
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);
 		timing_constr.add(t0, t1);
 	#endif
-
-		priv_task->priv = inst;
-		priv_task->len  = KVM_PROGRAM_MAGIC;
-		priv_task->free = [] (void* inst) {
-		#ifdef ENABLE_TIMING
-			TIMING_LOCATION(t2);
-		#endif
-			((MachineInstance*) inst)->~MachineInstance(); /* call destructor */
-		#ifdef ENABLE_TIMING
-			TIMING_LOCATION(t3);
-			timing_destr.add(t2, t3);
-		#endif
-		};
 	}
 	return (MachineInstance*) priv_task->priv;
 }

@@ -1,4 +1,5 @@
 #include "program_instance.hpp"
+#include "varnish.hpp"
 #include <tinykvm/rsp_client.hpp>
 
 namespace kvm {
@@ -36,6 +37,50 @@ ProgramInstance::ProgramInstance(
 }
 ProgramInstance::~ProgramInstance()
 {
+}
+
+MachineInstance* ProgramInstance::workspace_fork(const vrt_ctx* ctx,
+	TenantInstance* tenant, std::shared_ptr<ProgramInstance>& prog)
+{
+	auto* alloc = WS_Alloc(ctx->ws, sizeof(MachineInstance));
+	MachineInstance *mi =
+		new (alloc) MachineInstance{this->script, ctx, tenant, *this};
+	mi->assign_instance(prog);
+	return mi;
+}
+void ProgramInstance::workspace_free(MachineInstance* inst)
+{
+	inst->~MachineInstance();
+}
+
+MachineInstance* ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
+	TenantInstance* tenant, std::shared_ptr<ProgramInstance>& prog)
+{
+	mqueue_mtx.lock();
+
+	if (UNLIKELY(mqueue.empty())) {
+		mqueue_mtx.unlock();
+		/* When the queue is empty, just create a new machine instance */
+		auto* inst = new MachineInstance{this->script, ctx, tenant, *this};
+		/* This creates a self-reference, which ensures that open
+		   Script instances will keep the machine instance alive. */
+		inst->assign_instance(prog);
+		return inst;
+	}
+
+	auto* inst = mqueue.back();
+	mqueue.pop_back();
+	mqueue_mtx.unlock();
+
+	inst->reset_to(ctx, this->script);
+	inst->assign_instance(prog);
+	return inst;
+}
+void ProgramInstance::return_machine(MachineInstance* inst)
+{
+	std::lock_guard<std::mutex> lk(mqueue_mtx);
+	mqueue.push_back(inst);
+	inst->unassign_instance();
 }
 
 } // kvm

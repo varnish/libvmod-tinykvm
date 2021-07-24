@@ -15,6 +15,7 @@ struct TenantGroup {
 	std::string name;
 	uint64_t max_time; /* milliseconds */
 	uint64_t max_memory;
+	size_t   max_machines = 16;
 	size_t   max_backends = 8;
 	size_t   max_regex    = 32;
 

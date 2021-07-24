@@ -24,16 +24,30 @@ struct ProgramInstance
 		return script.resolve_address(name);
 	}
 
+	/* Workspace VM */
+	MachineInstance* workspace_fork(const vrt_ctx*,
+		TenantInstance*, std::shared_ptr<ProgramInstance>&);
+	void workspace_free(MachineInstance*);
+	/* Heap-allocated VM from concurrent queue */
+	MachineInstance* concurrent_fork(const vrt_ctx*,
+		TenantInstance*, std::shared_ptr<ProgramInstance>&);
+	void return_machine(MachineInstance*);
+
 	const std::vector<uint8_t> binary;
 	MachineInstance  script;
 
+	std::mutex mqueue_mtx;
+	std::vector<MachineInstance*> mqueue;
+
 	MachineInstance  storage;
 	std::mutex storage_mtx;
+
+	/* Lookup tree for ELF symbol names */
+	std::map<std::string, gaddr_t> sym_lookup;
+
 	std::unique_ptr<tinykvm::RSPClient> rspclient;
 	MachineInstance* rsp_script = nullptr;
 	std::mutex rsp_mtx;
-	/* Lookup tree for ELF symbol names */
-	std::map<std::string, gaddr_t> sym_lookup;
 };
 
 } // kvm

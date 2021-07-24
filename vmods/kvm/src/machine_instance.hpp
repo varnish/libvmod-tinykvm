@@ -42,6 +42,7 @@ public:
 	auto& instance() { return m_inst; }
 	const auto& instance() const { return m_inst; }
 	void assign_instance(std::shared_ptr<ProgramInstance>& ref) { m_inst_ref = std::move(ref); }
+	void unassign_instance() { m_inst_ref = nullptr; }
 
 	uint64_t max_time() const noexcept;
 	const std::string& name() const noexcept;
@@ -67,7 +68,7 @@ public:
 	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance&, bool sto, bool dbg);
 	MachineInstance(const MachineInstance& source, const vrt_ctx*, const TenantInstance*, ProgramInstance&);
 	~MachineInstance();
-	bool reset(); // true if the reset was successful
+	void reset_to(const vrt_ctx*, MachineInstance& master);
 
 private:
 	static void kvm_initialize();
@@ -75,8 +76,8 @@ private:
 	void handle_exception(gaddr_t);
 	void handle_timeout(gaddr_t);
 
-	machine_t m_machine;
 	const vrt_ctx* m_ctx;
+	machine_t m_machine;
 	const struct TenantInstance* m_tenant = nullptr;
 	ProgramInstance& m_inst;
 
