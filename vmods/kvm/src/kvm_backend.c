@@ -9,7 +9,7 @@
 
 extern long kvm_current_result_status(VRT_CTX);
 extern struct vmod_kvm_machine *kvm_fork_machine(VRT_CTX, VCL_STRING, bool);
-extern struct backend_buffer kvm_backend_call(VRT_CTX, struct vmod_kvm_machine *, long, long);
+extern struct backend_buffer kvm_backend_call(VRT_CTX, struct vmod_kvm_machine *, long, const char *);
 extern uint64_t kvm_resolve_name(struct vmod_kvm_machine *, const char*);
 
 static void v_matchproto_(vdi_panic_f)
@@ -160,7 +160,7 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING tenant, VCL_STRING func, VCL_STR
 
 	if (func) {
 		kvmr->funcaddr = atoi(func);
-		kvmr->funcarg  = atoi(farg);
+		kvmr->funcarg  = farg;
 		/* If it's not an address, lookup as a public function */
 		if (kvmr->funcaddr == 0x0) {
 			kvmr->funcaddr = kvm_resolve_name(kvmr->machine, func);

@@ -58,5 +58,5 @@ sub vcl_backend_fetch {
 	set bereq.backend = kvm.vm_backend(
 			bereq.http.Host,
 			urlplus.get_basename(),
-			"argument");
+			bereq.url);
 }

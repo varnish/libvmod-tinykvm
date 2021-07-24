@@ -23,31 +23,45 @@ inline backend_buffer backend_error() {
 }*/
 
 extern "C"
-struct backend_buffer kvm_backend_call(VRT_CTX, MachineInstance* machine, long func, long farg)
+struct backend_buffer kvm_backend_call(VRT_CTX, MachineInstance* machine,
+	long func, const char *farg)
 {
 	auto* old_ctx = machine->ctx();
 	try {
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);
 	#endif
-		printf("Calling VM backend function: 0x%lX\n", func);
 		/* Use backend ctx which can write to beresp */
 		machine->set_ctx(ctx);
 		/* Call the backend response function */
-		machine->machine().vmcall(func);
-			//(uint64_t) farg, (int) HDR_BEREQ, (int) HDR_BERESP);
+		machine->machine().vmcall(func, std::string(farg),
+			(int) HDR_BEREQ, (int) HDR_BERESP);
 		/* Restore old ctx for backend_response */
 		machine->set_ctx(old_ctx);
 
 		/* Get content-type and data */
-		//const auto [type, data] = machine->machine().sysargs<riscv::Buffer, riscv::Buffer> ();
+		auto& vm = machine->machine();
+		auto regs = vm.registers();
+		const uint64_t tlen = regs.rsi;
+		const uint64_t clen = regs.rcx;
+
+		char *tbuf = (char *)WS_Alloc(ctx->ws, tlen);
+		char *cbuf = (char *)WS_Alloc(ctx->ws, clen);
+		if (tbuf == nullptr || cbuf == nullptr) {
+			throw std::runtime_error("Out of workspace for backend call result");
+		}
+
+		vm.copy_from_guest(tbuf, regs.rdi, tlen);
+		vm.copy_from_guest(cbuf, regs.rdx, clen);
+
 		/* Return content-type, data, size */
 		const backend_buffer result {
-			.type = "text/html",
-			.tsize = 9,
-			.data = "resp",
-			.size = 4
+			.type = tbuf,
+			.tsize = tlen,
+			.data = cbuf,
+			.size = clen
 		};
+
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t2);
 		printf("Time spent in backend_call(): %ld ns\n", nanodiff(t1, t2));

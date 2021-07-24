@@ -9,6 +9,7 @@ add_vmod(vmod_kvm vmod_kvm.vcc "KVM Userspace Emulator VMOD"
 	src/backend.cpp
 	src/machine_instance.cpp
 	src/program_instance.cpp
+	src/system_calls.cpp
 	src/tenant.cpp
 	src/tenant_instance.cpp
 	tinykvm/src/functions.cpp

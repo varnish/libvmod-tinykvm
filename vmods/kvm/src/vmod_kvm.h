@@ -43,6 +43,6 @@ struct vmod_kvm_response
 	const void*    priv_key;
 	struct vmod_kvm_machine *machine;
 	uint64_t funcaddr;
-	uint64_t funcarg;
+	const char* funcarg;
 	uint64_t max_response_size;
 };
