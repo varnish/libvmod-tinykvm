@@ -4,7 +4,7 @@ project (varnish C)
 
 option(VARNISH_PLUS "Build with the varnish plus repo" ON)
 option(BUILD_VMODS  "Build most VMODs in varnish lib" ON)
-option(NUMA_AWARE   "Enable NUMA-aware features" ON)
+option(NUMA_AWARE   "Enable NUMA-aware features" OFF)
 option(GPROF        "Enable profiling with gprof" OFF)
 option(LTO_ENABLE   "Enable LTO builds" OFF)
 option(MINIMAL      "Minimal build" OFF)
