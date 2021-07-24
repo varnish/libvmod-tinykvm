@@ -31,7 +31,7 @@ jobs:
       - persist_to_workspace:
           root: .
           paths: build ext scripts vmods
-  sandbox_tests:
+  riscv_sandbox_tests:
       docker:
           - image: cimg/base:2020.01
       working_directory: ~/project
@@ -42,15 +42,31 @@ jobs:
               name: "Test dependencies"
               command: bash ./scripts/install_runtime_deps.sh
           - run:
-              name: "Sandbox tests"
+              name: "RISC-V sandbox tests"
               working_directory: build
               command: "ctest --verbose -R vmod_riscv_ ."
-
+  kvm_sandbox_tests:
+      docker:
+          - image: cimg/base:2020.01
+      working_directory: ~/project
+      steps:
+          - attach_workspace:
+              at: .
+          - run:
+              name: "Test dependencies"
+              command: bash ./scripts/install_runtime_deps.sh
+          - run:
+              name: "KVM sandbox tests"
+              working_directory: build
+              command: "ctest --verbose -R vmod_kvm_ ."
 workflows:
   version: 2
   cmake_build_system:
     jobs:
       - cmake_builds
-      - sandbox_tests:
+      - riscv_sandbox_tests:
+            requires:
+                - cmake_builds
+      - kvm_sandbox_tests:
             requires:
                 - cmake_builds
