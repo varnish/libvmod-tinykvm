@@ -1,5 +1,5 @@
 #include "../src/machine/syscalls.h"
-#include "../src/machine/crc32_embedded.hpp"
+#include <stddef.h>
 #include <stdint.h>
 #define  NOT_CACHED  0
 #define  PASS        0
@@ -81,22 +81,6 @@ inline void synth(const char* ctype, size_t clen, const char* data, size_t dlen)
 	__builtin_unreachable();
 }
 
-extern "C" void (*dyncall_helper) ();
-struct Call {
-	const uint32_t hash;
-
-	constexpr Call(const char* f) : hash(crc32(f)) {}
-	constexpr Call(uint32_t h) : hash(h) {}
-
-	template <typename... Args>
-	long operator() (Args... args) const {
-		using FCH = long(*)(uint32_t, Args...);
-
-		auto fch = reinterpret_cast<FCH> (&dyncall_helper);
-		return fch(hash, args...);
-	}
-};
-
 extern "C" __attribute__((used))
 void on_recv();
 extern "C" __attribute__((used))
@@ -121,13 +105,15 @@ _start:                         \t\n\
 	call start					\t\n\
 ");
 
-#define HELPER_FUNCTION(isr, name) \
+#define DYNAMIC_CALL(isr, name, hash) \
 	asm(".global " #name "\n" \
 	#name ":\n" \
 	"	li a7, " #isr "\n" \
+	"	li t0, " #hash "\n" \
 	"	ecall\n" \
-	"   ret\n");
-HELPER_FUNCTION(15, dyncall_helper)
+	"   ret\n"); \
+	extern "C" long name(...);
+DYNAMIC_CALL(16, goto_dns, 0x746238D2)
 
 extern "C" __attribute__((visibility("hidden"), used))
 void start(int, char**);

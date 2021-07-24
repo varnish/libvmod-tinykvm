@@ -23,8 +23,6 @@ void on_backend_fetch()
 		GOTO_IPV_IPv4 = 1,
 		GOTO_IPV_IPv6 = 2
 	};
-	constexpr Call goto_dns("goto.dns");
-
 	long be = goto_dns("docs.varnish-software.com", GOTO_IPV_IPv4);
 	syscall(ECALL_SET_BACKEND, be);
 }
@@ -78,5 +76,5 @@ varnish v1 -vcl+backend {
 client c1 {
 	txreq -url "/" -hdr "Host: docs.varnish-software.com"
 	rxresp
-	expect resp.status == 200
+	expect resp.status == 301
 } -run
