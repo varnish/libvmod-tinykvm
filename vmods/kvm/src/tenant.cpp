@@ -4,7 +4,9 @@
 
 using json = nlohmann::json;
 using namespace kvm;
-extern std::vector<uint8_t> file_loader(const std::string& filename);
+namespace kvm {
+	extern std::vector<uint8_t> file_loader(const std::string&);
+}
 
 using MapType = std::unordered_map<std::string, kvm::TenantInstance*>;
 static MapType temporaries;
@@ -140,6 +142,6 @@ void kvm_init_tenants_str(VRT_CTX, const char* str)
 extern "C"
 void kvm_init_tenants_file(VRT_CTX, const char* filename)
 {
-	const auto json = file_loader(filename);
+	const auto json = kvm::file_loader(filename);
 	kvm_init_tenants(ctx, json, filename);
 }

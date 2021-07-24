@@ -3,7 +3,7 @@
 static constexpr bool FAST_RESET_METHOD = false;
 
 namespace kvm {
-	std::vector<uint8_t> file_loader(const std::string& file);
+	extern std::vector<uint8_t> file_loader(const std::string&);
 
 TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 	: config{conf}
