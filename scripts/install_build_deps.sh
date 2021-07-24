@@ -15,4 +15,5 @@ DEBIAN_FRONTEND=noninteractive sudo -E apt install -y \
 	libbrotli-dev \
 	libedit-dev \
 	libncursesw5-dev \
-	numactl
+	numactl \
+	libnuma-dev

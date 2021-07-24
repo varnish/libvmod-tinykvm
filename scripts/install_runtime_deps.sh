@@ -5,4 +5,5 @@ sudo apt install -y \
 	cmake \
 	clang-10 lld-10 \
 	libbrotli1 \
-	libconfig9
+	libconfig9 \
+	libnuma1
