@@ -5,3 +5,5 @@ perf-*.svg
 callgraph.svg
 server/img/**
 ext/work-plus
+
+vmods/kvm/programs/basic
