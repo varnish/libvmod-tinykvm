@@ -33,6 +33,7 @@ MachineInstance::MachineInstance(
 	  m_regex     {ten->config.max_regex()},
 	  m_directors {ten->config.max_backends()}
 {
+	machine().set_userdata<MachineInstance> (this);
 	try {
 		machine().setup_linux(
 			{"vmod_kvm", name().c_str()},

@@ -15,6 +15,10 @@ set(KVM_SOURCES
 	src/tenant.cpp
 	src/tenant_instance.cpp
 	tinykvm/src/functions.cpp  # setup_kvm_system_calls
+	src/varnish_interface.c
+	### VMODS ###
+	src/vmods/vmods.cpp
+	src/vmods/goto.cpp
 )
 
 add_library(kvm_sandbox STATIC ${KVM_SOURCES})

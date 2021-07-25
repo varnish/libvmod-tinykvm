@@ -13,9 +13,9 @@ struct TenantInstance
 
 	// Install a callback function using a string name
 	// Can be invoked from the guest using the same string name
-	void set_dynamic_call(const std::string& name, ghandler_t);
-	void set_dynamic_calls(std::vector<std::pair<std::string, ghandler_t>>);
-	void reset_dynamic_call(const std::string& name, ghandler_t = nullptr);
+	static void set_dynamic_call(const std::string& name, ghandler_t);
+	static void set_dynamic_calls(std::vector<std::pair<std::string, ghandler_t>>);
+	static void reset_dynamic_call(const std::string& name, ghandler_t = nullptr);
 	void dynamic_call(uint32_t hash, MachineInstance&) const;
 
 	inline uint64_t lookup(const char* name) const {
@@ -35,8 +35,9 @@ struct TenantInstance
 	std::shared_ptr<ProgramInstance> program = nullptr;
 	/* Machine for debugging */
 	std::shared_ptr<ProgramInstance> debug_program = nullptr;
+private:
 	/* Hash map of string hashes associated with dyncall handlers */
-	std::unordered_map<uint32_t, ghandler_t> m_dynamic_functions;
+	static std::unordered_map<uint32_t, ghandler_t> m_dynamic_functions;
 };
 
 } // kvm

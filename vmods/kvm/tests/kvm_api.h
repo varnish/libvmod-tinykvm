@@ -11,3 +11,13 @@ void return_result(const char *ctype, const char *content)
 {
 	sys_return_result(ctype, strlen(ctype), content, strlen(content));
 }
+
+#define DYNAMIC_CALL(name, hash) \
+	asm(".global " #name "\n" \
+	#name ":\n" \
+	"	mov $0x11111, %rax\n" \
+	"	mov " #hash ", %rdi\n" \
+	"	syscall\n" \
+	"   ret\n"); \
+	extern long name();
+DYNAMIC_CALL(goto_dns, 0x746238D2)

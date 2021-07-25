@@ -1,4 +1,5 @@
 vcl 4.1;
+import goto;
 import kvm;
 import std;
 import urlplus;

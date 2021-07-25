@@ -1,9 +1,12 @@
 #include "tenant_instance.hpp"
 #include "varnish.hpp"
+#include "utils/crc32.hpp"
 static constexpr bool FAST_RESET_METHOD = false;
 
 namespace kvm {
 	extern std::vector<uint8_t> file_loader(const std::string&);
+	extern void initialize_vmods(VRT_CTX);
+	std::unordered_map<uint32_t, TenantInstance::ghandler_t> TenantInstance::m_dynamic_functions;
 
 TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 	: config{conf}
@@ -12,6 +15,7 @@ TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 	if (!init) {
 		init = true;
 		MachineInstance::kvm_initialize();
+		initialize_vmods(ctx);
 	}
 	init_vmods(ctx);
 	try {
@@ -90,11 +94,6 @@ MachineInstance* TenantInstance::vmfork(const vrt_ctx* ctx, bool debug)
 	#endif
 	}
 	return (MachineInstance*) priv_task->priv;
-}
-
-/* XXX: add compile-time CRC32 */
-uint32_t crc32(const char *, size_t) {
-	return 0;
 }
 
 void TenantInstance::set_dynamic_call(const std::string& name, ghandler_t handler)
