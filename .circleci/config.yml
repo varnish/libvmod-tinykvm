@@ -26,7 +26,7 @@ jobs:
             export REVISION=$CIRCLE_BRANCH
             export VERSION=$CIRCLE_SHA1
       - run: bash ./scripts/install_build_deps.sh
-      - run: bash ./scripts/vcp_riscv_setup.sh
+      - run: bash ./scripts/repo_setup.sh
       - run: bash ./scripts/cmaketool.sh --vcp=build --no-optimize --build
       - persist_to_workspace:
           root: .
