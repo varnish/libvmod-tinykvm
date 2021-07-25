@@ -96,11 +96,19 @@ case $i in
     args="$args -DCMAKE_BUILD_TYPE= -DLTO_ENABLE=OFF -DNATIVE=OFF"
     shift
     ;;
-	--static-sandbox)
+	--static-kvm)
+	args="$args -DSHARED_KVM=OFF"
+    shift
+    ;;
+	--shared-kvm)
+	args="$args -DSHARED_KVM=ON"
+    shift
+    ;;
+	--static-riscv)
 	args="$args -DSHARED_LIBRISCV=OFF"
     shift
     ;;
-	--shared-sandbox)
+	--shared-riscv)
 	args="$args -DSHARED_LIBRISCV=ON"
     shift
     ;;
@@ -139,8 +147,10 @@ case $i in
 	  echo "--clean		Clean build folder (ninja clean)"
 	  echo "--sanitize	Sanitize with asan"
 	  echo "--optimize	Enable all optimizations"
-	  echo "--static-sandbox	Link sandbox statically into varnishd"
-	  echo "--shared-sandbox	Build sandbox as a shared library"
+	  echo "--static-kvm		Link with KVM sandbox directly"
+	  echo "--shared-kvm		Build KVM sandbox as a shared library"
+	  echo "--static-riscv		Link with RISC-V sandbox directly"
+	  echo "--shared-riscv		Build RISC-V sandbox as a shared library"
 	  echo "--mgt-process		Run child in subprocess (default)"
 	  echo "--single-process	Run child in same process as mgt"
 	  echo "--disable-numa		Force varnishd to run on NUMA node 0"
