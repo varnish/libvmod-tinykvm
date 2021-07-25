@@ -18,15 +18,21 @@ void MachineInstance::setup_syscall_interface()
 				auto* dir = inst.directors().get(regs.rdi);
 				kvm_SetBackend(inst.ctx(), dir);
 				} break;
-			case 0x11111: {
-				auto regs = machine.registers();
-				inst.tenant().dynamic_call(regs.rdi, inst);
-				} break;
 			default:
 				printf("Unhandled system call: %u\n", scall);
 				auto regs = machine.registers();
 				regs.rax = -ENOSYS;
 				machine.set_registers(regs);
+		}
+	});
+	tinykvm::Machine::install_output_handler(
+	[] (tinykvm::Machine& machine, unsigned port, unsigned data)
+	{
+		auto& inst = *machine.get_userdata<MachineInstance>();
+		switch (port) {
+			case 0x1: /* Dynamic calls */
+				inst.tenant().dynamic_call(data, inst);
+				break;
 		}
 	});
 }
