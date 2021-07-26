@@ -1,6 +1,5 @@
 #pragma once
 #include "machine_instance.hpp"
-#include <atomic>
 #include <mutex>
 namespace tinykvm {
 	struct RSPClient;
@@ -24,7 +23,7 @@ struct ProgramInstance
 		return script.resolve_address(name);
 	}
 
-	/* Workspace VM */
+	/* Workspace-allocated VM */
 	MachineInstance* workspace_fork(const vrt_ctx*,
 		TenantInstance*, std::shared_ptr<ProgramInstance>&);
 	void workspace_free(MachineInstance*);

@@ -1,6 +1,5 @@
 #include "machine_instance.hpp"
 #include "tenant_instance.hpp"
-#include "utils/cpu_id.hpp"
 #include "varnish.hpp"
 extern void setup_kvm_system_calls();
 static constexpr bool VERBOSE_ERRORS = true;
@@ -28,7 +27,7 @@ MachineInstance::MachineInstance(
 	  m_machine(binary, {
 		.max_mem = ten->config.max_memory(),
 	  }),
-	  m_tenant(ten), m_inst(inst), m_cpu(cpu_id()),
+	  m_tenant(ten), m_inst(inst),
 	  m_is_storage(storage), m_is_debug(debug),
 	  m_regex     {ten->config.max_regex()},
 	  m_directors {ten->config.max_backends()}
@@ -46,6 +45,7 @@ MachineInstance::MachineInstance(
 	} catch (...) {
 		fprintf(stderr,
 			"Error: Machine not initialized properly: %s\n", name().c_str());
+		throw; /* IMPORTANT: Re-throw */
 	}
 }
 
@@ -68,7 +68,7 @@ MachineInstance::MachineInstance(
 		.page_deallocator = [] (char*) {
 		},*/
 	  }),
-	  m_tenant(ten), m_inst(inst), m_cpu(cpu_id()),
+	  m_tenant(ten), m_inst(inst),
 	  m_is_debug(source.is_debug()),
 	  m_sighandler{source.m_sighandler},
 	  m_regex     {ten->config.max_regex()},

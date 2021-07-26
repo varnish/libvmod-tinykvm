@@ -44,10 +44,8 @@ MachineInstance* TenantInstance::vmfork(const vrt_ctx* ctx, bool debug)
 		else
 			prog = this->debug_program;
 		/* First-time tenants could have no program */
-		if (UNLIKELY(prog == nullptr))
-			return nullptr;
-		if (UNLIKELY(!prog->script.is_forkable())) {
-			VRT_fail(ctx, "vmfork: Cannot fork from %s. Not initialized?",
+		if (UNLIKELY(prog == nullptr)) {
+			VRT_fail(ctx, "vmfork: Missing program for %s. Not uploaded?",
 				config.name.c_str());
 			return nullptr;
 		}

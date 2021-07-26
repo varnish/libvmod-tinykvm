@@ -48,11 +48,9 @@ public:
 	const std::string& name() const noexcept;
 	const std::string& group() const noexcept;
 
-	int  cpu() const noexcept { return m_cpu; }
 	bool is_paused() const noexcept { return m_is_paused; }
 	bool is_storage() const noexcept { return m_is_storage; }
 	bool is_debug() const noexcept { return m_is_debug; }
-	bool is_forkable() const noexcept { return machine().is_forkable(); }
 	gaddr_t max_memory() const noexcept;
 
 	void init_sha256();
@@ -81,7 +79,6 @@ private:
 	machine_t m_machine;
 	const struct TenantInstance* m_tenant = nullptr;
 	ProgramInstance& m_inst;
-	int         m_cpu;
 	bool        m_is_paused = false;
 	bool        m_is_storage = false;
 	bool        m_is_debug = false;
