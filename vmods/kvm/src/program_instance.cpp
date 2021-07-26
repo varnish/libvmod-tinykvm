@@ -63,7 +63,8 @@ MachineInstance* ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 		/* When the queue is empty, just create a new machine instance */
 		local_vm = new MachineInstance{this->script, ctx, tenant, *this};
 	} else {
-		local_vm->reset_to(ctx, this->script);
+		/* The VM should already be reset, but needs a new VRT ctx */
+		local_vm->set_ctx(ctx);
 	}
 
 	/* This creates a self-reference, which ensures that open
@@ -73,6 +74,7 @@ MachineInstance* ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 }
 void ProgramInstance::return_machine(MachineInstance* inst)
 {
+	inst->reset_to(nullptr, this->script);
 	inst->unassign_instance();
 }
 
