@@ -1,8 +1,8 @@
 #include "machine_instance.hpp"
 #include "tenant_instance.hpp"
+#include "utils/cpu_id.hpp"
 #include "varnish.hpp"
 extern void setup_kvm_system_calls();
-static constexpr uint64_t SIGHANDLER_INSN = 60'000;
 static constexpr bool VERBOSE_ERRORS = true;
 
 //#define ENABLE_TIMING
@@ -28,7 +28,7 @@ MachineInstance::MachineInstance(
 	  m_machine(binary, {
 		.max_mem = ten->config.max_memory(),
 	  }),
-	  m_tenant(ten), m_inst(inst),
+	  m_tenant(ten), m_inst(inst), m_cpu(cpu_id()),
 	  m_is_storage(storage), m_is_debug(debug),
 	  m_regex     {ten->config.max_regex()},
 	  m_directors {ten->config.max_backends()}
@@ -55,10 +55,10 @@ MachineInstance::MachineInstance(
 	: m_ctx(ctx),
 	  m_machine(source.machine(), {
 		.max_mem = ten->config.max_memory(),
-		.page_allocator = [this] (const size_t N) -> char* {
+/*		.page_allocator = [this] (const size_t N) -> char* {
 			char* mem = (char *)WS_Alloc(m_ctx->ws, (N + 1) * 4096);
 			if (mem == nullptr) return nullptr;
-			/* Page re-alignment */
+			// Page re-alignment
 			uintptr_t addr = (uintptr_t) mem;
 			if (addr & ~(uint64_t) 0xFFF) {
 				mem += 0x1000 - (addr & 0xFFF);
@@ -66,9 +66,9 @@ MachineInstance::MachineInstance(
 			return mem;
 		},
 		.page_deallocator = [] (char*) {
-		},
+		},*/
 	  }),
-	  m_tenant(ten), m_inst(inst),
+	  m_tenant(ten), m_inst(inst), m_cpu(cpu_id()),
 	  m_is_debug(source.is_debug()),
 	  m_sighandler{source.m_sighandler},
 	  m_regex     {ten->config.max_regex()},

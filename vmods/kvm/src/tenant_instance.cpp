@@ -1,7 +1,7 @@
 #include "tenant_instance.hpp"
 #include "varnish.hpp"
 #include "utils/crc32.hpp"
-static constexpr bool FAST_RESET_METHOD = false;
+static constexpr bool FAST_RESET_METHOD = true;
 
 namespace kvm {
 	extern std::vector<uint8_t> file_loader(const std::string&);
@@ -17,7 +17,7 @@ TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 		MachineInstance::kvm_initialize();
 		initialize_vmods(ctx);
 	}
-	init_vmods(ctx);
+
 	try {
 		auto elf = file_loader(conf.filename);
 		this->program =
@@ -28,11 +28,6 @@ TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 			conf.name.c_str(), e.what());
 		this->program = nullptr;
 	}
-}
-
-void TenantInstance::init_vmods(VRT_CTX)
-{
-	/* TODO: implement Goto as dynamic call */
 }
 
 MachineInstance* TenantInstance::vmfork(const vrt_ctx* ctx, bool debug)

@@ -36,9 +36,6 @@ struct ProgramInstance
 	const std::vector<uint8_t> binary;
 	MachineInstance  script;
 
-	std::mutex mqueue_mtx;
-	std::vector<MachineInstance*> mqueue;
-
 	MachineInstance  storage;
 	std::mutex storage_mtx;
 

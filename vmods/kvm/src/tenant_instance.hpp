@@ -26,7 +26,6 @@ struct TenantInstance
 	}
 
 	TenantInstance(const vrt_ctx*, const TenantConfig&);
-	void init_vmods(const vrt_ctx*);
 
 	/* Initialized during vcl_init */
 	const uint64_t magic = 0xb385716f486938e6;

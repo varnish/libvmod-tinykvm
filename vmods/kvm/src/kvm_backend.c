@@ -8,8 +8,9 @@
 #include "vcc_if.h"
 
 extern long kvm_current_result_status(VRT_CTX);
+extern struct vmod_kvm_tenant *kvm_tenant_find(VRT_CTX, VCL_STRING);
 extern struct vmod_kvm_machine *kvm_fork_machine(VRT_CTX, VCL_STRING, bool);
-extern struct backend_buffer kvm_backend_call(VRT_CTX, struct vmod_kvm_machine *, long, const char *);
+extern struct backend_buffer kvm_backend_call(VRT_CTX, struct vmod_kvm_tenant *, const char *, const char *);
 extern uint64_t kvm_resolve_name(struct vmod_kvm_machine *, const char*);
 
 static void v_matchproto_(vdi_panic_f)
@@ -97,7 +98,7 @@ kvmbe_gethdrs(const struct director *dir,
 		.http_beresp = bo->beresp,
 	};
 	struct backend_buffer output =
-		kvm_backend_call(&ctx, kvmr->machine, kvmr->funcaddr, kvmr->funcarg);
+		kvm_backend_call(&ctx, kvmr->tenant, kvmr->func, kvmr->funcarg);
 
 	if (output.data == NULL || output.type == NULL)
 	{
@@ -152,25 +153,14 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING tenant, VCL_STRING func, VCL_STR
 
 	INIT_OBJ(kvmr, KVM_BACKEND_MAGIC);
 	kvmr->priv_key = ctx;
-	kvmr->machine = kvm_fork_machine(ctx, tenant, false);
-	if (kvmr->machine == NULL) {
+	kvmr->tenant = kvm_tenant_find(ctx, tenant);
+	if (kvmr->tenant == NULL) {
 		VRT_fail(ctx, "KVM sandbox says 'No such tenant': %s", tenant);
 		return NULL;
 	}
 
-	if (func) {
-		kvmr->funcaddr = atoi(func);
-		kvmr->funcarg  = farg;
-		/* If it's not an address, lookup as a public function */
-		if (kvmr->funcaddr == 0x0) {
-			kvmr->funcaddr = kvm_resolve_name(kvmr->machine, func);
-			if (kvmr->funcaddr == 0x0) {
-				VRT_fail(ctx,
-					"KVM sandbox says 'No such backend function': %s", func);
-				return NULL;
-			}
-		}
-	}
+	kvmr->func = func;
+	kvmr->funcarg = farg;
 	kvmr->max_response_size = 0;
 
 	setup_response_director(&kvmr->dir, kvmr);

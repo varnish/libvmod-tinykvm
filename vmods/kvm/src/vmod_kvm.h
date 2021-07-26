@@ -40,9 +40,9 @@ struct vmod_kvm_response
 	uint64_t magic;
 	struct director dir;
 
-	const void*    priv_key;
-	struct vmod_kvm_machine *machine;
-	uint64_t funcaddr;
-	const char* funcarg;
+	const void *priv_key;
+	struct vmod_kvm_tenant *tenant;
+	const char *func;
+	const char *funcarg;
 	uint64_t max_response_size;
 };

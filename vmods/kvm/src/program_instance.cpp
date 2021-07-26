@@ -1,4 +1,5 @@
 #include "program_instance.hpp"
+#include "utils/cpu_id.hpp"
 #include "varnish.hpp"
 #include <tinykvm/rsp_client.hpp>
 
@@ -53,13 +54,12 @@ void ProgramInstance::workspace_free(MachineInstance* inst)
 	inst->~MachineInstance();
 }
 
+thread_local std::vector<MachineInstance*> vq;
+
 MachineInstance* ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 	TenantInstance* tenant, std::shared_ptr<ProgramInstance>& prog)
 {
-	mqueue_mtx.lock();
-
-	if (UNLIKELY(mqueue.empty())) {
-		mqueue_mtx.unlock();
+	if (UNLIKELY(vq.empty())) {
 		/* When the queue is empty, just create a new machine instance */
 		auto* inst = new MachineInstance{this->script, ctx, tenant, *this};
 		/* This creates a self-reference, which ensures that open
@@ -68,9 +68,8 @@ MachineInstance* ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 		return inst;
 	}
 
-	auto* inst = mqueue.back();
-	mqueue.pop_back();
-	mqueue_mtx.unlock();
+	auto* inst = vq.back();
+	vq.pop_back();
 
 	inst->reset_to(ctx, this->script);
 	inst->assign_instance(prog);
@@ -78,9 +77,8 @@ MachineInstance* ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 }
 void ProgramInstance::return_machine(MachineInstance* inst)
 {
-	std::lock_guard<std::mutex> lk(mqueue_mtx);
-	mqueue.push_back(inst);
 	inst->unassign_instance();
+	vq.push_back(inst);
 }
 
 } // kvm
