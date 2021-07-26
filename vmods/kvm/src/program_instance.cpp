@@ -54,31 +54,26 @@ void ProgramInstance::workspace_free(MachineInstance* inst)
 	inst->~MachineInstance();
 }
 
-thread_local std::vector<MachineInstance*> vq;
+thread_local MachineInstance* local_vm;
 
 MachineInstance* ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 	TenantInstance* tenant, std::shared_ptr<ProgramInstance>& prog)
 {
-	if (UNLIKELY(vq.empty())) {
+	if (UNLIKELY(local_vm == nullptr)) {
 		/* When the queue is empty, just create a new machine instance */
-		auto* inst = new MachineInstance{this->script, ctx, tenant, *this};
-		/* This creates a self-reference, which ensures that open
-		   Machine instances will keep the program instance alive. */
-		inst->assign_instance(prog);
-		return inst;
+		local_vm = new MachineInstance{this->script, ctx, tenant, *this};
+	} else {
+		local_vm->reset_to(ctx, this->script);
 	}
 
-	auto* inst = vq.back();
-	vq.pop_back();
-
-	inst->reset_to(ctx, this->script);
-	inst->assign_instance(prog);
-	return inst;
+	/* This creates a self-reference, which ensures that open
+	   Machine instances will keep the program instance alive. */
+	local_vm->assign_instance(prog);
+	return local_vm;
 }
 void ProgramInstance::return_machine(MachineInstance* inst)
 {
 	inst->unassign_instance();
-	vq.push_back(inst);
 }
 
 } // kvm
