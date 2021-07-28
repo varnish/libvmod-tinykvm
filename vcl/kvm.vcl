@@ -48,6 +48,11 @@ sub vcl_recv {
 
 	/* Determine tenant */
 	if (req.http.Host) {
+		if (req.method == "POST") {
+			set req.backend_hint = kvm.live_update(req.http.Host, 15MB);
+			std.cache_req_body(15MB);
+			return (pass);
+		}
 		return (pass);
 	} else {
 		/* No 'Host: tenant' specified */
@@ -56,6 +61,10 @@ sub vcl_recv {
 }
 
 sub vcl_backend_fetch {
+	if (bereq.method == "POST") {
+		return (fetch);
+	}
+
 	set bereq.backend = kvm.vm_backend(
 			bereq.http.Host,
 			urlplus.get_basename(),

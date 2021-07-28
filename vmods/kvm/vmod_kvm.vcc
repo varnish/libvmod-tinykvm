@@ -3,11 +3,21 @@ $Module kvm 3 "High-Performance KVM Sandbox For VCL"
 DESCRIPTION
 ===========
 
-vmod_kvm allows creating low overhead virtual machines
-per request directly from VCL, that runs native x86 machine code.
+vmod_kvm allows using ultra-low overhead virtual machines
+directly from VCL, that runs native x86 machine code.
 Each machine lives in complete separation and cannot affect any other.
 Machines communicate with Varnish using a system call API that covers
 all the basic tasks that tenants want to perform.
+
+The VMOD is configured by specifying a list of tenants with
+each having a program path. Tenants do not need to have an
+existing program for Varnish to start. New programs can be
+uploaded while Varnish is running and will not affect the
+run-time performance of the cache.
+
+Additionally, it is possible to live-debug programs in production.
+Each live-debugging session will use a temporary tenant that does
+not persist changes in the cache.
 
 
 API
@@ -30,6 +40,32 @@ $Function VOID embed_tenants(STRING json)
 			}
 		}
 	""");
+
+
+$Function BACKEND live_update(STRING tenant, BYTES max_size = 2097152)
+
+- Update this machine using binary data received in a POST
+  request. If the machine fails to load, the old machine
+  will be kept running.
+- Example:
+	sub vcl_recv {
+		if (req.method == "POST") {
+			set req.backend_hint = kvm.live_update(req.http.Host, 15MB);
+			std.cache_req_body(15MB);
+			return (pass);
+		}
+	}
+	sub vcl_backend_fetch {
+		if (bereq.method == "POST") {
+			return (fetch);
+		}
+	}
+
+$Function BACKEND live_debug(STRING tenant, BYTES max_size = 2097152)
+
+- Receive a binary suitable for debugging, then
+  open a port for GDB remote debugging.
+- A temporary tenant name is returned in the response.
 
 
 $Function BACKEND vm_backend(STRING tenant, STRING func, STRING arg = "")
