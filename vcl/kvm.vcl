@@ -41,6 +41,9 @@ sub vcl_recv {
 	else if (req.url == "/z") {
 		set req.http.Host = "zpizza.com";
 	}
+	else if (req.url == "/my_backend") {
+		set req.http.Host = "zpizza.com";
+	}
 
 	//set req.url = req.url + "?foo=" + utils.cpu_id();
 	//set req.url = req.url + "?foo=" + utils.thread_id();

@@ -26,6 +26,8 @@ add_library(kvm_sandbox STATIC ${KVM_SOURCES})
 set_target_properties(kvm_sandbox PROPERTIES CXX_STANDARD 17)
 target_include_directories(kvm_sandbox PRIVATE ${VARNISH_PATH}/include)
 target_include_directories(kvm_sandbox PRIVATE ${VARNISH_PATH}/bin/varnishd)
+# We want to see the stdout/stderr of guest programs (for now)
+target_compile_definitions(kvm_sandbox PRIVATE ENABLE_GUEST_STDOUT=1)
 
 add_subdirectory(tinykvm/lib tinykvm)
 if (NATIVE)

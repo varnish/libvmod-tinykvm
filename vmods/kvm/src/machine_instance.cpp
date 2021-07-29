@@ -41,7 +41,9 @@ MachineInstance::MachineInstance(
 		machine().run();
 		/* Make forkable */
 		machine().prepare_copy_on_write();
-		printf("Machine %s loaded\n", name().c_str());
+		if (!storage) {
+			printf("Machine %s loaded\n", name().c_str());
+		}
 	} catch (...) {
 		fprintf(stderr,
 			"Error: Machine not initialized properly: %s\n", name().c_str());
