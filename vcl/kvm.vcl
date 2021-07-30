@@ -13,6 +13,10 @@ backend default {
 sub vcl_init {
 	kvm.embed_tenants("""
 		{
+			"wpizza.com": {
+				"filename": "/tmp/wpizza",
+				"group": "test"
+			},
 			"xpizza.com": {
 				"filename": "/tmp/xpizza",
 				"group": "test"
@@ -40,6 +44,9 @@ sub vcl_recv {
 	}
 	else if (req.url == "/z") {
 		set req.http.Host = "zpizza.com";
+	}
+	else if (req.url == "/w") {
+		set req.http.Host = "wpizza.com";
 	}
 	if (req.http.Host ~ "^\d+\.\d+\.\d+\.\d+:\d+$") {
 		set req.http.Host = "zpizza.com";
