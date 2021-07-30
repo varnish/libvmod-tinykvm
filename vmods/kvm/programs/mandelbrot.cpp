@@ -33,7 +33,7 @@ inline void encode_color(uint32_t& px, int count, int max_count)
 
 // Function to draw mandelbrot set
 template <int DimX, int DimY, int MaxCount>
-//__attribute__((optimize("unroll-loops")))
+__attribute__((optimize("unroll-loops")))
 std::array<uint32_t, DimX * DimY>
 fractal(double left, double top, double xside, double yside)
 {

@@ -4,7 +4,7 @@
 
 int main(int argc, char **argv)
 {
-	printf("Hello from %s!\n", argv[1]);
+	printf("Hello from '%s'!\n", argv[1]);
 }
 
 __attribute__((naked, noinline, noreturn))

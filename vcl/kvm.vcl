@@ -32,7 +32,7 @@ sub vcl_init {
 sub vcl_recv {
 
 	/* Easier to work with wrk */
-	if (req.url ~ "/x") {
+	if (req.url == "/x") {
 		set req.http.Host = "xpizza.com";
 	}
 	else if (req.url == "/y") {
@@ -41,7 +41,7 @@ sub vcl_recv {
 	else if (req.url == "/z") {
 		set req.http.Host = "zpizza.com";
 	}
-	else if (!req.http.Host) {
+	if (req.http.Host ~ "^\d+\.\d+\.\d+\.\d+:\d+$") {
 		set req.http.Host = "zpizza.com";
 	}
 
@@ -70,6 +70,6 @@ sub vcl_backend_fetch {
 
 	set bereq.backend = kvm.vm_backend(
 			bereq.http.Host,
-			urlplus.get_basename(),
+			"my_backend",
 			bereq.url);
 }
