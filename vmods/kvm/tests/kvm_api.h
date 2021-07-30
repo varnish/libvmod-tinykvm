@@ -6,18 +6,22 @@ extern "C" {
 #endif
 
 asm(".global backend_response\n" \
+".type backend_response, function\n" \
 "backend_response:\n" \
 "	mov $0xFFFF, %eax\n" \
-"	out %eax, $0\n" \
-"   ret\n"); \
+"	out %eax, $0\n");
+
+/* Use this to create a backend response from a KVM backend */
 extern void __attribute__((noreturn))
 backend_response(const void *t, uint64_t, const void *c, uint64_t);
 
+static inline
 void return_result(const char *ctype, const char *content)
 {
 	backend_response(ctype, strlen(ctype), content, strlen(content));
 }
 
+/* This cannot be used when KVM is used as a backend */
 #define DYNAMIC_CALL(name, hash) \
 	asm(".global " #name "\n" \
 	#name ":\n" \
