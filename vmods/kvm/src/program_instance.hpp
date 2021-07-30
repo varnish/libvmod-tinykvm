@@ -35,6 +35,9 @@ struct ProgramInstance
 	const std::vector<uint8_t> binary;
 	MachineInstance  script;
 
+	std::unordered_map<int, MachineInstance*> instances;
+	std::mutex queue_mtx;
+
 	MachineInstance  storage;
 	std::mutex storage_mtx;
 

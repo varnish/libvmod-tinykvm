@@ -2,6 +2,7 @@
 #include "utils/cpu_id.hpp"
 #include "varnish.hpp"
 #include <tinykvm/rsp_client.hpp>
+extern "C" int gettid();
 
 namespace kvm {
 
@@ -38,6 +39,9 @@ ProgramInstance::ProgramInstance(
 }
 ProgramInstance::~ProgramInstance()
 {
+	for (auto& entry : instances) {
+		delete entry.second;
+	}
 }
 
 MachineInstance* ProgramInstance::workspace_fork(const vrt_ctx* ctx,
@@ -54,23 +58,25 @@ void ProgramInstance::workspace_free(MachineInstance* inst)
 	inst->~MachineInstance();
 }
 
-thread_local MachineInstance* local_vm;
-
 MachineInstance* ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 	TenantInstance* tenant, std::shared_ptr<ProgramInstance>& prog)
 {
-	if (UNLIKELY(local_vm == nullptr)) {
+	queue_mtx.lock();
+	auto& inst = instances[gettid()];
+	queue_mtx.unlock();
+
+	if (UNLIKELY(inst == nullptr)) {
 		/* When the queue is empty, just create a new machine instance */
-		local_vm = new MachineInstance{this->script, ctx, tenant, *this};
+		inst = new MachineInstance{this->script, ctx, tenant, *this};
 	} else {
 		/* The VM should already be reset, but needs a new VRT ctx */
-		local_vm->set_ctx(ctx);
+		inst->set_ctx(ctx);
 	}
 
 	/* This creates a self-reference, which ensures that open
 	   Machine instances will keep the program instance alive. */
-	local_vm->assign_instance(prog);
-	return local_vm;
+	inst->assign_instance(prog);
+	return inst;
 }
 void ProgramInstance::return_machine(MachineInstance* inst)
 {
