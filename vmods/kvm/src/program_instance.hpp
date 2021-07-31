@@ -30,11 +30,9 @@ struct ProgramInstance
 	/* Workspace-allocated VM */
 	inst_pair workspace_fork(const vrt_ctx*,
 		TenantInstance*, std::shared_ptr<ProgramInstance>&);
-	void workspace_free(MachineInstance*);
 	/* Heap-allocated VM from concurrent queue */
 	inst_pair concurrent_fork(const vrt_ctx*,
 		TenantInstance*, std::shared_ptr<ProgramInstance>&);
-	void return_machine(MachineInstance*);
 
 	const std::vector<uint8_t> binary;
 	MachineInstance  script;

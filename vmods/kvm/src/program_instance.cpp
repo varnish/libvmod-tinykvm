@@ -54,12 +54,8 @@ inst_pair ProgramInstance::workspace_fork(const vrt_ctx* ctx,
 	mi->assign_instance(prog);
 	return {mi, [] (void* inst) {
 		auto* mi = (MachineInstance *)inst;
-		mi->instance().workspace_free(mi);
+		mi->~MachineInstance();
 	}};
-}
-void ProgramInstance::workspace_free(MachineInstance* inst)
-{
-	inst->~MachineInstance();
 }
 
 inst_pair ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
@@ -75,7 +71,7 @@ inst_pair ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 		if (UNLIKELY(instances.size() >= max)) {
 			return workspace_fork(ctx, tenant, prog);
 		}
-		/* When the queue is empty, just create a new machine instance */
+		/* Create a new machine instance on-demand */
 		inst = new MachineInstance{this->script, ctx, tenant, *this};
 	} else {
 		/* The VM should already be reset, but needs a new VRT ctx */
@@ -87,13 +83,9 @@ inst_pair ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 	inst->assign_instance(prog);
 	return {inst, [] (void* inst) {
 		auto* mi = (MachineInstance *)inst;
-		mi->instance().return_machine(mi);
+		mi->reset_to(nullptr, mi->instance().script);
+		mi->unassign_instance();
 	}};
-}
-void ProgramInstance::return_machine(MachineInstance* inst)
-{
-	inst->reset_to(nullptr, this->script);
-	inst->unassign_instance();
 }
 
 } // kvm
