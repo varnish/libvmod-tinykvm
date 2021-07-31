@@ -50,32 +50,18 @@ MachineInstance* TenantInstance::vmfork(const vrt_ctx* ctx, bool debug)
 			return nullptr;
 		}
 		try {
-			MachineInstance* inst;
+			inst_pair ip;
 			if constexpr (FAST_RESET_METHOD) {
 				/* Get free instance through concurrent queue */
-				inst = prog->concurrent_fork(ctx, this, prog);
+				ip = prog->concurrent_fork(ctx, this, prog);
 			} else {
 				/* Create new instance on workspace by forking */
-				inst = prog->workspace_fork(ctx, this, prog);
+				ip = prog->workspace_fork(ctx, this, prog);
 			}
 
-			priv_task->priv = inst;
+			priv_task->priv = ip.inst;
 			priv_task->len  = KVM_PROGRAM_MAGIC;
-			priv_task->free = [] (void* inst) {
-			#ifdef ENABLE_TIMING
-				TIMING_LOCATION(t2);
-			#endif
-				auto* mi = (MachineInstance *)inst;
-				if constexpr (FAST_RESET_METHOD) {
-					mi->instance().return_machine(mi);
-				} else {
-					mi->instance().workspace_free(mi);
-				}
-			#ifdef ENABLE_TIMING
-				TIMING_LOCATION(t3);
-				timing_destr.add(t2, t3);
-			#endif
-			};
+			priv_task->free = ip.free;
 		} catch (std::exception& e) {
 			VRT_fail(ctx,
 				"VM '%s' exception: %s", config.name.c_str(), e.what());

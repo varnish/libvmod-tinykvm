@@ -1,4 +1,5 @@
 #include "program_instance.hpp"
+#include "tenant_instance.hpp"
 #include "utils/cpu_id.hpp"
 #include "varnish.hpp"
 #include <tinykvm/rsp_client.hpp>
@@ -44,21 +45,24 @@ ProgramInstance::~ProgramInstance()
 	}
 }
 
-MachineInstance* ProgramInstance::workspace_fork(const vrt_ctx* ctx,
+inst_pair ProgramInstance::workspace_fork(const vrt_ctx* ctx,
 	TenantInstance* tenant, std::shared_ptr<ProgramInstance>& prog)
 {
 	auto* alloc = WS_Alloc(ctx->ws, sizeof(MachineInstance));
 	MachineInstance *mi =
 		new (alloc) MachineInstance{this->script, ctx, tenant, *this};
 	mi->assign_instance(prog);
-	return mi;
+	return {mi, [] (void* inst) {
+		auto* mi = (MachineInstance *)inst;
+		mi->instance().workspace_free(mi);
+	}};
 }
 void ProgramInstance::workspace_free(MachineInstance* inst)
 {
 	inst->~MachineInstance();
 }
 
-MachineInstance* ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
+inst_pair ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 	TenantInstance* tenant, std::shared_ptr<ProgramInstance>& prog)
 {
 	queue_mtx.lock();
@@ -66,6 +70,11 @@ MachineInstance* ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 	queue_mtx.unlock();
 
 	if (UNLIKELY(inst == nullptr)) {
+		/* XXX: We can check the size without locking */
+		const size_t max = tenant->config.max_machines();
+		if (UNLIKELY(instances.size() >= max)) {
+			return workspace_fork(ctx, tenant, prog);
+		}
 		/* When the queue is empty, just create a new machine instance */
 		inst = new MachineInstance{this->script, ctx, tenant, *this};
 	} else {
@@ -76,7 +85,10 @@ MachineInstance* ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 	/* This creates a self-reference, which ensures that open
 	   Machine instances will keep the program instance alive. */
 	inst->assign_instance(prog);
-	return inst;
+	return {inst, [] (void* inst) {
+		auto* mi = (MachineInstance *)inst;
+		mi->instance().return_machine(mi);
+	}};
 }
 void ProgramInstance::return_machine(MachineInstance* inst)
 {

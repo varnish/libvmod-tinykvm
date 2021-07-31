@@ -7,6 +7,10 @@ namespace tinykvm {
 #define KVM_PROGRAM_MAGIC 0x50ba93c7
 
 namespace kvm {
+struct inst_pair {
+	MachineInstance* inst;
+	void (*free) (void*);
+};
 
 struct ProgramInstance
 {
@@ -24,11 +28,11 @@ struct ProgramInstance
 	}
 
 	/* Workspace-allocated VM */
-	MachineInstance* workspace_fork(const vrt_ctx*,
+	inst_pair workspace_fork(const vrt_ctx*,
 		TenantInstance*, std::shared_ptr<ProgramInstance>&);
 	void workspace_free(MachineInstance*);
 	/* Heap-allocated VM from concurrent queue */
-	MachineInstance* concurrent_fork(const vrt_ctx*,
+	inst_pair concurrent_fork(const vrt_ctx*,
 		TenantInstance*, std::shared_ptr<ProgramInstance>&);
 	void return_machine(MachineInstance*);
 
