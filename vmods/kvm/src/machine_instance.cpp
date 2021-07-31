@@ -35,14 +35,14 @@ MachineInstance::MachineInstance(
 	machine().set_userdata<MachineInstance> (this);
 	try {
 		machine().setup_linux(
-			{"vmod_kvm", name().c_str()},
+			{"vmod_kvm", name(), storage ? "1" : "0"},
 			{"LC_TYPE=C", "LC_ALL=C", "USER=root"});
 		/* Run through main() */
 		machine().run();
 		/* Make forkable */
 		machine().prepare_copy_on_write();
 		if (!storage) {
-			printf("Machine %s loaded\n", name().c_str());
+			printf("Program for tenant %s is loaded\n", name().c_str());
 		}
 	} catch (...) {
 		fprintf(stderr,

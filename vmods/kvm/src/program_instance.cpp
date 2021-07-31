@@ -1,6 +1,5 @@
 #include "program_instance.hpp"
 #include "tenant_instance.hpp"
-#include "utils/cpu_id.hpp"
 #include "varnish.hpp"
 #include <tinykvm/rsp_client.hpp>
 extern "C" int gettid();
