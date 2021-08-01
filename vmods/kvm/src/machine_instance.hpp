@@ -86,8 +86,9 @@ private:
 	gaddr_t     m_sighandler = 0;
 	VSHA256Context* m_sha_ctx = nullptr;
 
-	Cache<vre> m_regex;
-	Cache<const director> m_directors;
+	Cache<int> m_fd;
+	Cache<vre*> m_regex;
+	Cache<const director*> m_directors;
 
 	/* Deref this last */
 	std::shared_ptr<ProgramInstance> m_inst_ref = nullptr;

@@ -135,6 +135,7 @@ kvmbe_gethdrs(const struct director *dir,
 			.data = result_data,
 			.len  = result_len,
 			.is_debug = kvmu->is_debug,
+			.debug_port = kvmu->debug_port,
 		};
 		struct update_result result =
 			kvm_live_update(&ctx, kvmu->machine, &uparams);

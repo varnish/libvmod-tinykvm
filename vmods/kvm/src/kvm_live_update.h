@@ -4,7 +4,8 @@
 struct update_params {
 	const uint8_t* data;
 	const size_t len;
-	const int is_debug;
+	const int16_t is_debug;
+	const int16_t debug_port;
 };
 
 struct update_result {

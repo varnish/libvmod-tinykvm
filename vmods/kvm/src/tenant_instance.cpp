@@ -26,6 +26,9 @@ TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 		VSL(SLT_Error, 0,
 			"Exception when creating machine '%s': %s",
 			conf.name.c_str(), e.what());
+		fprintf(stderr,
+			"Exception when creating machine '%s': %s\n",
+			conf.name.c_str(), e.what());
 		this->program = nullptr;
 	}
 }

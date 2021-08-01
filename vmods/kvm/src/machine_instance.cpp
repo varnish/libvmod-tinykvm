@@ -29,8 +29,9 @@ MachineInstance::MachineInstance(
 	  }),
 	  m_tenant(ten), m_inst(inst),
 	  m_is_storage(storage), m_is_debug(debug),
-	  m_regex     {ten->config.max_regex()},
-	  m_directors {ten->config.max_backends()}
+	  m_fd        {ten->config.max_fd(), "File descriptors"},
+	  m_regex     {ten->config.max_regex(), "Regex handles"},
+	  m_directors {ten->config.max_backends(), "Directors"}
 {
 	machine().set_userdata<MachineInstance> (this);
 	try {
@@ -73,12 +74,16 @@ MachineInstance::MachineInstance(
 	  m_tenant(ten), m_inst(inst),
 	  m_is_debug(source.is_debug()),
 	  m_sighandler{source.m_sighandler},
-	  m_regex     {ten->config.max_regex()},
-	  m_directors {ten->config.max_backends()}
+	  m_fd        {ten->config.max_fd(), "File descriptors"},
+	  m_regex     {ten->config.max_regex(), "Regex handles"},
+	  m_directors {ten->config.max_backends(), "Directors"}
 {
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t0);
 #endif
+	machine().set_userdata<MachineInstance> (this);
+	/* Load the fds of the source */
+	m_fd.loan_from(source.m_fd);
 	/* Load the compiled regexes of the source */
 	m_regex.loan_from(source.m_regex);
 	/* Load the directors of the source */

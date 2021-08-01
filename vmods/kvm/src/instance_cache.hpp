@@ -7,13 +7,24 @@ namespace kvm {
 template <typename T>
 struct Cache {
 	struct Entry {
-		T*       item   = nullptr;
+		T        item;
 		uint32_t hash = 0;
 		bool     non_owned = false;
+
+		void free() { item = T(); hash = 0; }
 	};
 
-	T* get(size_t idx) {
+	auto& get(size_t idx) {
+		return cache.at(idx);
+	}
+	T item(size_t idx) {
 		return cache.at(idx).item;
+	}
+	T translate(uint32_t hash) {
+		for (unsigned idx = 0; idx < cache.size(); idx++) {
+			if (cache[idx].hash == hash) return cache[idx].item;
+		}
+		return -1;
 	}
 	int find(uint32_t hash) {
 		for (unsigned idx = 0; idx < cache.size(); idx++) {
@@ -21,18 +32,26 @@ struct Cache {
 		}
 		return -1;
 	}
-	size_t manage(T* ptr, uint32_t hash)
+	size_t manage(T& ptr, uint32_t hash)
 	{
+		// Add new slot
 		if (cache.size() < max_entries)
 		{
 			cache.push_back({ptr, hash});
 			return cache.size() - 1;
 		}
-		throw std::out_of_range("Too many cached items");
+		// Re-use existing slot
+		for (unsigned idx = 0; idx < cache.size(); idx++) {
+			if (cache[idx].item == T()) {
+				cache[idx] = {ptr, hash};
+				return idx;
+			}
+		}
+		throw std::out_of_range("Too many items in cache: " + std::string(description));
 	}
 	void free(size_t idx)
 	{
-		cache.at(idx) = { nullptr, 0 };
+		cache.at(idx).free();
 	}
 
 	void loan_from(const Cache& source) {
@@ -50,10 +69,12 @@ struct Cache {
 		}
 	}
 
-	Cache(size_t max) : max_entries(max) {}
+	Cache(size_t max, const char* desc)
+		: max_entries(max), description(desc) {}
 
 	std::vector<Entry> cache;
 	const size_t max_entries;
+	const char*  description;
 };
 
 } // kvm

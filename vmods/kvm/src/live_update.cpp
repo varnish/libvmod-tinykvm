@@ -45,7 +45,6 @@ kvm_live_update(VRT_CTX, kvm::TenantInstance* ten, struct update_params *params)
 			   We need the *new* instance alive for access to the binary
 			   when writing it to disk. Don't *move*. See below. */
 			old = std::atomic_exchange(&ten->program, inst);
-
 		} else {
 			/* Live-debugging temporary tenant */
 			old = std::atomic_exchange(&ten->debug_program, inst);

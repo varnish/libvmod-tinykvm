@@ -10,6 +10,7 @@ set(KVM_SOURCES
 	src/backend.cpp
 	src/kvm_vcc_api.cpp
 	src/live_update.cpp
+	src/machine_debug.cpp
 	src/machine_instance.cpp
 	src/program_instance.cpp
 	src/system_calls.cpp
