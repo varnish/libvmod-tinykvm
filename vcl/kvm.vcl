@@ -12,18 +12,22 @@ sub vcl_init {
 		{
 			"wpizza.com": {
 				"filename": "/tmp/wpizza",
+				"key": "12daf155b8508edc4a4b8002264d7494",
 				"group": "test"
 			},
 			"xpizza.com": {
 				"filename": "/tmp/xpizza",
+				"key": "12daf155b8508edc4a4b8002264d7494",
 				"group": "test"
 			},
 			"ypizza.com": {
 				"filename": "/tmp/ypizza",
+				"key": "12daf155b8508edc4a4b8002264d7494",
 				"group": "test"
 			},
 			"zpizza.com": {
 				"filename": "/tmp/zpizza",
+				"key": "12daf155b8508edc4a4b8002264d7494",
 				"group": "test"
 			}
 		}
@@ -55,14 +59,10 @@ sub vcl_recv {
 
 	/* Determine tenant */
 	if (req.method == "POST") {
-		if (req.http.X-PostKey == "12daf155b8508edc4a4b8002264d7494") {
-			set req.backend_hint = kvm.live_update(req.http.Host, 15MB);
-			std.cache_req_body(15MB);
-			return (pass);
-		} else {
-			/* Wrong POST key */
-			return (synth(403, "Invalid POST request"));
-		}
+		set req.backend_hint = kvm.live_update(
+			req.http.Host, req.http.X-PostKey, 15MB);
+		std.cache_req_body(15MB);
+		return (pass);
 	}
 	return (hash);
 }

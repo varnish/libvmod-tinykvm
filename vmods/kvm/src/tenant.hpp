@@ -25,6 +25,7 @@ struct TenantGroup {
 		"/usr/lib/locale",
 		"/usr/share/locale",
 		"/usr/local/share/espeak-ng-data",
+		"/usr/share/mbrola/en1",
 	};
 
 	vmods_t vmods;
@@ -38,6 +39,7 @@ struct TenantConfig
 {
 	std::string    name;
 	std::string    filename;
+	std::string    key;
 	TenantGroup    group;
 
 	uint64_t max_time() const noexcept { return group.max_time; }
@@ -47,8 +49,8 @@ struct TenantConfig
 	size_t   max_regex() const noexcept { return group.max_regex; }
 	size_t   max_backends() const noexcept { return group.max_backends; }
 
-	TenantConfig(std::string n, std::string f, TenantGroup g)
-		: name(n), filename(f), group{std::move(g)} {}
+	TenantConfig(std::string n, std::string f, std::string k, TenantGroup g)
+		: name(n), filename(f), key(k), group{std::move(g)} {}
 };
 
 }

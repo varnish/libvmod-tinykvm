@@ -6,7 +6,7 @@
 #include "vcc_if.h"
 
 extern struct update_result kvm_live_update(VRT_CTX, struct vmod_kvm_machine*, const struct update_params*);
-extern struct vmod_kvm_machine* kvm_tenant_find(VRT_CTX, const char*);
+extern struct vmod_kvm_machine* kvm_tenant_find_key(VRT_CTX, const char* name, const char* key);
 
 static void v_matchproto_(vdi_panic_f)
 kvmbe_panic(const struct director *dir, struct vsb *vsb)
@@ -179,13 +179,18 @@ static inline void kvmu_director(
 	dir->panic   = kvmbe_panic;
 }
 
-VCL_BACKEND vmod_live_update(VRT_CTX, VCL_STRING tenant, VCL_BYTES max_size)
+VCL_BACKEND vmod_live_update(VRT_CTX, VCL_STRING tenant, VCL_STRING key, VCL_BYTES max_size)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	if (key == NULL) {
+		VRT_fail(ctx, "Missing key");
+		return NULL;
+	}
 
-	struct vmod_kvm_machine *rvm = kvm_tenant_find(ctx, tenant);
+	struct vmod_kvm_machine *rvm = kvm_tenant_find_key(ctx, tenant, key);
 	if (rvm == NULL) {
-		VRT_fail(ctx, "Could not find tenant: %s", tenant);
+		VRT_fail(ctx, "Could not find tenant: %s, or wrong key: %s",
+			tenant, key);
 		return NULL;
 	}
 
@@ -206,13 +211,18 @@ VCL_BACKEND vmod_live_update(VRT_CTX, VCL_STRING tenant, VCL_BYTES max_size)
 }
 
 VCL_BACKEND vmod_live_debug(
-	VRT_CTX, VCL_STRING tenant, VCL_BYTES max_size)
+	VRT_CTX, VCL_STRING tenant, VCL_STRING key, VCL_BYTES max_size)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	if (key == NULL) {
+		VRT_fail(ctx, "Missing key");
+		return NULL;
+	}
 
-	struct vmod_kvm_machine *rvm = kvm_tenant_find(ctx, tenant);
+	struct vmod_kvm_machine *rvm = kvm_tenant_find_key(ctx, tenant, key);
 	if (rvm == NULL) {
-		VRT_fail(ctx, "Could not find tenant: %s", tenant);
+		VRT_fail(ctx, "Could not find tenant: %s, or wrong key: %s",
+			tenant, key);
 		return NULL;
 	}
 

@@ -45,6 +45,16 @@ kvm::TenantInstance* kvm_tenant_find(VRT_CTX, const char* name)
 	return nullptr;
 }
 
+extern "C"
+kvm::TenantInstance* kvm_tenant_find_key(VRT_CTX, const char* name, const char* key)
+{
+	auto* tenant = kvm_tenant_find(ctx, name);
+	if (tenant != nullptr) {
+		if (tenant->config.key == key) return tenant;
+	}
+	return nullptr;
+}
+
 TenantInstance* kvm_create_temporary_tenant(
 	const TenantInstance* vrm, const std::string& name)
 {
@@ -88,7 +98,9 @@ static void kvm_init_tenants(VRT_CTX,
 		for (const auto& it : j.items())
 		{
 			const auto& obj = it.value();
-			if (obj.contains("filename") && obj.contains("group"))
+			if (obj.contains("filename")
+				&& obj.contains("key")
+				&& obj.contains("group"))
 			{
 				const std::string& grname = obj["group"];
 				auto grit = groups.find(grname);
@@ -102,7 +114,10 @@ static void kvm_init_tenants(VRT_CTX,
 				const auto& group = grit->second;
 				/* Use the group data except filename */
 				kvm_load_tenant(ctx, kvm::TenantConfig{
-					it.key(), obj["filename"], group,
+					it.key(),
+					obj["filename"],
+					obj["key"],
+					group,
 				});
 			} else {
 				if (obj.contains("max_time") &&
