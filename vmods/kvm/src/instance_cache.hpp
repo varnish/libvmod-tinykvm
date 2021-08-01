@@ -62,7 +62,6 @@ struct Cache {
 		}
 	}
 	void foreach_owned(std::function<void(Entry&)> callback) {
-		/* Load the items of the source and make them non-owned */
 		for (auto& entry : cache) {
 			if (entry.item && !entry.non_owned)
 				callback(entry);

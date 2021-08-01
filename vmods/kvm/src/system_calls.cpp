@@ -1,5 +1,6 @@
 #include "tenant_instance.hpp"
 #include "varnish.hpp"
+#include <cstring>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -14,6 +15,23 @@ extern "C" long kvm_SetBackend(VRT_CTX, VCL_BACKEND dir);
 #endif
 
 namespace kvm {
+
+void MachineInstance::sanitize_path(char* buffer, size_t buflen)
+{
+	buffer[buflen-1] = 0;
+	const size_t len = strnlen(buffer, buflen);
+	for (const auto& gucci_path : tenant().config.group.allowed_paths)
+	{
+		if (gucci_path.size() <= len &&
+			memcmp(buffer, gucci_path.c_str(), gucci_path.size()) == 0) {
+			//printf("Path OK: %.*s against %s\n",
+			//	(int)len, buffer, gucci_path.c_str());
+			return;
+		}
+	}
+	printf("Path failed: %.*s\n", (int)len, buffer);
+	throw std::runtime_error("Disallowed path used");
+}
 
 void MachineInstance::setup_syscall_interface()
 {
@@ -43,19 +61,17 @@ void MachineInstance::setup_syscall_interface()
 			auto regs = machine.registers();
 			SYSPRINT("READ to fd=%lld, data=0x%llX, size=%llu\n",
 				regs.rdi, regs.rsi, regs.rdx);
-
-			int fd = inst.m_fd.translate(regs.rdi);
-			char* buffer = (char *)std::malloc(regs.rdx);
-			if (buffer != nullptr)
-			{
-				ssize_t res = read(fd, buffer, regs.rdx);
-				if (res > 0) {
-					machine.copy_to_guest(regs.rsi, buffer, res);
-				}
-				std::free(buffer);
-				regs.rax = res;
+			if (regs.rdx > 4*1024*1024) {
+				regs.rax = -1; /* Buffer too big */
 			} else {
-				regs.rax = -1;
+				int fd = inst.m_fd.translate(regs.rdi);
+				auto buffer = std::unique_ptr<char[]> (new char[regs.rdx]);
+				/* TODO: Use fragmented readv buffer */
+				ssize_t res = read(fd, buffer.get(), regs.rdx);
+				if (res > 0) {
+					machine.copy_to_guest(regs.rsi, buffer.get(), res);
+				}
+				regs.rax = res;
 			}
 			machine.set_registers(regs);
 		});
@@ -69,7 +85,7 @@ void MachineInstance::setup_syscall_interface()
 			if (idx >= 0) {
 				auto& entry = inst.m_fd.get(idx);
 				regs.rax = close(entry.item);
-				//entry.free();
+				entry.free();
 			} else {
 				regs.rax = -1;
 			}
@@ -79,12 +95,11 @@ void MachineInstance::setup_syscall_interface()
 		4, [] (Machine& machine) { // STAT
 			auto& inst = *machine.get_userdata<MachineInstance>();
 			auto regs = machine.registers();
-
 			const auto vpath = regs.rdi;
 
 			char path[256];
 			machine.copy_from_guest(path, vpath, sizeof(path));
-			path[sizeof(path)-1] = 0;
+			inst.sanitize_path(path, sizeof(path));
 
 			struct stat vstat;
 			regs.rax = stat(path, &vstat);
@@ -136,7 +151,7 @@ void MachineInstance::setup_syscall_interface()
 
 			char path[256];
 			machine.copy_from_guest(path, vpath, sizeof(path));
-			path[sizeof(path)-1] = 0;
+			inst.sanitize_path(path, sizeof(path));
 
 			int fd = openat(AT_FDCWD, path, flags);
 			SYSPRINT("OPENAT fd=%lld path=%s = %d\n",

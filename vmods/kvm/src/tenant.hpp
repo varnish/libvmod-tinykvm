@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <vector>
 
 namespace kvm {
 
@@ -16,9 +17,15 @@ struct TenantGroup {
 	uint64_t max_time; /* milliseconds */
 	uint64_t max_memory;
 	size_t   max_machines = 64;
-	size_t   max_fd       = 512;
+	size_t   max_fd       = 32;
 	size_t   max_backends = 8;
 	size_t   max_regex    = 32;
+
+	std::vector<std::string> allowed_paths {
+		"/usr/lib/locale",
+		"/usr/local/share",
+		"/usr/share/locale"
+	};
 
 	vmods_t vmods;
 

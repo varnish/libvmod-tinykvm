@@ -74,6 +74,7 @@ private:
 	static void setup_syscall_interface();
 	void handle_exception(gaddr_t);
 	void handle_timeout(gaddr_t);
+	void sanitize_path(char*, size_t);
 
 	const vrt_ctx* m_ctx;
 	machine_t m_machine;
