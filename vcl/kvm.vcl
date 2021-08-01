@@ -5,10 +5,7 @@ import std;
 import urlplus;
 import utils;
 
-backend default {
-	.host = "127.0.0.1";
-	.port = "8081";
-}
+backend default none;
 
 sub vcl_init {
 	kvm.embed_tenants("""
@@ -48,8 +45,8 @@ sub vcl_recv {
 	else if (req.url == "/w") {
 		set req.http.Host = "wpizza.com";
 	}
-	if (req.http.Host ~ "^\d+\.\d+\.\d+\.\d+:\d+$") {
-		set req.http.Host = "zpizza.com";
+	else if (req.http.Host ~ "^\d+\.\d+\.\d+\.\d+:\d+$") {
+		set req.http.Host = "ypizza.com";
 	}
 
 	//set req.url = req.url + "?foo=" + utils.cpu_id();
@@ -57,17 +54,17 @@ sub vcl_recv {
 	//set req.url = req.url + "?foo=" + utils.fast_random_int(100);
 
 	/* Determine tenant */
-	if (req.http.Host) {
-		if (req.method == "POST") {
+	if (req.method == "POST") {
+		if (req.http.X-PostKey == "12daf155b8508edc4a4b8002264d7494") {
 			set req.backend_hint = kvm.live_update(req.http.Host, 15MB);
 			std.cache_req_body(15MB);
 			return (pass);
+		} else {
+			/* Wrong POST key */
+			return (synth(403, "Invalid POST request"));
 		}
-		return (pass);
-	} else {
-		/* No 'Host: tenant' specified */
-		return (synth(403, "Missing Host header field"));
 	}
+	return (hash);
 }
 
 sub vcl_backend_fetch {
