@@ -23,8 +23,8 @@ struct TenantGroup {
 
 	std::vector<std::string> allowed_paths {
 		"/usr/lib/locale",
-		"/usr/local/share",
-		"/usr/share/locale"
+		"/usr/share/locale",
+		"/usr/local/share/espeak-ng-data",
 	};
 
 	vmods_t vmods;

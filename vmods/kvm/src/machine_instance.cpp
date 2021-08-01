@@ -1,6 +1,7 @@
 #include "machine_instance.hpp"
 #include "tenant_instance.hpp"
 #include "varnish.hpp"
+extern "C" int close(int);
 extern void setup_kvm_system_calls();
 static constexpr bool VERBOSE_ERRORS = true;
 
@@ -102,6 +103,11 @@ void MachineInstance::reset_to(const vrt_ctx* ctx, MachineInstance& master)
 
 MachineInstance::~MachineInstance()
 {
+	// close any open files
+	m_fd.foreach_owned(
+		[] (const auto& entry) {
+			close(entry.item);
+		});
 	// free any owned regex pointers
 	m_regex.foreach_owned(
 		[] (auto& entry) {
