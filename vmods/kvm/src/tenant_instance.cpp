@@ -15,7 +15,6 @@ TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 	if (!init) {
 		init = true;
 		MachineInstance::kvm_initialize();
-		initialize_vmods(ctx);
 	}
 
 	try {

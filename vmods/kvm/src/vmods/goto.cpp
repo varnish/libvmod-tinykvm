@@ -30,6 +30,8 @@ extern "C" {
 	    VCL_ENUM);
 
 	void* VMOD_Handle(struct vmod *);
+	typedef struct vmod *(*vmod_handle_f) ();
+	typedef struct vmod_priv *(*vmod_priv_handle_f) ();
 }
 
 namespace kvm {
@@ -49,16 +51,18 @@ void initialize_vmod_goto(VRT_CTX)
 	auto* vcl = ctx->vcl;
 	assert (vcl != nullptr);
 
-	struct vmod **goto_ptr = (struct vmod **)dlsym(vcl->dlh, "VGC_vmod_goto");
-	struct vmod_priv *priv = (struct vmod_priv *)dlsym(vcl->dlh, "vmod_priv_goto");
+	auto goto_getter = (vmod_handle_f)dlsym(vcl->dlh, "vmod_goto_handle");
+	auto priv_getter = (vmod_priv_handle_f)dlsym(vcl->dlh, "vmod_priv_goto_handle");
 
-	if (goto_ptr == nullptr || priv == nullptr) {
+	if (goto_getter == nullptr || priv_getter == nullptr) {
 		printf("*** Goto dyncall: VMOD NOT FOUND\n");
+		TenantInstance::reset_dynamic_call("goto.dns");
 		return;
 	}
 
-	struct vmod *vmod_goto = *goto_ptr;
-	assert(vmod_goto != nullptr);
+	struct vmod *vmod_goto = goto_getter();
+	struct vmod_priv *priv = priv_getter();
+	assert(vmod_goto != nullptr && priv != nullptr);
 
 	auto* handle = VMOD_Handle(vmod_goto);
 	if (handle == nullptr) return;
