@@ -72,7 +72,8 @@ static void kvm_init_tenants(VRT_CTX, VCL_PRIV task,
 			{"test", kvm::TenantGroup{
 				"test",
 				256, /* Milliseconds */
-				256 * 1024 * 1024
+				256 * 1024 * 1024, /* Memory */
+				256 * 1024, /* 256KB CoW memory */
 			}}
 		};
 
@@ -103,14 +104,16 @@ static void kvm_init_tenants(VRT_CTX, VCL_PRIV task,
 				});
 			} else {
 				if (obj.contains("max_time") &&
-					obj.contains("max_memory"))
+					obj.contains("max_memory") &&
+					obj.contains("max_cow_memory"))
 				{
 					groups.emplace(std::piecewise_construct,
 						std::forward_as_tuple(it.key()),
 						std::forward_as_tuple(
 							it.key(),
 							obj["max_time"],
-							obj["max_memory"]
+							obj["max_memory"],
+							obj["max_cow_memory"]
 						));
 				} else {
 					VRT_fail(ctx, "Tenancy JSON %s: group '%s' has missing fields",
