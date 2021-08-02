@@ -1,5 +1,8 @@
-#include "../tenant_instance.hpp"
+#include "../tenant.hpp"
+#include "../machine_instance.hpp"
 #include "../varnish.hpp"
+#include <cassert>
+#include <stdexcept>
 
 typedef struct oaref oaref_t;
 extern "C" {
@@ -46,7 +49,7 @@ inline auto* validate_deref(const char** ptr, const char* s) {
 #define vmod_enum(handle, x) \
 	validate_deref((const char **)dlsym(handle, #x), #x)
 
-void initialize_vmod_goto(VRT_CTX)
+void initialize_vmod_goto(VRT_CTX, VCL_PRIV task)
 {
 	auto* vcl = ctx->vcl;
 	assert (vcl != nullptr);
@@ -56,7 +59,7 @@ void initialize_vmod_goto(VRT_CTX)
 
 	if (goto_getter == nullptr || priv_getter == nullptr) {
 		printf("*** Goto dyncall: VMOD NOT FOUND\n");
-		TenantInstance::reset_dynamic_call("goto.dns");
+		TenantConfig::reset_dynamic_call(task, "goto.dns");
 		return;
 	}
 
@@ -94,7 +97,7 @@ void initialize_vmod_goto(VRT_CTX)
 		vmod_enum(handle, vmod_enum_force),
 	};
 
-	TenantInstance::set_dynamic_call("goto.dns",
+	TenantConfig::set_dynamic_call(task, "goto.dns",
 		[=] (MachineInstance& inst)
 		{
 			auto regs = inst.machine().registers();

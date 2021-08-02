@@ -1,9 +1,6 @@
 #include "vmod_kvm.h"
-extern void kvm_init_tenants_str(VRT_CTX, const char *);
-extern void kvm_init_tenants_file(VRT_CTX, const char *);
-extern void initialize_vmods(VRT_CTX);
 
-void vmod_embed_tenants(VRT_CTX, VCL_STRING json)
+VCL_VOID vmod_embed_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING json)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
@@ -13,12 +10,12 @@ void vmod_embed_tenants(VRT_CTX, VCL_STRING json)
 	}
 
 	/* Initialize, re-initialize and remove VMODs */
-	initialize_vmods(ctx);
+	initialize_vmods(ctx, task);
 
-	kvm_init_tenants_str(ctx, json);
+	kvm_init_tenants_str(ctx, task, json);
 }
 
-VCL_VOID vmod_load_tenants(VRT_CTX, VCL_STRING filename)
+VCL_VOID vmod_load_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING filename)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
@@ -28,7 +25,19 @@ VCL_VOID vmod_load_tenants(VRT_CTX, VCL_STRING filename)
 	}
 
 	/* Initialize, re-initialize and remove VMODs */
-	initialize_vmods(ctx);
+	initialize_vmods(ctx, task);
 
-	kvm_init_tenants_file(ctx, filename);
+	kvm_init_tenants_file(ctx, task, filename);
+}
+
+VCL_BOOL vmod_fork(VRT_CTX, VCL_PRIV task, VCL_STRING tenant)
+{
+	struct vmod_kvm_tenant *tenptr = kvm_tenant_find(task, tenant);
+
+	if (tenptr == NULL) {
+		VRT_fail(ctx, "No such tenant: %s", tenant);
+		return (0);
+	}
+
+	return (kvm_fork_machine(ctx, tenptr, 0) != NULL);
 }

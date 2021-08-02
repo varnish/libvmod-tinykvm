@@ -1,3 +1,5 @@
+#include "common_defs.hpp"
+#include "machine_instance.hpp"
 #include "tenant_instance.hpp"
 #include "varnish.hpp"
 using namespace kvm;
@@ -24,16 +26,7 @@ uint64_t kvm_resolve_name(kvm::MachineInstance* inst, const char* func)
 }
 
 extern "C"
-kvm::MachineInstance* kvm_fork_machine(const vrt_ctx *ctx, const char *tenant, bool debug)
+kvm::MachineInstance* kvm_fork_machine(const vrt_ctx *ctx, kvm::TenantInstance* tenant, bool debug)
 {
-	extern kvm::TenantInstance* kvm_tenant_find(VRT_CTX, const char *);
-	auto* ten = kvm_tenant_find(ctx, tenant);
-	if (UNLIKELY(ten == nullptr))
-		return nullptr;
-
-	auto* machine = ten->vmfork(ctx, debug);
-	if (UNLIKELY(machine == nullptr))
-		return nullptr;
-
-	return machine;
+	return tenant->vmfork(ctx, debug);
 }

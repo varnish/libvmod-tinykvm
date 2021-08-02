@@ -1,5 +1,7 @@
 #include "tenant_instance.hpp"
+#include "machine_instance.hpp"
 #include "varnish.hpp"
+#include <stdexcept>
 using namespace kvm;
 
 struct backend_buffer {
@@ -40,7 +42,7 @@ struct backend_buffer kvm_backend_call(VRT_CTX, kvm::TenantInstance* tenant,
 
 		char *tbuf = (char *)WS_Alloc(ctx->ws, tlen);
 		char *cbuf = (char *)WS_Alloc(ctx->ws, clen);
-		if (tbuf == nullptr || cbuf == nullptr) {
+		if (UNLIKELY(tbuf == nullptr || cbuf == nullptr)) {
 			throw std::runtime_error("Out of workspace for backend VM result");
 		}
 

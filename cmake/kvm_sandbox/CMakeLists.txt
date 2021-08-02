@@ -15,6 +15,7 @@ set(KVM_SOURCES
 	src/program_instance.cpp
 	src/system_calls.cpp
 	src/tenant.cpp
+	src/tenant_dfm.cpp
 	src/tenant_instance.cpp
 	tinykvm/src/functions.cpp  # setup_kvm_system_calls
 	src/varnish_interface.c
@@ -22,13 +23,6 @@ set(KVM_SOURCES
 	src/vmods/vmods.cpp
 	src/vmods/goto.cpp
 )
-
-add_library(kvm_sandbox STATIC ${KVM_SOURCES})
-set_target_properties(kvm_sandbox PROPERTIES CXX_STANDARD 17)
-target_include_directories(kvm_sandbox PRIVATE ${VARNISH_PATH}/include)
-target_include_directories(kvm_sandbox PRIVATE ${VARNISH_PATH}/bin/varnishd)
-# We want to see the stdout/stderr of guest programs (for now)
-target_compile_definitions(kvm_sandbox PRIVATE ENABLE_GUEST_STDOUT=1)
 
 add_subdirectory(tinykvm/lib tinykvm)
 if (NATIVE)
@@ -38,8 +32,13 @@ if (LTO_ENABLE)
 	target_compile_options(tinykvm PUBLIC -flto)
 endif()
 
-
-target_link_libraries(kvm_sandbox PRIVATE nlohmann_json tinykvm stdc++)
+add_library(kvm_sandbox STATIC ${KVM_SOURCES})
+set_target_properties(kvm_sandbox PROPERTIES CXX_STANDARD 17)
+target_include_directories(kvm_sandbox PRIVATE ${VARNISH_PATH}/include)
+target_include_directories(kvm_sandbox PRIVATE ${VARNISH_PATH}/bin/varnishd)
+# We want to see the stdout/stderr of guest programs (for now)
+target_compile_definitions(kvm_sandbox PRIVATE ENABLE_GUEST_STDOUT=1)
+target_link_libraries(kvm_sandbox PRIVATE tinykvm nlohmann_json stdc++)
 
 if (SHARED_KVM)
 	set_property(TARGET tinykvm PROPERTY POSITION_INDEPENDENT_CODE 1)

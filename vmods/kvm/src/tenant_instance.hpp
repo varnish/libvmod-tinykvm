@@ -1,29 +1,21 @@
 #pragma once
+#include <functional>
+#include <memory>
 #include "tenant.hpp"
-#include "program_instance.hpp"
+struct vrt_ctx;
 
 namespace kvm {
+class MachineInstance;
+class ProgramInstance;
 
-struct TenantInstance
-{
-	using ghandler_t = std::function<void(MachineInstance&)>;
-
+class TenantInstance {
+public:
 	MachineInstance* vmfork(const vrt_ctx*, bool debug);
 	bool no_program_loaded() const noexcept { return this->program == nullptr; }
 
-	// Install a callback function using a string name
-	// Can be invoked from the guest using the same string name
-	static void set_dynamic_call(const std::string& name, ghandler_t);
-	static void set_dynamic_calls(std::vector<std::pair<std::string, ghandler_t>>);
-	static void reset_dynamic_call(const std::string& name, ghandler_t = nullptr);
-	void dynamic_call(uint32_t hash, MachineInstance&) const;
+	uint64_t lookup(const char* name) const;
 
-	inline uint64_t lookup(const char* name) const {
-		auto inst = program;
-		if (LIKELY(inst != nullptr))
-			return inst->lookup(name);
-		return 0x0;
-	}
+	void dynamic_call(uint32_t hash, MachineInstance&) const;
 
 	TenantInstance(const vrt_ctx*, const TenantConfig&);
 
@@ -34,9 +26,6 @@ struct TenantInstance
 	std::shared_ptr<ProgramInstance> program = nullptr;
 	/* Machine for debugging */
 	std::shared_ptr<ProgramInstance> debug_program = nullptr;
-private:
-	/* Hash map of string hashes associated with dyncall handlers */
-	static std::unordered_map<uint32_t, ghandler_t> m_dynamic_functions;
 };
 
 } // kvm

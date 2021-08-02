@@ -1,4 +1,5 @@
 #include "tenant_instance.hpp"
+#include "program_instance.hpp"
 #include "varnish.hpp"
 #include <atomic>
 #include <cstring>

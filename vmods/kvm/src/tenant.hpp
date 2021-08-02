@@ -1,9 +1,13 @@
+#pragma once
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
+typedef struct vmod_priv * VCL_PRIV;
 
 namespace kvm {
+class MachineInstance;
 
 struct TenantVMOD {
 	std::string name;
@@ -37,6 +41,9 @@ struct TenantGroup {
 
 struct TenantConfig
 {
+	using ghandler_t = std::function<void(MachineInstance&)>;
+	using dynfun_map = std::map<uint32_t, ghandler_t>;
+
 	std::string    name;
 	std::string    filename;
 	std::string    key;
@@ -49,8 +56,17 @@ struct TenantConfig
 	size_t   max_regex() const noexcept { return group.max_regex; }
 	size_t   max_backends() const noexcept { return group.max_backends; }
 
-	TenantConfig(std::string n, std::string f, std::string k, TenantGroup g)
-		: name(n), filename(f), key(k), group{std::move(g)} {}
+	// Install a callback function using a string name
+	// Can be invoked from the guest using the same string name
+	static void set_dynamic_call(VCL_PRIV, const std::string& name, ghandler_t);
+	static void set_dynamic_calls(VCL_PRIV, std::vector<std::pair<std::string, ghandler_t>>);
+	static void reset_dynamic_call(VCL_PRIV, const std::string& name, ghandler_t = nullptr);
+
+	TenantConfig(std::string n, std::string f, std::string k, TenantGroup g, dynfun_map& dfm)
+		: name(n), filename(f), key(k), group{std::move(g)}, dynamic_functions_ref{dfm} {}
+
+	/* Hash map of string hashes associated with dyncall handlers */
+	dynfun_map& dynamic_functions_ref;
 };
 
 }

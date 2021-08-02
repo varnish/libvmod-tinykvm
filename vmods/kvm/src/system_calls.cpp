@@ -1,4 +1,5 @@
 #include "tenant_instance.hpp"
+#include "machine_instance.hpp"
 #include "varnish.hpp"
 #include <cstring>
 #include <fcntl.h>

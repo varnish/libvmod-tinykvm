@@ -4,7 +4,6 @@
 namespace tinykvm {
 	struct RSPClient;
 }
-#define KVM_PROGRAM_MAGIC 0x50ba93c7
 
 namespace kvm {
 struct inst_pair {
@@ -12,8 +11,8 @@ struct inst_pair {
 	void (*free) (void*);
 };
 
-struct ProgramInstance
-{
+class ProgramInstance {
+public:
 	using gaddr_t = MachineInstance::gaddr_t;
 
 	ProgramInstance(std::vector<uint8_t>,

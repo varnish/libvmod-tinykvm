@@ -14,3 +14,4 @@ extern "C" {
 	void VSL(enum VSL_tag_e tag, uint32_t vxid, const char *fmt, ...);
 	void VSLb(struct vsl_log *, int tag, const char *fmt, ...);
 }
+typedef struct vmod_priv * VCL_PRIV;

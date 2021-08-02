@@ -23,12 +23,12 @@ not persist changes in the cache.
 API
 ===
 
-$Function VOID load_tenants(STRING filename)
+$Function VOID load_tenants(PRIV_VCL, STRING filename)
 
 - Load tenants from file
 - See below for example JSON
 
-$Function VOID embed_tenants(STRING json)
+$Function VOID embed_tenants(PRIV_VCL, STRING json)
 
 - Load tenants directly from embedded JSON.
 - Example:
@@ -43,7 +43,7 @@ $Function VOID embed_tenants(STRING json)
 	""");
 
 
-$Function BACKEND live_update(STRING tenant, STRING key, BYTES max_size = 2097152)
+$Function BACKEND live_update(PRIV_VCL, STRING tenant, STRING key, BYTES max_size = 2097152)
 
 - Update this machine using binary data received in a POST
   request. If the machine fails to load, the old machine
@@ -65,13 +65,13 @@ $Function BACKEND live_update(STRING tenant, STRING key, BYTES max_size = 209715
 		}
 	}
 
-$Function BACKEND live_debug(STRING tenant, STRING key, BYTES max_size = 2097152)
+$Function BACKEND live_debug(PRIV_VCL, STRING tenant, STRING key, BYTES max_size = 2097152)
 
 - Receive a binary suitable for debugging.
 - Whenever a request triggers a breakpoint, open a port
   for GDB remote debugging.
 
-$Function BACKEND vm_backend(STRING tenant, STRING func, STRING arg = "")
+$Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING func, STRING arg = "")
 
 - Returns a backend that will call into the current machine to produce a response.
 - Produces 500 server error if there is no active machine, or an error happens.

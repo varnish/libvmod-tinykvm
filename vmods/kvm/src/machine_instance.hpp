@@ -10,9 +10,8 @@ struct vre;
 struct director;
 
 namespace kvm {
-
-struct TenantInstance;
-struct ProgramInstance;
+class TenantInstance;
+class ProgramInstance;
 
 class MachineInstance {
 public:
@@ -78,7 +77,7 @@ private:
 
 	const vrt_ctx* m_ctx;
 	machine_t m_machine;
-	const struct TenantInstance* m_tenant = nullptr;
+	const TenantInstance* m_tenant = nullptr;
 	ProgramInstance& m_inst;
 	bool        m_is_paused = false;
 	bool        m_is_storage = false;

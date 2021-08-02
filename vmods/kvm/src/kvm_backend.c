@@ -6,12 +6,7 @@
 #include <vtim.h>
 #include "vcl.h"
 #include "vcc_if.h"
-
-extern long kvm_current_result_status(VRT_CTX);
-extern struct vmod_kvm_tenant *kvm_tenant_find(VRT_CTX, VCL_STRING);
-extern struct vmod_kvm_machine *kvm_fork_machine(VRT_CTX, VCL_STRING, bool);
 extern struct backend_buffer kvm_backend_call(VRT_CTX, struct vmod_kvm_tenant *, const char *, const char *);
-extern uint64_t kvm_resolve_name(struct vmod_kvm_machine *, const char*);
 
 static void v_matchproto_(vdi_panic_f)
 kvmbe_panic(const struct director *dir, struct vsb *vsb)
@@ -140,7 +135,7 @@ static void setup_response_director(struct director *dir, struct vmod_kvm_respon
 	dir->panic   = kvmbe_panic;
 }
 
-VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING tenant, VCL_STRING func, VCL_STRING farg)
+VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING func, VCL_STRING farg)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
@@ -153,7 +148,7 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING tenant, VCL_STRING func, VCL_STR
 
 	INIT_OBJ(kvmr, KVM_BACKEND_MAGIC);
 	kvmr->priv_key = ctx;
-	kvmr->tenant = kvm_tenant_find(ctx, tenant);
+	kvmr->tenant = kvm_tenant_find(task, tenant);
 	if (kvmr->tenant == NULL) {
 		VRT_fail(ctx, "KVM sandbox says 'No such tenant': %s", tenant);
 		return NULL;
