@@ -27,7 +27,7 @@ MachineInstance::MachineInstance(
 	: m_ctx(ctx),
 	  m_machine(binary, {
 		.max_mem = ten->config.max_memory(),
-		.max_cow_mem = ten->config.max_cow_memory(),
+		.max_cow_mem = ten->config.max_work_memory(),
 	  }),
 	  m_tenant(ten), m_inst(inst),
 	  m_is_storage(storage), m_is_debug(debug),
@@ -60,7 +60,7 @@ MachineInstance::MachineInstance(
 	: m_ctx(ctx),
 	  m_machine(source.machine(), {
 		.max_mem = ten->config.max_memory(),
-		.max_cow_mem = ten->config.max_cow_memory(),
+		.max_cow_mem = ten->config.max_work_memory(),
 /*		.page_allocator = [this] (const size_t N) -> char* {
 			char* mem = (char *)WS_Alloc(m_ctx->ws, (N + 1) * 4096);
 			if (mem == nullptr) return nullptr;

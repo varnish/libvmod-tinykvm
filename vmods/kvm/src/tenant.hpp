@@ -20,7 +20,7 @@ struct TenantGroup {
 	std::string name;
 	uint64_t max_time; /* milliseconds */
 	uint64_t max_memory;
-	uint32_t max_cow_mem;
+	uint32_t max_work_mem;
 	size_t   max_machines = 64;
 	size_t   max_fd       = 32;
 	size_t   max_backends = 8;
@@ -35,8 +35,8 @@ struct TenantGroup {
 
 	vmods_t vmods;
 
-	TenantGroup(std::string n, uint64_t mi, uint64_t mm, uint64_t mcm, vmods_t&& vm = vmods_t{})
-		: name{n}, max_time(mi), max_memory(mm), max_cow_mem(mcm),
+	TenantGroup(std::string n, uint64_t mi, uint64_t mm, uint64_t mwm, vmods_t&& vm = vmods_t{})
+		: name{n}, max_time(mi), max_memory(mm), max_work_mem(mwm),
 		  vmods{std::move(vm)}  {}
 };
 
@@ -52,7 +52,7 @@ struct TenantConfig
 
 	uint64_t max_time() const noexcept { return group.max_time; }
 	uint64_t max_memory() const noexcept { return group.max_memory; }
-	uint32_t max_cow_memory() const noexcept { return group.max_cow_mem; }
+	uint32_t max_work_memory() const noexcept { return group.max_work_mem; }
 	uint64_t max_machines() const noexcept { return group.max_machines; }
 	size_t   max_fd() const noexcept { return group.max_fd; }
 	size_t   max_regex() const noexcept { return group.max_regex; }

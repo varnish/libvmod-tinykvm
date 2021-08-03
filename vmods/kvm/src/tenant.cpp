@@ -10,6 +10,13 @@ using namespace kvm;
 namespace kvm {
 extern std::vector<uint8_t> file_loader(const std::string&);
 
+static const TenantGroup test_group {
+	"test",
+	256, /* Milliseconds */
+	256 * 1024 * 1024, /* Memory */
+	2 * 1024 * 1024, /* 2MB working memory */
+};
+
 Tenants& tenancy(VCL_PRIV task)
 {
 	if (task->priv) {
@@ -69,12 +76,7 @@ static void kvm_init_tenants(VRT_CTX, VCL_PRIV task,
 		const json j = json::parse(vec.begin(), vec.end());
 
 		std::map<std::string, kvm::TenantGroup> groups {
-			{"test", kvm::TenantGroup{
-				"test",
-				256, /* Milliseconds */
-				256 * 1024 * 1024, /* Memory */
-				384 * 1024, /* 384KB CoW memory */
-			}}
+			{"test", test_group}
 		};
 
 		for (const auto& it : j.items())
@@ -105,7 +107,7 @@ static void kvm_init_tenants(VRT_CTX, VCL_PRIV task,
 			} else {
 				if (obj.contains("max_time") &&
 					obj.contains("max_memory") &&
-					obj.contains("max_cow_memory"))
+					obj.contains("max_work_memory"))
 				{
 					groups.emplace(std::piecewise_construct,
 						std::forward_as_tuple(it.key()),
@@ -113,7 +115,7 @@ static void kvm_init_tenants(VRT_CTX, VCL_PRIV task,
 							it.key(),
 							obj["max_time"],
 							obj["max_memory"],
-							obj["max_cow_memory"]
+							obj["max_work_memory"]
 						));
 				} else {
 					VRT_fail(ctx, "Tenancy JSON %s: group '%s' has missing fields",
