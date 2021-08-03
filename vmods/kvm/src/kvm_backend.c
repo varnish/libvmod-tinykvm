@@ -21,10 +21,8 @@ kvmbe_finish(const struct director *dir, struct worker *wrk, struct busyobj *bo)
 	CHECK_OBJ_NOTNULL(dir, DIRECTOR_MAGIC);
 	struct vmod_kvm_updater *kvmu = (struct vmod_kvm_updater *) dir->priv;
 	CHECK_OBJ_NOTNULL(kvmu, KVM_BACKEND_MAGIC);
-	//FREE_OBJ(dir);
-	//FREE_OBJ(kvmu);
 	(void) wrk;
-	/* */
+	/* The objects here are workspace allocated */
 	bo->htc = NULL;
 }
 

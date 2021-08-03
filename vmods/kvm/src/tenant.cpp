@@ -1,5 +1,6 @@
 #include "tenants.hpp"
 
+#include "common_defs.hpp"
 #include "tenant_instance.hpp"
 #include "varnish.hpp"
 #include <nlohmann/json.hpp>
@@ -19,7 +20,7 @@ static const TenantGroup test_group {
 
 Tenants& tenancy(VCL_PRIV task)
 {
-	if (task->priv) {
+	if (LIKELY(task->priv != nullptr)) {
 		return *(Tenants *)task->priv;
 	}
 	task->priv = new Tenants{};
@@ -59,7 +60,7 @@ void kvm_delete_temporary_tenant(VCL_PRIV task,
 {
 	auto& temps = tenancy(task).temporaries;
 	auto it = temps.find(ten->config.name);
-	if (it != temps.end())
+	if (LIKELY(it != temps.end()))
 	{
 		assert(ten == it->second);
 		delete ten;
@@ -140,9 +141,11 @@ extern "C"
 kvm::TenantInstance* kvm_tenant_find(VCL_PRIV task, const char* name)
 {
 	auto& t = tenancy(task);
+	if (UNLIKELY(name == nullptr))
+		return nullptr;
 	// regular tenants
 	auto it = t.tenants.find(name);
-	if (it != t.tenants.end())
+	if (LIKELY(it != t.tenants.end()))
 		return it->second;
 	// temporary tenants (updates)
 	it = t.temporaries.find(name);
