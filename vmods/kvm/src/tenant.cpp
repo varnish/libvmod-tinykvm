@@ -73,7 +73,7 @@ static void kvm_init_tenants(VRT_CTX, VCL_PRIV task,
 				"test",
 				256, /* Milliseconds */
 				256 * 1024 * 1024, /* Memory */
-				256 * 1024, /* 256KB CoW memory */
+				384 * 1024, /* 384KB CoW memory */
 			}}
 		};
 

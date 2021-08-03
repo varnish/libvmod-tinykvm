@@ -1,5 +1,6 @@
 #pragma once
 #include "machine_instance.hpp"
+#include <map>
 #include <mutex>
 namespace tinykvm {
 	struct RSPClient;
