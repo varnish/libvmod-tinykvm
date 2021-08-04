@@ -15,7 +15,7 @@ static const TenantGroup test_group {
 	"test",
 	256, /* Milliseconds */
 	256 * 1024 * 1024, /* Memory */
-	2 * 1024 * 1024, /* 2MB working memory */
+	4 * 1024 * 1024, /* 4MB working memory */
 };
 
 Tenants& tenancy(VCL_PRIV task)

@@ -152,16 +152,20 @@ void MachineInstance::setup_syscall_interface()
 
 			char path[256];
 			machine.copy_from_guest(path, vpath, sizeof(path));
-			inst.sanitize_path(path, sizeof(path));
+			try {
+				inst.sanitize_path(path, sizeof(path));
 
-			int fd = openat(AT_FDCWD, path, flags);
-			SYSPRINT("OPENAT fd=%lld path=%s = %d\n",
-				regs.rdi, path, fd);
+				int fd = openat(AT_FDCWD, path, flags);
+				SYSPRINT("OPENAT fd=%lld path=%s = %d\n",
+					regs.rdi, path, fd);
 
-			if (fd > 0) {
-				inst.m_fd.manage(fd, 0x1000 + fd);
-				regs.rax = 0x1000 + fd;
-			} else {
+				if (fd > 0) {
+					inst.m_fd.manage(fd, 0x1000 + fd);
+					regs.rax = 0x1000 + fd;
+				} else {
+					regs.rax = -1;
+				}
+			} catch (...) {
 				regs.rax = -1;
 			}
 			machine.set_registers(regs);
