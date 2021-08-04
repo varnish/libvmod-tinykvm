@@ -1,4 +1,5 @@
 vcl 4.1;
+import file;
 import goto;
 import kvm;
 import std;
@@ -8,6 +9,7 @@ import utils;
 backend default none;
 
 sub vcl_init {
+	kvm.cache_symbol("my_backend");
 	kvm.embed_tenants("""
 		{
 			"wpizza.com": {
@@ -32,6 +34,7 @@ sub vcl_init {
 			}
 		}
 	""");
+	new f = file.init("/tmp");
 }
 
 sub vcl_recv {
@@ -39,6 +42,10 @@ sub vcl_recv {
 	/* Easier to work with wrk */
 	if (req.url == "/x") {
 		set req.http.Host = "xpizza.com";
+	}
+	else if (req.url == "/xhash") {
+		set req.http.Host = "xpizza.com";
+		return (hash);
 	}
 	else if (req.url == "/y") {
 		set req.http.Host = "ypizza.com";
@@ -48,6 +55,14 @@ sub vcl_recv {
 	}
 	else if (req.url == "/w") {
 		set req.http.Host = "wpizza.com";
+	}
+	else if (req.url == "/file") {
+		set req.backend_hint = f.backend();
+		set req.url = "/inn.png";
+		return (pass);
+	}
+	else if (req.url == "/synth") {
+		return (synth(700, "Testing"));
 	}
 	else if (req.http.Host ~ "^\d+\.\d+\.\d+\.\d+:\d+$") {
 		set req.http.Host = "ypizza.com";
@@ -64,7 +79,7 @@ sub vcl_recv {
 		std.cache_req_body(15MB);
 		return (pass);
 	}
-	return (hash);
+	return (pass);
 }
 
 sub vcl_backend_fetch {

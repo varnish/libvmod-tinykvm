@@ -30,6 +30,18 @@ VCL_VOID vmod_load_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING filename)
 	kvm_init_tenants_file(ctx, task, filename);
 }
 
+VCL_VOID vmod_cache_symbol(VRT_CTX, VCL_STRING symbol)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	if (symbol == NULL || symbol[0] == 0) {
+		VRT_fail(ctx, "kvm.cache_symbol() requires a symbol name");
+		return;
+	}
+
+	kvm_cache_symbol(symbol);
+}
+
 VCL_BOOL vmod_fork(VRT_CTX, VCL_PRIV task, VCL_STRING tenant)
 {
 	struct vmod_kvm_tenant *tenptr = kvm_tenant_find(task, tenant);

@@ -43,6 +43,12 @@ $Function VOID embed_tenants(PRIV_VCL, STRING json)
 	""");
 
 
+$Function VOID cache_symbol(STRING symbol)
+
+- Looks up the given symbol in all programs initialized
+  after calling this function, and then caches it.
+- Cached symbols are much faster to call.
+
 $Function BACKEND live_update(PRIV_VCL, STRING tenant, STRING key, BYTES max_size = 2097152)
 
 - Update this machine using binary data received in a POST

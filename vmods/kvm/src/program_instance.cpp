@@ -7,7 +7,7 @@ extern "C" int gettid();
 namespace kvm {
 
 /* Functions commonly exposed in all machines */
-std::vector<const char*> kvm_lookup_wishlist {
+std::vector<const char*> lookup_wishlist {
 	"on_init",
 	"on_recv",
 	"on_hash",
@@ -29,8 +29,8 @@ ProgramInstance::ProgramInstance(
 	  storage{binary, ctx, ten, *this, true, debug},
 	  rspclient{nullptr}
 {
-	extern std::vector<const char*> kvm_lookup_wishlist;
-	for (const auto* func : kvm_lookup_wishlist) {
+	extern std::vector<const char*> lookup_wishlist;
+	for (const auto* func : lookup_wishlist) {
 		/* NOTE: We can't check if addr is 0 here, because
 		   the wishlist applies to ALL machines. */
 		const auto addr = lookup(func);
@@ -88,3 +88,10 @@ inst_pair ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 }
 
 } // kvm
+
+
+extern "C"
+void kvm_cache_symbol(const char* symname)
+{
+	kvm::lookup_wishlist.push_back(symname);
+}
