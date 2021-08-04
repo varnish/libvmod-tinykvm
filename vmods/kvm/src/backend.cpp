@@ -3,20 +3,13 @@
 #include "varnish.hpp"
 #include <stdexcept>
 using namespace kvm;
-
-struct backend_buffer {
-	const char* type;
-	size_t      tsize;
-	const char* data;
-	size_t      size;
-};
-static inline backend_buffer kvm_backend_error() {
-	return backend_buffer {nullptr, 0, nullptr, 0};
+extern "C" {
+#include "kvm_backend.h"
 }
 
 extern "C"
-struct backend_buffer kvm_backend_call(VRT_CTX, kvm::TenantInstance* tenant,
-	const char *func, const char *farg)
+void kvm_backend_call(VRT_CTX, kvm::TenantInstance* tenant,
+	const char *func, const char *farg, struct backend_result *result)
 {
 	try {
 	#ifdef ENABLE_TIMING
@@ -41,27 +34,23 @@ struct backend_buffer kvm_backend_call(VRT_CTX, kvm::TenantInstance* tenant,
 		const uint64_t clen = regs.rcx;
 
 		char *tbuf = (char *)WS_Alloc(ctx->ws, tlen);
-		char *cbuf = (char *)WS_Alloc(ctx->ws, clen);
-		if (UNLIKELY(tbuf == nullptr || cbuf == nullptr)) {
-			throw std::runtime_error("Out of workspace for backend VM result");
+		if (UNLIKELY(tbuf == nullptr)) {
+			throw std::runtime_error("Out of workspace for backend VM content-type");
 		}
-
 		vm.copy_from_guest(tbuf, regs.rdi, tlen);
-		vm.copy_from_guest(cbuf, regs.rdx, clen);
 
-		/* Return content-type, data, size */
-		const backend_buffer result {
-			.type = tbuf,
-			.tsize = tlen,
-			.data = cbuf,
-			.size = clen
-		};
+		/* Return content-type, content-length and buffers */
+		result->type = tbuf;
+		result->tsize = tlen;
+		result->content_length = clen;
+		result->bufcount = vm.gather_buffers_from_range(
+			result->bufcount, (tinykvm::Machine::Buffer *)result->buffers, regs.rdx, clen);
 
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t2);
 		printf("Time spent in backend_call(): %ld ns\n", nanodiff(t1, t2));
 	#endif
-		return result;
+		return;
 
 	} catch (const tinykvm::MachineException& e) {
 		fprintf(stderr, "Backend VM exception: %s (data: 0x%lX)\n",
@@ -73,5 +62,9 @@ struct backend_buffer kvm_backend_call(VRT_CTX, kvm::TenantInstance* tenant,
 		fprintf(stderr, "Backend VM exception: %s\n", e.what());
 		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
 	}
-	return kvm_backend_error();
+	/* An error result */
+	new (result) backend_result {nullptr, 0,
+		0,
+		0, {}
+	};
 }

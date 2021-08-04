@@ -30,12 +30,6 @@ struct vmod_kvm_updater
 	uint16_t debug_port;
 };
 
-struct backend_buffer {
-	const char* type;
-	size_t      tsize;
-	const char* data;
-	size_t      size;
-};
 struct vmod_kvm_response
 {
 	uint64_t magic;
