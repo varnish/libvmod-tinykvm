@@ -87,6 +87,42 @@ inst_pair ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 	}};
 }
 
+long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
+	gaddr_t src_addr, size_t src_size, gaddr_t res_addr, size_t res_size)
+{
+	uint64_t old_stack = storage.machine().stack_address();
+	uint64_t new_stack  = (old_stack - src_size) & ~0x7;
+	/* Detect wrap-around */
+	if (UNLIKELY(new_stack > old_stack))
+		return -1;
+	if (UNLIKELY(res_addr + res_size < res_addr))
+		return -1;
+
+	std::unique_lock<std::mutex> lck (storage_mtx);
+
+	auto& stm = storage.machine();
+	/* Copy from the source machine into storage */
+	stm.copy_from_machine(new_stack, src, src_addr, src_size);
+
+	try {
+		auto regs = stm.setup_call(func, new_stack,
+			(uint64_t)new_stack, (uint64_t)src_size, (uint64_t)res_size);
+		stm.set_registers(regs);
+		stm.run();
+		/* Get the result buffer and length (capped to res_size) */
+		regs = stm.registers();
+		const gaddr_t st_res_buffer = regs.rdi;
+		const uint64_t st_res_size  = (regs.rsi < res_size) ? regs.rsi : res_size;
+		/* Copy from the storage machine back into tenant VM instance */
+		src.copy_from_machine(res_addr, stm, st_res_buffer, st_res_size);
+		/* Run the function to the end, allowing cleanup */
+		//stm.run();
+		return st_res_size;
+	} catch (...) {
+		return -1;
+	}
+}
+
 } // kvm
 
 

@@ -1,5 +1,5 @@
 #include "tenant_instance.hpp"
-#include "machine_instance.hpp"
+#include "program_instance.hpp"
 #include "varnish.hpp"
 #include <cstring>
 #include <fcntl.h>
@@ -48,6 +48,13 @@ void MachineInstance::setup_syscall_interface()
 				auto regs = machine.registers();
 				auto* dir = inst.directors().item(regs.rdi);
 				kvm_SetBackend(inst.ctx(), dir);
+				} break;
+			case 0x10707: {
+				auto regs = machine.registers();
+				regs.rax = inst.instance().storage_call(machine,
+				/*  func      src       srcsize   dst       dstsize */
+					regs.rdi, regs.rsi, regs.rdx, regs.rcx, regs.r8);
+				machine.set_registers(regs);
 				} break;
 			default:
 				printf("Unhandled system call: %u\n", scall);

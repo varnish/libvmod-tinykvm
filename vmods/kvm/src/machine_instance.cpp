@@ -42,9 +42,9 @@ MachineInstance::MachineInstance(
 			{"LC_TYPE=C", "LC_ALL=C", "USER=root"});
 		/* Run through main() */
 		machine().run();
-		/* Make forkable */
-		machine().prepare_copy_on_write();
 		if (!storage) {
+			/* Make forkable */
+			machine().prepare_copy_on_write();
 			printf("Program for tenant %s is loaded\n", name().c_str());
 		}
 	} catch (...) {

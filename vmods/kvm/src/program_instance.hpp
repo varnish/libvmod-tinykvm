@@ -1,6 +1,7 @@
 #pragma once
 #include "machine_instance.hpp"
 #include <map>
+#include <atomic>
 #include <mutex>
 namespace tinykvm {
 	struct RSPClient;
@@ -33,6 +34,9 @@ public:
 	/* Heap-allocated VM from concurrent queue */
 	inst_pair concurrent_fork(const vrt_ctx*,
 		TenantInstance*, std::shared_ptr<ProgramInstance>&);
+
+	/* Serialized vmcall into storage VM */
+	long storage_call(tinykvm::Machine& src, gaddr_t func, gaddr_t, size_t, gaddr_t, size_t);
 
 	const std::vector<uint8_t> binary;
 	MachineInstance  script;
