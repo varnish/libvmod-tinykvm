@@ -1,8 +1,7 @@
 #pragma once
 #include "machine_instance.hpp"
+#include "utils/thread_pool.hpp"
 #include <map>
-#include <atomic>
-#include <mutex>
 namespace tinykvm {
 	struct RSPClient;
 }
@@ -11,6 +10,12 @@ namespace kvm {
 struct inst_pair {
 	MachineInstance* inst;
 	void (*free) (void*);
+};
+struct StorageTask {
+	std::function<void()> task;
+	void operator() () {
+
+	}
 };
 
 class ProgramInstance {
@@ -45,7 +50,7 @@ public:
 	std::mutex queue_mtx;
 
 	MachineInstance  storage;
-	std::mutex storage_mtx;
+	kvm::ThreadPool<1> m_storage_queue;
 
 	/* Lookup tree for ELF symbol names */
 	std::map<std::string, gaddr_t> sym_lookup;
