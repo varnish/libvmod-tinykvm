@@ -23,12 +23,12 @@ void kvm_backend_call(VRT_CTX, kvm::TenantInstance* tenant,
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);
 	#endif
+		auto& vm = machine->machine();
 		/* Call the backend response function */
-		machine->machine().vmcall(func, farg,
+		vm.vmcall(func, farg,
 			(int) HDR_BEREQ, (int) HDR_BERESP);
 
 		/* Get content-type and data */
-		auto& vm = machine->machine();
 		auto regs = vm.registers();
 		const uint64_t tlen = regs.rsi;
 		const uint64_t clen = regs.rcx;

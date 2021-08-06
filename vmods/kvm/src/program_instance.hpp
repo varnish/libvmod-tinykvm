@@ -11,12 +11,6 @@ struct inst_pair {
 	MachineInstance* inst;
 	void (*free) (void*);
 };
-struct StorageTask {
-	std::function<void()> task;
-	void operator() () {
-
-	}
-};
 
 class ProgramInstance {
 public:
@@ -49,8 +43,8 @@ public:
 	const std::vector<uint8_t> binary;
 	MachineInstance  script;
 
-	std::unordered_map<int, MachineInstance*> instances;
-	std::mutex queue_mtx;
+	std::unordered_map<int, MachineInstance> instances;
+	std::mutex instances_mtx;
 
 	MachineInstance  storage;
 	kvm::ThreadPool<1> m_storage_queue;
