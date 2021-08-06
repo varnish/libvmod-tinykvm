@@ -126,6 +126,51 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 	return future.get();
 }
 
+long ProgramInstance::live_update_call(
+	gaddr_t func, tinykvm::Machine& new_machine, gaddr_t newfunc)
+{
+	struct SerializeResult {
+		std::unique_ptr<char[]>  data;
+		unsigned long long len;
+	};
+	auto future = m_storage_queue.enqueue(
+	[&] () -> SerializeResult
+	{
+		try {
+			/* Serialize data in the old machine */
+			auto& old_machine = storage.machine();
+			old_machine.vmcall(func);
+			/* Get serialized data */
+			auto regs = old_machine.registers();
+			auto data_addr = regs.rdi;
+			auto data_len  = regs.rsi;
+			if (data_addr + data_len < data_addr) {
+				return {nullptr, 0};
+			}
+			char* data = new char[data_len];
+			old_machine.copy_from_guest(data, data_addr, data_len);
+			return {std::unique_ptr<char[]> (data), data_len};
+		} catch (...) {
+			/* We have to make sure Varnish is not taken down */
+			return {nullptr, 0};
+		}
+	});
+	auto res = future.get();
+	if (res.data == nullptr)
+		return -1;
+	/* Begin resume procedure */
+	new_machine.vmcall(newfunc, (uint64_t)res.len);
+	auto new_regs = new_machine.registers();
+	/* The machine should be calling STOP with rsi=dst_data */
+	auto res_data = new_regs.rdi;
+	auto res_size = std::min(new_regs.rsi, res.len);
+	new_machine.copy_to_guest(
+		res_data, res.data.get(), res_size);
+	/* Resume the new machine, allowing it to deserialize data */
+	new_machine.run();
+	return 0;
+}
+
 } // kvm
 
 

@@ -43,6 +43,9 @@ public:
 	/* Serialized vmcall into storage VM */
 	long storage_call(tinykvm::Machine& src, gaddr_t func, gaddr_t, size_t, gaddr_t, size_t);
 
+	/* Serialized call into storage VM during live update */
+	long live_update_call(gaddr_t func, tinykvm::Machine& newm, gaddr_t newfunc);
+
 	const std::vector<uint8_t> binary;
 	MachineInstance  script;
 
