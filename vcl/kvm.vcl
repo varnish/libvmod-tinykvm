@@ -12,6 +12,11 @@ sub vcl_init {
 	kvm.cache_symbol("my_backend");
 	kvm.embed_tenants("""
 		{
+			"vpizza.com": {
+				"filename": "/tmp/vpizza",
+				"key": "12daf155b8508edc4a4b8002264d7494",
+				"group": "test"
+			},
 			"wpizza.com": {
 				"filename": "/tmp/wpizza",
 				"key": "12daf155b8508edc4a4b8002264d7494",
