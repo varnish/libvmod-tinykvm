@@ -36,9 +36,14 @@ pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 	AN(lp);
 
 	struct backend_result *result = (struct backend_result *)vfe->priv1;
-	struct VMBuffer *current = &result->buffers[vfe->priv2];
+	if (result->content_length == 0) {
+		*lp = 0;
+		return (VFP_END);
+	}
 
+	struct VMBuffer *current = &result->buffers[vfe->priv2];
 	ssize_t written = 0;
+
 	while (1) {
 		ssize_t len = (current->size > *lp) ? *lp : current->size;
 		memcpy(p, current->data, len);
@@ -119,8 +124,7 @@ kvmbe_gethdrs(const struct director *dir,
 	result->bufcount = VMBE_NUM_BUFFERS;
 	kvm_backend_call(&ctx, kvmr->tenant, kvmr->func, kvmr->funcarg, result);
 
-	/* XXX: Content-Length: 0 is probably allowed */
-	if (result->tsize == 0 || result->content_length == 0)
+	if (result->type == NULL || result->tsize == 0)
 	{
 		http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
 		return (-1);
