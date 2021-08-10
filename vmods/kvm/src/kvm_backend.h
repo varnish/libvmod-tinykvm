@@ -1,6 +1,6 @@
 
 struct VMBuffer {
-	const char  *data;
+	const char *data;
 	ssize_t size;
 };
 

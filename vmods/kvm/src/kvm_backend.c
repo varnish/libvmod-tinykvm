@@ -51,21 +51,25 @@ pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 		written += len;
 		current->data += len;
 		current->size -= len;
-		/* Return later if there's more, but we can't send more */
-		if (len == 0 && current->size > 0) {
+
+		/* Go to next buffer, or end if no more */
+		if (current->size == 0) {
+			/* Go to next buffer */
+			vfe->priv2 ++;
+			/* Reaching bufcount means end of fetch */
+			if (vfe->priv2 == (ssize_t)result->bufcount) {
+				assert(current->size == 0);
+				*lp = written;
+				return (VFP_END);
+			}
+			current = &result->buffers[vfe->priv2];
+		}
+		/* Return later if there's more, and we can't send more */
+		if (len == 0) {
 			assert(vfe->priv2 < (ssize_t)result->bufcount);
 			*lp = written;
 			return (VFP_OK);
 		}
-		/* Go to next buffer */
-		vfe->priv2 ++;
-		/* Reaching bufcount means end of fetch */
-		if (vfe->priv2 == (ssize_t)result->bufcount) {
-			assert(current->size == 0);
-			*lp = written;
-			return VFP_END;
-		}
-		current = &result->buffers[vfe->priv2];
 	}
 }
 
@@ -117,7 +121,7 @@ kvmbe_gethdrs(const struct director *dir,
 	struct backend_result *result =
 		(struct backend_result *)WS_Alloc(bo->ws, VMBE_RESULT_SIZE);
 	if (result == NULL) {
-		VSLb(ctx.vsl, SLT_Error, "Backend VM: Out of workspace\n");
+		VSLb(ctx.vsl, SLT_Error, "Backend VM: Out of workspace for result");
 		return (-1);
 	}
 
@@ -126,6 +130,7 @@ kvmbe_gethdrs(const struct director *dir,
 
 	if (result->type == NULL || result->tsize == 0)
 	{
+		VSLb(ctx.vsl, SLT_Error, "Backend VM: Invalid response from VM");
 		http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
 		return (-1);
 	}
@@ -140,8 +145,10 @@ kvmbe_gethdrs(const struct director *dir,
 	http_PrintfHeader(bo->beresp, "Last-Modified: %s", timestamp);
 
 	bo->htc = WS_Alloc(bo->ws, sizeof *bo->htc);
-	if (bo->htc == NULL)
+	if (bo->htc == NULL) {
+		VSLb(ctx.vsl, SLT_Error, "Backend VM: Out of workspace for HTC");
 		return (-1);
+	}
 	INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
 
 	/* store the result in workspace and free result */
