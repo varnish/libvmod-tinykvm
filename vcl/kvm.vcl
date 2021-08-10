@@ -1,4 +1,5 @@
 vcl 4.1;
+import brotli;
 import file;
 import goto;
 import kvm;
@@ -40,6 +41,7 @@ sub vcl_init {
 		}
 	""");
 	new f = file.init("/tmp");
+	brotli.init(BOTH, transcode = true);
 }
 
 sub vcl_recv {
@@ -58,6 +60,9 @@ sub vcl_recv {
 	else if (req.url == "/z") {
 		set req.http.Host = "zpizza.com";
 	}
+	else if (req.url == "/v") {
+		set req.http.Host = "vpizza.com";
+	}
 	else if (req.url == "/w") {
 		set req.http.Host = "wpizza.com";
 	}
@@ -69,8 +74,8 @@ sub vcl_recv {
 	else if (req.url == "/synth") {
 		return (synth(700, "Testing"));
 	}
-	else if (req.http.Host ~ "^\d+\.\d+\.\d+\.\d+:\d+$") {
-		set req.http.Host = "ypizza.com";
+	else {
+		set req.http.Host = "vpizza.com";
 	}
 
 	//set req.url = req.url + "?foo=" + utils.cpu_id();
@@ -80,8 +85,8 @@ sub vcl_recv {
 	/* Determine tenant */
 	if (req.method == "POST") {
 		set req.backend_hint = kvm.live_update(
-			req.http.Host, req.http.X-PostKey, 15MB);
-		std.cache_req_body(15MB);
+			req.http.Host, req.http.X-PostKey, 20MB);
+		std.cache_req_body(20MB);
 		return (pass);
 	}
 	return (pass);
@@ -96,4 +101,9 @@ sub vcl_backend_fetch {
 			bereq.http.Host,
 			"my_backend",
 			bereq.url);
+}
+
+sub vcl_backend_response {
+	brotli.compress();
+	//set beresp.do_gzip = true;
 }

@@ -42,6 +42,7 @@ pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 	}
 
 	struct VMBuffer *current = &result->buffers[vfe->priv2];
+	const ssize_t max = *lp;
 	ssize_t written = 0;
 
 	while (1) {
@@ -65,7 +66,7 @@ pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 			current = &result->buffers[vfe->priv2];
 		}
 		/* Return later if there's more, and we can't send more */
-		if (len == 0) {
+		if (written == max) {
 			assert(vfe->priv2 < (ssize_t)result->bufcount);
 			*lp = written;
 			return (VFP_OK);
