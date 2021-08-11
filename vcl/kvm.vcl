@@ -103,8 +103,9 @@ sub vcl_backend_fetch {
 		/* Regular POST */
 		set bereq.backend = kvm.vm_post_backend(
 			bereq.http.Host,
-			"my_post_backend",
-			bereq.url);
+			"my_streaming_response",
+			bereq.url,
+			processing = "my_streaming_function");
 		return (fetch);
 	}
 	/* Regular request */
@@ -115,6 +116,6 @@ sub vcl_backend_fetch {
 }
 
 sub vcl_backend_response {
-	brotli.compress();
-	//set beresp.do_gzip = true;
+	//brotli.compress();
+	set beresp.do_gzip = true;
 }

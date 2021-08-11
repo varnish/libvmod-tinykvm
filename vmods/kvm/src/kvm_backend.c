@@ -7,8 +7,8 @@
 #include <vtim.h>
 #include "vcl.h"
 #include "vcc_if.h"
-extern void kvm_backend_call(VRT_CTX, struct vmod_kvm_tenant *,
-	const char *func, const char *farg,
+extern void kvm_backend_call(VRT_CTX, struct vmod_kvm_machine *,
+	uint64_t func, const char *farg,
 	struct backend_post *, struct backend_result *);
 extern void kvm_get_body(struct backend_post *, struct busyobj *);
 
@@ -131,6 +131,13 @@ kvmbe_gethdrs(const struct director *dir,
 	}
 	result->bufcount = VMBE_NUM_BUFFERS;
 
+	struct vmod_kvm_machine *machine =
+		kvm_fork_machine(&ctx, kvmr->tenant, false);
+	if (machine == NULL) {
+		VSLb(ctx.vsl, SLT_Error, "Backend VM: Unable to fork machine");
+		return (-1);
+	}
+
 	struct backend_post *post = NULL;
 	if (kvmr->is_post)
 	{
@@ -141,16 +148,17 @@ kvmbe_gethdrs(const struct director *dir,
 			return (-1);
 		}
 		post->ctx = &ctx;
-		post->machine = kvm_fork_machine(&ctx, kvmr->tenant, false);
+		post->machine = machine;
 		post->address = 0x40000; /* 256kb userspace boundary */
 		post->length  = 0;
+		post->process_func = kvmr->process_func;
+		post->func = kvmr->func;
 		kvm_get_body(post, bo);
 	}
 
 	/* Make a backend VM call (with optional POST) */
-	kvm_backend_call(&ctx, kvmr->tenant,
-		kvmr->func, kvmr->funcarg,
-		post, result);
+	kvm_backend_call(&ctx, machine,
+		kvmr->func, kvmr->funcarg, post, result);
 
 	if (result->type == NULL || result->tsize == 0)
 	{
@@ -202,7 +210,12 @@ kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING func
 		return (NULL);
 	}
 
-	kvmr->func = func;
+	kvmr->func = kvm_resolve_name(kvmr->tenant, func);
+	if (kvmr->func == 0x0)
+	{
+		VRT_fail(ctx, "KVM sandbox says 'Invalid or missing function': %s", func);
+		return (NULL);
+	}
 	kvmr->funcarg = farg;
 	kvmr->max_response_size = 0;
 	kvmr->is_post = 0;
@@ -233,7 +246,9 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRIN
 	}
 }
 
-VCL_BACKEND vmod_vm_post_backend(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING func, VCL_STRING farg)
+VCL_BACKEND vmod_vm_post_backend(VRT_CTX, VCL_PRIV task,
+	VCL_STRING tenant, VCL_STRING func, VCL_STRING farg,
+	VCL_STRING processing)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
@@ -242,6 +257,18 @@ VCL_BACKEND vmod_vm_post_backend(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_
 
 	if (kvmr != NULL) {
 		kvmr->is_post = 1;
+		if (processing != NULL) {
+			kvmr->process_func = kvm_resolve_name(kvmr->tenant, processing);
+			if (kvmr->process_func == 0x0)
+			{
+				VRT_fail(ctx,
+					"KVM sandbox says 'Invalid or missing processing function': %s",
+					processing);
+				return (NULL);
+			}
+		} else {
+			kvmr->process_func = 0x0;
+		}
 		return (&kvmr->dir);
 	}
 

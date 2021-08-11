@@ -19,10 +19,10 @@ inline kvm::MachineInstance* kvm_get_machine(VRT_CTX)
 
 
 extern "C"
-uint64_t kvm_resolve_name(kvm::MachineInstance* inst, const char* func)
+uint64_t kvm_resolve_name(kvm::TenantInstance* tenant, const char* func)
 {
 	/* The tenant structure has lookup caching */
-	return inst->tenant().lookup(func);
+	return tenant->lookup(func);
 }
 
 extern "C"

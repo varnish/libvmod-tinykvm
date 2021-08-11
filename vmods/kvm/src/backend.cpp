@@ -8,32 +8,24 @@ extern "C" {
 }
 
 extern "C"
-void kvm_backend_call(VRT_CTX, kvm::TenantInstance* tenant,
-	const char *func, const char *farg,
+void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
+	uint64_t func, const char *farg,
 	struct backend_post *post,
 	struct backend_result *result)
 {
 	try {
-	#ifdef ENABLE_TIMING
-		TIMING_LOCATION(t0);
-	#endif
-		auto* machine = tenant->vmfork(ctx, false);
-		if (UNLIKELY(machine == nullptr)) {
-			throw std::runtime_error("Unable to fork backend VM");
-		}
-
-	#ifdef ENABLE_TIMING
-		TIMING_LOCATION(t1);
-	#endif
 		auto& vm = machine->machine();
 		if (post == nullptr) {
 			/* Call the backend response function */
 			vm.vmcall(func, farg,
 				(int) HDR_BEREQ, (int) HDR_BERESP);
-		} else {
+		} else if (post->process_func == 0x0) {
 			/* Call the backend POST function */
 			vm.vmcall(func, farg,
 				(uint64_t) post->address, (uint64_t) post->length);
+		} else {
+			/* Call the backend streaming POST function */
+			vm.vmcall(func, farg, (uint64_t) post->length);
 		}
 
 		/* Get content-type and data */
@@ -53,11 +45,6 @@ void kvm_backend_call(VRT_CTX, kvm::TenantInstance* tenant,
 		result->content_length = clen;
 		result->bufcount = vm.gather_buffers_from_range(
 			result->bufcount, (tinykvm::Machine::Buffer *)result->buffers, regs.rdx, clen);
-
-	#ifdef ENABLE_TIMING
-		TIMING_LOCATION(t2);
-		printf("Time spent in backend_call(): %ld ns\n", nanodiff(t1, t2));
-	#endif
 		return;
 
 	} catch (const tinykvm::MachineException& e) {
@@ -75,4 +62,41 @@ void kvm_backend_call(VRT_CTX, kvm::TenantInstance* tenant,
 		0,
 		0, {}
 	};
+}
+
+extern "C"
+int kvm_backend_stream(struct backend_post *post,
+	const void* data_ptr, ssize_t data_len, int last)
+{
+	assert(post && post->machine);
+	auto& mi = *(kvm::MachineInstance *)post->machine;
+	try {
+		auto& vm = mi.machine();
+
+		const uint64_t GADDR = 0x40000;
+
+		/* Copy the data segment into VM */
+		vm.copy_to_guest(GADDR, data_ptr, data_len);
+
+		/* Call the backend streaming function */
+		vm.vmcall(post->process_func, (uint64_t) GADDR, (uint64_t) data_len,
+			(uint64_t) post->length, !!last);
+
+		/* Get content-type and data */
+		auto regs = vm.registers();
+		return (regs.rdi == (uint64_t)data_len) ? 0 : -1;
+
+	} catch (const tinykvm::MachineException& e) {
+		fprintf(stderr, "Backend VM exception: %s (data: 0x%lX)\n",
+			e.what(), e.data());
+		VSLb(post->ctx->vsl, SLT_Error,
+			"Backend VM exception: %s (data: 0x%lX)\n",
+			e.what(), e.data());
+	} catch (const std::exception& e) {
+		fprintf(stderr, "Backend VM exception: %s\n", e.what());
+		VSLb(post->ctx->vsl, SLT_Error,
+			"VM call exception: %s", e.what());
+	}
+	/* An error result */
+	return -1;
 }

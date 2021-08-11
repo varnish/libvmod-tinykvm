@@ -7,16 +7,23 @@
 #include "vcl.h"
 #include "vcc_if.h"
 
+extern int kvm_backend_stream(struct backend_post *, const void*, ssize_t, int);
+
 static int
 kvm_get_aggregate_body(void *priv, int flush, int last, const void *ptr, ssize_t len)
 {
 	struct backend_post *post = (struct backend_post *)priv;
-
 	(void)flush;
-	(void)last;
 
-	int res = kvm_copy_to_machine(
-		post->machine, post->address + post->length, ptr, len);
+	if (post->process_func == 0x0) {
+		/* Collect all data into one buffer inside guest VM */
+		int res = kvm_copy_to_machine(
+			post->machine, post->address + post->length, ptr, len);
+		post->length += len;
+		return (res);
+	}
+	/* Streaming POST */
+	int res = kvm_backend_stream(post, ptr, len, last);
 	post->length += len;
 	return (res);
 }

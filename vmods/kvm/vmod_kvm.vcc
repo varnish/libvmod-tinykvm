@@ -85,11 +85,35 @@ $Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING func, STRING arg = 
 
 	set bereq.backend = kvm.vm_backend("xpizza.com", "my_backend");
 
-$Function BACKEND vm_post_backend(PRIV_VCL, STRING tenant, STRING func, STRING arg = "")
+$Function BACKEND vm_post_backend(PRIV_VCL,
+	STRING tenant, STRING func, STRING arg = "", STRING processing = "")
 
 - Returns a backend that will retrieve a POST body first,
   then call into a KVM VM with the body as argument, and then produce a response.
 - Produces 500 server error if there is not enough memory,
   a limit is hit, or an error is produced.
+- When the processing function is provided, the backend will be streaming
+  the request body data into the VM by calling the processing function on
+  each data segment. The processing function will need to return the
+  length processed to confirm that it was handled.
+  When the last streamed segment has been received, the processing Function
+  will have the 'last' argument set to 1. Finally, the regular POST function
+  will be called with the data argument removed, and the final length passed.
+  In the final call a backend response must be provided. Streaming is more
+  memory efficient and makes processing possible on big data, but it requires
+  the data processor to be able to work with segmented data.
 
 	set bereq.backend = kvm.vm_post_backend("xpizza.com", "my_post_backend");
+
+  Regular POST function prototype:
+    extern void __attribute__((used))
+    my_post_backend(const char *arg, void *data, size_t len)
+
+
+  Prototypes for streaming:
+  - Processing function:
+    extern long __attribute__((used))
+    my_streaming_function(void *data, size_t len, size_t processed, int last)
+  - Final function:
+    extern void __attribute__((used))
+    my_streaming_response(const char *arg, size_t len)
