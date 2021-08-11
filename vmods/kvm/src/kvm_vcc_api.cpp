@@ -30,3 +30,15 @@ kvm::MachineInstance* kvm_fork_machine(const vrt_ctx *ctx, kvm::TenantInstance* 
 {
 	return tenant->vmfork(ctx, debug);
 }
+
+extern "C"
+int kvm_copy_to_machine(kvm::MachineInstance* machine,
+	uint64_t dst, const void* src, size_t len)
+{
+	try {
+		machine->copy_to(dst, src, len);
+		return 0;
+	} catch (...) {
+		return -1;
+	}
+}

@@ -80,7 +80,16 @@ $Function BACKEND live_debug(PRIV_VCL, STRING tenant, STRING key, BYTES max_size
 $Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING func, STRING arg = "")
 
 - Returns a backend that will call into the current machine to produce a response.
-- Produces 500 server error if there is no active machine, or an error happens.
-- Call with no function specified if tenant has made a "backend" decision.
+- Produces 500 server error if there is not enough memory,
+  a limit is hit, or an error is produced.
 
 	set bereq.backend = kvm.vm_backend("xpizza.com", "my_backend");
+
+$Function BACKEND vm_post_backend(PRIV_VCL, STRING tenant, STRING func, STRING arg = "")
+
+- Returns a backend that will retrieve a POST body first,
+  then call into a KVM VM with the body as argument, and then produce a response.
+- Produces 500 server error if there is not enough memory,
+  a limit is hit, or an error is produced.
+
+	set bereq.backend = kvm.vm_post_backend("xpizza.com", "my_post_backend");

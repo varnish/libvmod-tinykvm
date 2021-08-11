@@ -6,6 +6,7 @@ add_vmod(vmod_kvm vmod_kvm.vcc "KVM Userspace Emulator VMOD"
 	src/vmod_kvm.c
 	src/kvm_backend.c
 	src/kvm_live_update.c
+	src/kvm_post.c
 )
 
 if (SHARED_KVM)

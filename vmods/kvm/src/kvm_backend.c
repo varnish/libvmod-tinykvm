@@ -7,7 +7,10 @@
 #include <vtim.h>
 #include "vcl.h"
 #include "vcc_if.h"
-extern void kvm_backend_call(VRT_CTX, struct vmod_kvm_tenant *, const char *, const char *, struct backend_result *);
+extern void kvm_backend_call(VRT_CTX, struct vmod_kvm_tenant *,
+	const char *func, const char *farg,
+	struct backend_post *, struct backend_result *);
+extern void kvm_get_body(struct backend_post *, struct busyobj *);
 
 static void v_matchproto_(vdi_panic_f)
 kvmbe_panic(const struct director *dir, struct vsb *vsb)
@@ -42,16 +45,16 @@ pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 	}
 
 	struct VMBuffer *current = &result->buffers[vfe->priv2];
-	const ssize_t max = *lp;
+	ssize_t max = *lp;
 	ssize_t written = 0;
 
 	while (1) {
-		ssize_t len = (current->size > *lp) ? *lp : current->size;
+		ssize_t len = (current->size > max) ? max : current->size;
 		memcpy(p, current->data, len);
 		p = (void *) ((char *)p + len);
-		written += len;
 		current->data += len;
 		current->size -= len;
+		written += len;
 
 		/* Go to next buffer, or end if no more */
 		if (current->size == 0) {
@@ -66,7 +69,8 @@ pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 			current = &result->buffers[vfe->priv2];
 		}
 		/* Return later if there's more, and we can't send more */
-		if (written == max) {
+		max -= len;
+		if (max == 0) {
 			assert(vfe->priv2 < (ssize_t)result->bufcount);
 			*lp = written;
 			return (VFP_OK);
@@ -125,9 +129,28 @@ kvmbe_gethdrs(const struct director *dir,
 		VSLb(ctx.vsl, SLT_Error, "Backend VM: Out of workspace for result");
 		return (-1);
 	}
-
 	result->bufcount = VMBE_NUM_BUFFERS;
-	kvm_backend_call(&ctx, kvmr->tenant, kvmr->func, kvmr->funcarg, result);
+
+	struct backend_post *post = NULL;
+	if (kvmr->is_post)
+	{
+		/* Retrieve body by copying directly into backend VM */
+		post = (struct backend_post *)WS_Alloc(bo->ws, sizeof(struct backend_post));
+		if (post == NULL) {
+			VSLb(ctx.vsl, SLT_Error, "Backend VM: Out of workspace for post");
+			return (-1);
+		}
+		post->ctx = &ctx;
+		post->machine = kvm_fork_machine(&ctx, kvmr->tenant, false);
+		post->address = 0x40000; /* 256kb userspace boundary */
+		post->length  = 0;
+		kvm_get_body(post, bo);
+	}
+
+	/* Make a backend VM call (with optional POST) */
+	kvm_backend_call(&ctx, kvmr->tenant,
+		kvmr->func, kvmr->funcarg,
+		post, result);
 
 	if (result->type == NULL || result->tsize == 0)
 	{
@@ -161,21 +184,9 @@ kvmbe_gethdrs(const struct director *dir,
 	return (0);
 }
 
-static void setup_response_director(struct director *dir, struct vmod_kvm_response *kvmr)
+static struct vmod_kvm_response *
+kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING func, VCL_STRING farg)
 {
-	INIT_OBJ(dir, DIRECTOR_MAGIC);
-	dir->priv = kvmr;
-	dir->name = "KVM backend director";
-	dir->vcl_name = "vmod_kvm";
-	dir->gethdrs = kvmbe_gethdrs;
-	dir->finish  = kvmbe_finish;
-	dir->panic   = kvmbe_panic;
-}
-
-VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING func, VCL_STRING farg)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-
 	struct vmod_kvm_response *kvmr;
 	kvmr = WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_response));
 	if (kvmr == NULL) {
@@ -194,8 +205,45 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRIN
 	kvmr->func = func;
 	kvmr->funcarg = farg;
 	kvmr->max_response_size = 0;
+	kvmr->is_post = 0;
 
-	setup_response_director(&kvmr->dir, kvmr);
+	struct director *dir = &kvmr->dir;
+	INIT_OBJ(dir, DIRECTOR_MAGIC);
+	dir->priv = kvmr;
+	dir->name = "KVM backend director";
+	dir->vcl_name = "vmod_kvm";
+	dir->gethdrs = kvmbe_gethdrs;
+	dir->finish  = kvmbe_finish;
+	dir->panic   = kvmbe_panic;
 
-	return &kvmr->dir;
+	return (kvmr);
+}
+
+VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING func, VCL_STRING farg)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	struct vmod_kvm_response *kvmr =
+		kvm_response_director(ctx, task, tenant, func, farg);
+
+	if (kvmr != NULL) {
+		return (&kvmr->dir);
+	} else {
+		return (NULL);
+	}
+}
+
+VCL_BACKEND vmod_vm_post_backend(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING func, VCL_STRING farg)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	struct vmod_kvm_response *kvmr =
+		kvm_response_director(ctx, task, tenant, func, farg);
+
+	if (kvmr != NULL) {
+		kvmr->is_post = 1;
+		return (&kvmr->dir);
+	}
+
+	return (NULL);
 }

@@ -11,6 +11,7 @@ backend default none;
 
 sub vcl_init {
 	kvm.cache_symbol("my_backend");
+	kvm.cache_symbol("my_post_backend");
 	kvm.embed_tenants("""
 		{
 			"vpizza.com": {
@@ -82,21 +83,31 @@ sub vcl_recv {
 	//set req.url = req.url + "?foo=" + utils.thread_id();
 	//set req.url = req.url + "?foo=" + utils.fast_random_int(100);
 
-	/* Determine tenant */
-	if (req.method == "POST") {
+	/* Live update with X-PostKey */
+	if (req.method == "POST" && req.http.X-PostKey) {
 		set req.backend_hint = kvm.live_update(
 			req.http.Host, req.http.X-PostKey, 20MB);
 		std.cache_req_body(20MB);
 		return (pass);
 	}
+	/* Normal request or POST */
 	return (pass);
 }
 
 sub vcl_backend_fetch {
-	if (bereq.method == "POST") {
+	if (bereq.method == "POST" && bereq.http.X-PostKey) {
+		/* Live update POST */
 		return (fetch);
 	}
-
+	else if (bereq.method == "POST") {
+		/* Regular POST */
+		set bereq.backend = kvm.vm_post_backend(
+			bereq.http.Host,
+			"my_post_backend",
+			bereq.url);
+		return (fetch);
+	}
+	/* Regular request */
 	set bereq.backend = kvm.vm_backend(
 			bereq.http.Host,
 			"my_backend",

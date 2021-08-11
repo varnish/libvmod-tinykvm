@@ -120,6 +120,11 @@ MachineInstance::~MachineInstance()
 	}
 }
 
+void MachineInstance::copy_to(uint64_t addr, const void* src, size_t len, bool zeroes)
+{
+	machine().copy_to_guest(addr, src, len, zeroes);
+}
+
 uint64_t MachineInstance::max_time() const noexcept {
 	return tenant().config.max_time();
 }

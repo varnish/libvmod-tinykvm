@@ -35,6 +35,8 @@ public:
 	auto& machine() { return m_machine; }
 	const auto& machine() const { return m_machine; }
 
+	void copy_to(uint64_t addr, const void*, size_t, bool zeroes = false);
+
 	const auto* ctx() const noexcept { return m_ctx; }
 	void set_ctx(const vrt_ctx* ctx) { m_ctx = ctx; }
 	const auto& tenant() const noexcept { return *m_tenant; }

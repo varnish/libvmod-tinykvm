@@ -13,3 +13,10 @@ struct backend_result {
 };
 #define VMBE_NUM_BUFFERS  1024
 #define VMBE_RESULT_SIZE  (sizeof(struct backend_result) + VMBE_NUM_BUFFERS * sizeof(struct VMBuffer))
+
+struct backend_post {
+	const struct vrt_ctx *ctx;
+	struct vmod_kvm_machine *machine;
+	uint64_t address;
+	size_t   length;
+};

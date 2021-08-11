@@ -9,7 +9,9 @@ extern "C" {
 
 extern "C"
 void kvm_backend_call(VRT_CTX, kvm::TenantInstance* tenant,
-	const char *func, const char *farg, struct backend_result *result)
+	const char *func, const char *farg,
+	struct backend_post *post,
+	struct backend_result *result)
 {
 	try {
 	#ifdef ENABLE_TIMING
@@ -24,9 +26,15 @@ void kvm_backend_call(VRT_CTX, kvm::TenantInstance* tenant,
 		TIMING_LOCATION(t1);
 	#endif
 		auto& vm = machine->machine();
-		/* Call the backend response function */
-		vm.vmcall(func, farg,
-			(int) HDR_BEREQ, (int) HDR_BERESP);
+		if (post == nullptr) {
+			/* Call the backend response function */
+			vm.vmcall(func, farg,
+				(int) HDR_BEREQ, (int) HDR_BERESP);
+		} else {
+			/* Call the backend POST function */
+			vm.vmcall(func, farg,
+				(uint64_t) post->address, (uint64_t) post->length);
+		}
 
 		/* Get content-type and data */
 		auto regs = vm.registers();

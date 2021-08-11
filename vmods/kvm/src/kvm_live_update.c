@@ -8,14 +8,14 @@
 extern struct update_result kvm_live_update(VRT_CTX, struct vmod_kvm_tenant*, const struct update_params*);
 
 static void v_matchproto_(vdi_panic_f)
-kvmbe_panic(const struct director *dir, struct vsb *vsb)
+kvm_updater_be_panic(const struct director *dir, struct vsb *vsb)
 {
 	(void)dir;
 	(void)vsb;
 }
 
 static void v_matchproto_(vdi_finish_f)
-kvmbe_finish(const struct director *dir, struct worker *wrk, struct busyobj *bo)
+kvm_updater_be_finish(const struct director *dir, struct worker *wrk, struct busyobj *bo)
 {
 	CHECK_OBJ_NOTNULL(dir, DIRECTOR_MAGIC);
 	struct vmod_kvm_updater *kvmu = (struct vmod_kvm_updater *) dir->priv;
@@ -48,7 +48,7 @@ pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 }
 
 static const struct vfp kvm_fetch_processor = {
-	.name = "kvm_updater_backend",
+	.name = "kvm_update_fetcher",
 	.pull = pull,
 };
 
@@ -68,7 +68,7 @@ vfp_init(struct busyobj *bo)
 
 
 static int
-aggregate_body(void *priv, int flush, int last, const void *ptr, ssize_t len)
+kvm_updater_aggregate_body(void *priv, int flush, int last, const void *ptr, ssize_t len)
 {
 	struct vsb *vsb = (struct vsb *)priv;
 
@@ -82,7 +82,7 @@ aggregate_body(void *priv, int flush, int last, const void *ptr, ssize_t len)
 }
 
 static int v_matchproto_(vdi_gethdrs_f)
-kvmbe_gethdrs(const struct director *dir,
+kvm_updater_be_gethdrs(const struct director *dir,
 	struct worker *wrk, struct busyobj *bo)
 {
 	(void)wrk;
@@ -96,9 +96,9 @@ kvmbe_gethdrs(const struct director *dir,
 	struct vsb *vsb = VSB_new_auto();
 	AN(vsb);
 	if (bo->req)
-		VRB_Iterate(bo->req, aggregate_body, vsb);
+		VRB_Iterate(bo->req, kvm_updater_aggregate_body, vsb);
 	else if (bo->bereq_body)
-		ObjIterate(bo->wrk, bo->bereq_body, vsb, aggregate_body,
+		ObjIterate(bo->wrk, bo->bereq_body, vsb, kvm_updater_aggregate_body,
 		    0, 0, -1);
 	VSB_finish(vsb);
 
@@ -110,72 +110,72 @@ kvmbe_gethdrs(const struct director *dir,
 	struct vmod_kvm_updater *kvmu;
 	CAST_OBJ_NOTNULL(kvmu, dir->priv, KVM_BACKEND_MAGIC);
 
-	if (result_len <= kvmu->max_binary_size)
+	if (result_len > kvmu->max_binary_size)
 	{
-		/* finish the backend request */
-		bo->htc = WS_Alloc(bo->ws, sizeof *bo->htc);
-		if (bo->htc == NULL) {
-			VSB_destroy(&vsb);
-			return (-1);
-		}
-		INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
-
-		const struct vrt_ctx ctx = {
-			.magic = VRT_CTX_MAGIC,
-			.vcl = bo->vcl,
-			.ws  = bo->ws,
-			.vsl = bo->vsl,
-			.req = NULL,
-			.bo  = bo,
-			.http_bereq  = bo->bereq,
-			.http_beresp = bo->beresp,
-		};
-		const struct update_params uparams = {
-			.data = result_data,
-			.len  = result_len,
-			.is_debug = kvmu->is_debug,
-			.debug_port = kvmu->debug_port,
-		};
-		struct update_result result =
-			kvm_live_update(&ctx, kvmu->tenant, &uparams);
-
-		http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
-		http_PrintfHeader(bo->beresp, "Content-Length: %zu", result.len);
-
-		/* store the output in workspace and free result */
-		bo->htc->content_length = result.len;
-		bo->htc->priv = WS_Copy(bo->ws, result.output, result.len);
-		bo->htc->body_status = BS_LENGTH;
-		/* Delete the result */
-		if (result.destructor)
-			result.destructor(&result);
-
-		if (bo->htc->priv == NULL) {
-			http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
-			VSB_destroy(&vsb);
-			return (-1);
-		}
-
-		vfp_init(bo);
+		http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
 		VSB_destroy(&vsb);
-		return (0);
+		return (-1);
 	}
 
-	http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
+	/* finish the backend request */
+	bo->htc = WS_Alloc(bo->ws, sizeof *bo->htc);
+	if (bo->htc == NULL) {
+		VSB_destroy(&vsb);
+		return (-1);
+	}
+	INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
+
+	const struct vrt_ctx ctx = {
+		.magic = VRT_CTX_MAGIC,
+		.vcl = bo->vcl,
+		.ws  = bo->ws,
+		.vsl = bo->vsl,
+		.req = NULL,
+		.bo  = bo,
+		.http_bereq  = bo->bereq,
+		.http_beresp = bo->beresp,
+	};
+	const struct update_params uparams = {
+		.data = result_data,
+		.len  = result_len,
+		.is_debug = kvmu->is_debug,
+		.debug_port = kvmu->debug_port,
+	};
+	struct update_result result =
+		kvm_live_update(&ctx, kvmu->tenant, &uparams);
+
+	http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
+	http_PrintfHeader(bo->beresp, "Content-Length: %zu", result.len);
+
+	/* store the output in workspace and free result */
+	bo->htc->content_length = result.len;
+	bo->htc->priv = WS_Copy(bo->ws, result.output, result.len);
+	bo->htc->body_status = BS_LENGTH;
+	/* Delete the result */
+	if (result.destructor)
+		result.destructor(&result);
+
+	if (bo->htc->priv == NULL) {
+		http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
+		VSB_destroy(&vsb);
+		return (-1);
+	}
+
+	vfp_init(bo);
 	VSB_destroy(&vsb);
-	return (-1);
+	return (0);
 }
 
-static inline void kvmu_director(
+static inline void kvm_update_director(
 	struct director *dir, struct vmod_kvm_updater *kvmu)
 {
 	INIT_OBJ(dir, DIRECTOR_MAGIC);
 	dir->priv = kvmu;
 	dir->name = "VM updater director";
 	dir->vcl_name = "vmod_machine_update";
-	dir->gethdrs = kvmbe_gethdrs;
-	dir->finish  = kvmbe_finish;
-	dir->panic   = kvmbe_panic;
+	dir->gethdrs = kvm_updater_be_gethdrs;
+	dir->finish  = kvm_updater_be_finish;
+	dir->panic   = kvm_updater_be_panic;
 }
 
 VCL_BACKEND vmod_live_update(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING key, VCL_BYTES max_size)
@@ -204,7 +204,7 @@ VCL_BACKEND vmod_live_update(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRI
 	kvmu->max_binary_size = max_size;
 	kvmu->tenant = ten;
 	kvmu->is_debug = 0;
-	kvmu_director(&kvmu->dir, kvmu);
+	kvm_update_director(&kvmu->dir, kvmu);
 
 	return &kvmu->dir;
 }
@@ -237,7 +237,7 @@ VCL_BACKEND vmod_live_debug(
 	kvmu->tenant = ten;
 	kvmu->is_debug   = 1;
 	kvmu->debug_port = 0;
-	kvmu_director(&kvmu->dir, kvmu);
+	kvm_update_director(&kvmu->dir, kvmu);
 
 	return &kvmu->dir;
 }

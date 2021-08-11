@@ -40,6 +40,7 @@ struct vmod_kvm_response
 	const char *func;
 	const char *funcarg;
 	uint64_t max_response_size;
+	int is_post;
 };
 
 extern void kvm_init_tenants_str(VRT_CTX, VCL_PRIV, const char *);
@@ -50,3 +51,4 @@ extern struct vmod_kvm_tenant *kvm_tenant_find(VCL_PRIV, const char *name);
 extern struct vmod_kvm_tenant *kvm_tenant_find_key(VCL_PRIV, const char *name, const char *key);
 extern struct vmod_kvm_machine *kvm_fork_machine(VRT_CTX, struct vmod_kvm_tenant *, int);
 extern uint64_t kvm_resolve_name(struct vmod_kvm_machine *, const char*);
+extern int kvm_copy_to_machine(struct vmod_kvm_machine *, uint64_t dst, const void* src, size_t len);
