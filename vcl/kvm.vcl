@@ -75,7 +75,8 @@ sub vcl_recv {
 	else if (req.url == "/synth") {
 		return (synth(700, "Testing"));
 	}
-	else {
+	else if (req.http.Host ~ "^.+\..+:\d+$") {
+		/* This will preserve good Host headers */
 		set req.http.Host = "vpizza.com";
 	}
 
