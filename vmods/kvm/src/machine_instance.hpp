@@ -76,6 +76,7 @@ private:
 	void handle_exception(gaddr_t);
 	void handle_timeout(gaddr_t);
 	void sanitize_path(char*, size_t);
+	tinykvm::Machine::printer_func get_vsl_printer() const;
 
 	const vrt_ctx* m_ctx;
 	machine_t m_machine;

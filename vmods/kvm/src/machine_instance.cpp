@@ -3,7 +3,6 @@
 #include "varnish.hpp"
 extern "C" int close(int);
 extern void setup_kvm_system_calls();
-static constexpr bool VERBOSE_ERRORS = true;
 
 //#define ENABLE_TIMING
 #define TIMING_LOCATION(x) \
@@ -36,6 +35,7 @@ MachineInstance::MachineInstance(
 	  m_directors {ten->config.max_backends(), "Directors"}
 {
 	machine().set_userdata<MachineInstance> (this);
+	machine().set_printer(get_vsl_printer());
 	try {
 		machine().setup_linux(
 			{"vmod_kvm", name(), storage ? "1" : "0"},
@@ -85,6 +85,7 @@ MachineInstance::MachineInstance(
 	TIMING_LOCATION(t0);
 #endif
 	machine().set_userdata<MachineInstance> (this);
+	machine().set_printer(get_vsl_printer());
 	/* Load the fds of the source */
 	m_fd.loan_from(source.m_fd);
 	/* Load the compiled regexes of the source */
@@ -133,6 +134,20 @@ const std::string& MachineInstance::name() const noexcept {
 }
 const std::string& MachineInstance::group() const noexcept {
 	return tenant().config.group.name;
+}
+
+tinykvm::Machine::printer_func MachineInstance::get_vsl_printer() const
+{
+	/* NOTE: Guests will "always" end with newlines */
+	return [this] (const char* buffer, size_t len) {
+		auto* vsl = this->ctx()->vsl;
+		if (vsl != nullptr) {
+			VSLb(vsl, SLT_VCL_Log,
+				"Guest says: %.*s", (int)len, buffer);
+		} else {
+			printf("Guest says: %.*s", (int)len, buffer);
+		}
+	};
 }
 
 } // kvm
