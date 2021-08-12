@@ -110,8 +110,11 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 	[&] () -> long
 	{
 		auto& stm = storage.machine();
-		/* Copy from the source machine into storage */
-		stm.copy_from_machine(new_stack, src, src_addr, src_size);
+		if (src_size > 0) {
+			/* Copy from the source machine into storage,
+			   but only if the length > 0, to allow src_addr=NULL. */
+			stm.copy_from_machine(new_stack, src, src_addr, src_size);
+		}
 
 		try {
 			auto regs = stm.setup_call(func, new_stack,
@@ -125,7 +128,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			/* Copy from the storage machine back into tenant VM instance */
 			src.copy_from_machine(res_addr, stm, st_res_buffer, st_res_size);
 			/* Run the function to the end, allowing cleanup */
-			//stm.run();
+			stm.run();
 			return st_res_size;
 		} catch (...) {
 			return -1;
