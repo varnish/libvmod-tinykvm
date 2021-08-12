@@ -257,7 +257,7 @@ VCL_BACKEND vmod_vm_post_backend(VRT_CTX, VCL_PRIV task,
 
 	if (kvmr != NULL) {
 		kvmr->is_post = 1;
-		if (processing != NULL) {
+		if (processing != NULL && processing[0] != 0) {
 			kvmr->process_func = kvm_resolve_name(kvmr->tenant, processing);
 			if (kvmr->process_func == 0x0)
 			{
