@@ -7,6 +7,24 @@ extern "C" {
 #include "kvm_backend.h"
 }
 
+static void memory_error_handling(VRT_CTX, const tinykvm::MemoryException& e)
+{
+	if (e.addr() < 0x100) { /* Null-pointer speculation */
+	fprintf(stderr,
+		"Backend VM memory exception: %s (addr: 0x%lX, size: 0x%lX)\n",
+		e.what(), e.addr(), e.size());
+	VSLb(ctx->vsl, SLT_Error,
+		"Backend VM memory exception: %s (addr: 0x%lX, size: 0x%lX)",
+		e.what(), e.addr(), e.size());
+	} else {
+		fprintf(stderr,
+			"Backend VM memory exception: Null-pointer access\n");
+		VSLb(ctx->vsl, SLT_Error,
+			"Backend VM memory exception: Null-pointer access");
+	}
+}
+
+
 extern "C"
 void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
 	uint64_t func, const char *farg,
@@ -51,8 +69,10 @@ void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
 		fprintf(stderr, "Backend VM exception: %s (data: 0x%lX)\n",
 			e.what(), e.data());
 		VSLb(ctx->vsl, SLT_Error,
-			"Backend VM exception: %s (data: 0x%lX)\n",
+			"Backend VM exception: %s (data: 0x%lX)",
 			e.what(), e.data());
+	} catch (const tinykvm::MemoryException& e) {
+		memory_error_handling(ctx, e);
 	} catch (const std::exception& e) {
 		fprintf(stderr, "Backend VM exception: %s\n", e.what());
 		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
@@ -90,8 +110,10 @@ int kvm_backend_stream(struct backend_post *post,
 		fprintf(stderr, "Backend VM exception: %s (data: 0x%lX)\n",
 			e.what(), e.data());
 		VSLb(post->ctx->vsl, SLT_Error,
-			"Backend VM exception: %s (data: 0x%lX)\n",
+			"Backend VM exception: %s (data: 0x%lX)",
 			e.what(), e.data());
+	} catch (const tinykvm::MemoryException& e) {
+		memory_error_handling(post->ctx, e);
 	} catch (const std::exception& e) {
 		fprintf(stderr, "Backend VM exception: %s\n", e.what());
 		VSLb(post->ctx->vsl, SLT_Error,
