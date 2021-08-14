@@ -24,6 +24,14 @@ static void memory_error_handling(VRT_CTX, const tinykvm::MemoryException& e)
 	}
 }
 
+static int16_t sanitize_status_code(int16_t code)
+{
+	/* Allow successes, redirects and client and server errors */
+	if (LIKELY(code >= 200 && code < 600))
+		return code;
+	[[unlikely]]
+	throw tinykvm::MachineException("Invalid status code returned by VM program", code);
+}
 
 extern "C"
 void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
@@ -48,21 +56,25 @@ void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
 
 		/* Get content-type and data */
 		auto regs = vm.registers();
-		const uint64_t tlen = regs.rsi;
-		const uint64_t clen = regs.rcx;
+		const uint16_t status = regs.rdi;
+		const uint64_t tvaddr = regs.rsi;
+		const uint16_t tlen   = regs.rdx;
+		const uint64_t cvaddr = regs.rcx;
+		const uint64_t clen   = regs.r8;
 
 		char *tbuf = (char *)WS_Alloc(ctx->ws, tlen);
 		if (UNLIKELY(tbuf == nullptr)) {
 			throw std::runtime_error("Out of workspace for backend VM content-type");
 		}
-		vm.copy_from_guest(tbuf, regs.rdi, tlen);
+		vm.copy_from_guest(tbuf, tvaddr, tlen);
 
 		/* Return content-type, content-length and buffers */
 		result->type = tbuf;
 		result->tsize = tlen;
+		result->status = sanitize_status_code(status);
 		result->content_length = clen;
 		result->bufcount = vm.gather_buffers_from_range(
-			result->bufcount, (tinykvm::Machine::Buffer *)result->buffers, regs.rdx, clen);
+			result->bufcount, (tinykvm::Machine::Buffer *)result->buffers, cvaddr, clen);
 		return;
 
 	} catch (const tinykvm::MachineException& e) {
@@ -79,6 +91,7 @@ void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
 	}
 	/* An error result */
 	new (result) backend_result {nullptr, 0,
+		500, /* Internal server error */
 		0,
 		0, {}
 	};

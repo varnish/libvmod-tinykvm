@@ -14,7 +14,7 @@ int main(int argc, char **argv)
 __attribute__((used))
 extern void my_backend(const char *arg)
 {
-	return_result("text/plain", arg);
+	return_result(200, "text/plain", arg);
 }
 EOF
 gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}

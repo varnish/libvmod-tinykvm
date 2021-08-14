@@ -160,17 +160,22 @@ kvmbe_gethdrs(const struct director *dir,
 	kvm_backend_call(&ctx, machine,
 		kvmr->func, kvmr->funcarg, post, result);
 
-	if (result->type == NULL || result->tsize == 0)
+	/* Status code is sanitized in the backend call */
+	http_PutResponse(bo->beresp, "HTTP/1.1", result->status, NULL);
+	/* Allow missing content-type when no content present */
+	if (result->content_length > 0)
 	{
-		VSLb(ctx.vsl, SLT_Error, "Backend VM: Invalid response from VM");
-		http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
-		return (-1);
+		if (result->type == NULL || result->tsize == 0)
+		{
+			VSLb(ctx.vsl, SLT_Error, "Backend VM: Invalid response from VM");
+			http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
+			return (-1);
+		}
+		http_PrintfHeader(bo->beresp, "Content-Type: %.*s",
+			(int) result->tsize, result->type);
+		http_PrintfHeader(bo->beresp,
+			"Content-Length: %zu", result->content_length);
 	}
-
-	http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
-	http_PrintfHeader(bo->beresp, "Content-Type: %.*s",
-		(int) result->tsize, result->type);
-	http_PrintfHeader(bo->beresp, "Content-Length: %zu", result->content_length);
 
 	char timestamp[VTIM_FORMAT_SIZE];
 	VTIM_format(VTIM_real(), timestamp);

@@ -6,7 +6,8 @@ struct VMBuffer {
 
 struct backend_result {
 	const char *type;
-	size_t  tsize;
+	uint16_t tsize; /* Max 64KB Content-Type */
+	int16_t  status;
 	size_t  content_length;
 	size_t  bufcount;
 	struct VMBuffer buffers[0];
