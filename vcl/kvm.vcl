@@ -38,6 +38,11 @@ sub vcl_init {
 				"filename": "/tmp/zpizza",
 				"key": "12daf155b8508edc4a4b8002264d7494",
 				"group": "test"
+			},
+			"jpizza.com": {
+				"filename": "/tmp/jpizza",
+				"key": "12daf155b8508edc4a4b8002264d7494",
+				"group": "test"
 			}
 		}
 	""");
@@ -51,9 +56,16 @@ sub vcl_recv {
 	if (req.url == "/x") {
 		set req.http.Host = "xpizza.com";
 	}
+	else if (req.url == "/xpass") {
+		set req.http.Host = "xpizza.com";
+		return (pass);
+	}
 	else if (req.url == "/xhash") {
 		set req.http.Host = "xpizza.com";
 		return (hash);
+	}
+	else if (req.url == "/j") {
+		set req.http.Host = "jpizza.com";
 	}
 	else if (req.url == "/y") {
 		set req.http.Host = "ypizza.com";
@@ -117,5 +129,5 @@ sub vcl_backend_fetch {
 
 sub vcl_backend_response {
 	//brotli.compress();
-	set beresp.do_gzip = true;
+	//set beresp.do_gzip = true;
 }
