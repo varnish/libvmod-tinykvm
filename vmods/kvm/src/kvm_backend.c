@@ -224,6 +224,7 @@ kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING func
 	kvmr->funcarg = farg;
 	kvmr->max_response_size = 0;
 	kvmr->is_post = 0;
+	kvmr->process_func = 0x0;
 
 	struct director *dir = &kvmr->dir;
 	INIT_OBJ(dir, DIRECTOR_MAGIC);

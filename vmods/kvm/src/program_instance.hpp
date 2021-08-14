@@ -50,7 +50,7 @@ public:
 	kvm::ThreadPool<1> m_storage_queue;
 
 	/* Lookup tree for ELF symbol names */
-	std::map<std::string, gaddr_t> sym_lookup;
+	std::unordered_map<std::string, gaddr_t> sym_lookup;
 
 	std::unique_ptr<tinykvm::RSPClient> rspclient;
 	MachineInstance* rsp_script = nullptr;
