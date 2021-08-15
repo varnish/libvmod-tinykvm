@@ -64,8 +64,9 @@ sub vcl_recv {
 		set req.http.Host = "xpizza.com";
 		return (hash);
 	}
-	else if (req.url == "/j") {
+	else if (req.url == "/j" || req.url == "/j/get") {
 		set req.http.Host = "jpizza.com";
+		return (pass);
 	}
 	else if (req.url == "/y") {
 		set req.http.Host = "ypizza.com";

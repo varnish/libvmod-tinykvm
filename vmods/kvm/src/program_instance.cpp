@@ -115,6 +115,9 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			   but only if the length > 0, to allow src_addr=NULL. */
 			stm.copy_from_machine(new_stack, src, src_addr, src_size);
 		}
+		/* We need to use the CTX from the current program */
+		auto& inst = *src.get_userdata<MachineInstance>();
+		storage.set_ctx(inst.ctx());
 
 		try {
 			auto regs = stm.setup_call(func, new_stack,

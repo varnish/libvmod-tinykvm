@@ -140,6 +140,9 @@ tinykvm::Machine::printer_func MachineInstance::get_vsl_printer() const
 {
 	/* NOTE: Guests will "always" end with newlines */
 	return [this] (const char* buffer, size_t len) {
+		/* Avoid wrap-around and empty log */
+		if (buffer + len < buffer || len == 0)
+			return;
 		auto* vsl = this->ctx()->vsl;
 		if (vsl != nullptr) {
 			VSLb(vsl, SLT_VCL_Log,
