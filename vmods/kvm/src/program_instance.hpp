@@ -11,6 +11,10 @@ struct inst_pair {
 	MachineInstance* inst;
 	void (*free) (void*);
 };
+struct VirtBuffer {
+	uint64_t addr;
+	size_t   len;
+};
 
 class ProgramInstance {
 public:
@@ -34,8 +38,9 @@ public:
 	inst_pair concurrent_fork(const vrt_ctx*,
 		TenantInstance*, std::shared_ptr<ProgramInstance>&);
 
-	/* Serialized vmcall into storage VM */
-	long storage_call(tinykvm::Machine& src, gaddr_t func, gaddr_t, size_t, gaddr_t, size_t);
+	/* Serialized vector-based vmcall into storage VM */
+	long storage_call(tinykvm::Machine& src,
+		gaddr_t func, size_t n, VirtBuffer[n], gaddr_t, size_t);
 
 	/* Serialized call into storage VM during live update */
 	long live_update_call(gaddr_t func, tinykvm::Machine& newm, gaddr_t newfunc);

@@ -96,13 +96,11 @@ inst_pair ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 }
 
 long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
-	gaddr_t src_addr, size_t src_size, gaddr_t res_addr, size_t res_size)
+	size_t n, VirtBuffer buffers[n], gaddr_t res_addr, size_t res_size)
 {
 	uint64_t old_stack = storage.machine().stack_address();
-	uint64_t new_stack  = (old_stack - src_size) & ~0x7;
+
 	/* Detect wrap-around */
-	if (UNLIKELY(new_stack > old_stack))
-		return -1;
 	if (UNLIKELY(res_addr + res_size < res_addr))
 		return -1;
 
@@ -110,18 +108,28 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 	[&] () -> long
 	{
 		auto& stm = storage.machine();
-		if (src_size > 0) {
-			/* Copy from the source machine into storage,
-			   but only if the length > 0, to allow src_addr=NULL. */
-			stm.copy_from_machine(new_stack, src, src_addr, src_size);
+		uint64_t vaddr = old_stack;
+
+		for (size_t i = 0; i < n; i++) {
+			vaddr -= buffers[i].len;
+			vaddr &= ~(uint64_t)0x7;
+			stm.copy_from_machine(vaddr, src, buffers[i].addr, buffers[i].len);
+			buffers[i].addr = vaddr;
 		}
+
+		vaddr -= n * sizeof(VirtBuffer);
+		const uint64_t stm_bufaddr = vaddr;
+		stm.copy_to_guest(stm_bufaddr, buffers, n * sizeof(VirtBuffer));
+
+		const uint64_t new_stack = vaddr;
+
 		/* We need to use the CTX from the current program */
 		auto& inst = *src.get_userdata<MachineInstance>();
 		storage.set_ctx(inst.ctx());
 
 		try {
 			auto regs = stm.setup_call(func, new_stack,
-				(uint64_t)new_stack, (uint64_t)src_size, (uint64_t)res_size);
+				(uint64_t)n, (uint64_t)stm_bufaddr, (uint64_t)res_size);
 			stm.set_registers(regs);
 			stm.run();
 			/* Get the result buffer and length (capped to res_size) */

@@ -51,9 +51,28 @@ void MachineInstance::setup_syscall_interface()
 				} break;
 			case 0x10707: {
 				auto regs = machine.registers();
+				VirtBuffer buffers[1];
+				buffers[0] = {
+					.addr = (uint64_t)regs.rsi,  // src
+					.len  = (uint64_t)regs.rdx   // len
+				};
 				regs.rax = inst.instance().storage_call(machine,
-				/*  func      src       srcsize   dst       dstsize */
-					regs.rdi, regs.rsi, regs.rdx, regs.rcx, regs.r8);
+				/*  func      buf vector    dst     dstsize */
+					regs.rdi, 1, buffers, regs.rcx, regs.r8);
+				machine.set_registers(regs);
+				} break;
+			case 0x10708: {
+				auto regs = machine.registers();
+				const size_t n = regs.rsi;
+				if (n <= 64) {
+					VirtBuffer buffers[64];
+					machine.copy_from_guest(buffers, regs.rdx, n * sizeof(VirtBuffer));
+					regs.rax = inst.instance().storage_call(machine,
+					/*  func      buf vector    dst     dstsize */
+						regs.rdi, n, buffers, regs.rcx, regs.r8);
+				} else {
+					regs.rax = -1;
+				}
 				machine.set_registers(regs);
 				} break;
 			default:
