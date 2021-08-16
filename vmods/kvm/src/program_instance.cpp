@@ -1,8 +1,8 @@
 #include "program_instance.hpp"
 #include "tenant_instance.hpp"
+#include "gettid.hpp"
 #include "varnish.hpp"
 #include <tinykvm/rsp_client.hpp>
-extern "C" int gettid();
 
 namespace kvm {
 
