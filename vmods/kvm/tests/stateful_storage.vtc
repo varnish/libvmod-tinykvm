@@ -1,0 +1,80 @@
+varnishtest "KVM Hello World Backend"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include <string.h>
+#include "kvm_api.h"
+
+int main() {}
+static int counter = 0;
+static void my_storage(size_t n, struct virtbuffer buffers[n], size_t reslen)
+{
+	struct virtbuffer *hello_string = &buffers[0];
+	counter ++;
+	((char *)hello_string->data)[11] = '0' + (counter % 10);
+	/* Data contains the inputs */
+	storage_return(hello_string->data, hello_string->len);
+}
+
+__attribute__((used))
+extern void my_backend(const char *arg)
+{
+	const struct virtbuffer buffers[1] = {
+		{.data = TRUST_ME(arg), .len = strlen(arg)}
+	};
+	char result[256];
+	const long rlen =
+		storage_callv(my_storage, 1, buffers, result, sizeof(result));
+
+	const char ctype[] = "text/plain";
+	backend_response(200, ctype, sizeof(ctype)-1, result, rlen);
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+	import urlplus;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""
+			{
+				"xpizza.com": {
+					"filename": "${tmpdir}/${testname}",
+					"key": "",
+					"group": "test"
+				}
+			}
+		""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				"my_backend",
+				"Hello World!");
+	}
+} -start
+
+client c1 {
+	txreq -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World1"
+	expect resp.status == 200
+	txreq -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World2"
+	expect resp.status == 200
+	txreq -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World3"
+	expect resp.status == 200
+} -run

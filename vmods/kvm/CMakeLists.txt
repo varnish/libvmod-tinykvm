@@ -19,4 +19,5 @@ add_vmod_tests(vmod_kvm kvm
 	tests/hello_backend_world.vtc
 	tests/main_arguments.vtc
 	tests/not_found.vtc
+	tests/stateful_storage.vtc
 )
