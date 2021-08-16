@@ -42,6 +42,12 @@ $Function VOID embed_tenants(PRIV_VCL, STRING json)
 		}
 	""");
 
+$Function BOOL tenant_is_ready(PRIV_VCL, STRING tenant)
+
+- Returns true if the tenants current program was initialized properly.
+- Sending a new program by live update that fails will not replace
+  the current program. The only way a program can fail to be ready is
+  when the program provided at startup is either missing or failing.
 
 $Function VOID cache_symbol(STRING symbol)
 

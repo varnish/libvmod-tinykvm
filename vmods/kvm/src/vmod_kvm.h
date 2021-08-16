@@ -44,12 +44,16 @@ struct vmod_kvm_response
 	int16_t is_post;
 };
 
+typedef struct vmod_kvm_tenant * TEN_PTR;
+typedef struct vmod_kvm_machine * KVM_PTR;
+
 extern void kvm_init_tenants_str(VRT_CTX, VCL_PRIV, const char *);
 extern void kvm_init_tenants_file(VRT_CTX, VCL_PRIV, const char *);
 extern void kvm_cache_symbol(const char *);
 extern void initialize_vmods(VRT_CTX, VCL_PRIV);
-extern struct vmod_kvm_tenant *kvm_tenant_find(VCL_PRIV, const char *name);
-extern struct vmod_kvm_tenant *kvm_tenant_find_key(VCL_PRIV, const char *name, const char *key);
-extern struct vmod_kvm_machine *kvm_fork_machine(VRT_CTX, struct vmod_kvm_tenant *, int);
-extern uint64_t kvm_resolve_name(struct vmod_kvm_tenant *, const char*);
-extern int kvm_copy_to_machine(struct vmod_kvm_machine *, uint64_t dst, const void* src, size_t len);
+extern TEN_PTR kvm_tenant_find(VCL_PRIV, const char *name);
+extern TEN_PTR kvm_tenant_find_key(VCL_PRIV, const char *name, const char *key);
+extern int     kvm_tenant_gucci(TEN_PTR, int debug);
+extern KVM_PTR kvm_fork_machine(VRT_CTX, TEN_PTR, int);
+extern uint64_t kvm_resolve_name(TEN_PTR, const char*);
+extern int kvm_copy_to_machine(KVM_PTR, uint64_t dst, const void* src, size_t len);

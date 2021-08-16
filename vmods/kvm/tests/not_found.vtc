@@ -2,19 +2,15 @@ varnishtest "KVM Hello World Backend"
 
 shell {
 cat >${tmpdir}/${testname}.c <<-EOF
-#include <stdio.h>
 #include <string.h>
 #include "kvm_api.h"
 
-int main(int argc, char **argv)
-{
-	printf("Hello from %s!\n", argv[1]);
-}
+int main() {}
 
 __attribute__((used))
 extern void my_backend(const char *arg)
 {
-	return_result(200, "text/plain", arg);
+	return_result(404, "text/plain", "Not found");
 }
 EOF
 gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
@@ -23,7 +19,6 @@ gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
 varnish v1 -vcl+backend {
 vcl 4.1;
 	import kvm;
-	import urlplus;
 
 	backend default none;
 
@@ -46,18 +41,17 @@ vcl 4.1;
 	sub vcl_backend_fetch {
 		set bereq.backend = kvm.vm_backend(
 				bereq.http.Host,
-				urlplus.get_basename(),
-				"Hello World");
+				"my_backend", "");
 	}
 } -start
 
 client c1 {
 	txreq -url "/my_backend" -hdr "Host: xpizza.com"
 	rxresp
-	expect resp.body == "Hello World"
-	expect resp.status == 200
+	expect resp.body == "Not found"
+	expect resp.status == 404
 	txreq -url "/my_backend" -hdr "Host: xpizza.com"
 	rxresp
-	expect resp.body == "Hello World"
-	expect resp.status == 200
+	expect resp.body == "Not found"
+	expect resp.status == 404
 } -run

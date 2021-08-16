@@ -1,0 +1,52 @@
+varnishtest "KVM Hello World Backend"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include <assert.h>
+#include <string.h>
+#include "kvm_api.h"
+
+int main(int argc, char **argv)
+{
+	assert(argc == 3);
+	assert(strcmp(argv[0], "vmod_kvm") == 0);
+	assert(strcmp(argv[1], "xpizza.com") == 0);
+	assert(strlen(argv[2]) == 1);
+	assert(0);
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""
+			{
+				"xpizza.com": {
+					"filename": "${tmpdir}/${testname}",
+					"key": "",
+					"group": "test"
+				}
+			}
+		""");
+	}
+
+	sub vcl_recv {
+		if (kvm.tenant_is_ready("xpizza.com")) {
+			return (synth(404, "Tenant is ready"));
+		} else {
+			return (synth(500, "Tenant is *not* ready"));
+		}
+	}
+} -start
+
+client c1 {
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 500
+} -run

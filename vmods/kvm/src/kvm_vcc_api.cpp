@@ -26,6 +26,18 @@ uint64_t kvm_resolve_name(kvm::TenantInstance* tenant, const char* func)
 }
 
 extern "C"
+int kvm_tenant_gucci(kvm::TenantInstance* tenant, int debug)
+{
+	assert(tenant);
+	/* This works because the program can only be replaced with
+	   another working program. It will not become null again. */
+	if (!debug)
+		return tenant->program != nullptr;
+	else
+		return tenant->debug_program != nullptr;
+}
+
+extern "C"
 kvm::MachineInstance* kvm_fork_machine(const vrt_ctx *ctx, kvm::TenantInstance* tenant, bool debug)
 {
 	return tenant->vmfork(ctx, debug);
