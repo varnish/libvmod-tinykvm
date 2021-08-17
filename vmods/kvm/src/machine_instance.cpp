@@ -21,7 +21,7 @@ void MachineInstance::kvm_initialize()
 
 MachineInstance::MachineInstance(
 	const std::vector<uint8_t>& binary, const vrt_ctx* ctx,
-	const TenantInstance* ten, ProgramInstance& inst,
+	const TenantInstance* ten, ProgramInstance* inst,
 	bool storage, bool debug)
 	: m_ctx(ctx),
 	  m_machine(binary, {
@@ -56,7 +56,7 @@ MachineInstance::MachineInstance(
 
 MachineInstance::MachineInstance(
 	const MachineInstance& source, const vrt_ctx* ctx,
-	const TenantInstance* ten, ProgramInstance& inst)
+	const TenantInstance* ten, ProgramInstance* inst)
 	: m_ctx(ctx),
 	  m_machine(source.machine(), {
 		.max_mem = ten->config.max_memory(),
@@ -100,7 +100,13 @@ MachineInstance::MachineInstance(
 void MachineInstance::reset_to(const vrt_ctx* ctx, MachineInstance& master)
 {
 	this->m_ctx = ctx;
-	machine().reset_to(master.machine());
+	machine().reset_to(master.machine(), {
+		.max_mem = tenant().config.max_memory(),
+		.max_cow_mem = tenant().config.max_work_memory(),
+	});
+	this->m_tenant = master.m_tenant;
+	this->m_inst   = master.m_inst;
+	this->m_sighandler = master.m_sighandler;
 	/* XXX: Todo: reset more stuff */
 }
 

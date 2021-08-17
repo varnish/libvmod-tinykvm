@@ -40,8 +40,8 @@ public:
 	const auto* ctx() const noexcept { return m_ctx; }
 	void set_ctx(const vrt_ctx* ctx) { m_ctx = ctx; }
 	const auto& tenant() const noexcept { return *m_tenant; }
-	auto& instance() { return m_inst; }
-	const auto& instance() const { return m_inst; }
+	auto& instance() { return *m_inst; }
+	const auto& instance() const { return *m_inst; }
 	void assign_instance(std::shared_ptr<ProgramInstance>& ref) { m_inst_ref = std::move(ref); }
 	void unassign_instance() { m_inst_ref = nullptr; }
 
@@ -49,7 +49,6 @@ public:
 	const std::string& name() const noexcept;
 	const std::string& group() const noexcept;
 
-	bool is_paused() const noexcept { return m_is_paused; }
 	bool is_storage() const noexcept { return m_is_storage; }
 	bool is_debug() const noexcept { return m_is_debug; }
 	gaddr_t max_memory() const noexcept;
@@ -66,8 +65,8 @@ public:
 	void open_debugger(uint16_t);
 
 	static void kvm_initialize();
-	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance&, bool sto, bool dbg);
-	MachineInstance(const MachineInstance& source, const vrt_ctx*, const TenantInstance*, ProgramInstance&);
+	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool sto, bool dbg);
+	MachineInstance(const MachineInstance& source, const vrt_ctx*, const TenantInstance*, ProgramInstance*);
 	~MachineInstance();
 	void reset_to(const vrt_ctx*, MachineInstance& master);
 
@@ -81,8 +80,7 @@ private:
 	const vrt_ctx* m_ctx;
 	machine_t m_machine;
 	const TenantInstance* m_tenant = nullptr;
-	ProgramInstance& m_inst;
-	bool        m_is_paused = false;
+	ProgramInstance* m_inst;
 	bool        m_is_storage = false;
 	bool        m_is_debug = false;
 	bool        m_currently_debugging = false;

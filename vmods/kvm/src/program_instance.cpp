@@ -25,8 +25,8 @@ ProgramInstance::ProgramInstance(
 	const vrt_ctx* ctx, TenantInstance* ten,
 	bool debug)
 	: binary{std::move(elf)},
-	  script{binary, ctx, ten, *this, false, debug},
-	  storage{binary, ctx, ten, *this, true, debug},
+	  script{binary, ctx, ten, this, false, debug},
+	  storage{binary, ctx, ten, this, true, debug},
 	  rspclient{nullptr}
 {
 	extern std::vector<const char*> lookup_wishlist;
@@ -36,8 +36,6 @@ ProgramInstance::ProgramInstance(
 		const auto addr = lookup(func);
 		sym_lookup.emplace(func, addr);
 	}
-
-	instances.reserve(ten->config.max_machines());
 }
 ProgramInstance::~ProgramInstance()
 {
@@ -48,7 +46,7 @@ inst_pair ProgramInstance::workspace_fork(const vrt_ctx* ctx,
 {
 	auto* alloc = WS_Alloc(ctx->ws, sizeof(MachineInstance));
 	MachineInstance *mi =
-		new (alloc) MachineInstance{this->script, ctx, tenant, *this};
+		new (alloc) MachineInstance{this->script, ctx, tenant, this};
 	mi->assign_instance(prog);
 	return {mi, [] (void* inst) {
 		auto* mi = (MachineInstance *)inst;
@@ -59,30 +57,14 @@ inst_pair ProgramInstance::workspace_fork(const vrt_ctx* ctx,
 inst_pair ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 	TenantInstance* tenant, std::shared_ptr<ProgramInstance>& prog)
 {
-	const int tid = gettid();
-	MachineInstance* inst;
-	{
-		/* Lock that unlocks on scope exit (exception safety) */
-		std::unique_lock<std::mutex> lck(instances_mtx);
-		auto it = instances.find(tid);
-
-		if (UNLIKELY(it == instances.end())) {
-			/* XXX: We can check the size without locking */
-			const size_t max = tenant->config.max_machines();
-			if (UNLIKELY(instances.size() >= max)) {
-				return workspace_fork(ctx, tenant, prog);
-			}
-			/* Create a new machine instance on-demand */
-			auto p = instances.emplace(std::piecewise_construct,
-				std::forward_as_tuple(tid),
-				std::forward_as_tuple(this->script, ctx, tenant, *this));
-			inst = &p.first->second;
-		} else {
-			inst = &it->second;
-			/* The VM should already be reset, but needs a new VRT ctx */
-			inst->set_ctx(ctx);
-		}
-	} /* Scope unlock */
+	thread_local MachineInstance* inst = nullptr;
+	if (UNLIKELY(inst == nullptr)) {
+		/* Create a new machine instance on-demand */
+		inst = new MachineInstance(this->script, ctx, tenant, this);
+	} else {
+		/* The VM needs to be reset and get a new VRT ctx */
+		inst->reset_to(ctx, this->script);
+	}
 
 	/* This creates a self-reference, which ensures that open
 	   Machine instances will keep the program instance alive. */
@@ -90,7 +72,6 @@ inst_pair ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 	/* What happens when the transaction is done */
 	return {inst, [] (void* inst) {
 		auto* mi = (MachineInstance *)inst;
-		mi->reset_to(nullptr, mi->instance().script);
 		mi->unassign_instance();
 	}};
 }

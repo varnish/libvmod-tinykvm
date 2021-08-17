@@ -1,7 +1,6 @@
 #pragma once
 #include "machine_instance.hpp"
 #include "utils/thread_pool.hpp"
-#include <map>
 namespace tinykvm {
 	struct RSPClient;
 }
@@ -47,9 +46,6 @@ public:
 
 	const std::vector<uint8_t> binary;
 	MachineInstance  script;
-
-	std::unordered_map<int, MachineInstance> instances;
-	std::mutex instances_mtx;
 
 	MachineInstance  storage;
 	kvm::ThreadPool<1> m_storage_queue;
