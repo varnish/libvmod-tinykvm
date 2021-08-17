@@ -45,6 +45,7 @@ MachineInstance::MachineInstance(
 		if (!storage) {
 			/* Make forkable */
 			machine().prepare_copy_on_write();
+		} else {
 			printf("Program for tenant %s is loaded\n", name().c_str());
 		}
 	} catch (...) {
@@ -152,9 +153,9 @@ tinykvm::Machine::printer_func MachineInstance::get_vsl_printer() const
 		auto* vsl = this->ctx()->vsl;
 		if (vsl != nullptr) {
 			VSLb(vsl, SLT_VCL_Log,
-				"Guest says: %.*s", (int)len, buffer);
+				"%s says: %.*s", name().c_str(), (int)len, buffer);
 		} else {
-			printf("Guest says: %.*s", (int)len, buffer);
+			printf("%s says: %.*s", name().c_str(), (int)len, buffer);
 		}
 	};
 }

@@ -37,6 +37,7 @@ void MachineInstance::sanitize_path(char* buffer, size_t buflen)
 void MachineInstance::setup_syscall_interface()
 {
 	using namespace tinykvm;
+
 	Machine::install_unhandled_syscall_handler(
 	[] (Machine& machine, unsigned scall) {
 		auto& inst = *machine.get_userdata<MachineInstance>();
@@ -76,7 +77,8 @@ void MachineInstance::setup_syscall_interface()
 				machine.set_registers(regs);
 				} break;
 			default:
-				printf("Unhandled system call: %u\n", scall);
+				printf("%s: Unhandled system call %u\n",
+					inst.name().c_str(), scall);
 				auto regs = machine.registers();
 				regs.rax = -ENOSYS;
 				machine.set_registers(regs);
