@@ -1,0 +1,68 @@
+varnishtest "KVM Backend: Superflous machines forked on-demand"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include <stdio.h>
+#include <string.h>
+#include "kvm_api.h"
+
+int main(int argc, char **argv)
+{
+	printf("Hello from %s!\n", argv[1]);
+}
+
+__attribute__((used))
+extern void my_backend(const char *arg)
+{
+	return_result(200, "text/plain", arg);
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""
+			{
+				"nomachines": {
+					"max_time": 20,
+					"max_memory": 16384,
+					"max_work_memory": 64,
+					"max_machines": 0
+				},
+				"xpizza.com": {
+					"filename": "${tmpdir}/${testname}",
+					"key": "",
+					"group": "nomachines"
+				}
+			}
+		""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				"my_backend",
+				"Hello World");
+	}
+} -start
+
+client c1 {
+	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+} -run

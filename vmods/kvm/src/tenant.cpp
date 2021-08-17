@@ -14,8 +14,8 @@ extern std::vector<uint8_t> file_loader(const std::string&);
 static const TenantGroup test_group {
 	"test",
 	256, /* Milliseconds */
-	256 * 1024 * 1024, /* Memory */
-	4 * 1024 * 1024, /* 4MB working memory */
+	256 * 1024, /* 256MB main memory */
+	4 * 1024, /* 4MB working memory */
 };
 
 Tenants& tenancy(VCL_PRIV task)
@@ -110,6 +110,7 @@ static void kvm_init_tenants(VRT_CTX, VCL_PRIV task,
 					obj.contains("max_memory") &&
 					obj.contains("max_work_memory"))
 				{
+					auto ins =
 					groups.emplace(std::piecewise_construct,
 						std::forward_as_tuple(it.key()),
 						std::forward_as_tuple(
@@ -118,6 +119,11 @@ static void kvm_init_tenants(VRT_CTX, VCL_PRIV task,
 							obj["max_memory"],
 							obj["max_work_memory"]
 						));
+					auto& group = ins.first->second;
+					/* Optional group settings */
+					if (obj.contains("max_machines")) {
+						group.max_machines = obj["max_machines"];
+					}
 				} else {
 					VRT_fail(ctx, "Tenancy JSON %s: group '%s' has missing fields",
 						source, it.key().c_str());

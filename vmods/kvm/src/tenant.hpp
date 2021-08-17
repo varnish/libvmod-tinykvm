@@ -36,7 +36,7 @@ struct TenantGroup {
 	vmods_t vmods;
 
 	TenantGroup(std::string n, uint64_t mi, uint64_t mm, uint64_t mwm, vmods_t&& vm = vmods_t{})
-		: name{n}, max_time(mi), max_memory(mm), max_work_mem(mwm),
+		: name{n}, max_time(mi), max_memory(mm * 1024ul), max_work_mem(mwm * 1024ul),
 		  vmods{std::move(vm)}  {}
 };
 
