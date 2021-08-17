@@ -54,9 +54,12 @@ struct Cache {
 		cache.at(idx).free();
 	}
 
-	void loan_from(const Cache& source) {
-		/* Load the items of the source and make them non-owned */
-		for (const auto& item : source.cache) {
+	void reset_and_loan(const Cache& other) {
+		/* Clear out the cache and reset to other */
+		this->max_entries = other.max_entries;
+		cache.clear();
+		/* Load the items of the other and make them non-owned */
+		for (const auto& item : other.cache) {
 			cache.push_back(item);
 			cache.back().non_owned = true;
 		}
@@ -72,7 +75,7 @@ struct Cache {
 		: max_entries(max), description(desc) {}
 
 	std::vector<Entry> cache;
-	const size_t max_entries;
+	size_t max_entries;
 	const char*  description;
 };
 

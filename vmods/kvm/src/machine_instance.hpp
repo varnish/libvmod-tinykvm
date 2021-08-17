@@ -68,6 +68,7 @@ public:
 	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool sto, bool dbg);
 	MachineInstance(const MachineInstance& source, const vrt_ctx*, const TenantInstance*, ProgramInstance*);
 	~MachineInstance();
+	void tail_reset();
 	void reset_to(const vrt_ctx*, MachineInstance& master);
 
 private:

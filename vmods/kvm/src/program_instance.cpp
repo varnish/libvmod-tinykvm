@@ -72,6 +72,7 @@ inst_pair ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 	/* What happens when the transaction is done */
 	return {inst, [] (void* inst) {
 		auto* mi = (MachineInstance *)inst;
+		mi->tail_reset();
 		mi->unassign_instance();
 	}};
 }

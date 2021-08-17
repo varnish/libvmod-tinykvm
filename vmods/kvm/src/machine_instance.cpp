@@ -61,18 +61,6 @@ MachineInstance::MachineInstance(
 	  m_machine(source.machine(), {
 		.max_mem = ten->config.max_memory(),
 		.max_cow_mem = ten->config.max_work_memory(),
-/*		.page_allocator = [this] (const size_t N) -> char* {
-			char* mem = (char *)WS_Alloc(m_ctx->ws, (N + 1) * 4096);
-			if (mem == nullptr) return nullptr;
-			// Page re-alignment
-			uintptr_t addr = (uintptr_t) mem;
-			if (addr & ~(uint64_t) 0xFFF) {
-				mem += 0x1000 - (addr & 0xFFF);
-			}
-			return mem;
-		},
-		.page_deallocator = [] (char*) {
-		},*/
 	  }),
 	  m_tenant(ten), m_inst(inst),
 	  m_is_debug(source.is_debug()),
@@ -87,37 +75,25 @@ MachineInstance::MachineInstance(
 	machine().set_userdata<MachineInstance> (this);
 	machine().set_printer(get_vsl_printer());
 	/* Load the fds of the source */
-	m_fd.loan_from(source.m_fd);
+	m_fd.reset_and_loan(source.m_fd);
 	/* Load the compiled regexes of the source */
-	m_regex.loan_from(source.m_regex);
+	m_regex.reset_and_loan(source.m_regex);
 	/* Load the directors of the source */
-	m_directors.loan_from(source.m_directors);
+	m_directors.reset_and_loan(source.m_directors);
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t1);
 	printf("Total time in MachineInstance constr body: %ldns\n", nanodiff(t0, t1));
 #endif
 }
-void MachineInstance::reset_to(const vrt_ctx* ctx, MachineInstance& master)
-{
-	this->m_ctx = ctx;
-	machine().reset_to(master.machine(), {
-		.max_mem = tenant().config.max_memory(),
-		.max_cow_mem = tenant().config.max_work_memory(),
-	});
-	this->m_tenant = master.m_tenant;
-	this->m_inst   = master.m_inst;
-	this->m_sighandler = master.m_sighandler;
-	/* XXX: Todo: reset more stuff */
-}
 
-MachineInstance::~MachineInstance()
+void MachineInstance::tail_reset()
 {
-	// close any open files
+	/* Close any open files */
 	m_fd.foreach_owned(
 		[] (const auto& entry) {
 			close(entry.item);
 		});
-	// free any owned regex pointers
+	/* Free any owned regex pointers */
 	m_regex.foreach_owned(
 		[] (auto& entry) {
 			VRE_free(&entry.item);
@@ -125,6 +101,30 @@ MachineInstance::~MachineInstance()
 	if (this->is_debug()) {
 		//this->stop_debugger();
 	}
+}
+void MachineInstance::reset_to(const vrt_ctx* ctx, MachineInstance& source)
+{
+	this->m_ctx = ctx;
+	m_tenant = source.m_tenant;
+	machine().reset_to(source.machine(), {
+		.max_mem = tenant().config.max_memory(),
+		.max_cow_mem = tenant().config.max_work_memory(),
+	});
+	m_inst   = source.m_inst;
+	m_sighandler = source.m_sighandler;
+
+	/* Load the fds of the source */
+	m_fd.reset_and_loan(source.m_fd);
+	/* Load the compiled regexes of the source */
+	m_regex.reset_and_loan(source.m_regex);
+	/* Load the directors of the source */
+	m_directors.reset_and_loan(source.m_directors);
+	/* XXX: Todo: reset more stuff */
+}
+
+MachineInstance::~MachineInstance()
+{
+	this->tail_reset();
 }
 
 void MachineInstance::copy_to(uint64_t addr, const void* src, size_t len, bool zeroes)
