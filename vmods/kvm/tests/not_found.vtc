@@ -1,4 +1,4 @@
-varnishtest "KVM Hello World Backend"
+varnishtest "KVM Backend: Verify that status codes work"
 
 shell {
 cat >${tmpdir}/${testname}.c <<-EOF
@@ -10,7 +10,13 @@ int main() {}
 __attribute__((used))
 extern void my_backend(const char *arg)
 {
-	return_result(404, "text/plain", "Not found");
+	if (strcmp(arg, "/my_backend") == 0) {
+		return_result(404, "text/plain", "Not found");
+	}
+	else if (strcmp(arg, "/my_admin") == 0) {
+		return_result(403, "text/plain", "Forbidden");
+	}
+	return_result(401, "text/plain", "Unauthorized");
 }
 EOF
 gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
@@ -41,7 +47,8 @@ vcl 4.1;
 	sub vcl_backend_fetch {
 		set bereq.backend = kvm.vm_backend(
 				bereq.http.Host,
-				"my_backend", "");
+				"my_backend",
+				bereq.url);
 	}
 } -start
 
@@ -50,8 +57,8 @@ client c1 {
 	rxresp
 	expect resp.body == "Not found"
 	expect resp.status == 404
-	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+	txreq -url "/my_admin" -hdr "Host: xpizza.com"
 	rxresp
-	expect resp.body == "Not found"
-	expect resp.status == 404
+	expect resp.body == "Forbidden"
+	expect resp.status == 403
 } -run

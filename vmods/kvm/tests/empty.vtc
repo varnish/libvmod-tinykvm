@@ -1,4 +1,4 @@
-varnishtest "KVM Empty program returns 503"
+varnishtest "KVM Backend: Empty program returns 503"
 
 varnish v1 -vcl+backend {
 vcl 4.1;

@@ -1,4 +1,4 @@
-varnishtest "KVM Hello World Backend"
+varnishtest "KVM: Verify arguments passed to programs"
 
 shell {
 cat >${tmpdir}/${testname}.c <<-EOF
@@ -12,7 +12,6 @@ int main(int argc, char **argv)
 	assert(strcmp(argv[0], "vmod_kvm") == 0);
 	assert(strcmp(argv[1], "xpizza.com") == 0);
 	assert(strlen(argv[2]) == 1);
-	assert(0);
 }
 EOF
 gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
@@ -48,5 +47,5 @@ vcl 4.1;
 client c1 {
 	txreq -url "/" -hdr "Host: xpizza.com"
 	rxresp
-	expect resp.status == 500
+	expect resp.status == 404
 } -run

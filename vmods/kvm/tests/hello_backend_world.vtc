@@ -1,4 +1,4 @@
-varnishtest "KVM Hello World Backend"
+varnishtest "KVM Backend: Basic Hello World test"
 
 shell {
 cat >${tmpdir}/${testname}.c <<-EOF
