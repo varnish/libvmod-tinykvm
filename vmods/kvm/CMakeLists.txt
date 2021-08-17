@@ -16,6 +16,7 @@ endif()
 # VCL import name is "kvm"
 add_vmod_tests(vmod_kvm kvm
 	tests/empty.vtc
+	tests/failing_program.vtc
 	tests/hello_backend_world.vtc
 	tests/main_arguments.vtc
 	tests/not_found.vtc
