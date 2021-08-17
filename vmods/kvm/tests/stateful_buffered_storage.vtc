@@ -1,0 +1,95 @@
+varnishtest "KVM Backend: Stateful storage with many buffers"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include <assert.h>
+#include <string.h>
+#include "kvm_api.h"
+
+int main() {}
+
+static void partial_buffers(size_t n, struct virtbuffer buffers[n], size_t r)
+{
+	static char state[64];
+	static char *current = state;
+	assert(n == 8);
+
+	for (size_t i = 0; i < 8; i++) {
+		assert(buffers[i].data != NULL);
+		assert(buffers[i].len == 1);
+		*current++ = ((char *)buffers[i].data)[0];
+	}
+
+	/* Data contains the inputs */
+	storage_return(state, current - state);
+}
+
+__attribute__((used))
+extern void my_backend(const char *arg)
+{
+	const struct virtbuffer buffers[8] = {
+		{.data = TRUST_ME("1"), .len = 1},
+		{.data = TRUST_ME("2"), .len = 1},
+		{.data = TRUST_ME("3"), .len = 1},
+		{.data = TRUST_ME("4"), .len = 1},
+		{.data = TRUST_ME("5"), .len = 1},
+		{.data = TRUST_ME("6"), .len = 1},
+		{.data = TRUST_ME("7"), .len = 1},
+		{.data = TRUST_ME("8"), .len = 1},
+	};
+	char result[64];
+	const long rlen =
+		storage_callv(partial_buffers, 8, buffers, result, sizeof(result));
+
+	const char ctype[] = "text/plain";
+	backend_response(200, ctype, sizeof(ctype)-1, result, rlen);
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+	import urlplus;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""
+			{
+				"xpizza.com": {
+					"filename": "${tmpdir}/${testname}",
+					"key": "",
+					"group": "test"
+				}
+			}
+		""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				"my_backend",
+				"Hello World!");
+	}
+} -start
+
+client c1 {
+	txreq -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "12345678"
+	expect resp.status == 200
+	txreq -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "1234567812345678"
+	expect resp.status == 200
+	txreq -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "123456781234567812345678"
+	expect resp.status == 200
+} -run
