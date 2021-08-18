@@ -22,11 +22,12 @@ kvmbe_panic(const struct director *dir, struct vsb *vsb)
 static void v_matchproto_(vdi_finish_f)
 kvmbe_finish(const struct director *dir, struct worker *wrk, struct busyobj *bo)
 {
-	CHECK_OBJ_NOTNULL(dir, DIRECTOR_MAGIC);
-	struct vmod_kvm_updater *kvmu = (struct vmod_kvm_updater *) dir->priv;
-	CHECK_OBJ_NOTNULL(kvmu, KVM_BACKEND_MAGIC);
 	(void) wrk;
-	/* The objects here are workspace allocated */
+	(void) dir;
+
+	CHECK_OBJ_NOTNULL(bo->htc, HTTP_CONN_MAGIC);
+	bo->htc->priv = NULL;
+	bo->htc->magic = 0;
 	bo->htc = NULL;
 }
 
@@ -79,7 +80,7 @@ pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 }
 
 static const struct vfp kvm_fetch_processor = {
-	.name = "kvm_response_backend",
+	.name = "kvm_backend",
 	.pull = pull,
 };
 

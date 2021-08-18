@@ -17,13 +17,12 @@ kvm_updater_be_panic(const struct director *dir, struct vsb *vsb)
 static void v_matchproto_(vdi_finish_f)
 kvm_updater_be_finish(const struct director *dir, struct worker *wrk, struct busyobj *bo)
 {
-	CHECK_OBJ_NOTNULL(dir, DIRECTOR_MAGIC);
-	struct vmod_kvm_updater *kvmu = (struct vmod_kvm_updater *) dir->priv;
-	CHECK_OBJ_NOTNULL(kvmu, KVM_BACKEND_MAGIC);
-	//FREE_OBJ(dir);
-	//FREE_OBJ(rvu);
 	(void) wrk;
-	/* */
+	(void) dir;
+
+	CHECK_OBJ_NOTNULL(bo->htc, HTTP_CONN_MAGIC);
+	bo->htc->priv = NULL;
+	bo->htc->magic = 0;
 	bo->htc = NULL;
 }
 
@@ -48,7 +47,7 @@ pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 }
 
 static const struct vfp kvm_fetch_processor = {
-	.name = "kvm_update_fetcher",
+	.name = "kvm_updater",
 	.pull = pull,
 };
 
@@ -108,7 +107,7 @@ kvm_updater_be_gethdrs(const struct director *dir,
 
 	/* Update this machine */
 	struct vmod_kvm_updater *kvmu;
-	CAST_OBJ_NOTNULL(kvmu, dir->priv, KVM_BACKEND_MAGIC);
+	CAST_OBJ_NOTNULL(kvmu, dir->priv, KVM_UPDATER_MAGIC);
 
 	if (result_len > kvmu->max_binary_size)
 	{
@@ -144,7 +143,7 @@ kvm_updater_be_gethdrs(const struct director *dir,
 	struct update_result result =
 		kvm_live_update(&ctx, kvmu->tenant, &uparams);
 
-	http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
+	http_PutResponse(bo->beresp, "HTTP/1.1", 201, NULL);
 	http_PrintfHeader(bo->beresp, "Content-Length: %zu", result.len);
 
 	/* store the output in workspace and free result */
@@ -183,30 +182,30 @@ VCL_BACKEND vmod_live_update(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRI
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	if (key == NULL) {
 		VRT_fail(ctx, "Missing key");
-		return NULL;
+		return (NULL);
 	}
 
 	struct vmod_kvm_tenant *ten = kvm_tenant_find_key(task, tenant, key);
 	if (ten == NULL) {
 		VRT_fail(ctx, "Could not find tenant: %s, or wrong key: %s",
 			tenant, key);
-		return NULL;
+		return (NULL);
 	}
 
 	struct vmod_kvm_updater *kvmu;
 	kvmu = WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_updater));
 	if (kvmu == NULL) {
 		VRT_fail(ctx, "Out of workspace for live update");
-		return NULL;
+		return (NULL);
 	}
 
-	INIT_OBJ(kvmu, KVM_BACKEND_MAGIC);
+	INIT_OBJ(kvmu, KVM_UPDATER_MAGIC);
 	kvmu->max_binary_size = max_size;
 	kvmu->tenant = ten;
 	kvmu->is_debug = 0;
 	kvm_update_director(&kvmu->dir, kvmu);
 
-	return &kvmu->dir;
+	return (&kvmu->dir);
 }
 
 VCL_BACKEND vmod_live_debug(
@@ -215,29 +214,29 @@ VCL_BACKEND vmod_live_debug(
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	if (key == NULL) {
 		VRT_fail(ctx, "Missing key");
-		return NULL;
+		return (NULL);
 	}
 
 	struct vmod_kvm_tenant *ten = kvm_tenant_find_key(task, tenant, key);
 	if (ten == NULL) {
 		VRT_fail(ctx, "Could not find tenant: %s, or wrong key: %s",
 			tenant, key);
-		return NULL;
+		return (NULL);
 	}
 
 	struct vmod_kvm_updater *kvmu;
 	kvmu = WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_updater));
 	if (kvmu == NULL) {
 		VRT_fail(ctx, "Out of workspace for live debugging");
-		return NULL;
+		return (NULL);
 	}
 
-	INIT_OBJ(kvmu, KVM_BACKEND_MAGIC);
+	INIT_OBJ(kvmu, KVM_UPDATER_MAGIC);
 	kvmu->max_binary_size = max_size;
 	kvmu->tenant = ten;
 	kvmu->is_debug   = 1;
 	kvmu->debug_port = 0;
 	kvm_update_director(&kvmu->dir, kvmu);
 
-	return &kvmu->dir;
+	return (&kvmu->dir);
 }

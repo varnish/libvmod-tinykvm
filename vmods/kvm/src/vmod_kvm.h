@@ -9,6 +9,7 @@
 typedef struct vmod_priv * VCL_PRIV;
 
 #define KVM_BACKEND_MAGIC 0x645603935c082fa6
+#define KVM_UPDATER_MAGIC 0xb39b941de14e9f89
 
 struct vmod_kvm_backend
 {
