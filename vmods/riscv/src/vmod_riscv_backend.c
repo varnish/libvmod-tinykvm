@@ -52,7 +52,7 @@ pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 }
 
 static const struct vfp riscv_fetch_processor = {
-	.name = "riscv_response_backend",
+	.name = "riscv_backend",
 	.pull = pull,
 };
 
@@ -127,7 +127,7 @@ riscvbe_gethdrs(const struct director *dir,
 	return (0);
 }
 
-static void setup_response_director(struct director *dir, struct vmod_riscv_response *rvr)
+static void setup_backend_director(struct director *dir, struct vmod_riscv_response *rvr)
 {
 	INIT_OBJ(dir, DIRECTOR_MAGIC);
 	dir->priv = rvr;
@@ -167,7 +167,7 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING func, VCL_STRING farg)
 	}
 	rvr->max_response_size = 0;
 
-	setup_response_director(&rvr->dir, rvr);
+	setup_backend_director(&rvr->dir, rvr);
 
 	return &rvr->dir;
 }
