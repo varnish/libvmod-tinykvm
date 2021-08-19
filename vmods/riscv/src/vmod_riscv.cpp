@@ -1,6 +1,7 @@
 #include "sandbox.hpp"
 #include "varnish.hpp"
 extern "C" {
+#  include "riscv_backend.h"
 #  include "update_result.h"
 }
 static bool file_writer(const std::string& file, const std::vector<uint8_t>&);
@@ -311,15 +312,6 @@ int  riscv_current_apply_hash(VRT_CTX)
 	return 0;
 }
 
-struct backend_buffer {
-	const char* type;
-	size_t      tsize;
-	const char* data;
-	size_t      size;
-};
-inline backend_buffer backend_error() {
-	return backend_buffer {nullptr, 0, nullptr, 0};
-}
 inline const char* optional_copy(VRT_CTX, const riscv::Buffer& buffer)
 {
 	char* data = (char*) WS_Alloc(ctx->ws, buffer.size());
@@ -331,7 +323,8 @@ inline const char* optional_copy(VRT_CTX, const riscv::Buffer& buffer)
 }
 
 extern "C"
-struct backend_buffer riscv_backend_call(VRT_CTX, const void* key, long func, long farg)
+void riscv_backend_call(VRT_CTX, const void* key, long func, long farg,
+	struct backend_result *result)
 {
 	auto* script = get_machine(ctx, key);
 	if (script) {
@@ -349,19 +342,22 @@ struct backend_buffer riscv_backend_call(VRT_CTX, const void* key, long func, lo
 			script->set_ctx(old_ctx);
 
 			/* Get content-type and data */
-			const auto [type, data] = script->machine().sysargs<riscv::Buffer, riscv::Buffer> ();
+			const auto [type, data, datalen] =
+				script->machine().sysargs<riscv::Buffer, Script::gaddr_t, Script::gaddr_t> ();
 			/* Return content-type, data, size */
-			const backend_buffer result {
-				.type = optional_copy(ctx, type),
-				.tsize = type.size(),
-				.data = optional_copy(ctx, data),
-				.size = data.size()
-			};
+			using vBuffer = riscv::Memory<Script::MARCH>::vBuffer;
+			result->type = optional_copy(ctx, type);
+			result->tsize = type.size();
+			result->status = 200;
+			result->content_length = datalen;
+			result->bufcount = script->machine().memory.gather_buffers_from_range(
+				result->bufcount, (vBuffer *)result->buffers, data, datalen);
+
 		#ifdef ENABLE_TIMING
 			TIMING_LOCATION(t2);
 			printf("Time spent in backend_call(): %ld ns\n", nanodiff(t1, t2));
 		#endif
-			return result;
+			return;
 		} catch (const riscv::MachineException& e) {
 			fprintf(stderr, "Backend VM exception: %s (data: 0x%lX)\n",
 				e.what(), e.data());
@@ -374,7 +370,12 @@ struct backend_buffer riscv_backend_call(VRT_CTX, const void* key, long func, lo
 		}
 		script->set_ctx(old_ctx);
 	}
-	return backend_error();
+	/* An error result */
+	new (result) backend_result {nullptr, 0,
+		500, /* Internal server error */
+		0,
+		0, {}
+	};
 }
 
 bool file_writer(const std::string& filename, const std::vector<uint8_t>& binary)

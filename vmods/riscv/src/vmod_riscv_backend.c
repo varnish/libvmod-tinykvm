@@ -1,4 +1,5 @@
 #include "vmod_riscv.h"
+#include "riscv_backend.h"
 
 #include <malloc.h>
 #include <stdlib.h>
@@ -8,7 +9,7 @@
 
 extern long riscv_current_result_status(VRT_CTX);
 extern struct vmod_riscv_machine* riscv_current_machine(VRT_CTX);
-extern struct backend_buffer riscv_backend_call(VRT_CTX, const void*, long, long);
+extern void riscv_backend_call(VRT_CTX, const void*, long, long, struct backend_result *);
 extern uint64_t riscv_resolve_name(struct vmod_riscv_machine*, const char*);
 
 static void v_matchproto_(vdi_panic_f)
@@ -39,16 +40,44 @@ pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 	AN(p);
 	AN(lp);
 
-	ssize_t len = (vfe->priv2 > *lp) ? *lp : vfe->priv2;
-	assert(len == 0 || vfe->priv1);
-	memcpy(p, vfe->priv1, len);
-	*lp = len;
-	vfe->priv1 = (char *)vfe->priv1 + len;
-	vfe->priv2 -= len;
-	if (vfe->priv2)
-		return (VFP_OK);
-	else
+	struct backend_result *result = (struct backend_result *)vfe->priv1;
+	if (result->content_length == 0) {
+		*lp = 0;
 		return (VFP_END);
+	}
+
+	struct VMBuffer *current = &result->buffers[vfe->priv2];
+	ssize_t max = *lp;
+	ssize_t written = 0;
+
+	while (1) {
+		ssize_t len = (current->size > max) ? max : current->size;
+		memcpy(p, current->data, len);
+		p = (void *) ((char *)p + len);
+		current->data += len;
+		current->size -= len;
+		written += len;
+
+		/* Go to next buffer, or end if no more */
+		if (current->size == 0) {
+			/* Go to next buffer */
+			vfe->priv2 ++;
+			/* Reaching bufcount means end of fetch */
+			if (vfe->priv2 == (ssize_t)result->bufcount) {
+				assert(current->size == 0);
+				*lp = written;
+				return (VFP_END);
+			}
+			current = &result->buffers[vfe->priv2];
+		}
+		/* Return later if there's more, and we can't send more */
+		max -= len;
+		if (max == 0) {
+			assert(vfe->priv2 < (ssize_t)result->bufcount);
+			*lp = written;
+			return (VFP_OK);
+		}
+	}
 }
 
 static const struct vfp riscv_fetch_processor = {
@@ -67,7 +96,7 @@ vfp_init(struct busyobj *bo)
 	CHECK_OBJ_NOTNULL(vfe, VFP_ENTRY_MAGIC);
 
 	vfe->priv1 = bo->htc->priv;
-	vfe->priv2 = bo->htc->content_length;
+	vfe->priv2 = 0;
 }
 
 static int v_matchproto_(vdi_gethdrs_f)
@@ -95,19 +124,26 @@ riscvbe_gethdrs(const struct director *dir,
 		.http_bereq  = bo->bereq,
 		.http_beresp = bo->beresp,
 	};
-	struct backend_buffer output =
-		riscv_backend_call(&ctx, rvr->priv_key, rvr->funcaddr, rvr->funcarg);
-
-	if (output.data == NULL || output.type == NULL)
-	{
-		http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
+	struct backend_result *result =
+		(struct backend_result *)WS_Alloc(bo->ws, VMBE_RESULT_SIZE);
+	if (result == NULL) {
+		VSLb(ctx.vsl, SLT_Error, "Backend VM: Out of workspace for result");
 		return (-1);
 	}
+	result->bufcount = VMBE_NUM_BUFFERS;
 
-	http_PutResponse(bo->beresp, "HTTP/1.1", 200, NULL);
-	http_PrintfHeader(bo->beresp, "Content-Type: %.*s",
-		(int) output.tsize, output.type);
-	http_PrintfHeader(bo->beresp, "Content-Length: %zu", output.size);
+	riscv_backend_call(&ctx, rvr->priv_key, rvr->funcaddr, rvr->funcarg, result);
+
+	/* Status code is sanitized in the backend call */
+	http_PutResponse(bo->beresp, "HTTP/1.1", result->status, NULL);
+	/* Allow missing content-type when no content present */
+	if (result->content_length > 0)
+	{
+		http_PrintfHeader(bo->beresp, "Content-Type: %.*s",
+			(int) result->tsize, result->type);
+		http_PrintfHeader(bo->beresp,
+			"Content-Length: %zu", result->content_length);
+	}
 
 	char timestamp[VTIM_FORMAT_SIZE];
 	VTIM_format(VTIM_real(), timestamp);
@@ -119,8 +155,8 @@ riscvbe_gethdrs(const struct director *dir,
 	INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
 
 	/* store the output in workspace and free result */
-	bo->htc->content_length = output.size;
-	bo->htc->priv = (void *)output.data;
+	bo->htc->content_length = result->content_length;
+	bo->htc->priv = (void *)result;
 	bo->htc->body_status = BS_LENGTH;
 
 	vfp_init(bo);
