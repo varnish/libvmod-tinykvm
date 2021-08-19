@@ -83,6 +83,7 @@ public:
 	void print_backtrace(const gaddr_t addr);
 	void open_debugger(uint16_t);
 
+	static void init();
 	Script(const std::vector<uint8_t>&, const vrt_ctx*, const SandboxTenant*, MachineInstance&, bool sto, bool dbg);
 	Script(const Script& source, const vrt_ctx*, const SandboxTenant*, MachineInstance&);
 	~Script();
@@ -95,13 +96,12 @@ private:
 	void machine_initialize();
 	void machine_setup(machine_t&, bool init);
 	void setup_virtual_memory(bool init);
-	void setup_syscall_interface(machine_t&);
+	static void setup_syscall_interface();
 
 	machine_t m_machine;
 	const vrt_ctx* m_ctx;
 	const struct SandboxTenant* m_tenant = nullptr;
 	MachineInstance& m_inst;
-	void*       m_arena = nullptr;
 	gaddr_t     m_heap_base = 0;
 
 	std::string m_want_result;

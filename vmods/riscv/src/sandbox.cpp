@@ -18,14 +18,20 @@ SandboxTenant::SandboxTenant(VRT_CTX, const TenantConfig& conf)
 	init_vmods(ctx);
 	try {
 		auto elf = file_loader(conf.filename);
-		this->machine =
+		this->program =
 			std::make_shared<MachineInstance> (std::move(elf), ctx, this);
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
 			"Exception when creating machine '%s': %s",
 			conf.name.c_str(), e.what());
-		machine = nullptr;
+		printf("Machine '%s' failed: %s\n",
+			conf.name.c_str(), e.what());
+		this->program = nullptr;
 	}
+}
+void SandboxTenant::init()
+{
+	Script::init();
 }
 
 Script* SandboxTenant::vmfork(VRT_CTX, bool debug)
@@ -36,26 +42,28 @@ Script* SandboxTenant::vmfork(VRT_CTX, bool debug)
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t0);
 	#endif
-		std::shared_ptr<MachineInstance> program;
+		std::shared_ptr<MachineInstance> prog;
 		if (!debug)
-			program = this->machine;
+			prog = this->program;
 		else
-			program = this->debug_machine;
-		/* First-time tenants could have no program */
-		if (UNLIKELY(program == nullptr))
+			prog = this->debug_program;
+		/* First-time tenants could have no prog */
+		if (UNLIKELY(prog == nullptr))
 			return nullptr;
 		/* Allocate Script on workspace, and construct it in-place */
-		auto* script = (Script*) WS_Alloc(ctx->ws, sizeof(Script));
-		if (UNLIKELY(script == nullptr)) {
+		uintptr_t saddr = (uintptr_t)WS_Alloc(ctx->ws, sizeof(Script) + 0x10);
+		if (UNLIKELY(saddr == 0x0)) {
 			VRT_fail(ctx, "Out of workspace");
 			return nullptr;
 		}
+		saddr = (saddr + 0xF) & ~(uintptr_t)0xF;
+		auto* script = (Script*) saddr;
 
 		try {
-			new (script) Script{program->script, ctx, this, *program};
+			new (script) Script{prog->script, ctx, this, *prog};
 			/* This creates a self-reference, which ensures that open
 			   Script instances will keep the machine instance alive. */
-			script->assign_instance(program);
+			script->assign_instance(prog);
 
 		} catch (std::exception& e) {
 			VRT_fail(ctx,

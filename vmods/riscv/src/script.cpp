@@ -1,6 +1,6 @@
 #include "script.hpp"
 
-#include <include/syscall_helpers.hpp>
+#include <libriscv/native_heap.hpp>
 #include "machine/include_api.hpp"
 #include "sandbox.hpp"
 #include "varnish.hpp"
@@ -35,7 +35,7 @@ Script::Script(
 	this->machine_setup(machine(), false);
 
 	/* Transfer allocations from the source machine, to fully replicate heap */
-	arena_transfer((sas_alloc::Arena*) source.m_arena, (sas_alloc::Arena*) m_arena);
+	source.machine().arena().transfer(machine().arena());
 	/* Load the compiled regexes of the source */
 	m_regex.loan_from(source.m_regex);
 	/* Load the directors of the source */
@@ -65,6 +65,11 @@ Script::Script(
 	  m_directors {vrm->config.max_backends()}
 {
 	this->machine_initialize();
+}
+
+void Script::init()
+{
+	setup_syscall_interface();
 }
 
 Script::~Script()
@@ -196,33 +201,17 @@ void Script::machine_setup(machine_t& machine, bool init)
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t2);
 #endif
-	if (init == false)
-	{
-		this->m_arena = setup_native_heap_syscalls<MARCH>(
-			machine, arena_base(), vrm()->config.max_heap(),
-			[this] (size_t size) -> void* {
-				return WS_Alloc(m_ctx->ws, size);
-			});
-	} else {
-		this->m_arena = setup_native_heap_syscalls<MARCH>(
-			machine, arena_base(), vrm()->config.max_heap());
-	}
+	machine.setup_native_heap(NATIVE_SYSCALLS_BASE,
+		arena_base(), vrm()->config.max_heap());
 
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t3);
 #endif
-	setup_native_memory_syscalls<MARCH>(machine, true);
+	machine.setup_native_memory(NATIVE_SYSCALLS_BASE+5, true);
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t4);
 #endif
-	setup_syscall_interface(machine);
 
-	machine.on_unhandled_syscall(
-		[] (int number) {
-			//VSLb(m_ctx->vsl, SLT_Debug,
-			//	"VM unhandled system call: %d\n", number);
-			printf("VM unhandled system call: %d\n", number);
-		});
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t5);
 	printf("[Constr] pagetbl: %ldns, vmem: %ldns, arena: %ldns, nat.mem: %ldns, syscalls: %ldns\n",
@@ -320,11 +309,11 @@ size_t Script::heap_size() const noexcept {
 
 Script::gaddr_t Script::guest_alloc(size_t len)
 {
-	return arena_malloc((sas_alloc::Arena*) m_arena, len);
+	return machine().arena().malloc(len);
 }
 bool Script::guest_free(gaddr_t addr)
 {
-	return (arena_free((sas_alloc::Arena*) m_arena, addr) == 0);
+	return machine().arena().free(addr) == 0;
 }
 
 

@@ -71,6 +71,7 @@ void delete_temporary_tenant(const SandboxTenant* vrm)
 static void init_tenants(VRT_CTX,
 	const std::vector<uint8_t>& vec, const char* source)
 {
+	SandboxTenant::init();
 	try {
 		const json j = json::parse(vec.begin(), vec.end());
 

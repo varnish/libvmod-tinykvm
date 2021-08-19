@@ -844,15 +844,10 @@ APICALL(regex_delete)
 
 void sha256(machine_t&);
 
-void Script::setup_syscall_interface(machine_t& machine)
+void Script::setup_syscall_interface()
 {
-	#define FPTR(x) machine_t::syscall_fptr_t { x }
-	#ifdef __GNUG__
-	#define FuckOff
-	#else
-	#define FuckOff constinit
-	#endif
-	static FuckOff std::array<const machine_t::syscall_t, ECALL_LAST - SYSCALL_BASE> handlers {
+	#define FPTR(x) machine_t::syscall_t { x }
+	static constexpr std::array<const machine_t::syscall_t, ECALL_LAST - SYSCALL_BASE> handlers {
 		FPTR(fail),
 		FPTR(assertion_failed),
 		FPTR(print),
@@ -896,7 +891,15 @@ void Script::setup_syscall_interface(machine_t& machine)
 
 		FPTR(sha256)
 	};
-	machine.install_syscall_handler_range(SYSCALL_BASE, handlers);
+	std::memcpy(&machine_t::syscall_handlers[SYSCALL_BASE],
+		&handlers[0], sizeof(handlers));
+
+	machine_t::on_unhandled_syscall =
+		[] (auto&, int number) {
+			//VSLb(m_ctx->vsl, SLT_Debug,
+			//	"VM unhandled system call: %d\n", number);
+			printf("VM unhandled system call: %d\n", number);
+		};
 }
 
 timespec time_now()

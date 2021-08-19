@@ -48,10 +48,10 @@ riscv_update(VRT_CTX, SandboxTenant* vrm, struct update_params *params)
 				vrm, vrm->config.name + "_temporary");
 			try {
 				/* Create machine with VRT context */
-				temp->machine = std::make_shared<MachineInstance>(live_binary, ctx, temp);
+				temp->program = std::make_shared<MachineInstance>(live_binary, ctx, temp);
 				/* Run the tenants self-test function manually.
 				   We want to propagate any exceptions to the client. */
-				auto& machine = temp->machine->script.machine();
+				auto& machine = temp->program->script.machine();
 				machine.vmcall<2'000'000, true>(selftest);
 			} catch (...) {
 				delete_temporary_tenant(temp);
@@ -68,11 +68,11 @@ riscv_update(VRT_CTX, SandboxTenant* vrm, struct update_params *params)
 			/* Decrements reference when it goes out of scope.
 			   We need the *new* instance alive for access to the binary
 			   when writing it to disk. Don't *move*. See below. */
-			old = std::atomic_exchange(&vrm->machine, inst);
+			old = std::atomic_exchange(&vrm->program, inst);
 
 		} else {
 			/* Live-debugging temporary tenant */
-			old = std::atomic_exchange(&vrm->debug_machine, inst);
+			old = std::atomic_exchange(&vrm->debug_program, inst);
 		}
 
 		if (old != nullptr) {

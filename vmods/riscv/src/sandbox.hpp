@@ -10,7 +10,7 @@ struct SandboxTenant
 	using ghandler_t = std::function<void(Script&)>;
 
 	Script* vmfork(const vrt_ctx*, bool debug);
-	bool no_program_loaded() const noexcept { return this->machine == nullptr; }
+	bool no_program_loaded() const noexcept { return this->program == nullptr; }
 
 	// Install a callback function using a string name
 	// Can be invoked from the guest using the same string name
@@ -20,31 +20,32 @@ struct SandboxTenant
 	void dynamic_call(uint32_t hash, Script&) const;
 
 	inline Script::gaddr_t lookup(const char* name) const {
-		auto program = machine;
-		if (LIKELY(program != nullptr))
-			return program->lookup(name);
+		auto ref = program;
+		if (LIKELY(ref != nullptr))
+			return ref->lookup(name);
 		return 0x0;
 	}
 
 	inline auto callsite(const char* name) {
-		auto program = machine;
-		if (LIKELY(program != nullptr)) {
-			auto addr = program->lookup(name);
-			return program->script.callsite(addr);
+		auto ref = program;
+		if (LIKELY(ref != nullptr)) {
+			auto addr = ref->lookup(name);
+			return ref->script.callsite(addr);
 		}
-		return decltype(program->script.callsite(0)) {};
+		return decltype(ref->script.callsite(0)) {};
 	}
 
 	SandboxTenant(const vrt_ctx*, const TenantConfig&);
+	static void init();
 	void init_vmods(const vrt_ctx*);
 
 	/* Initialized during vcl_init */
 	const uint64_t magic = 0xb385716f486938e6;
 	const TenantConfig config;
-	/* Hot-swappable machine */
-	std::shared_ptr<MachineInstance> machine = nullptr;
-	/* Machine for debugging */
-	std::shared_ptr<MachineInstance> debug_machine = nullptr;
+	/* Hot-swappable program */
+	std::shared_ptr<MachineInstance> program = nullptr;
+	/* Program for debugging */
+	std::shared_ptr<MachineInstance> debug_program = nullptr;
 	/* Hash map of string hashes associated with dyncall handlers */
 	std::unordered_map<uint32_t, ghandler_t> m_dynamic_functions;
 };

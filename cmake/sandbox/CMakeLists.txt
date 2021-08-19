@@ -17,16 +17,12 @@ list(APPEND RISCV_SOURCES
 	src/vmod_riscv.cpp
 	src/varnish_interface.c
 	src/vmods/goto.cpp
-	libriscv/emulator/syscalls/src/syscalls.cpp
-	libriscv/emulator/syscalls/src/native_libc.cpp
-	libriscv/emulator/syscalls/src/native_threads.cpp
 )
 
 add_library(sandbox STATIC ${RISCV_SOURCES})
 set_target_properties(sandbox PROPERTIES CXX_STANDARD 17)
 target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/include)
 target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/bin/varnishd)
-target_include_directories(sandbox PRIVATE libriscv/emulator/syscalls)
 target_compile_definitions(sandbox PRIVATE
 	NATIVE_SYSCALLS_BASE=80
 )
@@ -54,7 +50,10 @@ endif()
 if (LTO_ENABLE)
 	target_compile_options(riscv PUBLIC -flto)
 endif()
-
+if (DEBUGGING)
+	target_compile_options(riscv PUBLIC -O1 -ggdb3)
+	target_compile_options(riscv PUBLIC ${SANITIZE_FLAGS})
+endif()
 
 target_link_libraries(sandbox PRIVATE nlohmann_json riscv stdc++)
 
