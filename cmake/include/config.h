@@ -242,7 +242,7 @@
 #define PACKAGE_NAME "Varnish Plus"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "Varnish Plus 6.0.6r2"
+#define PACKAGE_STRING "Varnish Plus 6.0.6r3"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "varnish-plus"
@@ -251,7 +251,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "6.0.6r2"
+#define PACKAGE_VERSION "6.0.6r3"
 
 /* Define to necessary symbol if this constant uses a non-standard name on
    your system. */
@@ -297,7 +297,7 @@
 #endif
 
 /* Version number of package */
-#define VERSION "6.0.6r2"
+#define VERSION "6.0.6r3"
 
 /* Enable large inode numbers on Mac OS X 10.5.  */
 #ifndef _DARWIN_USE_64_BIT_INODE
