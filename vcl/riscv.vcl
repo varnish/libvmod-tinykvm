@@ -12,15 +12,15 @@ sub vcl_init {
 	riscv.embed_tenants("""
 		{
 			"xpizza.com": {
-				"filename": "/tmp/xpizza",
+				"filename": "/tmp/riscv_xpizza",
 				"group": "test"
 			},
 			"ypizza.com": {
-				"filename": "/tmp/ypizza",
+				"filename": "/tmp/riscv_ypizza",
 				"group": "test"
 			},
 			"zpizza.com": {
-				"filename": "/tmp/zpizza",
+				"filename": "/tmp/riscv_zpizza",
 				"group": "test"
 			}
 		}
