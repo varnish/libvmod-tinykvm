@@ -5,10 +5,7 @@ import riscv;
 import std;
 import utils;
 
-backend default {
-	.host = "127.0.0.1";
-	.port = "8081";
-}
+backend default none;
 
 sub vcl_init {
 	new f = file.init(std.getenv("HOME"));
@@ -50,6 +47,7 @@ sub vcl_recv {
 	}
 	else if (req.url == "/z") {
 		set req.http.Host = "zpizza.com";
+		set req.url = req.url + "?foo=" + utils.fast_random_int(100);
 	}
 
 	/* Determine tenant */
