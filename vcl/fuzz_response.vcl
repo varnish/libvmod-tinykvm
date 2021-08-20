@@ -1,5 +1,6 @@
 vcl 4.1;
 import synthbackend;
+import brotli;
 
 backend default none;
 
@@ -8,5 +9,6 @@ sub vcl_recv {
 }
 
 sub vcl_backend_fetch {
+	unset bereq.http.content-encoding;
 	set bereq.backend = synthbackend.mirror();
 }

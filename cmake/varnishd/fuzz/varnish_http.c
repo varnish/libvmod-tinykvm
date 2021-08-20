@@ -28,6 +28,9 @@ void varnishd_initialize(const char* vcl_path)
     // timeout idle is modified by mgt_main, make it writable
     char ti_buffer[64];
     snprintf(ti_buffer, sizeof(ti_buffer), "timeout_idle=0.001");
+	// timeout idle is modified by mgt_main, make it writable
+    char lbt_buffer[64];
+    snprintf(lbt_buffer, sizeof(lbt_buffer), "last_byte_timeout=0.01");
 	// the tiny workspace used by connections
     char ws_buffer[128];
     snprintf(ws_buffer, sizeof(ws_buffer),
@@ -74,6 +77,7 @@ void varnishd_initialize(const char* vcl_path)
 		"-p", feature_http2,
 		"-p", feature_siproc,
 		"-p", ti_buffer,
+		"-p", lbt_buffer,
 		"-p", cs_buffer, // needed?
 		"-p", ws_buffer,
 		"-p", tpmin_buffer,
