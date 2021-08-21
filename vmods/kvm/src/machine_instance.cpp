@@ -89,7 +89,8 @@ MachineInstance::MachineInstance(
 }
 
 MachineInstance::MachineInstance(
-	const MachineInstance& source, const std::vector<uint8_t>& binary, ProgramInstance* prog, bool storage)
+	const MachineInstance& source, const std::vector<uint8_t>& binary,
+	ProgramInstance* prog, bool storage)
 	: m_ctx(source.ctx()),
 	  m_machine(source.machine(), {
 		.max_mem = source.tenant().config.max_memory(),

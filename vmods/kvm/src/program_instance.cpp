@@ -89,7 +89,7 @@ inline void check_for_deferred_commit(MachineInstance& storage) {
 	/* Look for deferred VM commits */
 	if (auto program = storage.get_deferred_commit();
 		program != nullptr) {
-		//storage.tenant().commit_program_live(program, true);
+		storage.tenant().commit_program_live(program, true);
 	}
 }
 
@@ -146,20 +146,19 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			return -1;
 		}
 	});
-	long result = future.get();
-	return result;
+	return future.get();
 }
 
 long ProgramInstance::live_update_call(
-	gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc,
-	const bool from_storage)
+	gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc)
 {
 	struct SerializeResult {
 		std::unique_ptr<char[]>  data;
 		unsigned long long len;
 	};
 
-	auto storage_operation = [&] () -> SerializeResult
+	auto future = m_storage_queue.enqueue(
+	[&] () -> SerializeResult
 	{
 		try {
 			/* Serialize data in the old machine */
@@ -179,15 +178,9 @@ long ProgramInstance::live_update_call(
 			/* We have to make sure Varnish is not taken down */
 			return {nullptr, 0};
 		}
-	};
+	});
 
-	SerializeResult res;
-	if (!from_storage) {
-		auto future = m_storage_queue.enqueue(std::move(storage_operation));
-		res = future.get();
-	} else {
-		res = storage_operation();
-	}
+	SerializeResult res = future.get();
 	if (res.data == nullptr)
 		return -1;
 

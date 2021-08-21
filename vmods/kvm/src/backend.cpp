@@ -39,6 +39,7 @@ void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
 	struct backend_post *post,
 	struct backend_result *result)
 {
+	assert(func);
 	try {
 		auto& vm = machine->machine();
 		if (post == nullptr) {

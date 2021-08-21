@@ -44,7 +44,7 @@ public:
 
 	/* Serialized call into storage VM during live update */
 	long live_update_call(
-		gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc, bool from_storage);
+		gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc);
 
 	const std::vector<uint8_t> binary;
 	MachineInstance  script;

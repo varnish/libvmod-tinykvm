@@ -124,8 +124,7 @@ std::vector<uint8_t> file_loader(const std::string& filename)
 void TenantInstance::serialize_storage_state(
 	VRT_CTX,
 	std::shared_ptr<ProgramInstance>& old,
-	std::shared_ptr<ProgramInstance>& inst,
-	const bool from_storage)
+	std::shared_ptr<ProgramInstance>& inst)
 {
 	const auto luaddr = old->lookup("on_live_update");
 	if (luaddr != 0x0)
@@ -133,8 +132,9 @@ void TenantInstance::serialize_storage_state(
 		const auto resaddr = inst->lookup("on_resume_update");
 		if (resaddr != 0x0)
 		{
-			old->live_update_call(
-				luaddr, *inst, resaddr, from_storage);
+			VSLb(ctx->vsl, SLT_Debug,
+				"Live-update serialization will be performed");
+			old->live_update_call(luaddr, *inst, resaddr);
 		} else {
 			VSLb(ctx->vsl, SLT_Debug,
 				"Live-update deserialization skipped (new binary lacks resume)");
@@ -155,9 +155,9 @@ void TenantInstance::commit_program_live(
 		old = this->debug_program;
 	}
 
-	if (old != nullptr) {
+	if (old != nullptr && !storage) {
 		TenantInstance::serialize_storage_state(
-			new_prog->script.ctx(), old, new_prog, storage);
+			new_prog->script.ctx(), old, new_prog);
 	}
 
 	if (!new_prog->script.is_debug())
