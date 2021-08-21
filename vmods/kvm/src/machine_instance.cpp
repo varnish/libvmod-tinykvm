@@ -64,6 +64,7 @@ MachineInstance::MachineInstance(
 		.max_cow_mem = ten->config.max_work_memory(),
 	  }),
 	  m_tenant(ten), m_inst(inst),
+	  m_is_storage(false),
 	  m_is_debug(source.is_debug()),
 	  m_sighandler{source.m_sighandler},
 	  m_fd        {ten->config.max_fd(), "File descriptors"},
@@ -85,6 +86,35 @@ MachineInstance::MachineInstance(
 	TIMING_LOCATION(t1);
 	printf("Total time in MachineInstance constr body: %ldns\n", nanodiff(t0, t1));
 #endif
+}
+
+MachineInstance::MachineInstance(
+	const MachineInstance& source, const std::vector<uint8_t>& binary, ProgramInstance* prog, bool storage)
+	: m_ctx(source.ctx()),
+	  m_machine(source.machine(), {
+		.max_mem = source.tenant().config.max_memory(),
+		.max_cow_mem = source.tenant().config.max_work_memory(),
+		.binary = std::string_view{(const char*)&binary[0], binary.size()},
+		.linearize_memory = true
+	  }),
+	  m_tenant(&source.tenant()), m_inst(prog),
+	  m_is_storage(storage),
+	  m_is_debug(source.is_debug()),
+	  m_sighandler{source.m_sighandler},
+	  m_fd        {m_tenant->config.max_fd(), "File descriptors"},
+	  m_regex     {m_tenant->config.max_regex(), "Regex handles"},
+	  m_directors {m_tenant->config.max_backends(), "Directors"}
+{
+	machine().set_userdata<MachineInstance> (this);
+	machine().set_printer(get_vsl_printer());
+	/* XXX: Handle file descriptors */
+	if (!storage) {
+		machine().prepare_copy_on_write();
+	} else {
+		VSLb(m_ctx->vsl, SLT_VCL_Log,
+			"New %s program committed and ready",
+			name().c_str());
+	}
 }
 
 void MachineInstance::tail_reset()

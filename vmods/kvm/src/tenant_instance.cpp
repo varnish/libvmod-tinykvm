@@ -121,4 +121,48 @@ std::vector<uint8_t> file_loader(const std::string& filename)
     return result;
 }
 
+void TenantInstance::serialize_storage_state(
+	VRT_CTX,
+	std::shared_ptr<ProgramInstance>& old,
+	std::shared_ptr<ProgramInstance>& inst)
+{
+	const auto luaddr = old->lookup("on_live_update");
+	if (luaddr != 0x0)
+	{
+		const auto resaddr = inst->lookup("on_resume_update");
+		if (resaddr != 0x0)
+		{
+			auto& new_machine = inst->storage;
+			old->live_update_call(luaddr, new_machine.machine(), resaddr);
+		} else {
+			VSLb(ctx->vsl, SLT_Debug,
+				"Live-update deserialization skipped (new binary lacks resume)");
+		}
+	} else {
+		VSLb(ctx->vsl, SLT_Debug,
+			"Live-update skipped (old binary lacks serializer)");
+	}
+}
+
+void TenantInstance::commit_program_live(
+	std::shared_ptr<ProgramInstance>& new_prog) const
+{
+	std::shared_ptr<ProgramInstance> old;
+	if (!new_prog->script.is_debug())
+	{
+		/* Decrements reference when it goes out of scope.
+		   We need the *new* instance alive for access to the binary
+		   when writing it to disk. Don't *move*. See below. */
+		old = std::atomic_exchange(&this->program, new_prog);
+	} else {
+		/* Live-debugging temporary tenant */
+		old = std::atomic_exchange(&this->debug_program, new_prog);
+	}
+
+	if (old != nullptr) {
+		TenantInstance::serialize_storage_state(
+			new_prog->script.ctx(), old, new_prog);
+	}
+}
+
 } // kvm

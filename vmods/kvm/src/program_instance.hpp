@@ -21,6 +21,7 @@ public:
 
 	ProgramInstance(std::vector<uint8_t>,
 		const vrt_ctx*, TenantInstance*, bool debug = false);
+	ProgramInstance(const MachineInstance&);
 	~ProgramInstance();
 
 	inline gaddr_t lookup(const char* name) const {

@@ -76,6 +76,20 @@ void MachineInstance::setup_syscall_interface()
 				}
 				machine.set_registers(regs);
 				} break;
+			case 0x1070A: { // VMCOMMIT
+				auto regs = machine.registers();
+				// 1. Make a linearized copy of this machine
+				auto program = std::make_shared<ProgramInstance> ( inst );
+				try {
+					// 2. Perform the live update process on new program
+					inst.tenant().commit_program_live(program);
+					regs.rax = 0;
+				} catch (const std::exception& e) {
+					fprintf(stderr, "VMCommit exception: %s\n", e.what());
+					regs.rax = -1;
+				}
+				machine.set_registers(regs);
+				} break;
 			default:
 				printf("%s: Unhandled system call %u\n",
 					inst.name().c_str(), scall);

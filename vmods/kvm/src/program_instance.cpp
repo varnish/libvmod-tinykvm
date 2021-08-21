@@ -37,6 +37,14 @@ ProgramInstance::ProgramInstance(
 		sym_lookup.emplace(func, addr);
 	}
 }
+ProgramInstance::ProgramInstance(const MachineInstance& source)
+	: binary{source.instance().binary},
+	  script{source, binary, this, false},
+	  storage{source, binary, this, true},
+	  sym_lookup{source.instance().sym_lookup},
+	  rspclient{nullptr}
+{
+}
 ProgramInstance::~ProgramInstance()
 {
 }

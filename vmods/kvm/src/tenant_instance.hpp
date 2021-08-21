@@ -17,15 +17,21 @@ public:
 
 	void dynamic_call(uint32_t hash, MachineInstance&) const;
 
+	void commit_program_live(std::shared_ptr<ProgramInstance>& new_prog) const;
+
+	static void serialize_storage_state(const vrt_ctx*,
+		std::shared_ptr<ProgramInstance>& old,
+		std::shared_ptr<ProgramInstance>& inst);
+
 	TenantInstance(const vrt_ctx*, const TenantConfig&);
 
 	/* Initialized during vcl_init */
 	const uint64_t magic = 0xb385716f486938e6;
 	const TenantConfig config;
 	/* Hot-swappable machine */
-	std::shared_ptr<ProgramInstance> program = nullptr;
-	/* Machine for debugging */
-	std::shared_ptr<ProgramInstance> debug_program = nullptr;
+	mutable std::shared_ptr<ProgramInstance> program = nullptr;
+	/* Hot-swappable machine for debugging */
+	mutable std::shared_ptr<ProgramInstance> debug_program = nullptr;
 };
 
 } // kvm

@@ -18,30 +18,6 @@ dynamic_result(const char* text) {
 		[] (update_result* res) { free((void*) res->output); } };
 }
 
-static void
-kvm_serialize_storage_state(
-	VRT_CTX,
-	std::shared_ptr<kvm::ProgramInstance>& old,
-	std::shared_ptr<kvm::ProgramInstance>& inst)
-{
-	const auto luaddr = old->lookup("on_live_update");
-	if (luaddr != 0x0)
-	{
-		const auto resaddr = inst->lookup("on_resume_update");
-		if (resaddr != 0x0)
-		{
-			auto& new_machine = inst->storage;
-			old->live_update_call(luaddr, new_machine.machine(), resaddr);
-		} else {
-			VSLb(ctx->vsl, SLT_Debug,
-				"Live-update deserialization skipped (new binary lacks resume)");
-		}
-	} else {
-		VSLb(ctx->vsl, SLT_Debug,
-			"Live-update skipped (old binary lacks serializer)");
-	}
-}
-
 extern "C"
 struct update_result
 kvm_live_update(VRT_CTX, kvm::TenantInstance* ten, struct update_params *params)
@@ -76,7 +52,7 @@ kvm_live_update(VRT_CTX, kvm::TenantInstance* ten, struct update_params *params)
 		}
 
 		if (old != nullptr) {
-			kvm_serialize_storage_state(ctx, old, inst);
+			TenantInstance::serialize_storage_state(ctx, old, inst);
 		}
 
 	#ifdef ENABLE_TIMING
