@@ -52,6 +52,8 @@ public:
 	bool is_storage() const noexcept { return m_is_storage; }
 	bool is_debug() const noexcept { return m_is_debug; }
 	gaddr_t max_memory() const noexcept;
+	void defer_commit(std::shared_ptr<ProgramInstance>& ref) { m_deferred_commit = std::move(ref); }
+	auto get_deferred_commit() { return std::move(m_deferred_commit); }
 
 	void init_sha256();
 	void hash_buffer(const char* buffer, int len);
@@ -93,6 +95,8 @@ private:
 	Cache<vre*> m_regex;
 	Cache<const director*> m_directors;
 
+	/* Perform deferred live update after storage handling */
+	std::shared_ptr<ProgramInstance> m_deferred_commit = nullptr;
 	/* Deref this last */
 	std::shared_ptr<ProgramInstance> m_inst_ref = nullptr;
 };

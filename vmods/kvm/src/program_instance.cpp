@@ -85,6 +85,14 @@ inst_pair ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 	}};
 }
 
+inline void check_for_deferred_commit(MachineInstance& storage) {
+	/* Look for deferred VM commits */
+	if (auto program = storage.get_deferred_commit();
+		program != nullptr) {
+		//storage.tenant().commit_program_live(program, true);
+	}
+}
+
 long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 	size_t n, VirtBuffer buffers[n], gaddr_t res_addr, size_t res_size)
 {
@@ -130,23 +138,28 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			src.copy_from_machine(res_addr, stm, st_res_buffer, st_res_size);
 			/* Run the function to the end, allowing cleanup */
 			stm.run();
+
+			check_for_deferred_commit(storage);
 			return st_res_size;
 		} catch (...) {
+			check_for_deferred_commit(storage);
 			return -1;
 		}
 	});
-	return future.get();
+	long result = future.get();
+	return result;
 }
 
 long ProgramInstance::live_update_call(
-	gaddr_t func, tinykvm::Machine& new_machine, gaddr_t newfunc)
+	gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc,
+	const bool from_storage)
 {
 	struct SerializeResult {
 		std::unique_ptr<char[]>  data;
 		unsigned long long len;
 	};
-	auto future = m_storage_queue.enqueue(
-	[&] () -> SerializeResult
+
+	auto storage_operation = [&] () -> SerializeResult
 	{
 		try {
 			/* Serialize data in the old machine */
@@ -166,10 +179,19 @@ long ProgramInstance::live_update_call(
 			/* We have to make sure Varnish is not taken down */
 			return {nullptr, 0};
 		}
-	});
-	auto res = future.get();
+	};
+
+	SerializeResult res;
+	if (!from_storage) {
+		auto future = m_storage_queue.enqueue(std::move(storage_operation));
+		res = future.get();
+	} else {
+		res = storage_operation();
+	}
 	if (res.data == nullptr)
 		return -1;
+
+	auto& new_machine = new_prog.storage.machine();
 	/* Begin resume procedure */
 	new_machine.vmcall(newfunc, (uint64_t)res.len);
 	auto new_regs = new_machine.registers();

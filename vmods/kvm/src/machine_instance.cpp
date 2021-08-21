@@ -110,10 +110,6 @@ MachineInstance::MachineInstance(
 	/* XXX: Handle file descriptors */
 	if (!storage) {
 		machine().prepare_copy_on_write();
-	} else {
-		VSLb(m_ctx->vsl, SLT_VCL_Log,
-			"New %s program committed and ready",
-			name().c_str());
 	}
 }
 

@@ -43,7 +43,8 @@ public:
 		gaddr_t func, size_t n, VirtBuffer[n], gaddr_t, size_t);
 
 	/* Serialized call into storage VM during live update */
-	long live_update_call(gaddr_t func, tinykvm::Machine& newm, gaddr_t newfunc);
+	long live_update_call(
+		gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc, bool from_storage);
 
 	const std::vector<uint8_t> binary;
 	MachineInstance  script;

@@ -17,11 +17,13 @@ public:
 
 	void dynamic_call(uint32_t hash, MachineInstance&) const;
 
-	void commit_program_live(std::shared_ptr<ProgramInstance>& new_prog) const;
+	void commit_program_live(
+		std::shared_ptr<ProgramInstance>& new_prog, bool storage) const;
 
 	static void serialize_storage_state(const vrt_ctx*,
 		std::shared_ptr<ProgramInstance>& old,
-		std::shared_ptr<ProgramInstance>& inst);
+		std::shared_ptr<ProgramInstance>& inst,
+		bool from_storage);
 
 	TenantInstance(const vrt_ctx*, const TenantConfig&);
 

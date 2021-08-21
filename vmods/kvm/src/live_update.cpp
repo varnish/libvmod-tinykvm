@@ -39,21 +39,8 @@ kvm_live_update(VRT_CTX, kvm::TenantInstance* ten, struct update_params *params)
 			std::move(binary), ctx, ten, params->is_debug);
 		const auto& live_binary = inst->binary;
 
-		std::shared_ptr<ProgramInstance> old;
-		if (!params->is_debug)
-		{
-			/* Decrements reference when it goes out of scope.
-			   We need the *new* instance alive for access to the binary
-			   when writing it to disk. Don't *move*. See below. */
-			old = std::atomic_exchange(&ten->program, inst);
-		} else {
-			/* Live-debugging temporary tenant */
-			old = std::atomic_exchange(&ten->debug_program, inst);
-		}
-
-		if (old != nullptr) {
-			TenantInstance::serialize_storage_state(ctx, old, inst);
-		}
+		/* Complex dance to replace the currently running program */
+		ten->commit_program_live(inst, false);
 
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);

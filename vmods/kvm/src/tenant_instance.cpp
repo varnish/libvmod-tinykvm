@@ -124,7 +124,8 @@ std::vector<uint8_t> file_loader(const std::string& filename)
 void TenantInstance::serialize_storage_state(
 	VRT_CTX,
 	std::shared_ptr<ProgramInstance>& old,
-	std::shared_ptr<ProgramInstance>& inst)
+	std::shared_ptr<ProgramInstance>& inst,
+	const bool from_storage)
 {
 	const auto luaddr = old->lookup("on_live_update");
 	if (luaddr != 0x0)
@@ -132,8 +133,8 @@ void TenantInstance::serialize_storage_state(
 		const auto resaddr = inst->lookup("on_resume_update");
 		if (resaddr != 0x0)
 		{
-			auto& new_machine = inst->storage;
-			old->live_update_call(luaddr, new_machine.machine(), resaddr);
+			old->live_update_call(
+				luaddr, *inst, resaddr, from_storage);
 		} else {
 			VSLb(ctx->vsl, SLT_Debug,
 				"Live-update deserialization skipped (new binary lacks resume)");
@@ -145,9 +146,20 @@ void TenantInstance::serialize_storage_state(
 }
 
 void TenantInstance::commit_program_live(
-	std::shared_ptr<ProgramInstance>& new_prog) const
+	std::shared_ptr<ProgramInstance>& new_prog, bool storage) const
 {
 	std::shared_ptr<ProgramInstance> old;
+	if (!new_prog->script.is_debug()) {
+		old = this->program;
+	} else {
+		old = this->debug_program;
+	}
+
+	if (old != nullptr) {
+		TenantInstance::serialize_storage_state(
+			new_prog->script.ctx(), old, new_prog, storage);
+	}
+
 	if (!new_prog->script.is_debug())
 	{
 		/* Decrements reference when it goes out of scope.
@@ -157,11 +169,6 @@ void TenantInstance::commit_program_live(
 	} else {
 		/* Live-debugging temporary tenant */
 		old = std::atomic_exchange(&this->debug_program, new_prog);
-	}
-
-	if (old != nullptr) {
-		TenantInstance::serialize_storage_state(
-			new_prog->script.ctx(), old, new_prog);
 	}
 }
 
