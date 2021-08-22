@@ -22,5 +22,4 @@ add_vmod_tests(vmod_kvm kvm
 	tests/not_found.vtc
 	tests/stateful_storage.vtc
 	tests/stateful_buffered_storage.vtc
-	tests/workspace_forked.vtc
 )
