@@ -51,7 +51,6 @@ gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
 varnish v1 -vcl+backend {
 vcl 4.1;
 	import kvm;
-	import urlplus;
 
 	backend default none;
 

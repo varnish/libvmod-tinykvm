@@ -1,0 +1,110 @@
+varnishtest "KVM Backend: Test the vmcommit system call"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include <assert.h>
+#include <string.h>
+#include "kvm_api.h"
+
+int main() {}
+
+static char data[512];
+static size_t datalen = 0;
+
+__attribute__((used))
+extern void my_backend(const char *arg)
+{
+	const char ctype[] = "text/plain";
+	backend_response(200, ctype, sizeof(ctype)-1, data, datalen);
+}
+
+static void set_data(size_t n, struct virtbuffer buffers[n], size_t r)
+{
+	assert(n == 1);
+	datalen = buffers[0].len;
+	memcpy(data, buffers[0].data, datalen);
+
+	vmcommit();
+
+	storage_return_nothing();
+}
+
+__attribute__((used))
+extern void my_post_backend(const char *arg, void *indata, size_t inlen)
+{
+	const struct virtbuffer buffers[1] = {
+		{.data = indata, .len = inlen},
+	};
+
+	char result[sizeof(data)];
+	const long rlen =
+		storage_callv(set_data, 1, buffers, result, sizeof(result));
+
+	const char ctype[] = "text/plain";
+	backend_response(201, ctype, sizeof(ctype)-1, result, rlen);
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""
+			{
+				"xpizza.com": {
+					"filename": "${tmpdir}/${testname}",
+					"key": "",
+					"group": "test"
+				}
+			}
+		""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		if (bereq.method == "POST") {
+			set bereq.backend = kvm.vm_post_backend(
+				bereq.http.Host,
+				"my_post_backend",
+				bereq.url);
+			return (fetch);
+		}
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				"my_backend",
+				"Hello World!");
+	}
+} -start
+
+client c1 {
+	txreq -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == ""
+	expect resp.status == 200
+	# Make a POST that modifies and commits to data
+	txreq -url "/" -req POST -hdr "Host: xpizza.com" -body "Hello World"
+	rxresp
+	expect resp.status == 201
+	# Regular requests should return committed changes
+	txreq -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+	# Make another POST that modifies and commits to data
+	txreq -url "/" -req POST -hdr "Host: xpizza.com" -body "Hello Mutable World"
+	rxresp
+	expect resp.status == 201
+	# Regular requests should again return committed changes
+	txreq -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello Mutable World"
+	expect resp.status == 200
+} -run
