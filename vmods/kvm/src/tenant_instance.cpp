@@ -148,27 +148,24 @@ void TenantInstance::serialize_storage_state(
 void TenantInstance::commit_program_live(
 	std::shared_ptr<ProgramInstance>& new_prog, bool storage) const
 {
-	std::shared_ptr<ProgramInstance> old;
+	std::shared_ptr<ProgramInstance> current;
+	/* Make a reference to the current program, keeping it alive */
 	if (!new_prog->script.is_debug()) {
-		old = this->program;
+		current = this->program;
 	} else {
-		old = this->debug_program;
+		current = this->debug_program;
 	}
 
-	if (old != nullptr && !storage) {
+	if (current != nullptr && !storage) {
 		TenantInstance::serialize_storage_state(
-			new_prog->script.ctx(), old, new_prog);
+			new_prog->script.ctx(), current, new_prog);
 	}
 
 	if (!new_prog->script.is_debug())
 	{
-		/* Decrements reference when it goes out of scope.
-		   We need the *new* instance alive for access to the binary
-		   when writing it to disk. Don't *move*. See below. */
-		old = std::atomic_exchange(&this->program, new_prog);
+		std::atomic_exchange(&this->program, new_prog);
 	} else {
-		/* Live-debugging temporary tenant */
-		old = std::atomic_exchange(&this->debug_program, new_prog);
+		std::atomic_exchange(&this->debug_program, new_prog);
 	}
 }
 
