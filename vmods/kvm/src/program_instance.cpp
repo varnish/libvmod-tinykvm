@@ -26,27 +26,19 @@ ProgramInstance::ProgramInstance(
 	const vrt_ctx* ctx, TenantInstance* ten,
 	bool debug)
 	: binary{std::move(elf)},
-	  script{binary, ctx, ten, this, false, debug},
+	  script{std::make_shared<MachineInstance>(binary, ctx, ten, this, false, debug)},
 	  storage{binary, ctx, ten, this, true, debug},
 	  rspclient{nullptr}
 {
-	this->my_backend_addr = script.resolve_address("my_backend");
+	this->my_backend_addr = script->resolve_address("my_backend");
 
 	extern std::vector<const char*> lookup_wishlist;
 	for (const auto* func : lookup_wishlist) {
 		/* NOTE: We can't check if addr is 0 here, because
 		   the wishlist applies to ALL machines. */
-		const auto addr = script.resolve_address(func);
+		const auto addr = script->resolve_address(func);
 		sym_lookup.emplace(func, addr);
 	}
-}
-ProgramInstance::ProgramInstance(const MachineInstance& source)
-	: binary{source.instance().binary},
-	  script{source, binary, this, false},
-	  storage{source, binary, this, true},
-	  sym_lookup{source.instance().sym_lookup},
-	  rspclient{nullptr}
-{
 }
 ProgramInstance::~ProgramInstance()
 {
@@ -63,32 +55,20 @@ uint64_t ProgramInstance::lookup(const char* name) const
 	if (it != sym_lookup.end()) return it->second;
 
 	// slow fallback
-	return script.resolve_address(name);
-}
-
-inst_pair ProgramInstance::workspace_fork(const vrt_ctx* ctx,
-	TenantInstance* tenant, std::shared_ptr<ProgramInstance>& prog)
-{
-	auto* alloc = WS_Alloc(ctx->ws, sizeof(MachineInstance));
-	MachineInstance *mi =
-		new (alloc) MachineInstance{this->script, ctx, tenant, this};
-	mi->assign_instance(prog);
-	return {mi, [] (void* inst) {
-		auto* mi = (MachineInstance *)inst;
-		mi->~MachineInstance();
-	}};
+	return script->resolve_address(name);
 }
 
 inst_pair ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 	TenantInstance* tenant, std::shared_ptr<ProgramInstance>& prog)
 {
 	thread_local MachineInstance* inst = nullptr;
+	auto script_ref = script;
 	if (UNLIKELY(inst == nullptr)) {
 		/* Create a new machine instance on-demand */
-		inst = new MachineInstance(this->script, ctx, tenant, this);
+		inst = new MachineInstance(script_ref, ctx, tenant, this);
 	} else {
 		/* The VM needs to be reset and get a new VRT ctx */
-		inst->reset_to(ctx, this->script);
+		inst->reset_to(ctx, script_ref);
 	}
 
 	/* This creates a self-reference, which ensures that open
@@ -102,19 +82,9 @@ inst_pair ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 	}};
 }
 
-inline void check_for_deferred_commit(MachineInstance& storage) {
-	/* Look for deferred VM commits */
-	if (auto program = storage.get_deferred_commit();
-		program != nullptr) {
-		storage.tenant().commit_program_live(program, true);
-	}
-}
-
 long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 	size_t n, VirtBuffer buffers[n], gaddr_t res_addr, size_t res_size)
 {
-	uint64_t old_stack = storage.machine().stack_address();
-
 	/* Detect wrap-around */
 	if (UNLIKELY(res_addr + res_size < res_addr))
 		return -1;
@@ -123,7 +93,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 	[&] () -> long
 	{
 		auto& stm = storage.machine();
-		uint64_t vaddr = old_stack;
+		uint64_t vaddr = storage.machine().stack_address();
 
 		for (size_t i = 0; i < n; i++) {
 			vaddr -= buffers[i].len;
@@ -151,15 +121,14 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			regs = stm.registers();
 			const gaddr_t st_res_buffer = regs.rdi;
 			const uint64_t st_res_size  = (regs.rsi < res_size) ? regs.rsi : res_size;
-			/* Copy from the storage machine back into tenant VM instance */
-			src.copy_from_machine(res_addr, stm, st_res_buffer, st_res_size);
+			if (res_addr != 0x0 && st_res_buffer != 0x0) {
+				/* Copy from the storage machine back into tenant VM instance */
+				src.copy_from_machine(res_addr, stm, st_res_buffer, st_res_size);
+			}
 			/* Run the function to the end, allowing cleanup */
 			stm.run();
-
-			check_for_deferred_commit(storage);
 			return st_res_size;
 		} catch (...) {
-			check_for_deferred_commit(storage);
 			return -1;
 		}
 	});
@@ -213,6 +182,15 @@ long ProgramInstance::live_update_call(
 	/* Resume the new machine, allowing it to deserialize data */
 	new_machine.run();
 	return 0;
+}
+
+void ProgramInstance::commit_instance_live(
+	std::shared_ptr<MachineInstance>& new_inst) const
+{
+	/* Make a reference to the current program, keeping it alive */
+	std::shared_ptr<MachineInstance> current = this->script;
+
+	std::atomic_exchange(&this->script, new_inst);
 }
 
 } // kvm

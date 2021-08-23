@@ -3,7 +3,6 @@
 #include "common_defs.hpp"
 #include "program_instance.hpp"
 #include "varnish.hpp"
-static constexpr bool FAST_RESET_METHOD = true;
 
 namespace kvm {
 	extern std::vector<uint8_t> file_loader(const std::string&);
@@ -53,14 +52,8 @@ MachineInstance* TenantInstance::vmfork(const vrt_ctx* ctx, bool debug)
 			return nullptr;
 		}
 		try {
-			inst_pair ip;
-			if constexpr (FAST_RESET_METHOD) {
-				/* Get free instance through concurrent queue */
-				ip = prog->concurrent_fork(ctx, this, prog);
-			} else {
-				/* Create new instance on workspace by forking */
-				ip = prog->workspace_fork(ctx, this, prog);
-			}
+			/* Get free instance through concurrent queue */
+			inst_pair ip = prog->concurrent_fork(ctx, this, prog);
 
 			priv_task->priv = ip.inst;
 			priv_task->len  = KVM_PROGRAM_MAGIC;
@@ -150,7 +143,7 @@ void TenantInstance::commit_program_live(
 {
 	std::shared_ptr<ProgramInstance> current;
 	/* Make a reference to the current program, keeping it alive */
-	if (!new_prog->script.is_debug()) {
+	if (!new_prog->script->is_debug()) {
 		current = this->program;
 	} else {
 		current = this->debug_program;
@@ -158,10 +151,10 @@ void TenantInstance::commit_program_live(
 
 	if (current != nullptr && !storage) {
 		TenantInstance::serialize_storage_state(
-			new_prog->script.ctx(), current, new_prog);
+			new_prog->script->ctx(), current, new_prog);
 	}
 
-	if (!new_prog->script.is_debug())
+	if (!new_prog->script->is_debug())
 	{
 		std::atomic_exchange(&this->program, new_prog);
 	} else {

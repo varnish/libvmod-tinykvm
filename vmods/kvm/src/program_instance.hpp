@@ -21,14 +21,10 @@ public:
 
 	ProgramInstance(std::vector<uint8_t>,
 		const vrt_ctx*, TenantInstance*, bool debug = false);
-	ProgramInstance(const MachineInstance&);
 	~ProgramInstance();
 
 	gaddr_t lookup(const char* name) const;
 
-	/* Workspace-allocated VM */
-	inst_pair workspace_fork(const vrt_ctx*,
-		TenantInstance*, std::shared_ptr<ProgramInstance>&);
 	/* Heap-allocated VM from concurrent queue */
 	inst_pair concurrent_fork(const vrt_ctx*,
 		TenantInstance*, std::shared_ptr<ProgramInstance>&);
@@ -41,8 +37,11 @@ public:
 	long live_update_call(
 		gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc);
 
+	void commit_instance_live(
+		std::shared_ptr<MachineInstance>& new_inst) const;
+
 	const std::vector<uint8_t> binary;
-	MachineInstance  script;
+	mutable std::shared_ptr<MachineInstance> script;
 
 	MachineInstance  storage;
 	kvm::ThreadPool<1> m_storage_queue;

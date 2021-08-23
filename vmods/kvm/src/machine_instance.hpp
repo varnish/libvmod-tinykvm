@@ -42,8 +42,9 @@ public:
 	const auto& tenant() const noexcept { return *m_tenant; }
 	auto& instance() { return *m_inst; }
 	const auto& instance() const { return *m_inst; }
-	void assign_instance(std::shared_ptr<ProgramInstance>& ref) { m_inst_ref = std::move(ref); }
-	void unassign_instance() { m_inst_ref = nullptr; }
+	void assign_instance(std::shared_ptr<ProgramInstance>& ref) { m_prog_ref = std::move(ref); }
+	/* Unref machine first to be sure it is destructed before the program */
+	void unassign_instance() { m_mach_ref = nullptr; m_prog_ref = nullptr; }
 
 	uint64_t max_time() const noexcept;
 	const std::string& name() const noexcept;
@@ -52,8 +53,6 @@ public:
 	bool is_storage() const noexcept { return m_is_storage; }
 	bool is_debug() const noexcept { return m_is_debug; }
 	gaddr_t max_memory() const noexcept;
-	void defer_commit(std::shared_ptr<ProgramInstance>& ref) { m_deferred_commit = std::move(ref); }
-	auto get_deferred_commit() { return std::move(m_deferred_commit); }
 
 	void init_sha256();
 	void hash_buffer(const char* buffer, int len);
@@ -68,11 +67,11 @@ public:
 
 	static void kvm_initialize();
 	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool sto, bool dbg);
-	MachineInstance(const MachineInstance& source, const vrt_ctx*, const TenantInstance*, ProgramInstance*);
-	MachineInstance(const MachineInstance& source, const std::vector<uint8_t>&, ProgramInstance*, bool storage);
+	MachineInstance(std::shared_ptr<MachineInstance>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*);
+	MachineInstance(const MachineInstance& source);
 	~MachineInstance();
 	void tail_reset();
-	void reset_to(const vrt_ctx*, MachineInstance& master);
+	void reset_to(const vrt_ctx*, std::shared_ptr<MachineInstance>&);
 
 private:
 	static void setup_syscall_interface();
@@ -96,9 +95,9 @@ private:
 	Cache<const director*> m_directors;
 
 	/* Perform deferred live update after storage handling */
-	std::shared_ptr<ProgramInstance> m_deferred_commit = nullptr;
+	std::shared_ptr<MachineInstance> m_mach_ref = nullptr;
 	/* Deref this last */
-	std::shared_ptr<ProgramInstance> m_inst_ref = nullptr;
+	std::shared_ptr<ProgramInstance> m_prog_ref = nullptr;
 };
 
 template <typename... Args>

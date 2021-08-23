@@ -56,20 +56,21 @@ MachineInstance::MachineInstance(
 }
 
 MachineInstance::MachineInstance(
-	const MachineInstance& source, const vrt_ctx* ctx,
+	std::shared_ptr<MachineInstance>& source, const vrt_ctx* ctx,
 	const TenantInstance* ten, ProgramInstance* inst)
 	: m_ctx(ctx),
-	  m_machine(source.machine(), {
+	  m_machine(source->machine(), {
 		.max_mem = ten->config.max_memory(),
 		.max_cow_mem = ten->config.max_work_memory(),
 	  }),
 	  m_tenant(ten), m_inst(inst),
 	  m_is_storage(false),
-	  m_is_debug(source.is_debug()),
-	  m_sighandler{source.m_sighandler},
+	  m_is_debug(source->is_debug()),
+	  m_sighandler{source->m_sighandler},
 	  m_fd        {ten->config.max_fd(), "File descriptors"},
 	  m_regex     {ten->config.max_regex(), "Regex handles"},
-	  m_directors {ten->config.max_backends(), "Directors"}
+	  m_directors {ten->config.max_backends(), "Directors"},
+	  m_mach_ref {source}
 {
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t0);
@@ -77,29 +78,27 @@ MachineInstance::MachineInstance(
 	machine().set_userdata<MachineInstance> (this);
 	machine().set_printer(get_vsl_printer());
 	/* Load the fds of the source */
-	m_fd.reset_and_loan(source.m_fd);
+	m_fd.reset_and_loan(source->m_fd);
 	/* Load the compiled regexes of the source */
-	m_regex.reset_and_loan(source.m_regex);
+	m_regex.reset_and_loan(source->m_regex);
 	/* Load the directors of the source */
-	m_directors.reset_and_loan(source.m_directors);
+	m_directors.reset_and_loan(source->m_directors);
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t1);
 	printf("Total time in MachineInstance constr body: %ldns\n", nanodiff(t0, t1));
 #endif
 }
 
-MachineInstance::MachineInstance(
-	const MachineInstance& source, const std::vector<uint8_t>& binary,
-	ProgramInstance* prog, bool storage)
+MachineInstance::MachineInstance(const MachineInstance& source)
 	: m_ctx(source.ctx()),
 	  m_machine(source.machine(), {
 		.max_mem = source.tenant().config.max_memory(),
 		.max_cow_mem = source.tenant().config.max_work_memory(),
-		.binary = std::string_view{(const char*)&binary[0], binary.size()},
+		.binary = std::string_view{source.machine().binary()},
 		.linearize_memory = true
 	  }),
-	  m_tenant(&source.tenant()), m_inst(prog),
-	  m_is_storage(storage),
+	  m_tenant(source.m_tenant), m_inst(source.m_inst),
+	  m_is_storage(false),
 	  m_is_debug(source.is_debug()),
 	  m_sighandler{source.m_sighandler},
 	  m_fd        {m_tenant->config.max_fd(), "File descriptors"},
@@ -109,9 +108,7 @@ MachineInstance::MachineInstance(
 	machine().set_userdata<MachineInstance> (this);
 	machine().set_printer(get_vsl_printer());
 	/* XXX: Handle file descriptors */
-	if (!storage) {
-		machine().prepare_copy_on_write();
-	}
+	machine().prepare_copy_on_write();
 }
 
 void MachineInstance::tail_reset()
@@ -130,23 +127,25 @@ void MachineInstance::tail_reset()
 		//this->stop_debugger();
 	}
 }
-void MachineInstance::reset_to(const vrt_ctx* ctx, MachineInstance& source)
+void MachineInstance::reset_to(const vrt_ctx* ctx,
+	std::shared_ptr<MachineInstance>& source)
 {
+	this->m_mach_ref = source;
 	this->m_ctx = ctx;
-	m_tenant = source.m_tenant;
-	machine().reset_to(source.machine(), {
+	m_tenant = source->m_tenant;
+	machine().reset_to(source->machine(), {
 		.max_mem = tenant().config.max_memory(),
 		.max_cow_mem = tenant().config.max_work_memory(),
 	});
-	m_inst   = source.m_inst;
-	m_sighandler = source.m_sighandler;
+	m_inst   = source->m_inst;
+	m_sighandler = source->m_sighandler;
 
 	/* Load the fds of the source */
-	m_fd.reset_and_loan(source.m_fd);
+	m_fd.reset_and_loan(source->m_fd);
 	/* Load the compiled regexes of the source */
-	m_regex.reset_and_loan(source.m_regex);
+	m_regex.reset_and_loan(source->m_regex);
 	/* Load the directors of the source */
-	m_directors.reset_and_loan(source.m_directors);
+	m_directors.reset_and_loan(source->m_directors);
 	/* XXX: Todo: reset more stuff */
 }
 

@@ -78,22 +78,14 @@ void MachineInstance::setup_syscall_interface()
 				} break;
 			case 0x1070A: { // VMCOMMIT
 				auto regs = machine.registers();
-				// 1. Make a linearized copy of this machine
-				auto program = std::make_shared<ProgramInstance> ( inst );
 				try {
-					if (!inst.is_storage()) {
-						// 2. Perform the live update process on new program
-						inst.tenant().commit_program_live(program, false);
-						VSLb(inst.ctx()->vsl, SLT_VCL_Log,
-							"vmcommit: New %s program committed and ready",
-							inst.name().c_str());
-					} else {
-						// 2. Defer the live update process until after storage handling
-						inst.defer_commit(program);
-						VSLb(inst.ctx()->vsl, SLT_VCL_Log,
-							"vmcommit: New %s program deferred until after storage",
-							inst.name().c_str());
-					}
+					// 1. Make a linearized copy of this machine
+					auto new_machine = std::make_shared<MachineInstance>(inst);
+					// 2. Perform the live update process on new program
+					inst.instance().commit_instance_live(new_machine);
+					VSLb(inst.ctx()->vsl, SLT_VCL_Log,
+						"vmcommit: New %s program committed and ready",
+						inst.name().c_str());
 					regs.rax = 0;
 				} catch (const std::exception& e) {
 					fprintf(stderr, "VMCommit exception: %s\n", e.what());
