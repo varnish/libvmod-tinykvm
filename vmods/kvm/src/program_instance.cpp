@@ -2,6 +2,7 @@
 #include "tenant_instance.hpp"
 #include "gettid.hpp"
 #include "varnish.hpp"
+#include <cstring>
 #include <tinykvm/rsp_client.hpp>
 
 namespace kvm {
@@ -29,11 +30,13 @@ ProgramInstance::ProgramInstance(
 	  storage{binary, ctx, ten, this, true, debug},
 	  rspclient{nullptr}
 {
+	this->my_backend_addr = script.resolve_address("my_backend");
+
 	extern std::vector<const char*> lookup_wishlist;
 	for (const auto* func : lookup_wishlist) {
 		/* NOTE: We can't check if addr is 0 here, because
 		   the wishlist applies to ALL machines. */
-		const auto addr = lookup(func);
+		const auto addr = script.resolve_address(func);
 		sym_lookup.emplace(func, addr);
 	}
 }
@@ -47,6 +50,20 @@ ProgramInstance::ProgramInstance(const MachineInstance& source)
 }
 ProgramInstance::~ProgramInstance()
 {
+}
+
+uint64_t ProgramInstance::lookup(const char* name) const
+{
+	// direct
+	if (strcmp(name, "my_backend") == 0)
+		return my_backend_addr;
+
+	// hash table
+	const auto& it = sym_lookup.find(name);
+	if (it != sym_lookup.end()) return it->second;
+
+	// slow fallback
+	return script.resolve_address(name);
 }
 
 inst_pair ProgramInstance::workspace_fork(const vrt_ctx* ctx,
