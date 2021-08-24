@@ -65,7 +65,13 @@ struct TenantConfig
 	static void reset_dynamic_call(VCL_PRIV, const std::string& name, ghandler_t = nullptr);
 
 	TenantConfig(std::string n, std::string f, std::string k, TenantGroup g, dynfun_map& dfm)
-		: name(n), filename(f), key(k), group{std::move(g)}, dynamic_functions_ref{dfm} {}
+		: name(n), filename(f), key(k), group{std::move(g)}, dynamic_functions_ref{dfm}
+	{
+		this->allowed_file = filename + ".state";
+	}
+
+	/* One allowed file for persistence / state-keeping */
+	std::string allowed_file;
 
 	/* Hash map of string hashes associated with dyncall handlers */
 	dynfun_map& dynamic_functions_ref;

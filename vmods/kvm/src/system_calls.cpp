@@ -34,6 +34,23 @@ void MachineInstance::sanitize_path(char* buffer, size_t buflen)
 	throw std::runtime_error("Disallowed path used");
 }
 
+void MachineInstance::sanitize_file(char* buffer, size_t buflen)
+{
+	buffer[buflen-1] = 0;
+	const size_t len = strnlen(buffer, buflen);
+
+	const auto& gucci_file = tenant().config.allowed_file;
+	if (gucci_file.size() <= len &&
+		memcmp(buffer, gucci_file.c_str(), gucci_file.size()) == 0) {
+		SYSPRINT("File OK: %.*s against %s\n",
+			(int)len, buffer, gucci_file.c_str());
+		return;
+	}
+
+	printf("File failed: %.*s\n", (int)len, buffer);
+	throw std::runtime_error("Disallowed file used");
+}
+
 void MachineInstance::setup_syscall_interface()
 {
 	using namespace tinykvm;
@@ -122,6 +139,29 @@ void MachineInstance::setup_syscall_interface()
 			machine.set_registers(regs);
 		});
 	Machine::install_syscall_handler(
+		1, [] (Machine& machine) { // WRITE
+			auto& inst = *machine.get_userdata<MachineInstance>();
+			auto regs = machine.registers();
+			const int    fd = regs.rdi;
+			const size_t bytes = regs.rdx;
+			char buffer[4096];
+			if (bytes > 4096) {
+				/* Ignore too big a write? */
+				regs.rax = -1;
+			} else if (fd != 1 && fd != 2) {
+				/* Ignore writes outside of stdout and stderr */
+				int fd = inst.m_fd.translate(regs.rdi);
+				machine.copy_from_guest(buffer, regs.rsi, bytes);
+				regs.rax = write(fd, buffer, bytes);
+			}
+			else {
+				machine.copy_from_guest(buffer, regs.rsi, bytes);
+				machine.print(buffer, bytes);
+				regs.rax = bytes;
+			}
+			machine.set_registers(regs);
+		});
+	Machine::install_syscall_handler(
 		3, [] (Machine& machine) { // CLOSE
 			auto& inst = *machine.get_userdata<MachineInstance>();
 			auto regs = machine.registers();
@@ -172,6 +212,14 @@ void MachineInstance::setup_syscall_interface()
 			machine.set_registers(regs);
 		});
 	Machine::install_syscall_handler(
+		8, [] (Machine& machine) { // LSEEK
+			auto& inst = *machine.get_userdata<MachineInstance>();
+			auto regs = machine.registers();
+			int fd = inst.m_fd.translate(regs.rdi);
+			regs.rax = lseek(fd, regs.rsi, regs.rdx);
+			machine.set_registers(regs);
+		});
+	Machine::install_syscall_handler(
 		217, [] (Machine& machine) { // GETDENTS64
 			auto& inst = *machine.get_userdata<MachineInstance>();
 			auto regs = machine.registers();
@@ -197,21 +245,44 @@ void MachineInstance::setup_syscall_interface()
 
 			char path[256];
 			machine.copy_from_guest(path, vpath, sizeof(path));
-			try {
-				inst.sanitize_path(path, sizeof(path));
+			bool write_flags = (flags & (O_WRONLY | O_RDWR)) != 0x0;
+			if (!write_flags)
+			{
+				try {
+					inst.sanitize_path(path, sizeof(path));
 
-				int fd = openat(AT_FDCWD, path, flags);
-				SYSPRINT("OPENAT fd=%lld path=%s = %d\n",
-					regs.rdi, path, fd);
+					int fd = openat(AT_FDCWD, path, flags);
+					SYSPRINT("OPENAT fd=%lld path=%s = %d\n",
+						regs.rdi, path, fd);
 
-				if (fd > 0) {
-					inst.m_fd.manage(fd, 0x1000 + fd);
-					regs.rax = 0x1000 + fd;
-				} else {
+					if (fd > 0) {
+						inst.m_fd.manage(fd, 0x1000 + fd);
+						regs.rax = 0x1000 + fd;
+					} else {
+						regs.rax = -1;
+					}
+				} catch (...) {
 					regs.rax = -1;
 				}
-			} catch (...) {
-				regs.rax = -1;
+			}
+			if (write_flags || regs.rax == (__u64)-1)
+			{
+				try {
+					inst.sanitize_file(path, sizeof(path));
+
+					int fd = openat(AT_FDCWD, path, flags, S_IWUSR | S_IRUSR);
+					SYSPRINT("OPENAT where=%lld path=%s flags=%X = fd %d\n",
+						regs.rdi, path, flags, fd);
+
+					if (fd > 0) {
+						inst.m_fd.manage(fd, 0x1000 + fd);
+						regs.rax = 0x1000 + fd;
+					} else {
+						regs.rax = -1;
+					}
+				} catch (...) {
+					regs.rax = -1;
+				}
 			}
 			machine.set_registers(regs);
 		});
