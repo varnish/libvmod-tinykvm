@@ -17,7 +17,6 @@ extern "C" {
 extern "C" {
 	void* VMOD_Handle(struct vmod *);
 	typedef struct vmod *(*vmod_handle_f) ();
-	typedef struct vmod_priv *(*vmod_priv_handle_f) ();
 }
 
 namespace kvm {
@@ -29,8 +28,6 @@ inline auto* validate_deref(const char** ptr, const char* s) {
 		return *ptr;
 	throw std::runtime_error("Invalid pointer for enum: " + std::string(s));
 }
-#define vmod_enum(handle, x) \
-	validate_deref((const char **)dlsym(handle, #x), #x)
 
 void initialize_vmod_http(VRT_CTX, VCL_PRIV task)
 {
@@ -38,17 +35,14 @@ void initialize_vmod_http(VRT_CTX, VCL_PRIV task)
 	assert (vcl != nullptr);
 
 	auto vmod_getter = (vmod_handle_f)dlsym(vcl->dlh, "vmod_http_handle");
-	auto priv_getter = (vmod_priv_handle_f)dlsym(vcl->dlh, "vmod_priv_http_handle");
-
-	if (vmod_getter == nullptr || priv_getter == nullptr) {
+	if (vmod_getter == nullptr) {
 		printf("*** Curl dyncall: VMOD NOT FOUND\n");
 		TenantConfig::reset_dynamic_call(task, "curl.fetch");
 		return;
 	}
 
 	struct vmod *vmod_http = vmod_getter();
-	struct vmod_priv *priv = priv_getter();
-	assert(vmod_http != nullptr && priv != nullptr);
+	assert(vmod_http != nullptr);
 
 	auto* handle = VMOD_Handle(vmod_http);
 	if (handle == nullptr) return;
