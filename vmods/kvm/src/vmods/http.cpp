@@ -97,6 +97,7 @@ void initialize_vmod_http(VRT_CTX, VCL_PRIV task)
 
 		CURL *curl = curl_easy_init();
 		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 8); /* Seconds */
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, (write_callback)
 		[] (char *ptr, size_t size, size_t nmemb, void *poop) -> size_t {
 			auto& woop = *(writeop *)poop;
@@ -117,7 +118,7 @@ void initialize_vmod_http(VRT_CTX, VCL_PRIV task)
 			res = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &opres.status);
 			const char* ctype = nullptr;
 			res = curl_easy_getinfo(curl, CURLINFO_CONTENT_TYPE, &ctype);
-			if (ctype) {
+			if (res == 0 && ctype != nullptr) {
 				const size_t ctlen = std::min(strlen(ctype)+1, (size_t)opres.ct_length);
 				opres.ct_length = ctlen;
 				inst.machine().copy_to_guest(regs.rdx + offsetof(opresult, ctype), ctype, ctlen);
