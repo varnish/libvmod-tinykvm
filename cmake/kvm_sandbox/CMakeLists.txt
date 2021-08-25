@@ -22,6 +22,7 @@ set(KVM_SOURCES
 	### VMODS ###
 	src/vmods/vmods.cpp
 	src/vmods/goto.cpp
+	src/vmods/http.cpp
 )
 
 add_subdirectory(tinykvm/lib tinykvm)

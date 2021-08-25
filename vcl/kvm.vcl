@@ -2,10 +2,9 @@ vcl 4.1;
 import brotli;
 import file;
 import goto;
+import http;
 import kvm;
 import std;
-import urlplus;
-import utils;
 
 backend default none;
 
@@ -92,10 +91,6 @@ sub vcl_recv {
 		/* This will preserve good Host headers */
 		set req.http.Host = "vpizza.com";
 	}
-
-	//set req.url = req.url + "?foo=" + utils.cpu_id();
-	//set req.url = req.url + "?foo=" + utils.thread_id();
-	//set req.url = req.url + "?foo=" + utils.fast_random_int(100);
 
 	/* Live update with X-PostKey */
 	if (req.method == "POST" && req.http.X-PostKey) {
