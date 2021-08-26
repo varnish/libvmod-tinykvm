@@ -5,6 +5,7 @@ import goto;
 import http;
 import kvm;
 import std;
+import utils;
 
 backend default none;
 
@@ -81,8 +82,14 @@ sub vcl_recv {
 	}
 	else if (req.url == "/file") {
 		set req.backend_hint = f.backend();
-		set req.url = "/inn.png";
+		set req.http.Host = "file";
 		return (pass);
+	}
+	else if (req.url == "/fbench") {
+		set req.backend_hint = f.backend();
+		set req.http.Host = "file";
+		set req.url = "/file?foo=" + utils.fast_random_int(100);
+		return (hash);
 	}
 	else if (req.url == "/synth") {
 		return (synth(700, "Testing"));
@@ -106,6 +113,9 @@ sub vcl_recv {
 sub vcl_backend_fetch {
 	if (bereq.method == "POST" && bereq.http.X-PostKey) {
 		/* Live update POST */
+		return (fetch);
+	}
+	else if (bereq.http.Host == "file") {
 		return (fetch);
 	}
 	else if (bereq.method == "POST") {
