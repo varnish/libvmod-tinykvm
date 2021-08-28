@@ -8,10 +8,11 @@ cat >${tmpdir}/${testname}.c <<-EOF
 
 int main(int argc, char **argv)
 {
-	assert(argc == 3);
+	assert(argc == 4);
 	assert(strcmp(argv[0], "vmod_kvm") == 0);
 	assert(strcmp(argv[1], "xpizza.com") == 0);
 	assert(strlen(argv[2]) == 1);
+	assert(strlen(argv[3]) > 0);
 }
 EOF
 gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
