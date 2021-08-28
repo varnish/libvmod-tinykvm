@@ -122,7 +122,8 @@ static void kvm_init_tenants(VRT_CTX, VCL_PRIV task,
 					auto& group = ins.first->second;
 					/* Optional group settings */
 					if (obj.contains("max_boot_time")) {
-						group.max_boot_time = obj["max_boot_time"];
+						group.max_boot_time =
+							TenantGroup::to_ticks(obj["max_boot_time"]);
 					}
 				} else {
 					VRT_fail(ctx, "Tenancy JSON %s: group '%s' has missing fields",
