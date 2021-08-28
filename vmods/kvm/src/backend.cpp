@@ -42,17 +42,19 @@ void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
 	assert(func);
 	try {
 		auto& vm = machine->machine();
+		const auto timeout = machine->tenant().config.max_time();
 		if (post == nullptr) {
 			/* Call the backend response function */
-			vm.vmcall(func, farg,
+			vm.timed_vmcall(func, timeout, farg,
 				(int) HDR_BEREQ, (int) HDR_BERESP);
 		} else if (post->process_func == 0x0) {
 			/* Call the backend POST function */
-			vm.vmcall(func, farg,
+			vm.timed_vmcall(func, timeout, farg,
 				(uint64_t) post->address, (uint64_t) post->length);
 		} else {
 			/* Call the backend streaming POST function */
-			vm.vmcall(func, farg, (uint64_t) post->length);
+			vm.timed_vmcall(func, timeout, farg,
+				(uint64_t) post->length);
 		}
 
 		/* Get content-type and data */
@@ -113,7 +115,9 @@ int kvm_backend_stream(struct backend_post *post,
 		vm.copy_to_guest(GADDR, data_ptr, data_len);
 
 		/* Call the backend streaming function */
-		vm.vmcall(post->process_func, (uint64_t) GADDR, (uint64_t) data_len,
+		const auto timeout = mi.tenant().config.max_time();
+		vm.timed_vmcall(post->process_func, timeout,
+			(uint64_t) GADDR, (uint64_t) data_len,
 			(uint64_t) post->length, !!last);
 
 		/* Get content-type and data */

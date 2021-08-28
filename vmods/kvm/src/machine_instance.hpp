@@ -21,12 +21,6 @@ public:
 	static constexpr size_t  DIRECTOR_MAX = 32;
 	static constexpr size_t  RESULTS_MAX  = 3;
 
-	// call any function, with any primitive arguments
-	template <typename... Args>
-	inline void call(gaddr_t addr, Args&&...);
-	template <typename... Args>
-	inline void debugcall(gaddr_t addr, Args&&...);
-
 	void dynamic_call(uint32_t hash);
 
 	auto& regex() { return m_regex; }
@@ -100,16 +94,5 @@ private:
 	/* Deref this last */
 	std::shared_ptr<ProgramInstance> m_prog_ref = nullptr;
 };
-
-template <typename... Args>
-inline void MachineInstance::call(gaddr_t address, Args&&... args)
-{
-	try {
-		machine().vmcall(address, std::forward<Args>(args)...);
-	}
-	catch (...) {
-		this->handle_exception(address);
-	}
-}
 
 } // kvm

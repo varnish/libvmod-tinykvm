@@ -113,10 +113,10 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 		storage.set_ctx(inst.ctx());
 
 		try {
-			auto regs = stm.setup_call(func, new_stack,
+			auto regs = stm.setup_call(func, new_stack, true,
 				(uint64_t)n, (uint64_t)stm_bufaddr, (uint64_t)res_size);
 			stm.set_registers(regs);
-			stm.run();
+			stm.run(TenantGroup::to_ticks(1.0));
 			/* Get the result buffer and length (capped to res_size) */
 			regs = stm.registers();
 			const gaddr_t st_res_buffer = regs.rdi;
@@ -149,7 +149,8 @@ long ProgramInstance::live_update_call(
 		try {
 			/* Serialize data in the old machine */
 			auto& old_machine = storage.machine();
-			old_machine.vmcall(func);
+			old_machine.timed_vmcall(func,
+				storage.tenant().config.max_time());
 			/* Get serialized data */
 			auto regs = old_machine.registers();
 			auto data_addr = regs.rdi;
@@ -172,7 +173,9 @@ long ProgramInstance::live_update_call(
 
 	auto& new_machine = new_prog.storage.machine();
 	/* Begin resume procedure */
-	new_machine.vmcall(newfunc, (uint64_t)res.len);
+	new_machine.timed_vmcall(newfunc,
+		new_prog.storage.tenant().config.max_time(),
+		(uint64_t)res.len);
 	auto new_regs = new_machine.registers();
 	/* The machine should be calling STOP with rsi=dst_data */
 	auto res_data = new_regs.rdi;

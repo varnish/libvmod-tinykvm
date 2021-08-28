@@ -27,6 +27,7 @@ MachineInstance::MachineInstance(
 	  m_machine(binary, {
 		.max_mem = ten->config.max_memory(),
 		.max_cow_mem = ten->config.max_work_memory(),
+		.timeout = ten->config.max_boot_time(),
 	  }),
 	  m_tenant(ten), m_inst(inst),
 	  m_is_storage(storage), m_is_debug(debug),
