@@ -62,7 +62,7 @@ sub test_vmod_blob {
 sub vcl_recv {
 	#f.write("crash.bin", req.http.Input);
 	# x/64bs 0x6310002328d8
-	if (false) {
+	if (true) {
 		//call test_vmod_header;
 		//call test_vmod_blob;
 		//call test_vmod_cookie;
@@ -75,8 +75,8 @@ sub vcl_recv {
 	//header.remove(req.http.Set-Cookie, req.http.Input);
 
 	header.append(req.http.Input, req.http.Input);
-	//header.remove(req.http.Input, "/foo/[!0-9]");
-	//header.copy(req.http.Input, req.http.Input);
+	header.remove(req.http.Input, "/foo/[!0-9]");
+	header.copy(req.http.Input, req.http.Input);
 
 	//std.cache_req_body(1KB);
 	//std.late_100_continue(false);

@@ -41,6 +41,11 @@ set(VCC_SOURCES ${VCC_PATH}/vcc_acl.c
                 ${VCC_PATH}/vcc_token.c
                 ${VCC_PATH}/vcc_var.c
             )
+if (NOT VARNISH_PLUS)
+	list (APPEND VCC_SOURCES
+		${VCC_PATH}/vcc_source.c
+	)
+endif()
 add_library(vcc STATIC ${VCC_SOURCES})
 target_include_directories(vcc PRIVATE ${VCC_PATH})
 target_include_directories(vcc PRIVATE ${VARNISH_PATH}/include)

@@ -48,6 +48,7 @@ if (NOT VARNISH_PLUS)
 	set(SOURCES ${SOURCES}
 		${PATH}/vtc_gzip.c
 		${PATH}/vtc_sess.c
+		${PATH}/vtc_tunnel.c
 	)
 else()
 	set(SOURCES ${SOURCES}

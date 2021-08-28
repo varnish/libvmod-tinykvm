@@ -10,6 +10,8 @@
 
 extern void varnishd_initialize(const char*);
 extern int  open_varnishd_connection();
+#define REMAIN_OPEN
+#define CLOSE_CFD(cfd) { close(cfd); cfd = -1; }
 
 void http_fuzzer(void* data, size_t len)
 {
@@ -20,39 +22,48 @@ void http_fuzzer(void* data, size_t len)
     }
 	if (len == 0) return;
 
-    int cfd = open_varnishd_connection();
-    if (cfd < 0) {
-        fprintf(stderr, "Could not create socket... going to sleep\n");
-        sleep(1);
-        return;
+#ifdef REMAIN_OPEN
+    static __thread int cfd = -1;
+#else
+    int cfd = -1;
+#endif
+    if (cfd == -1) {
+        cfd = open_varnishd_connection();
+        if (cfd < 0) {
+            fprintf(stderr, "Could not create socket... going to sleep\n");
+            sleep(1);
+            return;
+        }
     }
 
     const char* req = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n";
     int ret = write(cfd, req, strlen(req));
     if (ret < 0) {
-        printf("Writing the request failed\n");
-        close(cfd);
+        //printf("Writing the request failed\n");
+        CLOSE_CFD(cfd);
         return;
     }
 
 	const uint8_t* buffer = (uint8_t*) data;
 
 	// do everything in at least two writes
-	if (len > 0)
+	while (len > 0)
 	{
 		ssize_t bytes = write(cfd, buffer, len);
 	    if (bytes < 0) {
-	        close(cfd);
+	        CLOSE_CFD(cfd);
 	        return;
 	    }
 		buffer += bytes;
 		len    -= bytes;
-
-		write(cfd, "\r\n\r\n", 4);
 	}
+    // XXX: help fuzzer?
+    //write(cfd, "\r\n\r\n", 4);
 
+#ifndef REMAIN_OPEN
     // signalling end of request, increases exec/s by 4x
     shutdown(cfd, SHUT_WR);
+#endif
 
     char readbuf[2048];
     ssize_t rlen = read(cfd, readbuf, sizeof(readbuf));
@@ -61,9 +72,11 @@ void http_fuzzer(void* data, size_t len)
         if (errno != ECONNRESET) {
             printf("Read failed: %s\n", strerror(errno));
         }
-        close(cfd);
+        CLOSE_CFD(cfd);
         return;
     }
 
-    close(cfd);
+#ifndef REMAIN_OPEN
+    CLOSE_CFD(cfd);
+#endif
 }

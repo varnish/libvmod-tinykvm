@@ -13,3 +13,7 @@ set(VGZ_SOURCES ${VGZ_PATH}/adler32.c
             )
 add_library(vgz ${VGZ_SOURCES})
 target_include_directories(vgz PUBLIC ${VGZ_PATH})
+
+if (VARNISH_PLUS)
+    target_compile_definitions(vgz PUBLIC z_off_t=long)
+endif()

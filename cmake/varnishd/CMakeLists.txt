@@ -2,7 +2,6 @@ set (VD_PATH ${VARNISH_PATH}/bin/varnishd)
 
 set(VARNISHD_SOURCES
 	${VD_PATH}/cache/cache_acceptor.c
-	${VD_PATH}/cache/cache_accounting.c
 	${VD_PATH}/cache/cache_backend.c
 	${VD_PATH}/cache/cache_backend_probe.c
 	${VD_PATH}/cache/cache_ban.c
@@ -106,6 +105,7 @@ set(VARNISHD_SOURCES
 )
 if (VARNISH_PLUS)
     list (APPEND VARNISHD_SOURCES
+		${VD_PATH}/cache/cache_accounting.c
 		${VD_PATH}/cache/cache_brotli.c
 		${VD_PATH}/cache/cache_brotli_vfp.c
 		${VD_PATH}/cache/cache_brotli_vdp.c
@@ -155,6 +155,12 @@ else()
         ${VD_PATH}/cache/cache_vpi.c
         ${VD_PATH}/mgt/mgt_symtab.c
     )
+endif()
+if (WORKSPACE_EMULATOR)
+	list (REMOVE_ITEM VARNISHD_SOURCES
+		${VD_PATH}/cache/cache_ws.c)
+	list (APPEND VARNISHD_SOURCES
+		${VD_PATH}/cache/cache_ws_emu.c)
 endif()
 
 set (LIBPATH ${VARNISH_PATH}/lib)
@@ -302,6 +308,10 @@ if (SINGLE_PROCESS OR LIBFUZZER)
 		${VD_PATH}/mgt/mgt_child.c
         ${VD_PATH}/mgt/mgt_vcc.c
     PROPERTIES COMPILE_FLAGS -DSINGLE_PROCESS_MODE)
+endif()
+
+if (WORKSPACE_EMULATOR)
+	target_compile_definitions(varnishd PRIVATE ENABLE_WORKSPACE_EMULATOR=1)
 endif()
 
 find_library(LIBUNWIND unwind)

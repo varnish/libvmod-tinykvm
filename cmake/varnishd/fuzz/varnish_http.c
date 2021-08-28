@@ -77,7 +77,9 @@ void varnishd_initialize(const char* vcl_path)
 		"-p", feature_http2,
 		"-p", feature_siproc,
 		"-p", ti_buffer,
+#ifdef VARNISH_PLUS
 		"-p", lbt_buffer,
+#endif
 		"-p", cs_buffer, // needed?
 		"-p", ws_buffer,
 		"-p", tpmin_buffer,

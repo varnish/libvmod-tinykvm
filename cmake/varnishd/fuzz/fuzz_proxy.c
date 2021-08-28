@@ -14,7 +14,7 @@ extern bool varnishd_proxy_mode;
 
 static const char proxy1_preamble[] = "PROXY ";
 static const char proxy2_preamble[] = {
-	0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A
+//	0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A
 };
 
 void proxy_fuzzer(const void* data, size_t len, int version)
@@ -40,31 +40,40 @@ void proxy_fuzzer(const void* data, size_t len, int version)
 
 	if (version == 1) {
 		reqlen +=
-		snprintf(&request[0], sizeof(request), 
+		snprintf(&request[0], sizeof(request),
 				"%.*s", (int) sizeof(proxy1_preamble), proxy1_preamble);
 	}
 	else if (version == 2) {
 		reqlen +=
-		snprintf(&request[0], sizeof(request), 
+		snprintf(&request[0], sizeof(request),
 				"%.*s", (int) sizeof(proxy2_preamble), proxy2_preamble);
 	}
 
-	reqlen += snprintf(&request[reqlen], sizeof(request) - reqlen, 
+	reqlen += snprintf(&request[reqlen], sizeof(request) - reqlen,
 						"%.*s", (int) len, data);
 
 	// some HTTP
-	reqlen += snprintf(&request[reqlen], sizeof(request) - reqlen, 
+	reqlen += snprintf(&request[reqlen], sizeof(request) - reqlen,
 						"\r\nGET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
 
-	for (int i = 0; i < 2; i++)
-	{
-	    int ret = write(cfd, request, reqlen);
-	    if (ret < 0) {
-	        //printf("Writing the request failed\n");
-	        close(cfd);
-	        return;
-	    }
-		//usleep(300*1000);
+	if (version == 1) {
+		for (int i = 0; i < 2; i++)
+		{
+			int ret = write(cfd, request, reqlen);
+		    if (ret < 0) {
+		        //printf("Writing the request failed\n");
+		        close(cfd);
+		        return;
+		    }
+			//usleep(300*1000);
+		}
+	} else {
+		int ret = write(cfd, request, reqlen);
+		if (ret < 0) {
+			//printf("Writing the request failed\n");
+			close(cfd);
+			return;
+		}
 	}
 
     // signalling end of request, increases exec/s by 4x
