@@ -116,7 +116,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			auto regs = stm.setup_call(func, new_stack,
 				(uint64_t)n, (uint64_t)stm_bufaddr, (uint64_t)res_size);
 			stm.set_registers(regs);
-			stm.run(TenantGroup::to_ticks(1.0));
+			stm.run(1.0);
 			/* Get the result buffer and length (capped to res_size) */
 			regs = stm.registers();
 			const gaddr_t st_res_buffer = regs.rdi;

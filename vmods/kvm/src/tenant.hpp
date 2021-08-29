@@ -18,8 +18,8 @@ struct TenantGroup {
 	using vmods_t = std::map<uint32_t, TenantVMOD>;
 
 	std::string name;
-	uint32_t max_time; /* ticks */
-	uint32_t max_boot_time; /* ticks */
+	float    max_time; /* Seconds */
+	float    max_boot_time; /* Seconds */
 	uint64_t max_memory;
 	uint32_t max_work_mem;
 	size_t   max_fd       = 32;
@@ -34,16 +34,8 @@ struct TenantGroup {
 
 	vmods_t vmods;
 
-	static inline uint32_t to_ticks(float seconds) {
-		const float val = seconds * 62500000.0;
-		if (val < (float)UINT32_MAX)
-			return (uint32_t)val;
-		else
-			return UINT32_MAX;
-	}
-
 	TenantGroup(std::string n, float t, uint64_t mm, uint64_t mwm, vmods_t&& vm = vmods_t{})
-		: name{n}, max_time(to_ticks(t)), max_boot_time(to_ticks(10.0)),
+		: name{n}, max_time(t), max_boot_time(10.0),
 		  max_memory(mm * 1024ul), max_work_mem(mwm * 1024ul),
 		  vmods{std::move(vm)}  {}
 };
@@ -58,8 +50,8 @@ struct TenantConfig
 	std::string    key;
 	TenantGroup    group;
 
-	uint32_t max_boot_time() const noexcept { return group.max_boot_time; }
-	uint32_t max_time() const noexcept { return group.max_time; }
+	float    max_boot_time() const noexcept { return group.max_boot_time; }
+	float    max_time() const noexcept { return group.max_time; }
 	uint64_t max_memory() const noexcept { return group.max_memory; }
 	uint32_t max_work_memory() const noexcept { return group.max_work_mem; }
 	size_t   max_fd() const noexcept { return group.max_fd; }

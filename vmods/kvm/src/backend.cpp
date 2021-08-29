@@ -80,12 +80,18 @@ void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
 			result->bufcount, (tinykvm::Machine::Buffer *)result->buffers, cvaddr, clen);
 		return;
 
-	} catch (const tinykvm::MachineException& e) {
-		fprintf(stderr, "Backend VM exception: %s (data: 0x%lX)\n",
-			e.what(), e.data());
+	} catch (const tinykvm::MachineTimeoutException& mte) {
+		fprintf(stderr, "%s: Backend VM timed out (%f seconds)\n",
+			machine->name().c_str(), mte.seconds());
 		VSLb(ctx->vsl, SLT_Error,
-			"Backend VM exception: %s (data: 0x%lX)",
-			e.what(), e.data());
+			"%s: Backend VM timed out (%f seconds)",
+			machine->name().c_str(), mte.seconds());
+	} catch (const tinykvm::MachineException& e) {
+		fprintf(stderr, "%s: Backend VM exception: %s (data: 0x%lX)\n",
+			machine->name().c_str(), e.what(), e.data());
+		VSLb(ctx->vsl, SLT_Error,
+			"%s: Backend VM exception: %s (data: 0x%lX)",
+			machine->name().c_str(), e.what(), e.data());
 	} catch (const tinykvm::MemoryException& e) {
 		memory_error_handling(ctx, e);
 	} catch (const std::exception& e) {
