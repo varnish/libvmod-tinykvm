@@ -1,4 +1,4 @@
-version: 2
+version: 2.1
 jobs:
   cmake_builds:
     docker:
@@ -46,8 +46,8 @@ jobs:
               working_directory: build
               command: "ctest --verbose -R vmod_riscv_ ."
   kvm_sandbox_tests:
-      docker:
-          - image: cimg/base:2020.01
+      machine:
+        image: ubuntu-2004:202107-02
       working_directory: ~/project
       steps:
           - attach_workspace:
