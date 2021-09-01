@@ -6,4 +6,4 @@ callgraph.svg
 server/img/**
 ext/work-plus
 
-vmods/kvm/programs/basic
+vcl/kvm_tenants.json

@@ -153,9 +153,10 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 						group.max_boot_time = obj["max_boot_time"];
 					}
 				} else {
-					VRT_fail(ctx, "Tenancy JSON %s: group '%s' has missing fields",
+					VSL(SLT_Error, 0,
+						"Tenancy JSON %s: group '%s' has missing fields",
 						source, it.key().c_str());
-					return;
+					continue;
 				}
 			}
 		}
@@ -209,6 +210,15 @@ void kvm_init_tenants_str(VRT_CTX, VCL_PRIV task, const char* str)
 extern "C"
 void kvm_init_tenants_file(VRT_CTX, VCL_PRIV task, const char* filename)
 {
-	const auto json = kvm::file_loader(filename);
-	kvm::init_tenants(ctx, task, json, filename);
+	try {
+		const auto json = kvm::file_loader(filename);
+		kvm::init_tenants(ctx, task, json, filename);
+	} catch (const std::exception& e) {
+		VSL(SLT_Error, 0,
+			"vmod_kvm: Exception when loading tenants from file '%s': %s",
+			filename, e.what());
+		VRT_fail(ctx,
+			"vmod_kvm: Exception when loading tenants from file '%s': %s",
+			filename, e.what());
+	}
 }
