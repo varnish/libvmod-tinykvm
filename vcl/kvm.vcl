@@ -38,7 +38,11 @@ sub vcl_init {
 				"filename": "/tmp/zpizza",
 				"key": "12daf155b8508edc4a4b8002264d7494",
 				"group": "test"
-			},
+			}
+		}
+	""");
+	kvm.embed_tenants("""
+		{
 			"jpizza.com": {
 				"filename": "/tmp/jpizza",
 				"key": "12daf155b8508edc4a4b8002264d7494",

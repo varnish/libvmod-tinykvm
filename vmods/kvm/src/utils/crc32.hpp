@@ -1,6 +1,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 namespace kvm {
 
@@ -46,6 +47,24 @@ inline constexpr auto crc32(const void* vdata, const size_t len)
 		crc = crc32_table[(crc ^ data[i]) & 0xFF] ^ (crc >> 8);
 	}
 	return ~crc;
+}
+
+template <uint32_t POLYNOMIAL = 0xEDB88320>
+inline constexpr auto crc32(const std::string& value)
+{
+	return crc32<POLYNOMIAL>(value.c_str(), value.size());
+}
+
+inline constexpr auto crc32c(const std::string& value)
+{
+	return crc32<0x1EDC6F41>(value.c_str(), value.size());
+}
+
+extern uint32_t crc32c_hw(const char* vdata, size_t len);
+
+inline uint32_t crc32c_hw(const std::string& value)
+{
+	return crc32c_hw(value.c_str(), value.size());
 }
 
 } // kvm

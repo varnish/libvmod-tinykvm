@@ -48,6 +48,7 @@ struct TenantConfig
 	std::string    name;
 	std::string    filename;
 	std::string    key;
+	uint32_t       hash;
 	TenantGroup    group;
 
 	float    max_boot_time() const noexcept { return group.max_boot_time; }
@@ -58,17 +59,15 @@ struct TenantConfig
 	size_t   max_regex() const noexcept { return group.max_regex; }
 	size_t   max_backends() const noexcept { return group.max_backends; }
 
+	static bool begin_dyncall_initialization(VCL_PRIV);
 	// Install a callback function using a string name
 	// Can be invoked from the guest using the same string name
 	static void set_dynamic_call(VCL_PRIV, const std::string& name, ghandler_t);
 	static void set_dynamic_calls(VCL_PRIV, std::vector<std::pair<std::string, ghandler_t>>);
 	static void reset_dynamic_call(VCL_PRIV, const std::string& name, ghandler_t = nullptr);
 
-	TenantConfig(std::string n, std::string f, std::string k, TenantGroup g, dynfun_map& dfm)
-		: name(n), filename(f), key(k), group{std::move(g)}, dynamic_functions_ref{dfm}
-	{
-		this->allowed_file = filename + ".state";
-	}
+	TenantConfig(std::string n, std::string f, std::string k,
+		TenantGroup g, dynfun_map& dfm);
 
 	/* One allowed file for persistence / state-keeping */
 	std::string allowed_file;

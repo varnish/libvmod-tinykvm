@@ -18,6 +18,7 @@ set(KVM_SOURCES
 	src/tenant_dfm.cpp
 	src/tenant_instance.cpp
 	tinykvm/src/functions.cpp  # setup_kvm_system_calls
+	src/utils/crc32.cpp
 	src/varnish_interface.c
 	### VMODS ###
 	src/vmods/vmods.cpp

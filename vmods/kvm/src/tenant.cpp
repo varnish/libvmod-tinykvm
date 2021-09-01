@@ -2,14 +2,22 @@
 
 #include "common_defs.hpp"
 #include "tenant_instance.hpp"
+#include "utils/crc32.hpp"
 #include "varnish.hpp"
 #include <nlohmann/json.hpp>
 #define KVM_TENANTS_MAGIC  0xc465573f
-
 using json = nlohmann::json;
-using namespace kvm;
+
 namespace kvm {
 extern std::vector<uint8_t> file_loader(const std::string&);
+
+TenantConfig::TenantConfig(
+	std::string n, std::string f, std::string k,
+	TenantGroup g, dynfun_map& dfm)
+  : name(n), filename(f), key(k), hash{crc32c_hw(n)}, group{std::move(g)}, dynamic_functions_ref{dfm}
+{
+	this->allowed_file = filename + ".state";
+}
 
 static const TenantGroup test_group {
 	"test",
@@ -28,21 +36,39 @@ Tenants& tenancy(VCL_PRIV task)
 	return *(Tenants *)task->priv;
 }
 
-static inline void kvm_load_tenant(
+bool TenantConfig::begin_dyncall_initialization(VCL_PRIV task)
+{
+	auto& tcy = tenancy(task);
+	if (tcy.dyncalls_initialized) return false;
+	tcy.dyncalls_initialized = true;
+	return true;
+}
+
+static inline bool load_tenant(
 	VRT_CTX, VCL_PRIV task, kvm::TenantConfig&& config)
 {
 	try {
-		tenancy(task).tenants.emplace(std::piecewise_construct,
-			std::forward_as_tuple(config.name),
-			std::forward_as_tuple(new TenantInstance(ctx, config))
-		);
+		auto& tcy = tenancy(task);
+		const uint32_t hash = crc32c_hw(config.name);
+
+		const auto [it, inserted] =
+			tcy.tenants.try_emplace(hash, ctx, config);
+		if (UNLIKELY(!inserted)) {
+			throw std::runtime_error("Tenant already existed: " + config.name);
+		}
+		return true;
+
 	} catch (const std::exception& e) {
-		VRT_fail(ctx, "Exception when creating machine '%s': %s",
+		VSL(SLT_Error, 0,
+			"Exception when creating tenant '%s': %s",
 			config.name.c_str(), e.what());
+		VRT_fail(ctx, "Exception when creating tenant '%s': %s",
+			config.name.c_str(), e.what());
+		return false;
 	}
 }
 
-TenantInstance* kvm_create_temporary_tenant(VCL_PRIV task,
+TenantInstance* create_temporary_tenant(VCL_PRIV task,
 	const TenantInstance* vrm, const std::string& name)
 {
 	/* Create a new tenant with a temporary name,
@@ -50,27 +76,29 @@ TenantInstance* kvm_create_temporary_tenant(VCL_PRIV task,
 	TenantConfig config{vrm->config};
 	config.name = name;
 	config.filename = "";
+	config.hash = crc32c_hw(name);
 	auto it = tenancy(task).temporaries.try_emplace(
-		config.name,
-		new TenantInstance(nullptr, config));
-	return it.first->second;
+		config.hash,
+		nullptr, config);
+	return &it.first->second;
 }
-void kvm_delete_temporary_tenant(VCL_PRIV task,
+void delete_temporary_tenant(VCL_PRIV task,
 	const TenantInstance* ten)
 {
 	auto& temps = tenancy(task).temporaries;
-	auto it = temps.find(ten->config.name);
+	auto it = temps.find(ten->config.hash);
 	if (LIKELY(it != temps.end()))
 	{
-		assert(ten == it->second);
+		assert(ten->config.name == it->second.config.name);
 		delete ten;
 		temps.erase(it);
 		return;
 	}
-	throw std::runtime_error("Could not delete temporary tenant");
+	throw std::runtime_error(
+		"Could not delete temporary tenant: " + ten->config.name);
 }
 
-static void kvm_init_tenants(VRT_CTX, VCL_PRIV task,
+static void init_tenants(VRT_CTX, VCL_PRIV task,
 	const std::vector<uint8_t>& vec, const char* source)
 {
 	try {
@@ -98,12 +126,12 @@ static void kvm_init_tenants(VRT_CTX, VCL_PRIV task,
 				}
 				const auto& group = grit->second;
 				/* Use the group data except filename */
-				kvm_load_tenant(ctx, task, kvm::TenantConfig{
+				kvm::load_tenant(ctx, task, kvm::TenantConfig{
 					it.key(),
 					obj["filename"],
 					obj["key"],
 					group,
-					tenancy(task).dynamic_functions
+					kvm::tenancy(task).dynamic_functions
 				});
 			} else {
 				if (obj.contains("max_time") &&
@@ -133,11 +161,11 @@ static void kvm_init_tenants(VRT_CTX, VCL_PRIV task,
 		}
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
-			"Exception '%s' when loading tenants from: %s",
-			e.what(), source);
-		/* TODO: VRT_fail here? */
-		VRT_fail(ctx, "Exception '%s' when loading tenants from: %s",
-			e.what(), source);
+			"vmod_kvm: Exception when loading tenants from %s: %s",
+			source, e.what());
+		VRT_fail(ctx,
+			"vmod_kvm: Exception when loading tenants from %s: %s",
+			source, e.what());
 	}
 }
 
@@ -146,17 +174,18 @@ static void kvm_init_tenants(VRT_CTX, VCL_PRIV task,
 extern "C"
 kvm::TenantInstance* kvm_tenant_find(VCL_PRIV task, const char* name)
 {
-	auto& t = tenancy(task);
+	auto& t = kvm::tenancy(task);
 	if (UNLIKELY(name == nullptr))
 		return nullptr;
+	const uint32_t hash = kvm::crc32c_hw(name, strlen(name));
 	// regular tenants
-	auto it = t.tenants.find(name);
+	auto it = t.tenants.find(hash);
 	if (LIKELY(it != t.tenants.end()))
-		return it->second;
+		return &it->second;
 	// temporary tenants (updates)
-	it = t.temporaries.find(name);
+	it = t.temporaries.find(hash);
 	if (it != t.temporaries.end())
-		return it->second;
+		return &it->second;
 	return nullptr;
 }
 
@@ -174,12 +203,12 @@ extern "C"
 void kvm_init_tenants_str(VRT_CTX, VCL_PRIV task, const char* str)
 {
 	const std::vector<uint8_t> json { str, str + strlen(str) };
-	kvm_init_tenants(ctx, task, json, "string");
+	kvm::init_tenants(ctx, task, json, "string");
 }
 
 extern "C"
 void kvm_init_tenants_file(VRT_CTX, VCL_PRIV task, const char* filename)
 {
 	const auto json = kvm::file_loader(filename);
-	kvm_init_tenants(ctx, task, json, filename);
+	kvm::init_tenants(ctx, task, json, filename);
 }
