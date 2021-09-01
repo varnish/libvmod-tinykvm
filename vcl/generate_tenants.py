@@ -5,8 +5,8 @@ output_c = sys.argv[1]
 
 file = open(output_c, "w")
 file.write('{\n')
-for x in range(0, 400):
-    file.write('    "tenant' + str(x) + '.com": {\n')
+for x in range(0, 500):
+    file.write('    "tenant' + str(1+x) + '.com": {\n')
     file.write('        "filename": "/tmp/xpizza",\n')
     file.write('        "key": "12daf155b8508edc4a4b8002264d7494",\n')
     file.write('        "group": "test"\n')

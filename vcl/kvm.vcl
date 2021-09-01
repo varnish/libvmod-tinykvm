@@ -50,7 +50,7 @@ sub vcl_init {
 			}
 		}
 	""");
-	//kvm.load_tenants(std.getenv("HOME") + "/git/varnish_autoperf/vcl/kvm_tenants.json");
+	kvm.load_tenants(std.getenv("HOME") + "/git/varnish_autoperf/vcl/kvm_tenants.json");
 	new f = file.init("/tmp");
 	brotli.init(BOTH, transcode = true);
 }
@@ -106,9 +106,6 @@ sub vcl_recv {
 
 	/* Live update with X-PostKey */
 	if (req.method == "POST" && req.http.X-PostKey) {
-		set req.backend_hint = kvm.live_update(
-			req.http.Host, req.http.X-PostKey, 20MB);
-		std.cache_req_body(20MB);
 		return (pass);
 	}
 	/* Normal request or POST */
@@ -118,6 +115,8 @@ sub vcl_recv {
 sub vcl_backend_fetch {
 	if (bereq.method == "POST" && bereq.http.X-PostKey) {
 		/* Live update POST */
+		set bereq.backend = kvm.live_update(
+			bereq.http.Host, bereq.http.X-PostKey, 20MB);
 		return (fetch);
 	}
 	else if (bereq.http.Host == "file") {
