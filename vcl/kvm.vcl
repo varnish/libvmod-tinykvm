@@ -104,10 +104,6 @@ sub vcl_recv {
 		set req.http.Host = "vpizza.com";
 	}
 
-	/* Live update with X-PostKey */
-	if (req.method == "POST" && req.http.X-PostKey) {
-		return (pass);
-	}
 	/* Normal request or POST */
 	return (pass);
 }
