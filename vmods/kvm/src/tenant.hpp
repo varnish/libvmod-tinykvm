@@ -30,6 +30,7 @@ struct TenantGroup {
 		"/usr/lib/locale",
 		"/usr/share/locale",
 		"/usr/local/share/espeak-ng-data",
+		"/usr/lib/x86_64-linux-gnu/espeak-ng-data",
 	};
 
 	vmods_t vmods;
