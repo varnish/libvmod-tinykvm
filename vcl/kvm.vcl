@@ -50,7 +50,7 @@ sub vcl_init {
 			}
 		}
 	""");
-	kvm.load_tenants(std.getenv("HOME") + "/git/varnish_autoperf/vcl/kvm_tenants.json");
+//	kvm.load_tenants(std.getenv("HOME") + "/git/varnish_autoperf/vcl/kvm_tenants.json");
 	new f = file.init("/tmp");
 	brotli.init(BOTH, transcode = true);
 }

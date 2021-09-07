@@ -258,6 +258,8 @@ void MachineInstance::setup_syscall_interface()
 					if (fd > 0) {
 						inst.m_fd.manage(fd, 0x1000 + fd);
 						regs.rax = 0x1000 + fd;
+						machine.set_registers(regs);
+						return;
 					} else {
 						regs.rax = -1;
 					}
