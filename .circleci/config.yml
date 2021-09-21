@@ -48,6 +48,7 @@ jobs:
   kvm_sandbox_tests:
       machine:
         image: ubuntu-2004:202107-02
+        resource_class: varnish/fryer3
       working_directory: ~/project
       steps:
           - attach_workspace:
