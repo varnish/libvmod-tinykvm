@@ -14,9 +14,6 @@ jobs:
             git config --global url."ssh://git@github.com".insteadOf "https://github.com" || true
             git config --global gc.auto 0 || true
       - checkout
-      - add_ssh_keys:
-          fingerprints:
-            - "92:09:b8:08:d4:00:ac:ad:9b:b6:e5:68:9e:7f:08:3e"
       - run:
           name: Checkout submodules
           command: |
