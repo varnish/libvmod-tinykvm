@@ -110,6 +110,36 @@ void MachineInstance::setup_syscall_interface()
 				}
 				machine.set_registers(regs);
 				} break;
+			case 0x10710: { // MULTIPROCESS
+				auto regs = machine.registers();
+				try {
+					size_t num_cpus = std::min(regs.rdi, 8ull);
+					const size_t stack_size = 512 * 1024ul;
+					machine.timed_smpcall(num_cpus,
+						machine.mmap_allocate(num_cpus * stack_size),
+						stack_size,
+						regs.rsi,
+						2.0f,
+						(uint64_t) regs.rdx /* arg */
+						);
+					regs.rax = 0;
+				} catch (const std::exception& e) {
+					fprintf(stderr, "Multiprocess exception: %s\n", e.what());
+					regs.rax = -1;
+				}
+				machine.set_registers(regs);
+				} break;
+			case 0x10711: { // MULTIPROCESS_WAIT
+				auto regs = machine.registers();
+				try {
+					machine.smp_wait();
+					regs.rax = 0;
+				} catch (const std::exception& e) {
+					fprintf(stderr, "Multiprocess wait exception: %s\n", e.what());
+					regs.rax = -1;
+				}
+				machine.set_registers(regs);
+				} break;
 			default:
 				printf("%s: Unhandled system call %u\n",
 					inst.name().c_str(), scall);

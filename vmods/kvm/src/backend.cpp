@@ -56,6 +56,9 @@ void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
 			vm.timed_vmcall(func, timeout, farg,
 				(uint64_t) post->length);
 		}
+		/* Make sure no SMP work is in-flight. */
+		/* XXX: Make sure this gets called no matter what. */
+		vm.smp_wait();
 
 		/* Get content-type and data */
 		auto regs = vm.registers();
