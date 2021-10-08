@@ -113,6 +113,10 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10710: { // MULTIPROCESS
 				auto regs = machine.registers();
 				try {
+					/* It's too expensive to schedule multiple workloads. */
+					if (UNLIKELY(machine.smp_active())) {
+						throw std::runtime_error("Multiprocessing already active");
+					}
 					size_t num_cpus = std::min(regs.rdi, 8ull);
 					const size_t stack_size = 512 * 1024ul;
 					machine.timed_smpcall(num_cpus,

@@ -57,7 +57,6 @@ void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
 				(uint64_t) post->length);
 		}
 		/* Make sure no SMP work is in-flight. */
-		/* XXX: Make sure this gets called no matter what. */
 		vm.smp_wait();
 
 		/* Get content-type and data */
@@ -101,6 +100,8 @@ void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
 		fprintf(stderr, "Backend VM exception: %s\n", e.what());
 		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
 	}
+	/* Make sure no SMP work is in-flight. */
+	machine->machine().smp_wait();
 	/* An error result */
 	new (result) backend_result {nullptr, 0,
 		500, /* Internal server error */
