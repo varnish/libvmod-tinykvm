@@ -115,6 +115,7 @@ void MachineInstance::setup_syscall_interface()
 				try {
 					/* It's too expensive to schedule multiple workloads. */
 					if (UNLIKELY(machine.smp_active())) {
+						printf("SMP active count: %d\n", machine.smp_active_count());
 						throw std::runtime_error("Multiprocessing already active");
 					}
 					size_t num_cpus = std::min(regs.rdi, 8ull);
