@@ -177,8 +177,10 @@ tinykvm::Machine::printer_func MachineInstance::get_vsl_printer() const
 		/* Avoid wrap-around and empty log */
 		if (buffer + len < buffer || len == 0)
 			return;
+		/* Simultaneous printing is not possible with SMP. */
+		const bool smp = machine().smp_active();
 		auto* vsl = this->ctx()->vsl;
-		if (vsl != nullptr) {
+		if (vsl != nullptr && !smp) {
 			VSLb(vsl, SLT_VCL_Log,
 				"%s says: %.*s", name().c_str(), (int)len, buffer);
 		} else {
