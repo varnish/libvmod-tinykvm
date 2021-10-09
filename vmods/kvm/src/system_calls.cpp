@@ -123,7 +123,7 @@ void MachineInstance::setup_syscall_interface()
 					machine.timed_smpcall(num_cpus,
 						machine.mmap_allocate(num_cpus * stack_size),
 						stack_size,
-						regs.rsi,
+						(uint64_t) regs.rsi, /* func */
 						2.0f,
 						(uint64_t) regs.rdx /* arg */
 						);
