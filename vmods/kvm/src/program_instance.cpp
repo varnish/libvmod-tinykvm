@@ -113,7 +113,8 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 		storage.set_ctx(inst.ctx());
 
 		try {
-			auto regs = stm.setup_call(func, new_stack,
+			tinykvm::tinykvm_x86regs regs;
+			stm.setup_call(regs, func, new_stack,
 				(uint64_t)n, (uint64_t)stm_bufaddr, (uint64_t)res_size);
 			stm.set_registers(regs);
 			stm.run(1.0);
