@@ -113,15 +113,17 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10710: { // MULTIPROCESS
 				auto regs = machine.registers();
 				try {
-					const size_t num_cpus = regs.rdi;
 					/* It's too expensive to schedule multiple workloads. */
 					if (UNLIKELY(machine.smp_active())) {
 						printf("SMP active count: %d\n", machine.smp_active_count());
 						throw std::runtime_error("Multiprocessing: Already active");
-					} else if (UNLIKELY(num_cpus > 16)) {
+					} else if (UNLIKELY(regs.rdi < 2)) {
+						throw std::runtime_error("Multiprocessing: Must request at least one vCPU");
+					} else if (UNLIKELY(regs.rdi > 16)) {
 						/* TODO: Tenant-property */
 						throw std::runtime_error("Multiprocessing: Too many vCPUs requested");
 					}
+					const size_t num_cpus = regs.rdi - 1;
 					const size_t stack_size = 512 * 1024ul;
 					machine.timed_smpcall(num_cpus,
 						machine.mmap_allocate(num_cpus * stack_size),
@@ -131,8 +133,7 @@ void MachineInstance::setup_syscall_interface()
 						(uint64_t) regs.rdx, /* arg1 */
 						(uint64_t) regs.rcx, /* arg2 */
 						(uint64_t) regs.r8,  /* arg3 */
-						(uint64_t) regs.r9   /* arg4 */
-						);
+						(uint64_t) regs.r9); /* arg4 */
 					regs.rax = 0;
 				} catch (const std::exception& e) {
 					fprintf(stderr, "Multiprocess exception: %s\n", e.what());
@@ -140,7 +141,62 @@ void MachineInstance::setup_syscall_interface()
 				}
 				machine.set_registers(regs);
 				} break;
-			case 0x10711: { // MULTIPROCESS_WAIT
+			case 0x10711: { // MULTIPROCESS_ARRAY
+				auto regs = machine.registers();
+				try {
+					/* It's too expensive to schedule multiple workloads. */
+					if (UNLIKELY(machine.smp_active())) {
+						printf("SMP active count: %d\n", machine.smp_active_count());
+						throw std::runtime_error("Multiprocessing: Already active");
+					} else if (UNLIKELY(regs.rdi < 2)) {
+						throw std::runtime_error("Multiprocessing: Must request at least one vCPU");
+					} else if (UNLIKELY(regs.rdi > 16)) {
+						/* TODO: Tenant-property */
+						throw std::runtime_error("Multiprocessing: Too many vCPUs requested");
+					}
+					const size_t num_cpus = regs.rdi - 1;
+					const size_t stack_size = 512 * 1024ul;
+					machine.timed_smpcall_array(num_cpus,
+						machine.mmap_allocate(num_cpus * stack_size),
+						stack_size,
+						(uint64_t) regs.rsi,  /* func */
+						2.0f, /* TODO: Tenant-property */
+						(uint64_t) regs.rdx,  /* array */
+						(uint32_t) regs.rcx); /* array_size */
+					regs.rax = 0;
+				} catch (const std::exception& e) {
+					fprintf(stderr, "Multiprocess exception: %s\n", e.what());
+					regs.rax = -1;
+				}
+				machine.set_registers(regs);
+				} break;
+			case 0x10712: { // MULTIPROCESS_CLONE
+				auto regs = machine.registers();
+				try {
+					/* It's too expensive to schedule multiple workloads. */
+					if (UNLIKELY(machine.smp_active())) {
+						printf("SMP active count: %d\n", machine.smp_active_count());
+						throw std::runtime_error("Multiprocessing: Already active");
+					} else if (UNLIKELY(regs.rdi < 2)) {
+						throw std::runtime_error("Multiprocessing: Must request at least one vCPU");
+					} else if (UNLIKELY(regs.rdi > 16)) {
+						/* TODO: Tenant-property */
+						throw std::runtime_error("Multiprocessing: Too many vCPUs requested");
+					}
+					const size_t num_cpus = regs.rdi - 1;
+					machine.timed_smpcall_clone(num_cpus,
+						regs.rsi,
+						regs.rdx,
+						2.0f, /* TODO: Tenant-property */
+						regs);
+					regs.rax = 0;
+				} catch (const std::exception& e) {
+					fprintf(stderr, "Multiprocess exception: %s\n", e.what());
+					regs.rax = -1;
+				}
+				machine.set_registers(regs);
+				} break;
+			case 0x10713: { // MULTIPROCESS_WAIT
 				auto regs = machine.registers();
 				try {
 					/* XXX: Propagate SMP exceptions */
