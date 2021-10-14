@@ -19,6 +19,7 @@ set(PROFILE "../perf.afdo" CACHE STRING "Optimization profile path")
 option(LIBFUZZER    "Enable fuzzing with clang libfuzzer")
 option(LIBCPP       "Enable compiling with libc++ and linking with LLD" OFF)
 option(USE_LLD      "Always link with LLD" OFF)
+option(USE_MOLD     "Always link with MOLD" OFF)
 option(SINGLE_PROCESS "Disable fork() and run in single-process mode" OFF)
 option(WORKSPACE_EMULATOR "Replace workspace with checked emulator" OFF)
 

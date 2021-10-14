@@ -79,6 +79,8 @@ endif()
 
 if (USE_LLD)
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
+elseif (USE_MOLD)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --ld-path=/usr/bin/mold")
 endif()
 
 # C threadpool used by parallell fuzzer
