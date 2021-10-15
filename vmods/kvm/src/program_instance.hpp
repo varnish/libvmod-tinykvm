@@ -29,7 +29,8 @@ public:
 	inst_pair concurrent_fork(const vrt_ctx*,
 		TenantInstance*, std::shared_ptr<ProgramInstance>&);
 
-	/* Serialized vector-based vmcall into storage VM */
+	/* Serialized vector-based vmcall into storage VM.
+	   NOTE: buffers are clobbered by the function call. */
 	long storage_call(tinykvm::Machine& src,
 		gaddr_t func, size_t n, VirtBuffer[n], gaddr_t, size_t);
 
