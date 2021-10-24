@@ -11,12 +11,12 @@ __attribute__((used))
 extern void my_backend(const char *arg)
 {
 	if (strcmp(arg, "/my_backend") == 0) {
-		return_result(404, "text/plain", "Not found");
+		backend_response_str(404, "text/plain", "Not found");
 	}
 	else if (strcmp(arg, "/my_admin") == 0) {
-		return_result(403, "text/plain", "Forbidden");
+		backend_response_str(403, "text/plain", "Forbidden");
 	}
-	return_result(401, "text/plain", "Unauthorized");
+	backend_response_str(401, "text/plain", "Unauthorized");
 }
 EOF
 gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
