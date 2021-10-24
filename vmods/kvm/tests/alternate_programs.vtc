@@ -1,0 +1,91 @@
+varnishtest "KVM Backend: Alternating between programs"
+
+shell {
+cat >${tmpdir}/${testname}1.c <<-EOF
+#include <stdio.h>
+#include "kvm_api.h"
+
+int main(int argc, char **argv) {
+	printf("Hello from %s!\n", argv[1]);
+}
+
+extern void my_backend(const char *arg) {
+	backend_response_str(201, "text/plain", arg);
+}
+EOF
+
+cat >${tmpdir}/${testname}2.c <<-EOF
+#include <stdio.h>
+#include "kvm_api.h"
+
+int main(int argc, char **argv) {
+	printf("Hello from %s!\n", argv[1]);
+}
+
+extern void my_backend(const char *arg) {
+	backend_response_str(202, "text/plain", arg);
+}
+EOF
+
+gcc -static -O2 ${tmpdir}/${testname}1.c -I${testdir} -o ${tmpdir}/${testname}1
+gcc -static -O2 ${tmpdir}/${testname}2.c -I${testdir} -o ${tmpdir}/${testname}2
+}
+
+varnish v1 -vcl+backend {
+	vcl 4.1;
+	import kvm;
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""
+			{
+				"xpizza.com": {
+					"filename": "${tmpdir}/${testname}1",
+					"key": "",
+					"group": "test"
+				},
+				"ypizza.com": {
+					"filename": "${tmpdir}/${testname}2",
+					"key": "",
+					"group": "test"
+				}
+			}
+		""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				"my_backend",
+				bereq.url);
+	}
+} -start
+
+client c1 -repeat 40 {
+	txreq -url "/xpizza" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "/xpizza"
+	expect resp.status == 201
+	txreq -url "/ypizza" -hdr "Host: ypizza.com"
+	rxresp
+	expect resp.body == "/ypizza"
+	expect resp.status == 202
+} -start
+
+client c2 -repeat 40 {
+	txreq -url "/xpizza" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "/xpizza"
+	expect resp.status == 201
+	txreq -url "/ypizza" -hdr "Host: ypizza.com"
+	rxresp
+	expect resp.body == "/ypizza"
+	expect resp.status == 202
+} -start
+
+client c1 -wait
+client c2 -wait
