@@ -12,7 +12,9 @@ kvm::MachineInstance* kvm_get_machine(VRT_CTX, const void* key)
 		return (kvm::MachineInstance*) priv_task->priv;
 	return nullptr;
 }
-inline kvm::MachineInstance* kvm_get_machine(VRT_CTX)
+
+extern "C"
+kvm::MachineInstance* kvm_get_machine(VRT_CTX)
 {
 	return kvm_get_machine(ctx, ctx);
 }

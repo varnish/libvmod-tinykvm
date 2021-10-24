@@ -84,22 +84,16 @@ VCL_INT vmod_vm_call(VRT_CTX, VCL_PRIV task,
 	return (kvm_call(ctx, machine, func, arg));
 }
 
-VCL_INT vmod_vm_synth(VRT_CTX, VCL_PRIV task, VCL_STRING tenant)
+VCL_INT vmod_vm_synth(VRT_CTX)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
 	if (ctx->method == VCL_MET_SYNTH ||
 		ctx->method == VCL_MET_BACKEND_ERROR)
 	{
-		TEN_PTR tenptr = kvm_tenant_find(task, tenant);
-		if (tenptr == NULL) {
-			VRT_fail(ctx, "No such tenant: %s", tenant);
-			return (-1);
-		}
-
-		KVM_PTR machine = kvm_fork_machine(ctx, tenptr, KVM_FORK_MAIN);
+		KVM_PTR machine = kvm_get_machine(ctx);
 		if (machine == NULL) {
-			VRT_fail(ctx, "Unable to fork tenant machine: %s", tenant);
+			VRT_fail(ctx, "vmod_kvm: No active machine");
 			return (-1);
 		}
 

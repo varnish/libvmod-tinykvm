@@ -90,7 +90,7 @@ $Function INT vm_call(PRIV_VCL, STRING tenant, STRING func, STRING arg = "")
 - Subsequent calls on the same task will yield the same VM.
 - Use this to make a VCL decision, eg. return (synth ...).
 
-$Function INT vm_synth(PRIV_VCL, STRING tenant)
+$Function INT vm_synth()
 
 - Produces a synthetic response using the current active machine.
 - Can only be called from vcl_synth or vcl_backend_error.

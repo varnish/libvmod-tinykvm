@@ -67,6 +67,7 @@ sub vcl_recv {
 	}
 	else if (req.url == "/xhash") {
 		set req.http.Host = "xpizza.com";
+		set req.url = req.url + "?f=" + utils.fast_random_int(100);
 		return (hash);
 	}
 	else if (req.url == "/j" || req.url == "/j/get") {
@@ -112,7 +113,7 @@ sub vcl_recv {
 
 sub vcl_synth {
 	if (resp.status == 200) {
-		kvm.vm_synth(req.http.Host);
+		kvm.vm_synth();
 		return (deliver);
 	}
 }
