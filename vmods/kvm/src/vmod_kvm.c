@@ -1,5 +1,8 @@
 #include "vmod_kvm.h"
 
+# include <vsb.h>
+# include <vcl.h>
+
 VCL_VOID vmod_embed_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING json)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
@@ -61,16 +64,63 @@ VCL_VOID vmod_cache_symbol(VRT_CTX, VCL_STRING symbol)
 	kvm_cache_symbol(symbol);
 }
 
-VCL_BOOL vmod_fork(VRT_CTX, VCL_PRIV task, VCL_STRING tenant)
+VCL_INT vmod_vm_call(VRT_CTX, VCL_PRIV task,
+	VCL_STRING tenant, VCL_STRING func, VCL_STRING arg)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
-	struct vmod_kvm_tenant *tenptr = kvm_tenant_find(task, tenant);
-
+	TEN_PTR tenptr = kvm_tenant_find(task, tenant);
 	if (tenptr == NULL) {
 		VRT_fail(ctx, "No such tenant: %s", tenant);
-		return (0);
+		return (-1);
 	}
 
-	return (kvm_fork_machine(ctx, tenptr, 0) != NULL);
+	KVM_PTR machine = kvm_fork_machine(ctx, tenptr, KVM_FORK_MAIN);
+	if (machine == NULL) {
+		VRT_fail(ctx, "Unable to fork tenant machine: %s", tenant);
+		return (-1);
+	}
+
+	return (kvm_call(ctx, machine, func, arg));
+}
+
+VCL_INT vmod_vm_synth(VRT_CTX, VCL_PRIV task, VCL_STRING tenant)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	if (ctx->method == VCL_MET_SYNTH ||
+		ctx->method == VCL_MET_BACKEND_ERROR)
+	{
+		TEN_PTR tenptr = kvm_tenant_find(task, tenant);
+		if (tenptr == NULL) {
+			VRT_fail(ctx, "No such tenant: %s", tenant);
+			return (-1);
+		}
+
+		KVM_PTR machine = kvm_fork_machine(ctx, tenptr, KVM_FORK_MAIN);
+		if (machine == NULL) {
+			VRT_fail(ctx, "Unable to fork tenant machine: %s", tenant);
+			return (-1);
+		}
+
+		struct vsb *vsb = (struct vsb*) ctx->specific;
+		assert(vsb != NULL);
+
+		struct vmod_kvm_synth synth = {
+			.vsb = vsb,
+			.status = 0,
+			.ct_len = 0
+		};
+		if (kvm_synth(ctx, machine, &synth) < 0)
+			return (-1);
+
+		struct http *hp = ctx->http_resp;
+		assert(hp != NULL);
+		http_PrintfHeader(hp, "Content-Length: %zd", VSB_len(vsb));
+		http_PrintfHeader(hp, "Content-Type: %.*s", synth.ct_len, synth.ct_buf);
+
+		return (VSB_len(vsb));
+	}
+	VRT_fail(ctx, "Wrong VCL function for synth responses");
+	return (-1);
 }

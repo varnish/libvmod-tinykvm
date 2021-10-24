@@ -97,7 +97,9 @@ sub vcl_recv {
 		return (hash);
 	}
 	else if (req.url == "/synth") {
-		return (synth(700, "Testing"));
+		return (synth(
+			kvm.vm_call(req.http.Host, "on_recv", req.url)
+		));
 	}
 	else if (req.http.Host ~ "^.+\..+:\d+$") {
 		/* This will preserve good Host headers */
@@ -106,6 +108,13 @@ sub vcl_recv {
 
 	/* Normal request or POST */
 	return (pass);
+}
+
+sub vcl_synth {
+	if (resp.status == 200) {
+		kvm.vm_synth(req.http.Host);
+		return (deliver);
+	}
 }
 
 sub vcl_backend_fetch {

@@ -67,6 +67,7 @@ void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
 		const uint64_t cvaddr = regs.rcx;
 		const uint64_t clen   = regs.r8;
 
+		/* Immediately copy out content-type because small. */
 		char *tbuf = (char *)WS_Alloc(ctx->ws, tlen);
 		if (UNLIKELY(tbuf == nullptr)) {
 			throw std::runtime_error("Out of workspace for backend VM content-type");

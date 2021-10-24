@@ -48,6 +48,9 @@ public:
 	bool is_debug() const noexcept { return m_is_debug; }
 	gaddr_t max_memory() const noexcept;
 
+	void set_result(uint8_t value) noexcept { m_result = value; }
+	auto result() const noexcept { return m_result; }
+
 	void init_sha256();
 	void hash_buffer(const char* buffer, int len);
 	bool apply_hash();
@@ -82,6 +85,7 @@ private:
 	bool        m_is_storage = false;
 	bool        m_is_debug = false;
 	bool        m_currently_debugging = false;
+	uint16_t    m_result = 0;
 	gaddr_t     m_sighandler = 0;
 	VSHA256Context* m_sha_ctx = nullptr;
 

@@ -25,7 +25,7 @@ public:
 
 	gaddr_t lookup(const char* name) const;
 
-	/* Heap-allocated VM from concurrent queue */
+	/* Thread-local heap-allocated VM. */
 	inst_pair concurrent_fork(const vrt_ctx*,
 		TenantInstance*, std::shared_ptr<ProgramInstance>&);
 
