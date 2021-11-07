@@ -3,6 +3,7 @@
 #include "common_defs.hpp"
 #include "program_instance.hpp"
 #include "varnish.hpp"
+#include <unistd.h>
 
 namespace kvm {
 	extern std::vector<uint8_t> file_loader(const std::string&);
@@ -17,6 +18,18 @@ TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 		MachineInstance::kvm_initialize();
 	}
 
+	/* Check if we can read the program filename. */
+	if (access(conf.filename.c_str(), R_OK)) {
+		VSL(SLT_Error, 0,
+			"Missing program or invalid path for '%s'. Send new program.",
+			conf.name.c_str());
+		fprintf(stderr,
+			"Missing program or invalid path for '%s'. Send new program.\n",
+			conf.name.c_str());
+		return;
+	}
+
+	/* Load the program now. */
 	try {
 		auto elf = file_loader(conf.filename);
 		this->program =

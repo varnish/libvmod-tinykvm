@@ -1,15 +1,20 @@
 #!/bin/bash
-if ! command -v "clang-12" &> /dev/null; then
-	if ! command -v "clang-11" &> /dev/null; then
-		export CC="ccache clang-10"
-		export CXX="ccache clang++-10"
+if ! command -v "clang-14" &> /dev/null; then
+	if ! command -v "clang-12" &> /dev/null; then
+		if ! command -v "clang-11" &> /dev/null; then
+			export CC="ccache clang-10"
+			export CXX="ccache clang++-10"
+		else
+			export CC="ccache clang-11"
+			export CXX="ccache clang++-11"
+		fi
 	else
-		export CC="ccache clang-11"
-		export CXX="ccache clang++-11"
+		export CC="ccache clang-12"
+		export CXX="ccache clang++-12"
 	fi
 else
-	export CC="ccache clang-12"
-	export CXX="ccache clang++-12"
+	export CC="ccache clang-14"
+	export CXX="ccache clang++-14"
 fi
 BUILD_PATH="$PWD"
 SOURCE_DIR="$PWD"
