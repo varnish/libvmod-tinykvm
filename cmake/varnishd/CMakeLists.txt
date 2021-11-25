@@ -96,10 +96,10 @@ set(VARNISHD_SOURCES
 	${VD_PATH}/waiter/cache_waiter_ports.c
 	${VD_PATH}/waiter/mgt_waiter.c
     # persistent storage
-    ${VD_PATH}/storage/mgt_storage_persistent.c
-	${VD_PATH}/storage/storage_persistent.c
-	${VD_PATH}/storage/storage_persistent_silo.c
-	${VD_PATH}/storage/storage_persistent_subr.c
+    #${VD_PATH}/storage/mgt_storage_persistent.c
+	#${VD_PATH}/storage/storage_persistent.c
+	#${VD_PATH}/storage/storage_persistent_silo.c
+	#{VD_PATH}/storage/storage_persistent_subr.c
     # nodist
 	builtin_vcl.c
 )
@@ -110,6 +110,9 @@ if (VARNISH_PLUS)
 		${VD_PATH}/cache/cache_brotli_vfp.c
 		${VD_PATH}/cache/cache_brotli_vdp.c
 		${VD_PATH}/cache/cache_governor.c
+		${VD_PATH}/cache/cache_seg_deliver.c
+		${VD_PATH}/cache/cache_seg_fetch.c
+		${VD_PATH}/cache/cache_seg_ykey.c
 		${VD_PATH}/cache/cache_tcp_pool.c
 		${VD_PATH}/cache/cache_tcp_oper.c
 		${VD_PATH}/cache/cache_vcl_vrt.c

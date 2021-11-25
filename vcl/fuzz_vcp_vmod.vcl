@@ -6,6 +6,7 @@ import accept;
 import debug;
 import headerplus;
 //import jwt;
+import slicer;
 import std;
 import str;
 import synthbackend;
@@ -128,10 +129,23 @@ sub vcl_recv {
         call test_uri;
 	}
 
+	set req.http.Range = req.http.Input;
 
 	return (hash);
 }
 
 sub vcl_miss {
 	//return (restart);
+}
+
+## SLICER ##
+sub vcl_backend_fetch {
+    if (!slicer.failed()) {
+        slicer.enable();
+    }
+}
+sub vcl_backend_error {
+    if (slicer.failed()) {
+        return (retry);
+    }
 }

@@ -79,12 +79,12 @@ function(build_vsc_file NAME)
 	get_filename_component(VSC_FILE ${NAME} NAME_WE)
 	add_custom_command(
 			OUTPUT ${VSC_FILE}.c ${VSC_FILE}.h
-			COMMAND python3 ${LIBPATH}/libvcc/vsctool.py -ch ${NAME}
+			COMMAND python3 "${LIBPATH}/libvsc/vsctool.py" -ch ${NAME}
 			DEPENDS ${NAME}
 		)
 endfunction()
 foreach(VSC_FILE ${VSC_SOURCES})
-	build_vsc_file(${VARNISHD_PATH}/${VSC_FILE})
+	build_vsc_file("${LIBPATH}/libvsc/${VSC_FILE}")
 	get_filename_component(VSC_WEFILE ${VSC_FILE} NAME_WE)
 	list(APPEND VSC_COMPILED
 		${CMAKE_CURRENT_BINARY_DIR}/${VSC_WEFILE}.c
