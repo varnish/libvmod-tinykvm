@@ -113,12 +113,21 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 		storage.set_ctx(inst.ctx());
 
 		try {
+#ifdef TINYKVM_FAST_EXECUTION_TIMEOUT
 			constexpr uint32_t ONE_SECOND = 62'500'000;
+			const uint32_t ticks = ONE_SECOND
+#else
+			const uint32_t ticks = 0;
+#endif
 			tinykvm::tinykvm_x86regs regs;
-			stm.setup_call(regs, func, ONE_SECOND, new_stack,
+			stm.setup_call(regs, func, ticks, new_stack,
 				(uint64_t)n, (uint64_t)stm_bufaddr, (uint64_t)res_size);
 			stm.set_registers(regs);
+#ifdef TINYKVM_FAST_EXECUTION_TIMEOUT
 			stm.run();
+#else
+			stm.run(1.0);
+#endif
 			/* Get the result buffer and length (capped to res_size) */
 			regs = stm.registers();
 			const gaddr_t st_res_buffer = regs.rdi;
@@ -128,7 +137,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 				src.copy_from_machine(res_addr, stm, st_res_buffer, st_res_size);
 			}
 			/* Run the function to the end, allowing cleanup */
-			stm.run(99999999999999.0);
+			stm.run(1.0);
 			return st_res_size;
 		} catch (...) {
 			return -1;
