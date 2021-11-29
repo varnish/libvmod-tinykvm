@@ -13,7 +13,7 @@ add_vmod(vmod_http ${PATH}/vmod_http.vcc "HTTP VMOD"
 	${PATH}/http_io.c
 	${PATH}/http_object.c
 	${PATH}/http_params.c
-	${PATH}/http_params.h
+	${PATH}/http_pool.c
 	${PATH}/http_url.c
 	${PATH}/http_utils.c
 )
