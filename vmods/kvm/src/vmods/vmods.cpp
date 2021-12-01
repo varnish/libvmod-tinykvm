@@ -5,6 +5,7 @@ struct vrt_ctx;
 namespace kvm {
 extern void initialize_vmod_goto(const vrt_ctx*, VCL_PRIV);
 extern void initialize_vmod_http(const vrt_ctx*, VCL_PRIV);
+extern void initialize_facedetect(const vrt_ctx*, VCL_PRIV);
 
 extern "C"
 void initialize_vmods(const vrt_ctx* ctx, VCL_PRIV task)
@@ -14,6 +15,9 @@ void initialize_vmods(const vrt_ctx* ctx, VCL_PRIV task)
 
 	initialize_vmod_goto(ctx, task);
 	initialize_vmod_http(ctx, task);
+#ifdef KVM_FACEDETECTION
+	initialize_facedetect(ctx, task);
+#endif
 }
 
 }
