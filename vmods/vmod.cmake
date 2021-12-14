@@ -73,7 +73,7 @@ function(add_vmod LIBNAME VCCNAME comment)
 		COMMAND ${Python3_EXECUTABLE} ${VMODTOOL} -o vcc_if ${VCCFILE}
 		COMMAND ${CMAKE_COMMAND} -E create_symlink vcc_if.c ${SILLY_NAME}.c
 		COMMAND ${CMAKE_COMMAND} -E create_symlink vcc_if.h ${SILLY_NAME}.h
-		DEPENDS ${VCCFILE}
+		DEPENDS ${VCCFILE} ${VMODTOOL}
 		OUTPUT  ${OUTFILES}
 		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 	)

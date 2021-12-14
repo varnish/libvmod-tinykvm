@@ -54,18 +54,20 @@ void initialize_vmod_goto(VRT_CTX, VCL_PRIV task)
 	auto* vcl = ctx->vcl;
 	assert (vcl != nullptr);
 
-	auto goto_getter = (vmod_handle_f)dlsym(vcl->dlh, "vmod_goto_handle");
-	auto priv_getter = (vmod_priv_handle_f)dlsym(vcl->dlh, "vmod_priv_goto_handle");
+	/* Discover vmod_goto. */
+	struct vmod *vmod_goto = VMOD_ForEach(
+		[] (struct vmod *vmod) -> struct vmod * {
+			auto* dlh = VMOD_Handle(vmod);
+			if (dlsym(dlh, "vmod_dns_director__init"))
+				return vmod;
+			return nullptr;
+		});
 
-	if (goto_getter == nullptr || priv_getter == nullptr) {
+	if (vmod_goto == nullptr) {
 		printf("*** Goto dyncall: VMOD NOT FOUND\n");
 		TenantConfig::reset_dynamic_call(task, "goto.dns");
 		return;
 	}
-
-	struct vmod *vmod_goto = goto_getter();
-	struct vmod_priv *priv = priv_getter();
-	assert(vmod_goto != nullptr && priv != nullptr);
 
 	auto* handle = VMOD_Handle(vmod_goto);
 	if (handle == nullptr) return;
@@ -108,10 +110,12 @@ void initialize_vmod_goto(VRT_CTX, VCL_PRIV task)
 			/* IPV */
 			const int ipv = regs.rdx;
 
+			struct vmod_priv priv = {0};
+
 			printf("Goto: %s (ipv=%s)\n", host.c_str(), ip_version.at(ipv));
 			struct vmod_goto_dns_director *vo_d;
 			vmod_dns_director__init(inst.ctx(), &vo_d, "d",
-	          priv,
+	          &priv,
 	          host.c_str(), // host
 	          "",           // port
 	          "",           // Host: field

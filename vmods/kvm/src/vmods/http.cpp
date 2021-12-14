@@ -31,21 +31,24 @@ inline auto* validate_deref(const char** ptr, const char* s) {
 
 void initialize_vmod_http(VRT_CTX, VCL_PRIV task)
 {
-	auto* vcl = ctx->vcl;
-	assert (vcl != nullptr);
+	(void) ctx;
+	/* Discover any VMOD that links against curl. */
+	struct vmod *vmod = VMOD_ForEach(
+		[] (struct vmod *vmod) -> struct vmod * {
+			auto* dlh = VMOD_Handle(vmod);
+			if (dlsym(dlh, "curl_easy_init"))
+				return vmod;
+			return nullptr;
+		});
 
-	auto vmod_getter = (vmod_handle_f)dlsym(vcl->dlh, "vmod_http_handle");
-	if (vmod_getter == nullptr) {
-		printf("*** Curl dyncall: VMOD NOT FOUND\n");
+	if (vmod == nullptr) {
+		printf("*** Curl dyncall: CURL NOT FOUND\n");
 		TenantConfig::reset_dynamic_call(task, "curl.fetch");
 		return;
 	}
 
-	struct vmod *vmod_http = vmod_getter();
-	assert(vmod_http != nullptr);
-
-	auto* handle = VMOD_Handle(vmod_http);
-	if (handle == nullptr) return;
+	auto* handle = VMOD_Handle(vmod);
+	assert(handle);
 
 	typedef CURL* (*curl_easy_init_t) (void);
 	typedef CURLcode (*curl_easy_setopt_t)(CURL *, CURLoption, ...);
