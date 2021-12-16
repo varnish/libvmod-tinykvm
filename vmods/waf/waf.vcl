@@ -1,4 +1,3 @@
-vcl 4.1;
 #waf.vcl
 #
 # To use this vcl, simply include it at the top of your vcl, all
@@ -97,16 +96,3 @@ sub vcl_backend_error {
 }
 
 #EOF
-
-backend default {
-	.host = "127.0.0.1";
-	.port = "8000";
-}
-
-sub vcl_init {
-	varnish_waf.add_files(std.getenv("HOME") + "/git/varnish_autoperf/vcl/waf.conf");
-}
-
-sub vcl_recv {
-	set req.http.waf-skip = req.http.skip;
-}

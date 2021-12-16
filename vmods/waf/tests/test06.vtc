@@ -1,0 +1,32 @@
+varnishtest "RespBody disruptive action"
+
+server s1 {
+	rxreq
+	txresp -hdr "Content-Type: text/plain" -body "bar2"
+} -start
+
+varnish v1 -arg "-p thread_pool_stack=92k" -vcl+backend {
+	include "${pwd}/waf.vcl";
+
+	sub vcl_init {
+		varnish_waf.add_files("${testdir}/test.conf");
+	}
+
+} -start
+
+logexpect l1 -v v1 -g request -i WAF,FetchError {
+	expect 	* * 	WAF		{^ReqHeaders: \d*$}
+	expect 	* * 	WAF		{ReqBody: 0}
+	expect 	* * 	WAF		{^RespHeaders: \d*$}
+	expect 	* * 	WAF		{LOG:}
+	expect 	* *	FetchError	{WAF: Intercepted on MS phase 4}
+	expect 	* * 	WAF		{^RespBody: \d*$}
+} -start
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 404
+} -run
+
+logexpect l1 -wait

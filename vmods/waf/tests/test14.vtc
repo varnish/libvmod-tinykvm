@@ -1,0 +1,42 @@
+varnishtest "Call phase 4 with no body chunked TE"
+
+shell {
+	cat >${tmpdir}/test.conf <<-EOF
+	SecRuleEngine On
+	SecResponseBodyAccess On
+	# Block all URLs starting with foo. Return status of 678
+    	SecRule RESPONSE_HEADERS:test "testing" "id:1, phase:4, deny"
+	EOF
+}
+
+server s1 {
+	rxreq
+	txresp -nolen -hdr "test: testing" -hdr "Transfer-Encoding: chunked"
+	chunkedlen 0
+} -start
+
+varnish v1 -arg "-p thread_pool_stack=92k" -vcl+backend {
+	include "${pwd}/waf.vcl";
+
+	sub vcl_init {
+		varnish_waf.add_files("${tmpdir}/test.conf");
+	}
+
+} -start
+
+logexpect l1 -v v1 -g request -i WAF,FetchError {
+	expect 	* * 	WAF		{^ReqHeaders: \d*$}
+	expect 	* * 	WAF		{ReqBody: 0}
+	expect 	* * 	WAF		{^RespHeaders: \d*$}
+	expect 	* * 	WAF		{LOG:}
+	expect 	* *	FetchError	{WAF: Intercepted on MS phase 4}
+	expect 	* * 	WAF		{RespBody: 0}
+} -start
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 403
+} -run
+
+logexpect l1 -wait

@@ -1,0 +1,67 @@
+varnishtest "zipped content"
+
+server s1 {
+	rxreq
+	txresp -hdr "Content-Type: text/plain" -gziplevel 1 -gzipbody "foo1 bar2 baz3"
+
+	accept
+
+	rxreq
+	txresp -hdr "Content-Type: text/plain" -gziplevel 1 -gzipbody "foo1 bar4 baz3"
+} -start
+
+varnish v1 -arg "-p thread_pool_stack=92k" -vcl+backend {
+	include "${pwd}/waf.vcl";
+
+	sub vcl_init {
+		varnish_waf.add_files("${testdir}/test.conf");
+	}
+
+} -start
+
+logexpect l1 -v v1 -g request -i WAF,FetchError,VCL_call {
+	expect 	* * 	WAF		{^ReqHeaders: \d*$}
+	expect 	* * 	WAF		{ReqBody: 0}
+	expect 	* * 	WAF		{^RespHeaders: \d*$}
+	expect 	* * 	WAF		{LOG:}
+	expect 	* *	FetchError	{WAF: Intercepted on MS phase 4}
+	expect 	* * 	WAF		{^RespBody: \d*$}
+	
+	expect 	* * 	VCL_call	{MISS}
+
+	expect 	* * 	WAF		{^ReqHeaders: \d*$}
+	expect 	* * 	WAF		{ReqBody: 0}
+	expect 	* * 	WAF		{^RespHeaders: \d*$}
+	expect 	* * 	WAF		{^RespBody: \d*$}
+
+	expect 	* * 	VCL_call	{HIT}
+	expect 	* * 	VCL_call	{HIT}
+} -start
+
+
+client c1 {
+	# Check a diruptive action
+	txreq
+	rxresp
+	expect resp.status == 404
+
+	# Check successful action
+	txreq
+	rxresp
+	expect resp.body == "foo1 bar4 baz3"
+	expect resp.status == 200
+
+	# Check cache hit
+	txreq
+	rxresp
+	expect resp.body == "foo1 bar4 baz3"
+	expect resp.status == 200
+
+	# Check another cache hit
+	txreq -hdr "Accept-Encoding: gzip"
+	rxresp
+	expect resp.http.Content-Encoding == "gzip"
+	expect resp.status == 200
+} -run
+
+logexpect l1 -wait

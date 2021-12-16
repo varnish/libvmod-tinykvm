@@ -1,0 +1,29 @@
+varnishtest "ReqHeader disruptive action"
+
+server s1 {
+	rxreq
+	txresp
+} -start
+
+varnish v1 -arg "-p thread_pool_stack=92k" -vcl+backend {
+	include "${pwd}/waf.vcl";
+
+	sub vcl_init {
+		varnish_waf.add_files("${testdir}/test.conf");
+	}
+
+} -start
+
+logexpect l1 -v v1 -g request -i WAF,VCL_return {
+	expect 	* * 	WAF		{^ReqHeaders: \d*$}
+	expect 	* * 	WAF		{LOG:}
+	expect 	* *	VCL_return	{error}
+} -start
+
+client c1 {
+	txreq -hdr "User-Agent: sqlninja"
+	rxresp
+	expect resp.status == 666
+} -run
+
+logexpect l1 -wait

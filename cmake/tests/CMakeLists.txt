@@ -24,7 +24,7 @@ if (NOT SINGLE_PROCESS)
 		get_filename_component(TNAME ${TEST} NAME_WE)
 		add_test(
 			NAME tests_${TNAME}
-			COMMAND ${VARNISHTEST} "-pvmod_path=${VMOD_PATH}" ${TEST}
+			COMMAND ${VARNISHTEST} -l "-pvmod_path=${VMOD_PATH}" ${TEST}
 			WORKING_DIRECTORY ${TESTS_PATH}
 		)
 		list(APPEND LIST_OF_TESTS tests_${TNAME})

@@ -1,0 +1,31 @@
+varnishtest "URL redirect"
+
+server s1 {
+	rxreq
+	txresp
+} -start
+
+varnish v1 -arg "-p thread_pool_stack=92k" -vcl+backend {
+	include "${pwd}/waf.vcl";
+
+	sub vcl_init {
+		varnish_waf.add_files("${testdir}/test.conf");
+	}
+
+} -start
+
+logexpect l1 -v v1 -g request -i WAF,VCL_return {
+	expect 	* * 	WAF		{^ReqHeaders: \d*$}
+	expect 	* * 	WAF		{LOG:}
+	expect 	* *	VCL_return	{error}
+} -start
+
+
+client c1 {
+	txreq -url "/foo"
+	rxresp
+	expect resp.status == 302
+	expect resp.http.location == "/bar"
+} -run
+
+logexpect l1 -wait

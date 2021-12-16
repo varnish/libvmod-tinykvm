@@ -1,0 +1,30 @@
+varnishtest "Go through all phases"
+
+server s1 {
+	rxreq
+	txresp
+} -start
+
+varnish v1 -arg "-p thread_pool_stack=92k" -vcl+backend {
+	include "${pwd}/waf.vcl";
+
+	sub vcl_init {
+		varnish_waf.add_files("${testdir}/test.conf");
+	}
+
+} -start
+
+logexpect l1 -v v1 -g request -i WAF {
+	expect 	* * 	WAF		{^ReqHeaders: \d*$}
+	expect 	* * 	WAF		{ReqBody: 0}
+	expect 	* * 	WAF		{^RespHeaders: \d*$}
+	expect 	* * 	WAF		{RespBody: 0}
+} -start
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 200
+} -run
+
+logexpect l1 -wait
