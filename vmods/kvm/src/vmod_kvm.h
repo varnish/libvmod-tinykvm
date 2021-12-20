@@ -42,8 +42,6 @@ struct vmod_kvm_response
 
 	const void *priv_key;
 	struct vmod_kvm_tenant *tenant;
-	uint64_t process_func;
-	uint64_t func;
 	const char *funcarg;
 	uint64_t max_response_size;
 	int16_t is_post;

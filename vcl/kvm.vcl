@@ -132,14 +132,12 @@ sub vcl_backend_fetch {
 		/* Regular POST */
 		set bereq.backend = kvm.vm_post_backend(
 			bereq.http.Host,
-			"my_post_backend",
 			bereq.url);
 		return (fetch);
 	}
 	/* Regular request */
 	set bereq.backend = kvm.vm_backend(
 			bereq.http.Host,
-			"my_backend",
 			bereq.url);
 }
 

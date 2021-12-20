@@ -30,7 +30,10 @@ ProgramInstance::ProgramInstance(
 	  storage{binary, ctx, ten, this, true, debug},
 	  rspclient{nullptr}
 {
-	this->my_backend_addr = script->resolve_address("my_backend");
+	// Patch up backend computation callback using "my_backend"
+	if (entry_at(ProgramEntryIndex::BACKEND_COMP) == 0x0) {
+		set_entry_at(ProgramEntryIndex::BACKEND_COMP, script->resolve_address("my_backend"));
+	}
 
 	extern std::vector<const char*> lookup_wishlist;
 	for (const auto* func : lookup_wishlist) {
@@ -46,16 +49,20 @@ ProgramInstance::~ProgramInstance()
 
 uint64_t ProgramInstance::lookup(const char* name) const
 {
-	// direct
-	if (strcmp(name, "my_backend") == 0)
-		return my_backend_addr;
-
 	// hash table
 	const auto& it = sym_lookup.find(name);
 	if (it != sym_lookup.end()) return it->second;
 
 	// slow fallback
 	return script->resolve_address(name);
+}
+ProgramInstance::gaddr_t ProgramInstance::entry_at(const int idx) const
+{
+	return entry_address.at(idx);
+}
+void ProgramInstance::set_entry_at(const int idx, gaddr_t addr)
+{
+	entry_address.at(idx) = addr;
 }
 
 inst_pair ProgramInstance::concurrent_fork(const vrt_ctx* ctx,

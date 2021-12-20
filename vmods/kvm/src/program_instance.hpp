@@ -14,6 +14,13 @@ struct VirtBuffer {
 	uint64_t addr;
 	size_t   len;
 };
+enum class ProgramEntryIndex : uint8_t {
+	ON_RECV = 0,
+	BACKEND_COMP = 1,
+	BACKEND_POST = 2,
+	BACKEND_STREAM = 3,
+	TOTAL_ENTRIES
+};
 
 class ProgramInstance {
 public:
@@ -24,6 +31,10 @@ public:
 	~ProgramInstance();
 
 	gaddr_t lookup(const char* name) const;
+	gaddr_t entry_at(int) const;
+	gaddr_t entry_at(ProgramEntryIndex i) const { return entry_at((int) i); }
+	void set_entry_at(int, gaddr_t);
+	void set_entry_at(ProgramEntryIndex i, gaddr_t a) { return set_entry_at((int) i, a); }
 
 	/* Thread-local heap-allocated VM. */
 	inst_pair concurrent_fork(const vrt_ctx*,
@@ -47,8 +58,8 @@ public:
 	MachineInstance  storage;
 	kvm::ThreadPool<1> m_storage_queue;
 
+	std::array<gaddr_t, (size_t)ProgramEntryIndex::TOTAL_ENTRIES> entry_address;
 	/* Lookup table for ELF symbol names */
-	gaddr_t my_backend_addr = 0x0;
 	std::unordered_map<std::string, gaddr_t> sym_lookup;
 
 	std::unique_ptr<tinykvm::RSPClient> rspclient;

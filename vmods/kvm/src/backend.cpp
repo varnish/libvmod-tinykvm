@@ -1,5 +1,5 @@
 #include "tenant_instance.hpp"
-#include "machine_instance.hpp"
+#include "program_instance.hpp"
 #include "varnish.hpp"
 #include <stdexcept>
 using namespace kvm;
@@ -35,25 +35,26 @@ static int16_t sanitize_status_code(int16_t code)
 
 extern "C"
 void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
-	uint64_t func, const char *farg,
-	struct backend_post *post,
-	struct backend_result *result)
+	const char *farg, struct backend_post *post, struct backend_result *result)
 {
-	assert(func);
 	try {
 		auto& vm = machine->machine();
+		const auto& prog = machine->instance();
 		const auto timeout = machine->tenant().config.max_time();
 		if (post == nullptr) {
-			/* Call the backend response function */
-			vm.timed_vmcall(func, timeout, farg,
+			/* Call the backend compute function */
+			vm.timed_vmcall(prog.entry_at(ProgramEntryIndex::BACKEND_COMP),
+				timeout, farg,
 				(int) HDR_BEREQ, (int) HDR_BERESP);
 		} else if (post->process_func == 0x0) {
 			/* Call the backend POST function */
-			vm.timed_vmcall(func, timeout, farg,
+			vm.timed_vmcall(prog.entry_at(ProgramEntryIndex::BACKEND_POST),
+				timeout, farg,
 				(uint64_t) post->address, (uint64_t) post->length);
 		} else {
 			/* Call the backend streaming POST function */
-			vm.timed_vmcall(func, timeout, farg,
+			vm.timed_vmcall(prog.entry_at(ProgramEntryIndex::BACKEND_STREAM),
+				timeout, farg,
 				(uint64_t) post->length);
 		}
 		/* Make sure no SMP work is in-flight. */
@@ -127,8 +128,8 @@ int kvm_backend_stream(struct backend_post *post,
 
 		/* Call the backend streaming function */
 		const auto timeout = mi.tenant().config.max_time();
-		vm.timed_vmcall(post->process_func, timeout,
-			(uint64_t) GADDR, (uint64_t) data_len,
+		vm.timed_vmcall(mi.instance().entry_at(ProgramEntryIndex::BACKEND_STREAM),
+			timeout, (uint64_t) GADDR, (uint64_t) data_len,
 			(uint64_t) post->length, !!last);
 
 		/* Get content-type and data */

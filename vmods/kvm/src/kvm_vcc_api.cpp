@@ -1,5 +1,5 @@
 #include "common_defs.hpp"
-#include "machine_instance.hpp"
+#include "program_instance.hpp"
 #include "tenant_instance.hpp"
 #include "varnish.hpp"
 using namespace kvm;
@@ -18,7 +18,6 @@ kvm::MachineInstance* kvm_get_machine(VRT_CTX)
 {
 	return kvm_get_machine(ctx, ctx);
 }
-
 
 extern "C"
 uint64_t kvm_resolve_name(kvm::TenantInstance* tenant, const char* func)

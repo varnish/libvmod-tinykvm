@@ -85,7 +85,7 @@ $Function BACKEND live_debug(PRIV_VCL, STRING tenant, STRING key, BYTES max_size
 
 $Function INT vm_call(PRIV_VCL, STRING tenant, STRING func, STRING arg = "")
 
-- Looks up tenant, forks a new VM, calls the give function,
+- Looks up tenant, forks a new VM, calls the provided function,
   and then returns the result from the call.
 - Subsequent calls on the same task will yield the same VM.
 - Use this to make a VCL decision, eg. return (synth ...).
@@ -95,7 +95,7 @@ $Function INT vm_synth()
 - Produces a synthetic response using the current active machine.
 - Can only be called from vcl_synth or vcl_backend_error.
 
-$Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING func, STRING arg = "")
+$Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING arg = "")
 
 - Returns a backend that will call into the current machine to produce a response.
 - Produces 500 server error if there is not enough memory,
@@ -103,8 +103,7 @@ $Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING func, STRING arg = 
 
 	set bereq.backend = kvm.vm_backend("xpizza.com", "my_backend");
 
-$Function BACKEND vm_post_backend(PRIV_VCL,
-	STRING tenant, STRING func, STRING arg = "", STRING processing = "")
+$Function BACKEND vm_post_backend(PRIV_VCL, STRING tenant, STRING arg = "")
 
 - Returns a backend that will retrieve a POST body first,
   then call into a KVM VM with the body as argument, and then produce a response.
@@ -121,7 +120,7 @@ $Function BACKEND vm_post_backend(PRIV_VCL,
   memory efficient and makes processing possible on big data, but it requires
   the data processor to be able to work with segmented data.
 
-	set bereq.backend = kvm.vm_post_backend("xpizza.com", "my_post_backend");
+	set bereq.backend = kvm.vm_post_backend("xpizza.com", bereq.url);
 
   Regular POST function prototype:
     extern void __attribute__((used))

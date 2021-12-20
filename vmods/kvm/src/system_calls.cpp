@@ -59,9 +59,13 @@ void MachineInstance::setup_syscall_interface()
 	[] (Machine& machine, unsigned scall) {
 		auto& inst = *machine.get_userdata<MachineInstance>();
 		switch (scall) {
-			case 0x10000:
-				machine.stop();
-				break;
+			case 0x10000: {
+				// Register callback function for tenant
+				auto regs = machine.registers();
+				inst.instance().set_entry_at(regs.rdi, regs.rsi);
+				regs.rax = 0;
+				machine.set_registers(regs);
+				} break;
 			case 0x10001: {
 				auto regs = machine.registers();
 				auto* dir = inst.directors().item(regs.rdi);
