@@ -66,7 +66,14 @@ void MachineInstance::setup_syscall_interface()
 				regs.rax = 0;
 				machine.set_registers(regs);
 				} break;
-			case 0x10001: {
+			case 0x10001:
+				if (!machine.is_forked()) {
+					// Wait for events (stop machine)
+					inst.wait_for_requests();
+				} else {
+					throw std::runtime_error("wait_for_requests(): Cannot be called from ephemeral VM");
+				} break;
+			case 0x10100: {
 				auto regs = machine.registers();
 				auto* dir = inst.directors().item(regs.rdi);
 				kvm_SetBackend(inst.ctx(), dir);

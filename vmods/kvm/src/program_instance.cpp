@@ -30,6 +30,12 @@ ProgramInstance::ProgramInstance(
 	  storage{binary, ctx, ten, this, true, debug},
 	  rspclient{nullptr}
 {
+	if (!script->is_waiting_for_requests()) {
+		throw std::runtime_error("The main program was not waiting for requests. Did you forget to call 'wait_for_requests()'?");
+	}
+	if (!storage.is_waiting_for_requests()) {
+		throw std::runtime_error("The storage program was not waiting for requests. Did you forget to call 'wait_for_requests()'?");
+	}
 	// Patch up backend computation callback using "my_backend"
 	if (entry_at(ProgramEntryIndex::BACKEND_COMP) == 0x0) {
 		set_entry_at(ProgramEntryIndex::BACKEND_COMP, script->resolve_address("my_backend"));
