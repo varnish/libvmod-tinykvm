@@ -106,6 +106,10 @@ case $i in
     args="$args -DCMAKE_BUILD_TYPE= -DLTO_ENABLE=OFF -DNATIVE=OFF"
     shift
     ;;
+	--mold)
+    args="$args -DUSE_MOLD=ON"
+    shift
+    ;;
 	--static-kvm)
 	args="$args -DSHARED_KVM=OFF"
     shift
