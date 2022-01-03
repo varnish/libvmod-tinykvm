@@ -48,7 +48,10 @@ void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
 				(int) HDR_BEREQ, (int) HDR_BERESP);
 		} else if (post->process_func == 0x0) {
 			/* Call the backend POST function */
-			vm.timed_vmcall(prog.entry_at(ProgramEntryIndex::BACKEND_POST),
+			auto vm_entry_addr = prog.entry_at(ProgramEntryIndex::BACKEND_POST);
+			if (UNLIKELY(vm_entry_addr == 0x0))
+				throw std:runtime_error("The POST callback has not been registered");
+			vm.timed_vmcall(vm_entry_addr,
 				timeout, farg,
 				(uint64_t) post->address, (uint64_t) post->length);
 		} else {

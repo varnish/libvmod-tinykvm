@@ -6,15 +6,16 @@ cat >${tmpdir}/${testname}.c <<-EOF
 #include <string.h>
 #include "kvm_api.h"
 
+static void my_backend(const char *arg)
+{
+	backend_response_str(200, "text/plain", arg);
+}
+
 int main(int argc, char **argv)
 {
 	printf("Hello from %s!\n", argv[1]);
-}
-
-__attribute__((used))
-extern void my_backend(const char *arg)
-{
-	backend_response_str(200, "text/plain", arg);
+	set_backend_get(my_backend);
+	wait_for_requests();
 }
 EOF
 gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
@@ -46,7 +47,6 @@ vcl 4.1;
 	sub vcl_backend_fetch {
 		set bereq.backend = kvm.vm_backend(
 				bereq.http.Host,
-				urlplus.get_basename(),
 				"Hello World");
 	}
 } -start

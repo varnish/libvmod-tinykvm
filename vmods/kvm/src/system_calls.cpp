@@ -62,6 +62,8 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10000: {
 				// Register callback function for tenant
 				auto regs = machine.registers();
+				//printf("register_func: Function %lld is now 0x%llX\n",
+				//	regs.rdi, regs.rsi);
 				inst.instance().set_entry_at(regs.rdi, regs.rsi);
 				regs.rax = 0;
 				machine.set_registers(regs);

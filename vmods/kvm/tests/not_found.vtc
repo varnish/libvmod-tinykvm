@@ -5,10 +5,7 @@ cat >${tmpdir}/${testname}.c <<-EOF
 #include <string.h>
 #include "kvm_api.h"
 
-int main() {}
-
-__attribute__((used))
-extern void my_backend(const char *arg)
+static void my_backend(const char *arg)
 {
 	if (strcmp(arg, "/my_backend") == 0) {
 		backend_response_str(404, "text/plain", "Not found");
@@ -17,6 +14,12 @@ extern void my_backend(const char *arg)
 		backend_response_str(403, "text/plain", "Forbidden");
 	}
 	backend_response_str(401, "text/plain", "Unauthorized");
+}
+
+int main()
+{
+	set_backend_get(my_backend);
+	wait_for_requests();
 }
 EOF
 gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
@@ -47,7 +50,6 @@ vcl 4.1;
 	sub vcl_backend_fetch {
 		set bereq.backend = kvm.vm_backend(
 				bereq.http.Host,
-				"my_backend",
 				bereq.url);
 	}
 } -start

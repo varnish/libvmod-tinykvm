@@ -6,13 +6,10 @@ cat >${tmpdir}/${testname}.c <<-EOF
 #include <string.h>
 #include "kvm_api.h"
 
-int main() {}
-
 static char data[512];
 static size_t datalen = 0;
 
-__attribute__((used))
-extern void my_backend(const char *arg)
+static void my_backend(const char *arg)
 {
 	const char ctype[] = "text/plain";
 	backend_response(200, ctype, sizeof(ctype)-1, data, datalen);
@@ -29,8 +26,7 @@ static void set_data(size_t n, struct virtbuffer buffers[n], size_t r)
 	storage_return_nothing();
 }
 
-__attribute__((used))
-extern void my_post_backend(const char *arg, void *indata, size_t inlen)
+static void my_post_backend(const char *arg, void *indata, size_t inlen)
 {
 	const struct virtbuffer buffers[1] = {
 		{.data = indata, .len = inlen},
@@ -42,6 +38,13 @@ extern void my_post_backend(const char *arg, void *indata, size_t inlen)
 
 	const char ctype[] = "text/plain";
 	backend_response(201, ctype, sizeof(ctype)-1, result, rlen);
+}
+
+int main()
+{
+	set_backend_get(my_backend);
+	set_backend_post(my_post_backend);
+	wait_for_requests();
 }
 EOF
 gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
@@ -73,13 +76,11 @@ vcl 4.1;
 		if (bereq.method == "POST") {
 			set bereq.backend = kvm.vm_post_backend(
 				bereq.http.Host,
-				"my_post_backend",
 				bereq.url);
 			return (fetch);
 		}
 		set bereq.backend = kvm.vm_backend(
 				bereq.http.Host,
-				"my_backend",
 				"Hello World!");
 	}
 } -start

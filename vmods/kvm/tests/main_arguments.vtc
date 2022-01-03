@@ -13,6 +13,8 @@ int main(int argc, char **argv)
 	assert(strcmp(argv[1], "xpizza.com") == 0);
 	assert(strlen(argv[2]) == 1);
 	assert(strlen(argv[3]) > 0);
+	// We need to give the gucci signal
+	wait_for_requests();
 }
 EOF
 gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}

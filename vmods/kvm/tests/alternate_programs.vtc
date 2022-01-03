@@ -5,12 +5,14 @@ cat >${tmpdir}/${testname}1.c <<-EOF
 #include <stdio.h>
 #include "kvm_api.h"
 
-int main(int argc, char **argv) {
-	printf("Hello from %s!\n", argv[1]);
+static void my_backend(const char *arg, int a, int b) {
+	backend_response_str(201, "text/plain", arg);
 }
 
-extern void my_backend(const char *arg) {
-	backend_response_str(201, "text/plain", arg);
+int main(int argc, char **argv) {
+	printf("Hello from %s!\n", argv[1]);
+	set_backend_get(my_backend);
+	wait_for_requests();
 }
 EOF
 
@@ -18,12 +20,14 @@ cat >${tmpdir}/${testname}2.c <<-EOF
 #include <stdio.h>
 #include "kvm_api.h"
 
-int main(int argc, char **argv) {
-	printf("Hello from %s!\n", argv[1]);
+static void my_backend(const char *arg) {
+	backend_response_str(202, "text/plain", arg);
 }
 
-extern void my_backend(const char *arg) {
-	backend_response_str(202, "text/plain", arg);
+int main(int argc, char **argv) {
+	printf("Hello from %s!\n", argv[1]);
+	set_backend_get(my_backend);
+	wait_for_requests();
 }
 EOF
 
@@ -60,12 +64,11 @@ varnish v1 -vcl+backend {
 	sub vcl_backend_fetch {
 		set bereq.backend = kvm.vm_backend(
 				bereq.http.Host,
-				"my_backend",
 				bereq.url);
 	}
 } -start
 
-client c1 -repeat 40 {
+client c1 -repeat 20 {
 	txreq -url "/xpizza" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.body == "/xpizza"
@@ -76,7 +79,7 @@ client c1 -repeat 40 {
 	expect resp.status == 202
 } -start
 
-client c2 -repeat 40 {
+client c2 -repeat 20 {
 	txreq -url "/xpizza" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.body == "/xpizza"
