@@ -8,7 +8,7 @@ long Script::finish_debugger()
 	// resume until stopped
 	const uint64_t max = max_instructions();
 	while (!machine().stopped() && machine().instruction_counter() < max) {
-		machine().cpu.simulate();
+		machine().cpu.step_one();
 		machine().increment_counter(1);
 	}
 	return machine().cpu.reg(10);
@@ -61,7 +61,7 @@ void Script::open_debugger(uint16_t port)
 long Script::resume_debugger()
 {
 	// start the machine
-	machine().stop(false);
+	machine().stop();
 	// storage has serialized access, so don't debug that
 	if (is_storage()) {
 		return finish_debugger();

@@ -96,7 +96,7 @@ inst_pair ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
 }
 
 long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
-	size_t n, VirtBuffer buffers[n], gaddr_t res_addr, size_t res_size)
+	size_t n, VirtBuffer buffers[], gaddr_t res_addr, size_t res_size)
 {
 	/* Detect wrap-around */
 	if (UNLIKELY(res_addr + res_size < res_addr))

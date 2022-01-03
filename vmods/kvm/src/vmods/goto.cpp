@@ -110,7 +110,7 @@ void initialize_vmod_goto(VRT_CTX, VCL_PRIV task)
 			/* IPV */
 			const int ipv = regs.rdx;
 
-			struct vmod_priv priv = {0};
+			struct vmod_priv priv = {};
 
 			printf("Goto: %s (ipv=%s)\n", host.c_str(), ip_version.at(ipv));
 			struct vmod_goto_dns_director *vo_d;

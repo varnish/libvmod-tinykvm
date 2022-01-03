@@ -43,7 +43,7 @@ public:
 	/* Serialized vector-based vmcall into storage VM.
 	   NOTE: buffers are clobbered by the function call. */
 	long storage_call(tinykvm::Machine& src,
-		gaddr_t func, size_t n, VirtBuffer[n], gaddr_t, size_t);
+		gaddr_t func, size_t n, VirtBuffer[], gaddr_t, size_t);
 
 	/* Serialized call into storage VM during live update */
 	long live_update_call(

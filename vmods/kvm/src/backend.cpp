@@ -50,7 +50,7 @@ void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
 			/* Call the backend POST function */
 			auto vm_entry_addr = prog.entry_at(ProgramEntryIndex::BACKEND_POST);
 			if (UNLIKELY(vm_entry_addr == 0x0))
-				throw std:runtime_error("The POST callback has not been registered");
+				throw std::runtime_error("The POST callback has not been registered");
 			vm.timed_vmcall(vm_entry_addr,
 				timeout, farg,
 				(uint64_t) post->address, (uint64_t) post->length);

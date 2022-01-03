@@ -50,12 +50,12 @@ inline constexpr auto crc32(const void* vdata, const size_t len)
 }
 
 template <uint32_t POLYNOMIAL = 0xEDB88320>
-inline constexpr auto crc32(const std::string& value)
+inline auto crc32(const std::string& value)
 {
 	return crc32<POLYNOMIAL>(value.c_str(), value.size());
 }
 
-inline constexpr auto crc32c(const std::string& value)
+inline auto crc32c(const std::string& value)
 {
 	return crc32<0x1EDC6F41>(value.c_str(), value.size());
 }

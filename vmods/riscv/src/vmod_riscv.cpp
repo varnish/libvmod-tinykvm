@@ -345,7 +345,7 @@ void riscv_backend_call(VRT_CTX, const void* key, long func, long farg,
 			const auto [type, data, datalen] =
 				script->machine().sysargs<riscv::Buffer, Script::gaddr_t, Script::gaddr_t> ();
 			/* Return content-type, data, size */
-			using vBuffer = riscv::Memory<Script::MARCH>::vBuffer;
+			using vBuffer = riscv::vBuffer;
 			result->type = optional_copy(ctx, type);
 			result->tsize = type.size();
 			result->status = 200;

@@ -51,7 +51,7 @@ struct guest_header_field {
 	bool     foreach = false;
 };
 
-inline void foreach(http* hp, const riscv::Function<void(http*, txt&, size_t)>& cb)
+inline void foreach(http* hp, const std::function<void(http*, txt&, size_t)>& cb)
 {
 	for (size_t i = 0; i < hp->field_count; i++) {
 		cb(hp, hp->field_array[i], i);

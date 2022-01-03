@@ -1,4 +1,4 @@
 template <typename T>
-using Function = riscv::Function<T>;
+using Function = std::function<T>;
 
 #include "syscalls.h"
