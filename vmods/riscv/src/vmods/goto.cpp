@@ -1,7 +1,6 @@
 #include "../sandbox.hpp"
 #include "../varnish.hpp"
 #include <libriscv/util/crc32.hpp>
-typedef struct oaref oaref_t;
 extern "C" {
 # include <vqueue.h>
 # include <cache/cache_vcl.h>
@@ -49,22 +48,27 @@ void SandboxTenant::init_vmods(VRT_CTX)
 	auto* vcl = ctx->vcl;
 	assert (vcl != nullptr);
 
-	auto goto_getter = (vmod_handle_f)dlsym(vcl->dlh, "vmod_goto_handle");
-	auto priv_getter = (vmod_priv_handle_f)dlsym(vcl->dlh, "vmod_priv_goto_handle");
+	/* Discover vmod_goto. */
+	struct vmod *vmod_goto = VMOD_ForEach(
+		[] (struct vmod *vmod) -> struct vmod * {
+			auto* dlh = VMOD_Handle(vmod);
+			if (dlsym(dlh, "vmod_dns_director__init"))
+				return vmod;
+			return nullptr;
+		});
 
-	if (goto_getter == nullptr || priv_getter == nullptr) {
+	if (vmod_goto == nullptr) {
+		printf("*** Goto dyncall: VMOD NOT FOUND\n");
 		return;
 	}
-
-	struct vmod *vmod_goto = goto_getter();
-	struct vmod_priv *priv = priv_getter();
-	assert(vmod_goto != nullptr && priv != nullptr);
 
 	auto* handle = VMOD_Handle(vmod_goto);
 	if (handle == nullptr) return;
 
 	vlookup(handle, td_goto_dns_director__init*, vmod_dns_director__init);
 	vlookup(handle, td_goto_dns_director_backend*, vmod_dns_director_backend);
+
+	vlookup(handle, void*, vmod_priv_goto);
 
 	const std::array<const char*, 3> ip_version {
 		vmod_enum(handle, vmod_enum_all),
@@ -89,7 +93,7 @@ void SandboxTenant::init_vmods(VRT_CTX)
 		vmod_enum(handle, vmod_enum_abide),
 		vmod_enum(handle, vmod_enum_force),
 	};
-	printf("*** Goto ENABLED\n");
+	printf("*** Goto ENABLED, priv: %p\n", vmod_priv_goto);
 
 	set_dynamic_call("goto.dns",
 		[=] (Script& script)
@@ -98,8 +102,11 @@ void SandboxTenant::init_vmods(VRT_CTX)
 				= script.machine().sysargs<std::string, int> ();
 			printf("Goto: %s (ipv=%s)\n", host.c_str(), ip_version.at(ipv));
 			struct vmod_goto_dns_director *vo_d;
+			// This is not OK:
+			struct vmod_priv priv = {};
+
 			vmod_dns_director__init(script.ctx(), &vo_d, "d",
-	          priv,
+	          (vmod_priv *)vmod_priv_goto,
 	          host.c_str(), // host
 	          "",           // port
 	          "",           // Host: field

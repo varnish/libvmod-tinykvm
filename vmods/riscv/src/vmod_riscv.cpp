@@ -173,7 +173,9 @@ inline Script* get_machine(VRT_CTX, const void* key)
 }
 inline Script* get_machine(VRT_CTX)
 {
-	return get_machine(ctx, ctx);
+	if (ctx->req)
+		return get_machine(ctx, ctx->req);
+	return get_machine(ctx, ctx->bo);
 }
 
 extern "C"
@@ -232,6 +234,8 @@ long riscv_current_call_idx(VRT_CTX, vcall_info info)
 		#ifdef ENABLE_TIMING
 			TIMING_LOCATION(t1);
 		#endif
+			// VRT ctx can easily change even on the same request due to waitlist
+			script->set_ctx(ctx);
 			int ret = script->call(entry.addr, (int) info.arg1, (int) info.arg2);
 		#ifdef ENABLE_TIMING
 			TIMING_LOCATION(t2);
@@ -326,7 +330,7 @@ extern "C"
 void riscv_backend_call(VRT_CTX, const void* key, long func, long farg,
 	struct backend_result *result)
 {
-	auto* script = get_machine(ctx, key);
+	auto* script = get_machine(ctx, ctx->bo);
 	if (script) {
 		auto* old_ctx = script->ctx();
 		try {

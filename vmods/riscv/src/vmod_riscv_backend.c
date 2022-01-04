@@ -186,7 +186,7 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING func, VCL_STRING farg)
 	}
 
 	INIT_OBJ(rvr, RISCV_BACKEND_MAGIC);
-	rvr->priv_key = ctx;
+	rvr->priv_key = ctx->bo;
 	rvr->machine = riscv_current_machine(ctx);
 	if (rvr->machine == NULL) {
 		VRT_fail(ctx, "VM backend: No active tenant");

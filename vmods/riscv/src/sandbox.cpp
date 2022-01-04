@@ -36,7 +36,8 @@ void SandboxTenant::init()
 
 Script* SandboxTenant::vmfork(VRT_CTX, bool debug)
 {
-	auto* priv_task = VRT_priv_task(ctx, ctx);
+	void* priv_key = ctx->req;
+	auto* priv_task = VRT_priv_task(ctx, (priv_key) ? priv_key : ctx->bo);
 	if (!priv_task->priv)
 	{
 	#ifdef ENABLE_TIMING
