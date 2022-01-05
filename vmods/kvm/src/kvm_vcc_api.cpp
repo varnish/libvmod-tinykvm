@@ -16,7 +16,10 @@ kvm::MachineInstance* kvm_get_machine(VRT_CTX, const void* key)
 extern "C"
 kvm::MachineInstance* kvm_get_machine(VRT_CTX)
 {
-	return kvm_get_machine(ctx, ctx);
+	if (ctx->req)
+		return kvm_get_machine(ctx, ctx->req);
+	else
+		return kvm_get_machine(ctx, ctx->bo);
 }
 
 extern "C"
@@ -70,6 +73,8 @@ int kvm_synth(VRT_CTX, kvm::MachineInstance* machine,
 {
 	assert(machine && synth);
 
+	// NOTE: CTX can change between recv and synth due to waitlist
+	machine->set_ctx(ctx);
 	auto& vm = machine->machine();
 	auto regs = vm.registers();
 	auto* vsb = synth->vsb;
@@ -120,15 +125,11 @@ int kvm_synth(VRT_CTX, kvm::MachineInstance* machine,
 	}
 }
 
-extern "C"
-int kvm_call(VRT_CTX, kvm::MachineInstance* machine,
-	const char *func, const char *farg)
+static int kvm_forkcall(VRT_CTX, kvm::MachineInstance* machine,
+	const uint64_t addr, const char *farg)
 {
-	assert(func && farg);
-
 	try {
 		auto& vm = machine->machine();
-		const auto addr = machine->tenant().lookup(func);
 		const auto timeout = machine->tenant().config.max_time();
 		/* Call the backend response function */
 		vm.timed_vmcall(addr, timeout, farg);
@@ -139,22 +140,46 @@ int kvm_call(VRT_CTX, kvm::MachineInstance* machine,
 		return regs.rdi;
 
 	} catch (const tinykvm::MachineTimeoutException& mte) {
-		fprintf(stderr, "%s: Backend VM timed out (%f seconds)\n",
+		fprintf(stderr, "%s: KVM VM timed out (%f seconds)\n",
 			machine->name().c_str(), mte.seconds());
 		VSLb(ctx->vsl, SLT_Error,
-			"%s: Backend VM timed out (%f seconds)",
+			"%s: KVM VM timed out (%f seconds)",
 			machine->name().c_str(), mte.seconds());
 	} catch (const tinykvm::MachineException& e) {
-		fprintf(stderr, "%s: Backend VM exception: %s (data: 0x%lX)\n",
+		fprintf(stderr, "%s: KVM VM exception: %s (data: 0x%lX)\n",
 			machine->name().c_str(), e.what(), e.data());
 		VSLb(ctx->vsl, SLT_Error,
-			"%s: Backend VM exception: %s (data: 0x%lX)",
+			"%s: KVM VM exception: %s (data: 0x%lX)",
 			machine->name().c_str(), e.what(), e.data());
 	} catch (const std::exception& e) {
-		fprintf(stderr, "Backend VM exception: %s\n", e.what());
+		fprintf(stderr, "KVM VM exception: %s\n", e.what());
 		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
 	}
 	/* Make sure no SMP work is in-flight. */
 	machine->machine().smp_wait();
 	return -1;
+}
+
+extern "C"
+int kvm_call(VRT_CTX, kvm::MachineInstance* machine,
+	const char *func, const char *farg)
+{
+	assert(func && farg);
+	const auto addr = machine->tenant().lookup(func);
+	return kvm_forkcall(ctx, machine, addr, farg);
+}
+
+extern "C"
+int kvm_callv(VRT_CTX, kvm::MachineInstance* machine,
+	const int index, const char *farg)
+{
+	uint64_t addr = 0x0;
+	try {
+		addr = machine->instance().entry_at(index);
+	} catch (const std::exception& e) {
+		fprintf(stderr, "KVM VM exception: %s\n", e.what());
+		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
+		return -1;
+	}
+	return kvm_forkcall(ctx, machine, addr, farg);
 }

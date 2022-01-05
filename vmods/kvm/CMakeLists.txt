@@ -20,6 +20,7 @@ add_vmod_tests(vmod_kvm kvm
 	tests/empty.vtc
 	tests/failing_program.vtc
 	tests/hello_backend_world.vtc
+	tests/hello_synth_world.vtc
 	tests/infinite_init.vtc
 	tests/infinite_loop.vtc
 	tests/infinite_storage.vtc

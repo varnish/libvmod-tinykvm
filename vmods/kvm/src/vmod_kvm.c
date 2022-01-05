@@ -2,6 +2,7 @@
 
 # include <vsb.h>
 # include <vcl.h>
+# include "vcc_if.h"
 
 VCL_VOID vmod_embed_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING json)
 {
@@ -82,6 +83,34 @@ VCL_INT vmod_vm_call(VRT_CTX, VCL_PRIV task,
 	}
 
 	return (kvm_call(ctx, machine, func, arg));
+}
+
+VCL_INT vmod_vm_callv(VRT_CTX, VCL_PRIV task,
+	VCL_STRING tenant, VCL_ENUM func, VCL_STRING arg)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	int index = -1;
+	if (func == vmod_enum_ON_REQUEST)
+		index = 0;
+	else {
+		VRT_fail(ctx, "Wrong enum: %s", func);
+		return (-1);
+	}
+
+	TEN_PTR tenptr = kvm_tenant_find(task, tenant);
+	if (tenptr == NULL) {
+		VRT_fail(ctx, "No such tenant: %s", tenant);
+		return (-1);
+	}
+
+	KVM_PTR machine = kvm_fork_machine(ctx, tenptr, KVM_FORK_MAIN);
+	if (machine == NULL) {
+		VRT_fail(ctx, "Unable to fork tenant machine: %s", tenant);
+		return (-1);
+	}
+
+	return (kvm_callv(ctx, machine, index, arg));
 }
 
 VCL_INT vmod_vm_synth(VRT_CTX)

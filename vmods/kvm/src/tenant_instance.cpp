@@ -47,7 +47,11 @@ TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 
 MachineInstance* TenantInstance::vmfork(const vrt_ctx* ctx, bool debug)
 {
-	auto* priv_task = VRT_priv_task(ctx, ctx);
+	struct vmod_priv* priv_task;
+	if (ctx->req)
+		priv_task = VRT_priv_task(ctx, ctx->req);
+	else
+		priv_task = VRT_priv_task(ctx, ctx->bo);
 	if (!priv_task->priv)
 	{
 	#ifdef ENABLE_TIMING

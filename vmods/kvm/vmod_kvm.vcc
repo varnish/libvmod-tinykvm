@@ -90,6 +90,14 @@ $Function INT vm_call(PRIV_VCL, STRING tenant, STRING func, STRING arg = "")
 - Subsequent calls on the same task will yield the same VM.
 - Use this to make a VCL decision, eg. return (synth ...).
 
+$Function INT vm_callv(PRIV_VCL, STRING tenant,
+		ENUM {
+			ON_REQUEST
+		} func = "ON_REQUEST",
+		STRING arg = "")
+
+- Call self-registered function in tenant program.
+
 $Function INT vm_synth()
 
 - Produces a synthetic response using the current active machine.

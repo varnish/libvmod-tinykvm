@@ -6,15 +6,18 @@ cat >${tmpdir}/${testname}.c <<-EOF
 #include <string.h>
 #include "kvm_api.h"
 
-static void my_backend(const char *arg)
+static void on_recv(const char *arg)
 {
-	backend_response_str(200, "text/plain", arg);
+	if (strcmp(arg, "/") == 0)
+		backend_response_str(200, "text/plain", "Hello World");
+	else
+		backend_response_str(404, "text/plain", "Not Found");
 }
 
 int main(int argc, char **argv)
 {
 	printf("Hello from %s!\n", argv[1]);
-	set_backend_get(my_backend);
+	set_on_recv(on_recv);
 	wait_for_requests();
 }
 EOF
@@ -40,23 +43,29 @@ vcl 4.1;
 	}
 
 	sub vcl_recv {
-		return (pass);
+		return (synth(
+			kvm.vm_callv(req.http.Host, ON_REQUEST, req.url)
+		));
 	}
 
-	sub vcl_backend_fetch {
-		set bereq.backend = kvm.vm_backend(
-				bereq.http.Host,
-				"Hello World");
+	sub vcl_synth {
+		if (resp.status == 200) {
+			kvm.vm_synth();
+			return (deliver);
+		}
 	}
 } -start
 
 client c1 {
-	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+	txreq -url "/" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.body == "Hello World"
 	expect resp.status == 200
-	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+	txreq -url "/" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.body == "Hello World"
 	expect resp.status == 200
+	txreq -url "/hmm" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 404
 } -run

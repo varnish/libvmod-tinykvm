@@ -68,6 +68,7 @@ extern int     kvm_tenant_gucci(TEN_PTR, int debug);
 extern KVM_PTR kvm_fork_machine(VRT_CTX, TEN_PTR, int);
 extern KVM_PTR kvm_get_machine(VRT_CTX);
 extern int kvm_call(VRT_CTX, KVM_PTR, const char *func, const char *arg);
+extern int kvm_callv(VRT_CTX, KVM_PTR, const int, const char *arg);
 extern int kvm_synth(VRT_CTX, KVM_PTR, struct vmod_kvm_synth *);
 extern uint64_t kvm_resolve_name(TEN_PTR, const char*);
 extern int kvm_copy_to_machine(KVM_PTR, uint64_t dst, const void* src, size_t len);
