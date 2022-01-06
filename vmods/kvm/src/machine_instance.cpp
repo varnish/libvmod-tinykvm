@@ -41,10 +41,14 @@ MachineInstance::MachineInstance(
 		machine().setup_linux(
 			{"vmod_kvm", name(), storage ? "1" : "0", tenant().config.allowed_file},
 			{"LC_TYPE=C", "LC_ALL=C", "USER=root"});
-		/* Run through main() */
+		// Run through main()
 		machine().run();
 		if (!storage) {
-			/* Make forkable */
+			// Make sure the program is waiting for requests
+			if (!is_waiting_for_requests()) {
+				throw std::runtime_error("Program did not wait for requests");
+			}
+			// Make forkable
 			machine().prepare_copy_on_write();
 		} else {
 			printf("Program for tenant %s is loaded\n", name().c_str());
