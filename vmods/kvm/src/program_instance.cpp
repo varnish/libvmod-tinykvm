@@ -36,10 +36,6 @@ ProgramInstance::ProgramInstance(
 	if (!storage.is_waiting_for_requests()) {
 		throw std::runtime_error("The storage program was not waiting for requests. Did you forget to call 'wait_for_requests()'?");
 	}
-	// Patch up backend computation callback using "my_backend"
-	if (entry_at(ProgramEntryIndex::BACKEND_COMP) == 0x0) {
-		set_entry_at(ProgramEntryIndex::BACKEND_COMP, script->resolve_address("my_backend"));
-	}
 
 	extern std::vector<const char*> lookup_wishlist;
 	for (const auto* func : lookup_wishlist) {
@@ -159,7 +155,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 	return future.get();
 }
 
-long ProgramInstance::live_update_call(
+long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 	gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc)
 {
 	struct SerializeResult {
@@ -172,6 +168,7 @@ long ProgramInstance::live_update_call(
 	{
 		try {
 			/* Serialize data in the old machine */
+			storage.set_ctx(ctx);
 			auto& old_machine = storage.machine();
 			old_machine.timed_vmcall(func,
 				storage.tenant().config.max_time());
@@ -197,6 +194,7 @@ long ProgramInstance::live_update_call(
 
 	auto& new_machine = new_prog.storage.machine();
 	/* Begin resume procedure */
+	new_prog.storage.set_ctx(ctx);
 	new_machine.timed_vmcall(newfunc,
 		new_prog.storage.tenant().config.max_time(),
 		(uint64_t)res.len);
@@ -204,15 +202,17 @@ long ProgramInstance::live_update_call(
 	/* The machine should be calling STOP with rsi=dst_data */
 	auto res_data = new_regs.rdi;
 	auto res_size = std::min(new_regs.rsi, res.len);
-	new_machine.copy_to_guest(
-		res_data, res.data.get(), res_size);
-	/* Resume the new machine, allowing it to deserialize data */
-	new_machine.run();
+	if (res_data != 0x0) { // Just a courtesy, we *do* check permissions.
+		new_machine.copy_to_guest(
+			res_data, res.data.get(), res_size);
+		/* Resume the new machine, allowing it to deserialize data */
+		new_machine.run();
+	}
 	return 0;
 }
 
 void ProgramInstance::commit_instance_live(
-	std::shared_ptr<MachineInstance>& new_inst) const
+	std::shared_ptr<MachineInstance>& new_inst)
 {
 	/* Make a reference to the current program, keeping it alive */
 	std::shared_ptr<MachineInstance> current = this->script;

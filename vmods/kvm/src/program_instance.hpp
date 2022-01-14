@@ -19,6 +19,8 @@ enum class ProgramEntryIndex : uint8_t {
 	BACKEND_COMP = 1,
 	BACKEND_POST = 2,
 	BACKEND_STREAM = 3,
+	LIVEUPD_SERIALIZE = 4,
+	LIVEUPD_DESERIALIZE = 5,
 	TOTAL_ENTRIES
 };
 
@@ -46,14 +48,14 @@ public:
 		gaddr_t func, size_t n, VirtBuffer[], gaddr_t, size_t);
 
 	/* Serialized call into storage VM during live update */
-	long live_update_call(
+	long live_update_call(const vrt_ctx*,
 		gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc);
 
 	void commit_instance_live(
-		std::shared_ptr<MachineInstance>& new_inst) const;
+		std::shared_ptr<MachineInstance>& new_inst);
 
 	const std::vector<uint8_t> binary;
-	mutable std::shared_ptr<MachineInstance> script;
+	std::shared_ptr<MachineInstance> script;
 
 	MachineInstance  storage;
 	kvm::ThreadPool<1> m_storage_queue;

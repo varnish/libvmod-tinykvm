@@ -58,7 +58,7 @@ sub vcl_init {
 sub vcl_recv {
 
 	/* Easier to work with wrk */
-	if (req.url == "/x") {
+	if (req.url ~ "^/x") {
 		set req.http.Host = "xpizza.com";
 	}
 	else if (req.url == "/xpass") {

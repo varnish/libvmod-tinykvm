@@ -136,22 +136,24 @@ void TenantInstance::serialize_storage_state(
 	std::shared_ptr<ProgramInstance>& old,
 	std::shared_ptr<ProgramInstance>& inst)
 {
-	const auto luaddr = old->lookup("on_live_update");
-	if (luaddr != 0x0)
+	auto old_ser_func =
+		old->entry_at(ProgramEntryIndex::LIVEUPD_SERIALIZE);
+	if (old_ser_func != 0x0)
 	{
-		const auto resaddr = inst->lookup("on_resume_update");
-		if (resaddr != 0x0)
+		auto new_deser_func =
+			inst->entry_at(ProgramEntryIndex::LIVEUPD_DESERIALIZE);
+		if (new_deser_func != 0x0)
 		{
-			VSLb(ctx->vsl, SLT_Debug,
+			VSLb(ctx->vsl, SLT_VCL_Log,
 				"Live-update serialization will be performed");
-			old->live_update_call(luaddr, *inst, resaddr);
+			old->live_update_call(ctx, old_ser_func, *inst, new_deser_func);
 		} else {
-			VSLb(ctx->vsl, SLT_Debug,
-				"Live-update deserialization skipped (new binary lacks resume)");
+			VSLb(ctx->vsl, SLT_VCL_Log,
+				"Live-update deserialization skipped (new program lacks restorer)");
 		}
 	} else {
-		VSLb(ctx->vsl, SLT_Debug,
-			"Live-update skipped (old binary lacks serializer)");
+		VSLb(ctx->vsl, SLT_VCL_Log,
+			"Live-update skipped (old program lacks serializer)");
 	}
 }
 
