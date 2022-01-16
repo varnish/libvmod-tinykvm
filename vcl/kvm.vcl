@@ -61,24 +61,15 @@ sub vcl_recv {
 	if (req.url ~ "^/x") {
 		set req.http.Host = "xpizza.com";
 	}
-	else if (req.url == "/xpass") {
-		set req.http.Host = "xpizza.com";
-		return (pass);
-	}
-	else if (req.url == "/xhash") {
-		set req.http.Host = "xpizza.com";
-		set req.url = req.url + "?f=" + utils.fast_random_int(100);
-		return (hash);
-	}
-	else if (req.url == "/j" || req.url == "/j/get") {
-		set req.http.Host = "jpizza.com";
-		return (pass);
-	}
-	else if (req.url == "/y") {
+	else if (req.url ~ "^/y") {
 		set req.http.Host = "ypizza.com";
 	}
-	else if (req.url == "/z") {
+	else if (req.url ~ "^/z") {
 		set req.http.Host = "zpizza.com";
+	}
+	else if (req.url ~ "^/j") {
+		set req.http.Host = "jpizza.com";
+		return (pass);
 	}
 	else if (req.url == "/v") {
 		set req.http.Host = "vpizza.com";

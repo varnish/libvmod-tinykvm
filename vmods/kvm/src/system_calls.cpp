@@ -15,6 +15,8 @@ extern "C" long kvm_SetBackend(VRT_CTX, VCL_BACKEND dir);
 #define SYSPRINT(fmt, ...) /* */
 #endif
 
+#include "system_calls_http.cpp"
+
 namespace kvm {
 
 void MachineInstance::sanitize_path(char* buffer, size_t buflen)
@@ -59,7 +61,7 @@ void MachineInstance::setup_syscall_interface()
 	[] (Machine& machine, unsigned scall) {
 		auto& inst = *machine.get_userdata<MachineInstance>();
 		switch (scall) {
-			case 0x10000: {
+			case 0x10000: { // REGISTER_FUNC
 				// Register callback function for tenant
 				auto regs = machine.registers();
 				//printf("register_func: Function %lld is now 0x%llX\n",
@@ -68,12 +70,18 @@ void MachineInstance::setup_syscall_interface()
 				regs.rax = 0;
 				machine.set_registers(regs);
 				} break;
-			case 0x10001:
+			case 0x10001: // WAIT_FOR_EVENTS
 				if (!machine.is_forked()) {
 					// Wait for events (stop machine)
 					inst.wait_for_requests();
 				} else {
 					throw std::runtime_error("wait_for_requests(): Cannot be called from ephemeral VM");
+				} break;
+			case 0x10020: { // HTTP_APPEND
+				auto regs = machine.registers();
+				regs.rax =
+					http_header_append(inst, regs.rdi, regs.rsi, regs.rdx);
+				machine.set_registers(regs);
 				} break;
 			case 0x10100: {
 				auto regs = machine.registers();
