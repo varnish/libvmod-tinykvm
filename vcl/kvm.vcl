@@ -10,8 +10,6 @@ import utils;
 backend default none;
 
 sub vcl_init {
-	kvm.cache_symbol("my_backend");
-	kvm.cache_symbol("my_post_backend");
 	kvm.embed_tenants("""
 		{
 			"vpizza.com": {
