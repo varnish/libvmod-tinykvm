@@ -70,10 +70,11 @@ void MachineInstance::setup_syscall_interface()
 				regs.rax = 0;
 				machine.set_registers(regs);
 				} break;
-			case 0x10001: // WAIT_FOR_EVENTS
+			case 0x10001: // WAIT_FOR_REQUESTS
 				if (!machine.is_forked()) {
 					// Wait for events (stop machine)
 					inst.wait_for_requests();
+					machine.stop();
 				} else {
 					throw std::runtime_error("wait_for_requests(): Cannot be called from ephemeral VM");
 				} break;
@@ -250,6 +251,7 @@ void MachineInstance::setup_syscall_interface()
 			auto regs = machine.registers();
 			SYSPRINT("READ to fd=%lld, data=0x%llX, size=%llu\n",
 				regs.rdi, regs.rsi, regs.rdx);
+			// TODO: Make proper tenant setting for file sizes
 			if (regs.rdx > 4*1024*1024) {
 				regs.rax = -1; /* Buffer too big */
 			} else {
@@ -270,19 +272,32 @@ void MachineInstance::setup_syscall_interface()
 			auto regs = machine.registers();
 			const int    fd = regs.rdi;
 			const size_t bytes = regs.rdx;
-			char buffer[4096];
-			if (bytes > 4096) {
-				/* Ignore too big a write? */
+			SYSPRINT("WRITE to fd=%lld, data=0x%llX, size=%llu\n",
+				regs.rdi, regs.rsi, regs.rdx);
+			// TODO: Make proper tenant setting for file sizes
+			if (fd == 1 || fd == 2) {
+				if (bytes > 1024*64) {
+					regs.rax = -1;
+					machine.set_registers(regs);
+					return;
+				}
+			}
+			else if (bytes > 1024*1024*4) {
 				regs.rax = -1;
-			} else if (fd != 1 && fd != 2) {
+				machine.set_registers(regs);
+				return;
+			}
+			// TODO: Use gather-buffers and writev instead
+			auto buffer = std::unique_ptr<char[]> (new char[bytes]);
+			machine.copy_from_guest(buffer.get(), regs.rsi, bytes);
+
+			if (fd != 1 && fd != 2) {
 				/* Ignore writes outside of stdout and stderr */
 				int fd = inst.m_fd.translate(regs.rdi);
-				machine.copy_from_guest(buffer, regs.rsi, bytes);
-				regs.rax = write(fd, buffer, bytes);
+				regs.rax = write(fd, buffer.get(), bytes);
 			}
 			else {
-				machine.copy_from_guest(buffer, regs.rsi, bytes);
-				machine.print(buffer, bytes);
+				machine.print(buffer.get(), bytes);
 				regs.rax = bytes;
 			}
 			machine.set_registers(regs);
