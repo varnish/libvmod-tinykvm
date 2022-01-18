@@ -155,6 +155,47 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 	return future.get();
 }
 
+long ProgramInstance::async_storage_call(gaddr_t func, gaddr_t arg)
+{
+	if (m_async_queued) {
+		return -1;
+	}
+	m_async_queued = true;
+
+	m_storage_queue.enqueue(
+	[=] () -> long
+	{
+		auto& stm = storage.machine();
+		const uint64_t new_stack = storage.machine().stack_address();
+
+		/* This vmcall has no attached VRT_CTX. */
+		storage.set_ctx(nullptr);
+
+		try {
+#ifdef TINYKVM_FAST_EXECUTION_TIMEOUT
+			constexpr uint32_t ONE_SECOND = 62'500'000;
+			const uint32_t ticks = ONE_SECOND
+#else
+			const uint32_t ticks = 0;
+#endif
+			tinykvm::tinykvm_x86regs regs;
+			stm.setup_call(regs, func, ticks, new_stack,
+				(uint64_t)arg);
+			stm.set_registers(regs);
+#ifdef TINYKVM_FAST_EXECUTION_TIMEOUT
+			stm.run();
+#else
+			stm.run(1.0);
+#endif
+			this->m_async_queued = false;
+			return 0;
+		} catch (...) {
+			return -1;
+		}
+	});
+	return 0;
+}
+
 long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 	gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc)
 {

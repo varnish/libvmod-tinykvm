@@ -88,7 +88,7 @@ void MachineInstance::setup_syscall_interface()
 				auto* dir = inst.directors().item(regs.rdi);
 				kvm_SetBackend(inst.ctx(), dir);
 				} break;
-			case 0x10707: {
+			case 0x10707: { // STORAGE CALL BUFFER
 				auto regs = machine.registers();
 				VirtBuffer buffers[1];
 				buffers[0] = {
@@ -100,7 +100,7 @@ void MachineInstance::setup_syscall_interface()
 					regs.rdi, 1, buffers, regs.rcx, regs.r8);
 				machine.set_registers(regs);
 				} break;
-			case 0x10708: {
+			case 0x10708: { // STORAGE CALL VECTOR
 				auto regs = machine.registers();
 				const size_t n = regs.rsi;
 				if (n <= 64) {
@@ -112,6 +112,13 @@ void MachineInstance::setup_syscall_interface()
 				} else {
 					regs.rax = -1;
 				}
+				machine.set_registers(regs);
+				} break;
+			case 0x10709: { // ASYNC STORAGE CALL
+				auto regs = machine.registers();
+				regs.rax = inst.instance().async_storage_call(
+				/*  func      argument */
+					regs.rdi, regs.rsi);
 				machine.set_registers(regs);
 				} break;
 			case 0x1070A: { // VMCOMMIT

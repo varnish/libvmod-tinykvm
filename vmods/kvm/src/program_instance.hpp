@@ -47,6 +47,9 @@ public:
 	long storage_call(tinykvm::Machine& src,
 		gaddr_t func, size_t n, VirtBuffer[], gaddr_t, size_t);
 
+	/* Async serialized vmcall into storage VM. */
+	long async_storage_call(gaddr_t func, gaddr_t arg);
+
 	/* Serialized call into storage VM during live update */
 	long live_update_call(const vrt_ctx*,
 		gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc);
@@ -59,6 +62,7 @@ public:
 
 	MachineInstance  storage;
 	kvm::ThreadPool<1> m_storage_queue;
+	bool m_async_queued = false;
 
 	std::array<gaddr_t, (size_t)ProgramEntryIndex::TOTAL_ENTRIES> entry_address;
 	/* Lookup table for ELF symbol names */
