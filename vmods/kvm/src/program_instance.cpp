@@ -157,12 +157,12 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 
 long ProgramInstance::async_storage_call(gaddr_t func, gaddr_t arg)
 {
-	if (m_async_queued) {
-		return -1;
-	}
-	m_async_queued = true;
+	// Block and finish previous async tasks
+	// TODO: Read the return value of the tasks to detect errors
+	m_async_tasks.clear();
 
-	m_storage_queue.enqueue(
+	m_async_tasks.push_back(
+		m_storage_queue.enqueue(
 	[=] () -> long
 	{
 		auto& stm = storage.machine();
@@ -187,12 +187,11 @@ long ProgramInstance::async_storage_call(gaddr_t func, gaddr_t arg)
 #else
 			stm.run(1.0);
 #endif
-			this->m_async_queued = false;
 			return 0;
 		} catch (...) {
 			return -1;
 		}
-	});
+	}));
 	return 0;
 }
 

@@ -62,7 +62,7 @@ public:
 
 	MachineInstance  storage;
 	kvm::ThreadPool<1> m_storage_queue;
-	bool m_async_queued = false;
+	std::vector<std::future<long>> m_async_tasks;
 
 	std::array<gaddr_t, (size_t)ProgramEntryIndex::TOTAL_ENTRIES> entry_address;
 	/* Lookup table for ELF symbol names */
