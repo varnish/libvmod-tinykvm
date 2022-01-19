@@ -7,6 +7,7 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 extern "C" long kvm_SetBackend(VRT_CTX, VCL_BACKEND dir);
+using namespace tinykvm;
 //#define VERBOSE_SYSCALLS
 
 #ifdef VERBOSE_SYSCALLS
@@ -16,6 +17,7 @@ extern "C" long kvm_SetBackend(VRT_CTX, VCL_BACKEND dir);
 #endif
 
 #include "system_calls_http.cpp"
+#include "system_calls_api.cpp"
 
 namespace kvm {
 
@@ -53,196 +55,59 @@ void MachineInstance::sanitize_file(char* buffer, size_t buflen)
 	throw std::runtime_error("Disallowed file used");
 }
 
+static void syscall_unknown(Machine& machine, MachineInstance& inst, unsigned scall)
+{
+	printf("%s: Unhandled system call %u\n",
+		inst.name().c_str(), scall);
+	auto regs = machine.registers();
+	regs.rax = -ENOSYS;
+	machine.set_registers(regs);
+}
+
 void MachineInstance::setup_syscall_interface()
 {
-	using namespace tinykvm;
-
 	Machine::install_unhandled_syscall_handler(
 	[] (Machine& machine, unsigned scall) {
 		auto& inst = *machine.get_userdata<MachineInstance>();
 		switch (scall) {
-			case 0x10000: { // REGISTER_FUNC
-				// Register callback function for tenant
-				auto regs = machine.registers();
-				//printf("register_func: Function %lld is now 0x%llX\n",
-				//	regs.rdi, regs.rsi);
-				inst.instance().set_entry_at(regs.rdi, regs.rsi);
-				regs.rax = 0;
-				machine.set_registers(regs);
-				} break;
+			case 0x10000: // REGISTER_FUNC
+				syscall_register_func(machine, inst);
+				return;
 			case 0x10001: // WAIT_FOR_REQUESTS
-				if (!machine.is_forked()) {
-					// Wait for events (stop machine)
-					inst.wait_for_requests();
-					machine.stop();
-				} else {
-					throw std::runtime_error("wait_for_requests(): Cannot be called from ephemeral VM");
-				} break;
-			case 0x10020: { // HTTP_APPEND
-				auto regs = machine.registers();
-				regs.rax =
-					http_header_append(inst, regs.rdi, regs.rsi, regs.rdx);
-				machine.set_registers(regs);
-				} break;
-			case 0x10100: {
-				auto regs = machine.registers();
-				auto* dir = inst.directors().item(regs.rdi);
-				kvm_SetBackend(inst.ctx(), dir);
-				} break;
-			case 0x10707: { // STORAGE CALL BUFFER
-				auto regs = machine.registers();
-				VirtBuffer buffers[1];
-				buffers[0] = {
-					.addr = (uint64_t)regs.rsi,  // src
-					.len  = (uint64_t)regs.rdx   // len
-				};
-				regs.rax = inst.instance().storage_call(machine,
-				/*  func      buf vector    dst     dstsize */
-					regs.rdi, 1, buffers, regs.rcx, regs.r8);
-				machine.set_registers(regs);
-				} break;
-			case 0x10708: { // STORAGE CALL VECTOR
-				auto regs = machine.registers();
-				const size_t n = regs.rsi;
-				if (n <= 64) {
-					VirtBuffer buffers[64];
-					machine.copy_from_guest(buffers, regs.rdx, n * sizeof(VirtBuffer));
-					regs.rax = inst.instance().storage_call(machine,
-					/*  func      buf vector    dst     dstsize */
-						regs.rdi, n, buffers, regs.rcx, regs.r8);
-				} else {
-					regs.rax = -1;
-				}
-				machine.set_registers(regs);
-				} break;
-			case 0x10709: { // ASYNC STORAGE CALL
-				auto regs = machine.registers();
-				regs.rax = inst.instance().async_storage_call(
-				/*  func      argument */
-					regs.rdi, regs.rsi);
-				machine.set_registers(regs);
-				} break;
-			case 0x1070A: { // VMCOMMIT
-				auto regs = machine.registers();
-				try {
-					// 1. Make a linearized copy of this machine
-					auto new_machine = std::make_shared<MachineInstance>(inst);
-					// 2. Perform the live update process on new program
-					inst.instance().commit_instance_live(new_machine);
-					VSLb(inst.ctx()->vsl, SLT_VCL_Log,
-						"vmcommit: New %s program committed and ready",
-						inst.name().c_str());
-					regs.rax = 0;
-				} catch (const std::exception& e) {
-					fprintf(stderr, "VMCommit exception: %s\n", e.what());
-					regs.rax = -1;
-				}
-				machine.set_registers(regs);
-				} break;
-			case 0x10710: { // MULTIPROCESS
-				auto regs = machine.registers();
-				try {
-					/* It's too expensive to schedule multiple workloads. */
-					if (UNLIKELY(machine.smp_active())) {
-						printf("SMP active count: %d\n", machine.smp_active_count());
-						throw std::runtime_error("Multiprocessing: Already active");
-					} else if (UNLIKELY(regs.rdi < 2)) {
-						throw std::runtime_error("Multiprocessing: Must request at least one vCPU");
-					} else if (UNLIKELY(regs.rdi > 16)) {
-						/* TODO: Tenant-property */
-						throw std::runtime_error("Multiprocessing: Too many vCPUs requested");
-					}
-					const size_t num_cpus = regs.rdi - 1;
-					const size_t stack_size = 512 * 1024ul;
-					machine.timed_smpcall(num_cpus,
-						machine.mmap_allocate(num_cpus * stack_size),
-						stack_size,
-						(uint64_t) regs.rsi, /* func */
-						2.0f, /* TODO: Tenant-property */
-						(uint64_t) regs.rdx, /* arg1 */
-						(uint64_t) regs.rcx, /* arg2 */
-						(uint64_t) regs.r8,  /* arg3 */
-						(uint64_t) regs.r9); /* arg4 */
-					regs.rax = 0;
-				} catch (const std::exception& e) {
-					fprintf(stderr, "Multiprocess exception: %s\n", e.what());
-					regs.rax = -1;
-				}
-				machine.set_registers(regs);
-				} break;
-			case 0x10711: { // MULTIPROCESS_ARRAY
-				auto regs = machine.registers();
-				try {
-					/* It's too expensive to schedule multiple workloads. */
-					if (UNLIKELY(machine.smp_active())) {
-						printf("SMP active count: %d\n", machine.smp_active_count());
-						throw std::runtime_error("Multiprocessing: Already active");
-					} else if (UNLIKELY(regs.rdi < 2)) {
-						throw std::runtime_error("Multiprocessing: Must request at least one vCPU");
-					} else if (UNLIKELY(regs.rdi > 16)) {
-						/* TODO: Tenant-property */
-						throw std::runtime_error("Multiprocessing: Too many vCPUs requested");
-					}
-					const size_t num_cpus = regs.rdi - 1;
-					const size_t stack_size = 512 * 1024ul;
-					machine.timed_smpcall_array(num_cpus,
-						machine.mmap_allocate(num_cpus * stack_size),
-						stack_size,
-						(uint64_t) regs.rsi,  /* func */
-						2.0f, /* TODO: Tenant-property */
-						(uint64_t) regs.rdx,  /* array */
-						(uint32_t) regs.rcx); /* array_size */
-					regs.rax = 0;
-				} catch (const std::exception& e) {
-					fprintf(stderr, "Multiprocess exception: %s\n", e.what());
-					regs.rax = -1;
-				}
-				machine.set_registers(regs);
-				} break;
-			case 0x10712: { // MULTIPROCESS_CLONE
-				auto regs = machine.registers();
-				try {
-					/* It's too expensive to schedule multiple workloads. */
-					if (UNLIKELY(machine.smp_active())) {
-						printf("SMP active count: %d\n", machine.smp_active_count());
-						throw std::runtime_error("Multiprocessing: Already active");
-					} else if (UNLIKELY(regs.rdi < 2)) {
-						throw std::runtime_error("Multiprocessing: Must request at least one vCPU");
-					} else if (UNLIKELY(regs.rdi > 16)) {
-						/* TODO: Tenant-property */
-						throw std::runtime_error("Multiprocessing: Too many vCPUs requested");
-					}
-					const size_t num_cpus = regs.rdi - 1;
-					machine.timed_smpcall_clone(num_cpus,
-						regs.rsi,
-						regs.rdx,
-						2.0f, /* TODO: Tenant-property */
-						regs);
-					regs.rax = 0;
-				} catch (const std::exception& e) {
-					fprintf(stderr, "Multiprocess exception: %s\n", e.what());
-					regs.rax = -1;
-				}
-				machine.set_registers(regs);
-				} break;
-			case 0x10713: { // MULTIPROCESS_WAIT
-				auto regs = machine.registers();
-				try {
-					/* XXX: Propagate SMP exceptions */
-					machine.smp_wait();
-					regs.rax = 0;
-				} catch (const std::exception& e) {
-					fprintf(stderr, "Multiprocess wait exception: %s\n", e.what());
-					regs.rax = -1;
-				}
-				machine.set_registers(regs);
-				} break;
+				syscall_wait_for_requests(machine, inst);
+				return;
+			case 0x10020: // HTTP_APPEND
+				syscall_http_append(machine, inst);
+				return;
+			case 0x10100:
+				syscall_set_backend(machine, inst);
+				return;
+			case 0x10707: // STORAGE CALL BUFFER
+				syscall_storage_callb(machine, inst);
+				return;
+			case 0x10708: // STORAGE CALL VECTOR
+				syscall_storage_callv(machine, inst);
+				return;
+			case 0x10709: // STORAGE TASK
+				syscall_storage_task(machine, inst);
+				return;
+			case 0x1070A: // VMCOMMIT
+				syscall_vmcommit(machine, inst);
+				return;
+			case 0x10710: // MULTIPROCESS
+				syscall_multiprocess(machine, inst);
+				return;
+			case 0x10711: // MULTIPROCESS_ARRAY
+				syscall_multiprocess_array(machine, inst);
+				return;
+			case 0x10712: // MULTIPROCESS_CLONE
+				syscall_multiprocess_clone(machine, inst);
+				return;
+			case 0x10713: // MULTIPROCESS_WAIT
+				syscall_multiprocess_wait(machine, inst);
+				return;
 			default:
-				printf("%s: Unhandled system call %u\n",
-					inst.name().c_str(), scall);
-				auto regs = machine.registers();
-				regs.rax = -ENOSYS;
-				machine.set_registers(regs);
+				syscall_unknown(machine, inst, scall);
 		}
 	});
 	Machine::install_syscall_handler(

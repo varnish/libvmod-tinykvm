@@ -25,6 +25,8 @@ struct http {
 #define HDR_FIRST     6
 #define HDR_INVALID   UINT32_MAX
 
+namespace kvm {
+
 struct guest_header_field {
 	int where;
 	uint32_t index;
@@ -88,7 +90,8 @@ inline uint32_t field_length(const txt& field)
 	return field.end - field.begin;
 }
 
-long http_header_append(kvm::MachineInstance& inst, int where, uint64_t addr, uint32_t len)
+static long
+http_header_append(MachineInstance& inst, int where, uint64_t addr, uint32_t len)
 {
 	auto* hp = get_http(inst.ctx(), (gethdr_e) where);
 
@@ -107,3 +110,12 @@ long http_header_append(kvm::MachineInstance& inst, int where, uint64_t addr, ui
 	http_SetH(hp, idx, val);
 	return idx;
 }
+
+static void syscall_http_append(Machine& machine, MachineInstance& inst)
+{
+	auto regs = machine.registers();
+	regs.rax = http_header_append(inst, regs.rdi, regs.rsi, regs.rdx);
+	machine.set_registers(regs);
+}
+
+} // kvm
