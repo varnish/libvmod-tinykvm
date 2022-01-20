@@ -53,18 +53,6 @@ VCL_BOOL vmod_tenant_is_ready(VRT_CTX, VCL_PRIV task, VCL_STRING tenant)
 	return (kvm_tenant_gucci(tenptr, 0));
 }
 
-VCL_VOID vmod_cache_symbol(VRT_CTX, VCL_STRING symbol)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-
-	if (symbol == NULL || symbol[0] == 0) {
-		VRT_fail(ctx, "kvm.cache_symbol() requires a symbol name");
-		return;
-	}
-
-	kvm_cache_symbol(symbol);
-}
-
 VCL_INT vmod_vm_call(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING func, VCL_STRING arg)
 {

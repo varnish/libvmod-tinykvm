@@ -1,6 +1,5 @@
 #pragma once
 #include "machine_instance.hpp"
-#include "utils/thread_pool.hpp"
 namespace tinykvm {
 	struct RSPClient;
 }
@@ -61,12 +60,10 @@ public:
 	std::shared_ptr<MachineInstance> script;
 
 	MachineInstance  storage;
-	kvm::ThreadPool<1> m_storage_queue;
+	tinykvm::ThreadPool m_storage_queue;
 	std::vector<std::future<long>> m_async_tasks;
 
 	std::array<gaddr_t, (size_t)ProgramEntryIndex::TOTAL_ENTRIES> entry_address;
-	/* Lookup table for ELF symbol names */
-	std::unordered_map<std::string, gaddr_t> sym_lookup;
 
 	std::unique_ptr<tinykvm::RSPClient> rspclient;
 	MachineInstance* rsp_script = nullptr;

@@ -7,20 +7,6 @@
 
 namespace kvm {
 
-/* Functions commonly exposed in all machines */
-std::vector<const char*> lookup_wishlist {
-	"on_init",
-	"on_recv",
-	"on_hash",
-	"on_synth",
-	"on_backend_fetch",
-	"on_backend_response",
-	"on_deliver",
-
-	"on_live_update",
-	"on_resume_update"
-};
-
 ProgramInstance::ProgramInstance(
 	std::vector<uint8_t> elf,
 	const vrt_ctx* ctx, TenantInstance* ten,
@@ -36,14 +22,6 @@ ProgramInstance::ProgramInstance(
 	if (!storage.is_waiting_for_requests()) {
 		throw std::runtime_error("The storage program was not waiting for requests. Did you forget to call 'wait_for_requests()'?");
 	}
-
-	extern std::vector<const char*> lookup_wishlist;
-	for (const auto* func : lookup_wishlist) {
-		/* NOTE: We can't check if addr is 0 here, because
-		   the wishlist applies to ALL machines. */
-		const auto addr = script->resolve_address(func);
-		sym_lookup.emplace(func, addr);
-	}
 }
 ProgramInstance::~ProgramInstance()
 {
@@ -51,11 +29,6 @@ ProgramInstance::~ProgramInstance()
 
 uint64_t ProgramInstance::lookup(const char* name) const
 {
-	// hash table
-	const auto& it = sym_lookup.find(name);
-	if (it != sym_lookup.end()) return it->second;
-
-	// slow fallback
 	return script->resolve_address(name);
 }
 ProgramInstance::gaddr_t ProgramInstance::entry_at(const int idx) const
@@ -261,10 +234,3 @@ void ProgramInstance::commit_instance_live(
 }
 
 } // kvm
-
-
-extern "C"
-void kvm_cache_symbol(const char* symname)
-{
-	kvm::lookup_wishlist.push_back(symname);
-}
