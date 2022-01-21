@@ -75,6 +75,10 @@ sub vcl_recv {
 	else if (req.url == "/w") {
 		set req.http.Host = "wpizza.com";
 	}
+	else if (req.url == "/hash") {
+		set req.http.Host = "xpizza.com";
+		return (hash);
+	}
 	else if (req.url == "/file") {
 		set req.backend_hint = f.backend();
 		set req.http.Host = "file";
@@ -86,11 +90,6 @@ sub vcl_recv {
 		set req.url = "/file?foo=" + utils.fast_random_int(100);
 		return (hash);
 	}
-	else if (req.url == "/synth") {
-		return (synth(
-			kvm.vm_call(req.http.Host, "on_recv", req.url)
-		));
-	}
 	else if (req.http.Host ~ "^.+\..+:\d+$") {
 		/* This will preserve good Host headers */
 		set req.http.Host = "vpizza.com";
@@ -98,13 +97,6 @@ sub vcl_recv {
 
 	/* Normal request or POST */
 	return (pass);
-}
-
-sub vcl_synth {
-	if (resp.status == 200) {
-		kvm.vm_synth();
-		return (deliver);
-	}
 }
 
 sub vcl_backend_fetch {

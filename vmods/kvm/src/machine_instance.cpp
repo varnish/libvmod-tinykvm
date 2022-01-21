@@ -131,13 +131,16 @@ void MachineInstance::tail_reset()
 	if (this->is_debug()) {
 		//this->stop_debugger();
 	}
+
+	/* Unref active machine to be sure it is destructed before the program */
+	m_mach_ref = nullptr;
 }
 void MachineInstance::reset_to(const vrt_ctx* ctx,
 	std::shared_ptr<MachineInstance>& source)
 {
 	this->m_mach_ref = source;
 	this->m_ctx = ctx;
-	m_tenant = source->m_tenant;
+	//m_tenant = source->m_tenant;
 	machine().reset_to(source->machine(), {
 		.max_mem = tenant().config.max_memory(),
 		.max_cow_mem = tenant().config.max_work_memory(),

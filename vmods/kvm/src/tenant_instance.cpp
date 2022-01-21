@@ -45,7 +45,7 @@ TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 	}
 }
 
-MachineInstance* TenantInstance::vmfork(const vrt_ctx* ctx, bool debug)
+VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 {
 	struct vmod_priv* priv_task;
 	if (ctx->req)
@@ -64,15 +64,15 @@ MachineInstance* TenantInstance::vmfork(const vrt_ctx* ctx, bool debug)
 			prog = this->debug_program;
 		/* First-time tenants could have no program */
 		if (UNLIKELY(prog == nullptr)) {
-			VRT_fail(ctx, "vmfork: Missing program for %s. Not uploaded?",
+			VRT_fail(ctx, "vmreserve: Missing program for %s. Not uploaded?",
 				config.name.c_str());
 			return nullptr;
 		}
 		try {
 			/* Get free instance through concurrent queue */
-			inst_pair ip = prog->concurrent_fork(ctx, this, prog);
+			inst_pair ip = prog->reserve_vm(ctx, this, prog);
 
-			priv_task->priv = ip.inst;
+			priv_task->priv = ip.slot;
 			priv_task->len  = KVM_PROGRAM_MAGIC;
 			priv_task->free = ip.free;
 		} catch (std::exception& e) {
@@ -85,7 +85,7 @@ MachineInstance* TenantInstance::vmfork(const vrt_ctx* ctx, bool debug)
 		timing_constr.add(t0, t1);
 	#endif
 	}
-	return (MachineInstance*) priv_task->priv;
+	return (VMPoolItem*) priv_task->priv;
 }
 
 uint64_t TenantInstance::lookup(const char* name) const {
@@ -162,7 +162,7 @@ void TenantInstance::commit_program_live(
 {
 	std::shared_ptr<ProgramInstance> current;
 	/* Make a reference to the current program, keeping it alive */
-	if (!new_prog->script->is_debug()) {
+	if (!new_prog->main_vm->is_debug()) {
 		current = this->program;
 	} else {
 		current = this->debug_program;
@@ -170,10 +170,10 @@ void TenantInstance::commit_program_live(
 
 	if (current != nullptr && !storage) {
 		TenantInstance::serialize_storage_state(
-			new_prog->script->ctx(), current, new_prog);
+			new_prog->main_vm->ctx(), current, new_prog);
 	}
 
-	if (!new_prog->script->is_debug())
+	if (!new_prog->main_vm->is_debug())
 	{
 		std::atomic_exchange(&this->program, new_prog);
 	} else {

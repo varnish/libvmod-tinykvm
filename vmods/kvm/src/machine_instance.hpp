@@ -47,9 +47,6 @@ public:
 	const auto& tenant() const noexcept { return *m_tenant; }
 	auto& instance() { return *m_inst; }
 	const auto& instance() const { return *m_inst; }
-	void assign_instance(std::shared_ptr<ProgramInstance>& ref) { m_prog_ref = std::move(ref); }
-	/* Unref machine first to be sure it is destructed before the program */
-	void unassign_instance() { m_mach_ref = nullptr; m_prog_ref = nullptr; }
 
 	uint64_t max_time() const noexcept;
 	const std::string& name() const noexcept;
@@ -109,8 +106,6 @@ private:
 
 	/* Perform deferred live update after storage handling */
 	std::shared_ptr<MachineInstance> m_mach_ref = nullptr;
-	/* Deref this last */
-	std::shared_ptr<ProgramInstance> m_prog_ref = nullptr;
 };
 
 } // kvm

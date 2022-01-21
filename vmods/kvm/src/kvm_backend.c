@@ -7,7 +7,7 @@
 #include <vtim.h>
 #include "vcl.h"
 #include "vcc_if.h"
-extern void kvm_backend_call(VRT_CTX, struct vmod_kvm_machine *,
+extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
 	const char *farg, struct backend_post *, struct backend_result *);
 extern void kvm_get_body(struct backend_post *, struct busyobj *);
 
@@ -131,10 +131,10 @@ kvmbe_gethdrs(const struct director *dir,
 	}
 	result->bufcount = VMBE_NUM_BUFFERS;
 
-	struct vmod_kvm_machine *machine =
-		kvm_fork_machine(&ctx, kvmr->tenant, false);
-	if (machine == NULL) {
-		VSLb(ctx.vsl, SLT_Error, "Backend VM: Unable to fork machine");
+	struct vmod_kvm_slot *slot =
+		kvm_reserve_machine(&ctx, kvmr->tenant, false);
+	if (slot == NULL) {
+		VSLb(ctx.vsl, SLT_Error, "Backend VM: Unable to reserve machine");
 		return (-1);
 	}
 
@@ -148,7 +148,7 @@ kvmbe_gethdrs(const struct director *dir,
 			return (-1);
 		}
 		post->ctx = &ctx;
-		post->machine = machine;
+		post->slot = slot;
 		post->address = 0x40000; /* FIXME: 256kb userspace boundary */
 		post->process_func = 0x0;
 		post->length  = 0;
@@ -156,7 +156,7 @@ kvmbe_gethdrs(const struct director *dir,
 	}
 
 	/* Make a backend VM call (with optional POST) */
-	kvm_backend_call(&ctx, machine, kvmr->funcarg, post, result);
+	kvm_backend_call(&ctx, slot, kvmr->funcarg, post, result);
 
 	/* Status code is sanitized in the backend call */
 	http_PutResponse(bo->beresp, "HTTP/1.1", result->status, NULL);

@@ -12,16 +12,23 @@ ProgramInstance::ProgramInstance(
 	const vrt_ctx* ctx, TenantInstance* ten,
 	bool debug)
 	: binary{std::move(elf)},
-	  script{std::make_shared<MachineInstance>(binary, ctx, ten, this, false, debug)},
+	  main_vm{std::make_shared<MachineInstance>(binary, ctx, ten, this, false, debug)},
 	  storage{binary, ctx, ten, this, true, debug},
 	  m_storage_queue {1},
 	  rspclient{nullptr}
 {
-	if (!script->is_waiting_for_requests()) {
+	if (!main_vm->is_waiting_for_requests()) {
 		throw std::runtime_error("The main program was not waiting for requests. Did you forget to call 'wait_for_requests()'?");
 	}
 	if (!storage.is_waiting_for_requests()) {
 		throw std::runtime_error("The storage program was not waiting for requests. Did you forget to call 'wait_for_requests()'?");
+	}
+
+	const size_t max_vms = ten->config.group.max_concurrency;
+	for (size_t i = 0; i < max_vms; i++) {
+		m_vms.emplace_back(
+			new MachineInstance{main_vm, ctx, ten, this});
+		m_vmqueue.enqueue(&m_vms.back());
 	}
 }
 ProgramInstance::~ProgramInstance()
@@ -30,7 +37,8 @@ ProgramInstance::~ProgramInstance()
 
 uint64_t ProgramInstance::lookup(const char* name) const
 {
-	return script->resolve_address(name);
+	assert(main_vm);
+	return main_vm->resolve_address(name);
 }
 ProgramInstance::gaddr_t ProgramInstance::entry_at(const int idx) const
 {
@@ -41,27 +49,30 @@ void ProgramInstance::set_entry_at(const int idx, gaddr_t addr)
 	entry_address.at(idx) = addr;
 }
 
-inst_pair ProgramInstance::concurrent_fork(const vrt_ctx* ctx,
+inst_pair ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 	TenantInstance* tenant, std::shared_ptr<ProgramInstance>& prog)
 {
-	thread_local MachineInstance* inst = nullptr;
-	auto script_ref = script;
-	if (UNLIKELY(inst == nullptr)) {
-		/* Create a new machine instance on-demand */
-		inst = new MachineInstance(script_ref, ctx, tenant, this);
-	} else {
-		/* The VM needs to be reset and get a new VRT ctx */
-		inst->reset_to(ctx, script_ref);
-	}
+	VMPoolItem* slot = nullptr;
+	m_vmqueue.wait_dequeue(slot);
+	assert(slot && ctx);
+
+	/* Reset and reference the active program. */
+	slot->mi->reset_to(ctx, prog->main_vm);
 
 	/* This creates a self-reference, which ensures that open
 	   Machine instances will keep the program instance alive. */
-	inst->assign_instance(prog);
+	slot->prog_ref = prog;
+
 	/* What happens when the transaction is done */
-	return {inst, [] (void* inst) {
-		auto* mi = (MachineInstance *)inst;
+	return {slot, [] (void* slotv) {
+		auto* slot = (VMPoolItem *)slotv;
+		auto* mi = slot->mi.get();
 		mi->tail_reset();
-		mi->unassign_instance();
+		// Signal waiters that slot is ready again
+		// If there any waiters, they will keep the program referenced
+		mi->instance().m_vmqueue.enqueue(slot);
+		// Last action: Unassign program, which can destruct the program
+		slot->prog_ref = nullptr;
 	}};
 }
 
@@ -76,7 +87,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 	[&] () -> long
 	{
 		auto& stm = storage.machine();
-		uint64_t vaddr = storage.machine().stack_address();
+		uint64_t vaddr = stm.stack_address();
 
 		for (size_t i = 0; i < n; i++) {
 			vaddr -= buffers[i].len;
@@ -94,6 +105,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 		/* We need to use the CTX from the current program */
 		auto& inst = *src.get_userdata<MachineInstance>();
 		storage.set_ctx(inst.ctx());
+		assert(storage.ctx());
 
 		try {
 #ifdef TINYKVM_FAST_EXECUTION_TIMEOUT
@@ -229,9 +241,9 @@ void ProgramInstance::commit_instance_live(
 	std::shared_ptr<MachineInstance>& new_inst)
 {
 	/* Make a reference to the current program, keeping it alive */
-	std::shared_ptr<MachineInstance> current = this->script;
+	std::shared_ptr<MachineInstance> current = this->main_vm;
 
-	std::atomic_exchange(&this->script, new_inst);
+	std::atomic_exchange(&this->main_vm, new_inst);
 }
 
 } // kvm

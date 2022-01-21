@@ -34,71 +34,77 @@ static int16_t sanitize_status_code(int16_t code)
 }
 
 extern "C"
-void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
+void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 	const char *farg, struct backend_post *post, struct backend_result *result)
 {
+	auto& machine = *slot->mi;
+	machine.set_ctx(ctx);
 	try {
-		auto& vm = machine->machine();
-		const auto& prog = machine->instance();
-		const auto timeout = machine->tenant().config.max_time();
-		if (post == nullptr) {
-			/* Call the backend compute function */
-			vm.timed_vmcall(prog.entry_at(ProgramEntryIndex::BACKEND_COMP),
-				timeout, farg,
-				(int) HDR_BEREQ, (int) HDR_BERESP);
-		} else if (post->process_func == 0x0) {
-			/* Call the backend POST function */
-			auto vm_entry_addr = prog.entry_at(ProgramEntryIndex::BACKEND_POST);
-			if (UNLIKELY(vm_entry_addr == 0x0))
-				throw std::runtime_error("The POST callback has not been registered");
-			vm.timed_vmcall(vm_entry_addr,
-				timeout, farg,
-				(uint64_t) post->address, (uint64_t) post->length);
-		} else {
-			/* Call the backend streaming POST function */
-			vm.timed_vmcall(prog.entry_at(ProgramEntryIndex::BACKEND_STREAM),
-				timeout, farg,
-				(uint64_t) post->length);
-		}
-		/* Make sure no SMP work is in-flight. */
-		vm.smp_wait();
+		const auto& prog = machine.instance();
+		const auto timeout = machine.tenant().config.max_time();
+		auto& vm = machine.machine();
+		auto fut = slot->tp.enqueue(
+		[&] {
+			if (post == nullptr) {
+				/* Call the backend compute function */
+				vm.timed_vmcall(prog.entry_at(ProgramEntryIndex::BACKEND_COMP),
+					timeout, farg,
+					(int) HDR_BEREQ, (int) HDR_BERESP);
+			} else if (post->process_func == 0x0) {
+				/* Call the backend POST function */
+				auto vm_entry_addr = prog.entry_at(ProgramEntryIndex::BACKEND_POST);
+				if (UNLIKELY(vm_entry_addr == 0x0))
+					throw std::runtime_error("The POST callback has not been registered");
+				vm.timed_vmcall(vm_entry_addr,
+					timeout, farg,
+					(uint64_t) post->address, (uint64_t) post->length);
+			} else {
+				/* Call the backend streaming POST function */
+				vm.timed_vmcall(prog.entry_at(ProgramEntryIndex::BACKEND_STREAM),
+					timeout, farg,
+					(uint64_t) post->length);
+			}
+			/* Make sure no SMP work is in-flight. */
+			vm.smp_wait();
 
-		/* Get content-type and data */
-		auto regs = vm.registers();
-		const uint16_t status = regs.rdi;
-		const uint64_t tvaddr = regs.rsi;
-		const uint16_t tlen   = regs.rdx;
-		const uint64_t cvaddr = regs.rcx;
-		const uint64_t clen   = regs.r8;
+			/* Get content-type and data */
+			auto regs = vm.registers();
+			const uint16_t status = regs.rdi;
+			const uint64_t tvaddr = regs.rsi;
+			const uint16_t tlen   = regs.rdx;
+			const uint64_t cvaddr = regs.rcx;
+			const uint64_t clen   = regs.r8;
 
-		/* Immediately copy out content-type because small. */
-		char *tbuf = (char *)WS_Alloc(ctx->ws, tlen);
-		if (UNLIKELY(tbuf == nullptr)) {
-			throw std::runtime_error("Out of workspace for backend VM content-type");
-		}
-		vm.copy_from_guest(tbuf, tvaddr, tlen);
+			/* Immediately copy out content-type because small. */
+			char *tbuf = (char *)WS_Alloc(ctx->ws, tlen);
+			if (UNLIKELY(tbuf == nullptr)) {
+				throw std::runtime_error("Out of workspace for backend VM content-type");
+			}
+			vm.copy_from_guest(tbuf, tvaddr, tlen);
 
-		/* Return content-type, content-length and buffers */
-		result->type = tbuf;
-		result->tsize = tlen;
-		result->status = sanitize_status_code(status);
-		result->content_length = clen;
-		result->bufcount = vm.gather_buffers_from_range(
-			result->bufcount, (tinykvm::Machine::Buffer *)result->buffers, cvaddr, clen);
+			/* Return content-type, content-length and buffers */
+			result->type = tbuf;
+			result->tsize = tlen;
+			result->status = sanitize_status_code(status);
+			result->content_length = clen;
+			result->bufcount = vm.gather_buffers_from_range(
+				result->bufcount, (tinykvm::Machine::Buffer *)result->buffers, cvaddr, clen);
+		});
+		fut.get();
 		return;
 
 	} catch (const tinykvm::MachineTimeoutException& mte) {
 		fprintf(stderr, "%s: Backend VM timed out (%f seconds)\n",
-			machine->name().c_str(), mte.seconds());
+			machine.name().c_str(), mte.seconds());
 		VSLb(ctx->vsl, SLT_Error,
 			"%s: Backend VM timed out (%f seconds)",
-			machine->name().c_str(), mte.seconds());
+			machine.name().c_str(), mte.seconds());
 	} catch (const tinykvm::MachineException& e) {
 		fprintf(stderr, "%s: Backend VM exception: %s (data: 0x%lX)\n",
-			machine->name().c_str(), e.what(), e.data());
+			machine.name().c_str(), e.what(), e.data());
 		VSLb(ctx->vsl, SLT_Error,
 			"%s: Backend VM exception: %s (data: 0x%lX)",
-			machine->name().c_str(), e.what(), e.data());
+			machine.name().c_str(), e.what(), e.data());
 	} catch (const tinykvm::MemoryException& e) {
 		memory_error_handling(ctx, e);
 	} catch (const std::exception& e) {
@@ -106,7 +112,7 @@ void kvm_backend_call(VRT_CTX, kvm::MachineInstance* machine,
 		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
 	}
 	/* Make sure no SMP work is in-flight. */
-	machine->machine().smp_wait();
+	machine.machine().smp_wait();
 	/* An error result */
 	new (result) backend_result {nullptr, 0,
 		500, /* Internal server error */
@@ -119,8 +125,9 @@ extern "C"
 int kvm_backend_stream(struct backend_post *post,
 	const void* data_ptr, ssize_t data_len, int last)
 {
-	assert(post && post->machine);
-	auto& mi = *(kvm::MachineInstance *)post->machine;
+	assert(post && post->slot);
+	auto& slot = *(kvm::VMPoolItem *)post->slot;
+	auto& mi = *slot.mi;
 	try {
 		auto& vm = mi.machine();
 

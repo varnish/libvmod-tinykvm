@@ -4,24 +4,6 @@
 #include "varnish.hpp"
 using namespace kvm;
 
-kvm::MachineInstance* kvm_get_machine(VRT_CTX, const void* key)
-{
-	auto* priv_task = VRT_priv_task(ctx, key);
-	//printf("priv_task: ctx=%p bo=%p key=%p task=%p\n", ctx, ctx->bo, key, priv_task);
-	if (priv_task->priv && priv_task->len == KVM_PROGRAM_MAGIC)
-		return (kvm::MachineInstance*) priv_task->priv;
-	return nullptr;
-}
-
-extern "C"
-kvm::MachineInstance* kvm_get_machine(VRT_CTX)
-{
-	if (ctx->req)
-		return kvm_get_machine(ctx, ctx->req);
-	else
-		return kvm_get_machine(ctx, ctx->bo);
-}
-
 extern "C"
 uint64_t kvm_resolve_name(kvm::TenantInstance* tenant, const char* func)
 {
@@ -42,17 +24,17 @@ int kvm_tenant_gucci(kvm::TenantInstance* tenant, int debug)
 }
 
 extern "C"
-kvm::MachineInstance* kvm_fork_machine(const vrt_ctx *ctx, kvm::TenantInstance* tenant, bool debug)
+kvm::VMPoolItem* kvm_reserve_machine(const vrt_ctx *ctx, kvm::TenantInstance* tenant, bool debug)
 {
-	return tenant->vmfork(ctx, debug);
+	return tenant->vmreserve(ctx, debug);
 }
 
 extern "C"
-int kvm_copy_to_machine(kvm::MachineInstance* machine,
+int kvm_copy_to_machine(kvm::VMPoolItem* slot,
 	uint64_t dst, const void* src, size_t len)
 {
 	try {
-		machine->copy_to(dst, src, len);
+		slot->mi->copy_to(dst, src, len);
 		return 0;
 	} catch (...) {
 		return -1;
@@ -125,12 +107,14 @@ int kvm_synth(VRT_CTX, kvm::MachineInstance* machine,
 	}
 }
 
-static int kvm_forkcall(VRT_CTX, kvm::MachineInstance* machine,
+static int kvm_forkcall(VRT_CTX, kvm::VMPoolItem* slot,
 	const uint64_t addr, const char *farg)
 {
+	auto& machine = *slot->mi;
+	machine.set_ctx(ctx);
 	try {
-		auto& vm = machine->machine();
-		const auto timeout = machine->tenant().config.max_time();
+		auto& vm = machine.machine();
+		const auto timeout = machine.tenant().config.max_time();
 		/* Call the backend response function */
 		vm.timed_vmcall(addr, timeout, farg);
 		/* Make sure no SMP work is in-flight. */
@@ -141,45 +125,45 @@ static int kvm_forkcall(VRT_CTX, kvm::MachineInstance* machine,
 
 	} catch (const tinykvm::MachineTimeoutException& mte) {
 		fprintf(stderr, "%s: KVM VM timed out (%f seconds)\n",
-			machine->name().c_str(), mte.seconds());
+			machine.name().c_str(), mte.seconds());
 		VSLb(ctx->vsl, SLT_Error,
 			"%s: KVM VM timed out (%f seconds)",
-			machine->name().c_str(), mte.seconds());
+			machine.name().c_str(), mte.seconds());
 	} catch (const tinykvm::MachineException& e) {
 		fprintf(stderr, "%s: KVM VM exception: %s (data: 0x%lX)\n",
-			machine->name().c_str(), e.what(), e.data());
+			machine.name().c_str(), e.what(), e.data());
 		VSLb(ctx->vsl, SLT_Error,
 			"%s: KVM VM exception: %s (data: 0x%lX)",
-			machine->name().c_str(), e.what(), e.data());
+			machine.name().c_str(), e.what(), e.data());
 	} catch (const std::exception& e) {
 		fprintf(stderr, "KVM VM exception: %s\n", e.what());
 		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
 	}
 	/* Make sure no SMP work is in-flight. */
-	machine->machine().smp_wait();
+	machine.machine().smp_wait();
 	return -1;
 }
 
 extern "C"
-int kvm_call(VRT_CTX, kvm::MachineInstance* machine,
+int kvm_call(VRT_CTX, kvm::VMPoolItem* slot,
 	const char *func, const char *farg)
 {
 	assert(func && farg);
-	const auto addr = machine->tenant().lookup(func);
-	return kvm_forkcall(ctx, machine, addr, farg);
+	const auto addr = slot->mi->tenant().lookup(func);
+	return kvm_forkcall(ctx, slot, addr, farg);
 }
 
 extern "C"
-int kvm_callv(VRT_CTX, kvm::MachineInstance* machine,
+int kvm_callv(VRT_CTX, kvm::VMPoolItem* slot,
 	const int index, const char *farg)
 {
 	uint64_t addr = 0x0;
 	try {
-		addr = machine->instance().entry_at(index);
+		addr = slot->mi->instance().entry_at(index);
 	} catch (const std::exception& e) {
 		fprintf(stderr, "KVM VM exception: %s\n", e.what());
 		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
 		return -1;
 	}
-	return kvm_forkcall(ctx, machine, addr, farg);
+	return kvm_forkcall(ctx, slot, addr, farg);
 }

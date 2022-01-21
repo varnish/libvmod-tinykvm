@@ -1,15 +1,26 @@
 #pragma once
 #include "machine_instance.hpp"
+#include <blockingconcurrentqueue.h>
 
 namespace kvm {
-struct inst_pair {
-	MachineInstance* inst;
-	void (*free) (void*);
-};
 struct VirtBuffer {
 	uint64_t addr;
 	size_t   len;
 };
+struct VMPoolItem {
+	VMPoolItem(MachineInstance* inst) : mi{inst} {}
+	// VM instance
+	std::unique_ptr<MachineInstance> mi;
+	// Communicate with this VM using single thread pool
+	tinykvm::ThreadPool tp {1};
+	// Reference that keeps active program alive
+	std::shared_ptr<ProgramInstance> prog_ref = nullptr;
+};
+struct inst_pair {
+	VMPoolItem* slot;
+	void (*free) (void*);
+};
+
 enum class ProgramEntryIndex : uint8_t {
 	ON_RECV = 0,
 	BACKEND_COMP = 1,
@@ -52,8 +63,8 @@ public:
 	void set_entry_at(int, gaddr_t);
 	void set_entry_at(ProgramEntryIndex i, gaddr_t a) { return set_entry_at((int) i, a); }
 
-	/* Thread-local heap-allocated VM. */
-	inst_pair concurrent_fork(const vrt_ctx*,
+	/* Reserve VM from blocking queue. */
+	inst_pair reserve_vm(const vrt_ctx*,
 		TenantInstance*, std::shared_ptr<ProgramInstance>&);
 
 	/* Serialized vector-based vmcall into storage VM.
@@ -73,10 +84,19 @@ public:
 		std::shared_ptr<MachineInstance>& new_inst);
 
 	const std::vector<uint8_t> binary;
-	std::shared_ptr<MachineInstance> script;
+	/* Ready-made _main_ VM that can be forked into many small VMs */
+	std::shared_ptr<MachineInstance> main_vm;
 
+	/* Ticket-machine that gives access rights to VMs. */
+	moodycamel::BlockingConcurrentQueue<VMPoolItem*> m_vmqueue;
+	/* Simple container for VMs. */
+	std::deque<VMPoolItem> m_vms;
+
+	/* Single storage VM that is mutable and identity-mapped. */
 	MachineInstance  storage;
+	/* Queue of work to happen on storage VM. Bottleneck. */
 	tinykvm::ThreadPool m_storage_queue;
+	/* Tasks executed in storage after someone leaves storage VM. */
 	std::vector<std::future<long>> m_async_tasks;
 
 	std::array<gaddr_t, (size_t)ProgramEntryIndex::TOTAL_ENTRIES> entry_address;

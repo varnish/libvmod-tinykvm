@@ -7,10 +7,11 @@ struct vrt_ctx;
 namespace kvm {
 class MachineInstance;
 class ProgramInstance;
+struct VMPoolItem;
 
 class TenantInstance {
 public:
-	MachineInstance* vmfork(const vrt_ctx*, bool debug);
+	VMPoolItem* vmreserve(const vrt_ctx*, bool debug);
 	bool no_program_loaded() const noexcept { return this->program == nullptr; }
 
 	uint64_t lookup(const char* name) const;

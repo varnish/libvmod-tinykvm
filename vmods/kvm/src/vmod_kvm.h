@@ -56,7 +56,7 @@ struct vmod_kvm_synth
 };
 
 typedef struct vmod_kvm_tenant * TEN_PTR;
-typedef struct vmod_kvm_machine * KVM_PTR;
+typedef struct vmod_kvm_slot * KVM_SLOT;
 
 extern void kvm_init_tenants_str(VRT_CTX, VCL_PRIV, const char *);
 extern void kvm_init_tenants_file(VRT_CTX, VCL_PRIV, const char *);
@@ -64,10 +64,9 @@ extern void initialize_vmods(VRT_CTX, VCL_PRIV);
 extern TEN_PTR kvm_tenant_find(VCL_PRIV, const char *name);
 extern TEN_PTR kvm_tenant_find_key(VCL_PRIV, const char *name, const char *key);
 extern int     kvm_tenant_gucci(TEN_PTR, int debug);
-extern KVM_PTR kvm_fork_machine(VRT_CTX, TEN_PTR, int);
-extern KVM_PTR kvm_get_machine(VRT_CTX);
-extern int kvm_call(VRT_CTX, KVM_PTR, const char *func, const char *arg);
-extern int kvm_callv(VRT_CTX, KVM_PTR, const int, const char *arg);
-extern int kvm_synth(VRT_CTX, KVM_PTR, struct vmod_kvm_synth *);
+extern KVM_SLOT kvm_reserve_machine(VRT_CTX, TEN_PTR, int);
+extern int kvm_call(VRT_CTX, KVM_SLOT, const char *func, const char *arg);
+extern int kvm_callv(VRT_CTX, KVM_SLOT, const int, const char *arg);
+extern int kvm_synth(VRT_CTX, KVM_SLOT, struct vmod_kvm_synth *);
 extern uint64_t kvm_resolve_name(TEN_PTR, const char*);
-extern int kvm_copy_to_machine(KVM_PTR, uint64_t dst, const void* src, size_t len);
+extern int kvm_copy_to_machine(KVM_SLOT, uint64_t dst, const void* src, size_t len);

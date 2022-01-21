@@ -32,6 +32,15 @@ if (KVM_FACEDETECTION)
 	)
 endif()
 
+
+include(FetchContent)
+FetchContent_Declare(
+  concurrentqueue
+  GIT_REPOSITORY    https://github.com/cameron314/concurrentqueue
+  GIT_TAG           master
+)
+FetchContent_MakeAvailable(concurrentqueue)
+
 add_subdirectory(tinykvm/lib tinykvm)
 if (NATIVE)
 	target_compile_options(tinykvm PUBLIC -march=native -Ofast -fno-fast-math)
@@ -44,11 +53,15 @@ add_library(kvm_sandbox STATIC ${KVM_SOURCES})
 set_target_properties(kvm_sandbox PROPERTIES CXX_STANDARD 17)
 target_include_directories(kvm_sandbox PRIVATE ${VARNISH_PATH}/include)
 target_include_directories(kvm_sandbox PRIVATE ${VARNISH_PATH}/bin/varnishd)
-target_link_libraries(kvm_sandbox PRIVATE tinykvm nlohmann_json stdc++)
+target_link_libraries(kvm_sandbox PRIVATE tinykvm concurrentqueue nlohmann_json stdc++)
 
 if (SHARED_KVM)
 	set_property(TARGET tinykvm PROPERTY POSITION_INDEPENDENT_CODE 1)
 	set_property(TARGET kvm_sandbox PROPERTY POSITION_INDEPENDENT_CODE 1)
+endif()
+if (DEBUGGING)
+    target_compile_options(tinykvm PUBLIC -O0 -ggdb3)
+	target_compile_options(kvm_sandbox PUBLIC -O0 -ggdb3)
 endif()
 if (SANITIZE)
     target_compile_options(tinykvm PUBLIC  "${SANITIZE_FLAGS}")

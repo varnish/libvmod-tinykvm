@@ -18,7 +18,7 @@ kvm_get_aggregate_body(void *priv, int flush, int last, const void *ptr, ssize_t
 	if (post->process_func == 0x0) {
 		/* Collect all data into one buffer inside guest VM */
 		int res = kvm_copy_to_machine(
-			post->machine, post->address + post->length, ptr, len);
+			post->slot, post->address + post->length, ptr, len);
 		post->length += len;
 		return (res);
 	}

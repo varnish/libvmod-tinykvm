@@ -92,11 +92,6 @@ $Function INT vm_callv(PRIV_VCL, STRING tenant,
 
 - Call self-registered function in tenant program.
 
-$Function INT vm_synth()
-
-- Produces a synthetic response using the current active machine.
-- Can only be called from vcl_synth or vcl_backend_error.
-
 $Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING arg = "")
 
 - Returns a backend that will call into the current machine to produce a response.

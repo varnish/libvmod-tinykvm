@@ -64,13 +64,13 @@ VCL_INT vmod_vm_call(VRT_CTX, VCL_PRIV task,
 		return (-1);
 	}
 
-	KVM_PTR machine = kvm_fork_machine(ctx, tenptr, KVM_FORK_MAIN);
-	if (machine == NULL) {
-		VRT_fail(ctx, "Unable to fork tenant machine: %s", tenant);
+	KVM_SLOT slot = kvm_reserve_machine(ctx, tenptr, KVM_FORK_MAIN);
+	if (slot == NULL) {
+		VRT_fail(ctx, "Unable to reserve machine: %s", tenant);
 		return (-1);
 	}
 
-	return (kvm_call(ctx, machine, func, arg));
+	return (kvm_call(ctx, slot, func, arg));
 }
 
 VCL_INT vmod_vm_callv(VRT_CTX, VCL_PRIV task,
@@ -92,46 +92,11 @@ VCL_INT vmod_vm_callv(VRT_CTX, VCL_PRIV task,
 		return (-1);
 	}
 
-	KVM_PTR machine = kvm_fork_machine(ctx, tenptr, KVM_FORK_MAIN);
-	if (machine == NULL) {
-		VRT_fail(ctx, "Unable to fork tenant machine: %s", tenant);
+	KVM_SLOT slot = kvm_reserve_machine(ctx, tenptr, KVM_FORK_MAIN);
+	if (slot == NULL) {
+		VRT_fail(ctx, "Unable to reserve tenant machine: %s", tenant);
 		return (-1);
 	}
 
-	return (kvm_callv(ctx, machine, index, arg));
-}
-
-VCL_INT vmod_vm_synth(VRT_CTX)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-
-	if (ctx->method == VCL_MET_SYNTH ||
-		ctx->method == VCL_MET_BACKEND_ERROR)
-	{
-		KVM_PTR machine = kvm_get_machine(ctx);
-		if (machine == NULL) {
-			VRT_fail(ctx, "vmod_kvm: No active machine");
-			return (-1);
-		}
-
-		struct vsb *vsb = (struct vsb*) ctx->specific;
-		assert(vsb != NULL);
-
-		struct vmod_kvm_synth synth = {
-			.vsb = vsb,
-			.status = 0,
-			.ct_len = 0
-		};
-		if (kvm_synth(ctx, machine, &synth) < 0)
-			return (-1);
-
-		struct http *hp = ctx->http_resp;
-		assert(hp != NULL);
-		http_PrintfHeader(hp, "Content-Length: %zd", VSB_len(vsb));
-		http_PrintfHeader(hp, "Content-Type: %.*s", synth.ct_len, synth.ct_buf);
-
-		return (VSB_len(vsb));
-	}
-	VRT_fail(ctx, "Wrong VCL function for synth responses");
-	return (-1);
+	return (kvm_callv(ctx, slot, index, arg));
 }
