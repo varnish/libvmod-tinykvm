@@ -13,6 +13,17 @@ namespace kvm {
 class TenantInstance;
 class ProgramInstance;
 
+/**
+ * MachineInstance is a collection of state that is per VM,
+ * and per request. It will keep things like file descriptors,
+ * backends, regex handles and such. And most importanatly,
+ * it holds an actual KVM VM that is based on the tenants program.
+ *
+ * Once the request ends and this instance dies, it will decrease
+ * refcounts on a few things, so if the tenant sends a new program,
+ * the old program is kept alive until all requests that are using
+ * it ends.
+**/
 class MachineInstance {
 public:
 	using gaddr_t = uint64_t;

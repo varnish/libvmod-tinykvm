@@ -1,8 +1,5 @@
 #pragma once
 #include "machine_instance.hpp"
-namespace tinykvm {
-	struct RSPClient;
-}
 
 namespace kvm {
 struct inst_pair {
@@ -23,6 +20,13 @@ enum class ProgramEntryIndex : uint8_t {
 	TOTAL_ENTRIES
 };
 
+/**
+ * ProgramInstance is a collection of machines, thread pools
+ * and state that will be replaced each time a new program
+ * is sent to this tenant. The original program is stored
+ * alongside the VMs, but the VMs can diverge greatly over
+ * time.
+**/
 class ProgramInstance {
 public:
 	using gaddr_t = MachineInstance::gaddr_t;
@@ -31,7 +35,18 @@ public:
 		const vrt_ctx*, TenantInstance*, bool debug = false);
 	~ProgramInstance();
 
+	/* Look up the address of the given name (function or object)
+	   in the currently running program. The operation is very
+	   expensive as it iterates through the ELF symbol table. */
 	gaddr_t lookup(const char* name) const;
+
+	/* Entries are function addresses in an array that belongs
+	   to the running program. The program self-registers callbacks
+	   used by Varnish during various stages, such as GET and POST.
+	   We don't need to know function names because the function just
+	   directly registers the address of the function.
+
+	   See: ProgramEntryIndex for what each entry means. */
 	gaddr_t entry_at(int) const;
 	gaddr_t entry_at(ProgramEntryIndex i) const { return entry_at((int) i); }
 	void set_entry_at(int, gaddr_t);
@@ -53,6 +68,7 @@ public:
 	long live_update_call(const vrt_ctx*,
 		gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc);
 
+	/* Replace a running program with another */
 	void commit_instance_live(
 		std::shared_ptr<MachineInstance>& new_inst);
 
