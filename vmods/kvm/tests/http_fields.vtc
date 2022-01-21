@@ -1,0 +1,65 @@
+varnishtest "KVM Backend: Basic HTTP test"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include <stdio.h>
+#include <string.h>
+#include "kvm_api.h"
+
+static void my_backend(const char *arg, int req, int resp)
+{
+	http_append(resp, "X-Value: 5", 10);
+	backend_response_str(200, "text/plain", arg);
+}
+
+int main(int argc, char **argv)
+{
+	printf("Hello from %s!\n", argv[1]);
+	set_backend_get(my_backend);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""
+			{
+				"xpizza.com": {
+					"filename": "${tmpdir}/${testname}",
+					"key": "",
+					"group": "test"
+				}
+			}
+		""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				"Hello World");
+	}
+} -start
+
+client c1 {
+	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.http.X-Value == "5"
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.http.X-Value == "5"
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+} -run
