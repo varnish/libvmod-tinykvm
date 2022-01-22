@@ -49,7 +49,7 @@ void ProgramInstance::set_entry_at(const int idx, gaddr_t addr)
 	entry_address.at(idx) = addr;
 }
 
-inst_pair ProgramInstance::reserve_vm(const vrt_ctx* ctx,
+Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 	TenantInstance* tenant, std::shared_ptr<ProgramInstance>& prog)
 {
 	VMPoolItem* slot = nullptr;
@@ -69,7 +69,7 @@ inst_pair ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 		auto* mi = slot->mi.get();
 		mi->tail_reset();
 		// Signal waiters that slot is ready again
-		// If there any waiters, they will keep the program referenced
+		// If there any waiters, they keep the program referenced
 		mi->instance().m_vmqueue.enqueue(slot);
 		// Last action: Unassign program, which can destruct the program
 		slot->prog_ref = nullptr;

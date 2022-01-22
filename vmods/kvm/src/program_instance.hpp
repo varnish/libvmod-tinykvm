@@ -7,6 +7,13 @@ struct VirtBuffer {
 	uint64_t addr;
 	size_t   len;
 };
+/**
+ * A pool item is all the bits necessary to execute inside KVM
+ * for a particular tenant. The pool item can be requested as
+ * part of a front or backend request. It guarantees ownership
+ * of a VM until a request is fully completed, including any
+ * data transfers, and is then put back in a blocking queue.
+**/
 struct VMPoolItem {
 	VMPoolItem(MachineInstance* inst) : mi{inst} {}
 	// VM instance
@@ -16,7 +23,7 @@ struct VMPoolItem {
 	// Reference that keeps active program alive
 	std::shared_ptr<ProgramInstance> prog_ref = nullptr;
 };
-struct inst_pair {
+struct Reservation {
 	VMPoolItem* slot;
 	void (*free) (void*);
 };
@@ -36,7 +43,14 @@ enum class ProgramEntryIndex : uint8_t {
  * and state that will be replaced each time a new program
  * is sent to this tenant. The original program is stored
  * alongside the VMs, but the VMs can diverge greatly over
- * time.
+ * time. A ProgramInstance is kept alive for the duration of
+ * all requests that are using it. Once they are all finished
+ * a ProgramInstance may be destroyed if a live update happened
+ * during execution. Programs are kept alive until everything
+ * related to a request is completed, including data transfers.
+ * That is why you may see a lot of reference counting. There
+ * is additional reference counting on the main VM, as it may
+ * be live updated using a vmcommit system call.
 **/
 class ProgramInstance {
 public:
@@ -64,7 +78,7 @@ public:
 	void set_entry_at(ProgramEntryIndex i, gaddr_t a) { return set_entry_at((int) i, a); }
 
 	/* Reserve VM from blocking queue. */
-	inst_pair reserve_vm(const vrt_ctx*,
+	Reservation reserve_vm(const vrt_ctx*,
 		TenantInstance*, std::shared_ptr<ProgramInstance>&);
 
 	/* Serialized vector-based vmcall into storage VM.
@@ -98,9 +112,16 @@ public:
 	tinykvm::ThreadPool m_storage_queue;
 	/* Tasks executed in storage after someone leaves storage VM. */
 	std::vector<std::future<long>> m_async_tasks;
-
+	/* Entry points in the tenants program. Handlers for all types of
+	   requests, serialization mechanisms and related functionality. */
 	std::array<gaddr_t, (size_t)ProgramEntryIndex::TOTAL_ENTRIES> entry_address;
 
+	/* Live debugging feature using the GDB RSP protocol.
+	   Debugging allows stepping through the tenants program line by line
+	   as the request is processed. Once the debugger is connected KVM is
+	   switched to single stepping mode, and opens up the ability to connect
+	   to the Varnish instance using remote GDB. Once the connection is
+	   concluded KVM will continue running, finishing the request normally. */
 	std::unique_ptr<tinykvm::RSPClient> rspclient;
 	MachineInstance* rsp_script = nullptr;
 	std::mutex rsp_mtx;

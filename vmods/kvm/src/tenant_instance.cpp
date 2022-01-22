@@ -47,6 +47,10 @@ TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 
 VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 {
+	// Priv-task have request lifetime and is a Varnish feature.
+	// The key identifies any existing priv_task objects, which allows
+	// us to reserve the same machine during multiple VCL stages.
+	// The free callback is called at the end of a request
 	struct vmod_priv* priv_task;
 	if (ctx->req)
 		priv_task = VRT_priv_task(ctx, ctx->req);
@@ -62,19 +66,19 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 			prog = this->program;
 		else
 			prog = this->debug_program;
-		/* First-time tenants could have no program */
+		// First-time tenants could have no program loaded
 		if (UNLIKELY(prog == nullptr)) {
 			VRT_fail(ctx, "vmreserve: Missing program for %s. Not uploaded?",
 				config.name.c_str());
 			return nullptr;
 		}
 		try {
-			/* Get free instance through concurrent queue */
-			inst_pair ip = prog->reserve_vm(ctx, this, prog);
+			// Reserve a machine through blocking queue.
+			Reservation resv = prog->reserve_vm(ctx, this, prog);
 
-			priv_task->priv = ip.slot;
+			priv_task->priv = resv.slot;
 			priv_task->len  = KVM_PROGRAM_MAGIC;
-			priv_task->free = ip.free;
+			priv_task->free = resv.free;
 		} catch (std::exception& e) {
 			VRT_fail(ctx,
 				"VM '%s' exception: %s", config.name.c_str(), e.what());
@@ -113,12 +117,11 @@ void TenantInstance::dynamic_call(uint32_t hash, MachineInstance& machine) const
 #include <unistd.h>
 std::vector<uint8_t> file_loader(const std::string& filename)
 {
-    size_t size = 0;
     FILE* f = fopen(filename.c_str(), "rb");
     if (f == NULL) throw std::runtime_error("Could not open file: " + filename);
 
     fseek(f, 0, SEEK_END);
-    size = ftell(f);
+	const size_t size = ftell(f);
     fseek(f, 0, SEEK_SET);
 
     std::vector<uint8_t> result(size);
