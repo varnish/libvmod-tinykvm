@@ -14,6 +14,7 @@ ProgramInstance::ProgramInstance(
 	: binary{std::move(elf)},
 	  script{std::make_shared<MachineInstance>(binary, ctx, ten, this, false, debug)},
 	  storage{binary, ctx, ten, this, true, debug},
+	  m_storage_queue {1},
 	  rspclient{nullptr}
 {
 	if (!script->is_waiting_for_requests()) {
