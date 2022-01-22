@@ -10,6 +10,7 @@ using json = nlohmann::json;
 
 namespace kvm {
 extern std::vector<uint8_t> file_loader(const std::string&);
+const std::string TenantConfig::guest_state_file = "state";
 
 TenantConfig::TenantConfig(
 	std::string n, std::string f, std::string k,
@@ -151,6 +152,9 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 					/* Optional group settings */
 					if (obj.contains("max_boot_time")) {
 						group.max_boot_time = obj["max_boot_time"];
+					}
+					if (obj.contains("max_concurrency")) {
+						group.max_concurrency = obj["max_concurrency"];
 					}
 				} else {
 					VSL(SLT_Error, 0,

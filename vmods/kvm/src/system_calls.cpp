@@ -40,19 +40,12 @@ void MachineInstance::sanitize_path(char* buffer, size_t buflen)
 
 void MachineInstance::sanitize_file(char* buffer, size_t buflen)
 {
-	buffer[buflen-1] = 0;
-	const size_t len = strnlen(buffer, buflen);
-
-	const auto& gucci_file = tenant().config.allowed_file;
-	if (gucci_file.size() <= len &&
-		memcmp(buffer, gucci_file.c_str(), gucci_file.size()) == 0) {
-		SYSPRINT("File OK: %.*s against %s\n",
-			(int)len, buffer, gucci_file.c_str());
+	const auto& state_file = TenantConfig::guest_state_file;
+	// Test against state file including the terminating zero:
+	if (memcmp(buffer, state_file.c_str(), state_file.size()+1) == 0) {
 		return;
 	}
-
-	printf("File failed: %.*s\n", (int)len, buffer);
-	throw std::runtime_error("Disallowed file used");
+	throw std::runtime_error("Writable file must be the provided state file");
 }
 
 static void syscall_unknown(Machine& machine, MachineInstance& inst, unsigned scall)
@@ -249,7 +242,7 @@ void MachineInstance::setup_syscall_interface()
 			const auto vpath = regs.rsi;
 			const int  flags = regs.rdx;
 
-			char path[256];
+			char path[PATH_MAX];
 			machine.copy_from_guest(path, vpath, sizeof(path));
 			bool write_flags = (flags & (O_WRONLY | O_RDWR)) != 0x0;
 			if (!write_flags)
@@ -278,7 +271,8 @@ void MachineInstance::setup_syscall_interface()
 				try {
 					inst.sanitize_file(path, sizeof(path));
 
-					int fd = openat(AT_FDCWD, path, flags, S_IWUSR | S_IRUSR);
+					const auto& state_file = inst.tenant().config.allowed_file;
+					int fd = openat(AT_FDCWD, state_file.c_str(), flags, S_IWUSR | S_IRUSR);
 					SYSPRINT("OPENAT where=%lld path=%s flags=%X = fd %d\n",
 						regs.rdi, path, flags, fd);
 

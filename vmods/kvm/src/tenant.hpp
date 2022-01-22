@@ -73,6 +73,8 @@ struct TenantConfig
 
 	/* One allowed file for persistence / state-keeping */
 	std::string allowed_file;
+	/* The filename the guest will use to access the allowed file. */
+	static const std::string guest_state_file;
 
 	/* Hash map of string hashes associated with dyncall handlers */
 	dynfun_map& dynamic_functions_ref;

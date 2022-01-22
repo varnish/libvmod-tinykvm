@@ -39,7 +39,7 @@ MachineInstance::MachineInstance(
 	machine().set_printer(get_vsl_printer());
 	try {
 		machine().setup_linux(
-			{"vmod_kvm", name(), storage ? "1" : "0", tenant().config.allowed_file},
+			{"vmod_kvm", name(), storage ? "1" : "0", TenantConfig::guest_state_file},
 			{"LC_TYPE=C", "LC_ALL=C", "USER=root"});
 		// Run through main()
 		machine().run();
