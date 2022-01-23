@@ -1,21 +1,30 @@
-varnishtest "KVM: Execution timeout"
+varnishtest "KVM: Storage execution timeout"
 
 shell {
 cat >${tmpdir}/${testname}.c <<-EOF
 #include "kvm_api.h"
 #include <assert.h>
 
-static void my_storage(size_t n, struct virtbuffer buffers[n], size_t reslen)
+static void loopy(size_t n, struct virtbuffer buffers[n], size_t reslen)
 {
 	while(1);
 }
+static void gucci(size_t n, struct virtbuffer buffers[n], size_t reslen)
+{
+	storage_return("Hello World", 11);
+}
 
-static void my_backend(const char *arg)
+static void on_get(const char *arg)
 {
 	char result[256];
-	strcpy(result, "Hello World (NOT)");
-	const long rlen =
-		storage_callv(my_storage, 0, NULL, result, sizeof(result));
+	long rlen = 0;
+
+	if (strcmp(arg, "/1") == 0)
+		rlen = storage_callv(loopy, 0, NULL, result, sizeof(result));
+	else if (strcmp(arg, "/2") == 0)
+		rlen = storage_callv(gucci, 0, NULL, result, sizeof(result));
+	else
+		__builtin_trap();
 
 	const char ctype[] = "text/plain";
 	backend_response(200, ctype, sizeof(ctype)-1, result, rlen);
@@ -23,7 +32,7 @@ static void my_backend(const char *arg)
 
 int main()
 {
-	set_backend_get(my_backend);
+	set_backend_get(on_get);
 	wait_for_requests();
 }
 EOF
@@ -65,8 +74,14 @@ vcl 4.1;
 } -start
 
 client c1 {
-	# The program should timeout and respond 503
-	txreq -url "/" -hdr "Host: xpizza.com"
+	# The first URL enters storage and causes timeout
+	txreq -url "/1" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.status == 500
+
+	# The other URL should NOT timeout and replies normally
+	txreq -url "/2" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Hello World"
 } -run
