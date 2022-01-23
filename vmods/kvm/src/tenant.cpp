@@ -23,8 +23,8 @@ TenantConfig::TenantConfig(
 static const TenantGroup test_group {
 	"test",
 	1.0f, /* Seconds */
-	256 * 1024, /* 256MB main memory */
-	4 * 1024, /* 4MB working memory */
+	256, /* 256MB main memory */
+	4, /* 4MB working memory */
 };
 
 Tenants& tenancy(VCL_PRIV task)

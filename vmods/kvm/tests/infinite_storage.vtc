@@ -50,8 +50,8 @@ vcl 4.1;
 			{
 				"diefast": {
 					"max_time": 1.0,
-					"max_memory": 262144,
-					"max_work_memory": 256
+					"max_memory": 256,
+					"max_work_memory": 4
 				},
 				"xpizza.com": {
 					"filename": "${tmpdir}/${testname}",
