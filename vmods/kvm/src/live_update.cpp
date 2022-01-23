@@ -9,12 +9,12 @@ extern "C" {
 static bool file_writer(const std::string& file, const std::vector<uint8_t>&);
 
 constexpr update_result
-static_result(const char* text) {
-	return { text, __builtin_strlen(text), nullptr };
+static_result(const char* text, bool success) {
+	return { text, __builtin_strlen(text), success, nullptr };
 }
 static update_result
 dynamic_result(const char* text) {
-	return { strdup(text), __builtin_strlen(text),
+	return { strdup(text), __builtin_strlen(text), false,
 		[] (update_result* res) { free((void*) res->output); } };
 }
 
@@ -25,7 +25,7 @@ kvm_live_update(VRT_CTX, kvm::TenantInstance* ten, struct update_params *params)
 	using namespace kvm;
 	/* ELF loader will not be run for empty binary */
 	if (UNLIKELY(params->data == nullptr || params->len == 0)) {
-		return static_result("Empty file received");
+		return static_result("Empty file received", false);
 	}
 	try {
 	#ifdef ENABLE_TIMING
@@ -60,7 +60,7 @@ kvm_live_update(VRT_CTX, kvm::TenantInstance* ten, struct update_params *params)
 				return dynamic_result(buffer);
 			}
 		}
-		return static_result("Update successful\n");
+		return static_result("Update successful\n", true);
 	} catch (const tinykvm::MachineException& e) {
 		/* Pass machine error back to the client */
 		char buffer[2048];

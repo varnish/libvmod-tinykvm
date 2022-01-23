@@ -11,6 +11,7 @@ struct update_params {
 struct update_result {
 	const char* output;
 	const size_t len;
+	int success;
 	void(*destructor) (struct update_result*);
 };
 

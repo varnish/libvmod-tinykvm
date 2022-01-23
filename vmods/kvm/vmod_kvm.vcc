@@ -71,6 +71,8 @@ $Function BACKEND live_update(PRIV_VCL, STRING tenant, STRING key, BYTES max_siz
 		}
 	}
 
+$Function BOOL live_update_file(PRIV_VCL, STRING tenant, STRING filename)
+
 $Function BACKEND live_debug(PRIV_VCL, STRING tenant, STRING key, BYTES max_size = 2097152)
 
 - Receive a binary suitable for debugging.

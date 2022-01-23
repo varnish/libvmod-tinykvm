@@ -34,7 +34,7 @@ int main()
 	wait_for_requests();
 }
 EOF
-gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+gcc -static -O2 -s ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
 }
 
 varnish v1 -vcl+backend {
@@ -54,17 +54,43 @@ vcl 4.1;
 	}
 
 	sub vcl_recv {
+		if (req.url == "/1") {
+			if (kvm.live_update_file(
+				req.http.Host, "${tmpdir}/${testname}"))
+			{
+				return (synth(201));
+			} else {
+				return (synth(403));
+			}
+		}
 		return (pass);
 	}
 
 	sub vcl_backend_fetch {
 		set bereq.backend = kvm.vm_backend(
-				bereq.http.Host,
-				bereq.url);
+			bereq.http.Host,
+			bereq.url);
 	}
 } -start
 
 client c1 {
+	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "/helloworld1"
+	expect resp.status == 200
+	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "/helloworld2"
+	expect resp.status == 200
+	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "/helloworld3"
+	expect resp.status == 200
+
+	txreq -url "/1" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 201
+
 	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.body == "/helloworld1"

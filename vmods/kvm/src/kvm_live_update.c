@@ -240,3 +240,53 @@ VCL_BACKEND vmod_live_debug(
 
 	return (&kvmu->dir);
 }
+
+VCL_BOOL vmod_live_update_file(
+	VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING filename)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	struct vmod_kvm_tenant *tenptr = kvm_tenant_find(task, tenant);
+	if (tenptr == NULL) {
+		VRT_fail(ctx, "Could not find tenant: %s", tenant);
+		return (0);
+	}
+
+	FILE* f = fopen(filename, "rb");
+    if (f == NULL) {
+		VRT_fail(ctx, "Could not open file: %s", filename);
+		return (0);
+	}
+
+    fseek(f, 0, SEEK_END);
+	const size_t size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    char* data = malloc(size);
+	if (data == NULL) {
+		VRT_fail(ctx, "Could not allocate memory for file: %s", filename);
+		fclose(f);
+		return (0);
+	}
+
+    if (size != fread(data, 1, size, f))
+    {
+		VRT_fail(ctx, "Could not read file: %s", filename);
+		fclose(f);
+		free(data);
+		return (0);
+    }
+    fclose(f);
+
+	const struct update_params uparams = {
+		.data = data,
+		.len  = size,
+		.is_debug = 0,
+		.debug_port = 0,
+	};
+	struct update_result result =
+		kvm_live_update(ctx, tenptr, &uparams);
+
+	free(data);
+	return (result.success);
+}
