@@ -254,7 +254,8 @@ VCL_BOOL vmod_live_update_file(
 
 	FILE* f = fopen(filename, "rb");
     if (f == NULL) {
-		VRT_fail(ctx, "Could not open file: %s", filename);
+		/* NOTE: It is OK to not VRT_fail here as most likely the file
+		   access failed or the file does not exist. We return failure. */
 		return (0);
 	}
 
@@ -262,7 +263,7 @@ VCL_BOOL vmod_live_update_file(
 	const size_t size = ftell(f);
     fseek(f, 0, SEEK_SET);
 
-    char* data = malloc(size);
+    uint8_t* data = (uint8_t *)malloc(size);
 	if (data == NULL) {
 		VRT_fail(ctx, "Could not allocate memory for file: %s", filename);
 		fclose(f);
