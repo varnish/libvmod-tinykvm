@@ -26,6 +26,8 @@ struct TenantGroup {
 	size_t   max_fd       = 32;
 	size_t   max_backends = 8;
 	size_t   max_regex    = 32;
+	bool     hugepages    = false;
+	bool     ephemeral_hugepages = false;
 
 	std::vector<std::string> allowed_paths {
 		"/usr/lib/locale",
@@ -60,6 +62,8 @@ struct TenantConfig
 	size_t   max_fd() const noexcept { return group.max_fd; }
 	size_t   max_regex() const noexcept { return group.max_regex; }
 	size_t   max_backends() const noexcept { return group.max_backends; }
+	bool     hugepages() const noexcept { return group.hugepages; }
+	bool     ephemeral_hugepages() const noexcept { return group.ephemeral_hugepages; }
 
 	static bool begin_dyncall_initialization(VCL_PRIV);
 	// Install a callback function using a string name

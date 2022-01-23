@@ -156,6 +156,9 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 					if (obj.contains("max_concurrency")) {
 						group.max_concurrency = obj["max_concurrency"];
 					}
+					if (obj.contains("hugepages")) {
+						group.hugepages = obj["hugepages"];
+					}
 				} else {
 					VSL(SLT_Error, 0,
 						"Tenancy JSON %s: group '%s' has missing fields",

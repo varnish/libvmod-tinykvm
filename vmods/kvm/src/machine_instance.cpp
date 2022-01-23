@@ -28,6 +28,7 @@ MachineInstance::MachineInstance(
 		.max_mem = ten->config.max_memory(),
 		.max_cow_mem = ten->config.max_work_memory(),
 		.timeout = ten->config.max_boot_time(),
+		.hugepages = ten->config.hugepages(),
 	  }),
 	  m_tenant(ten), m_inst(inst),
 	  m_is_storage(storage), m_is_debug(debug),
@@ -67,6 +68,7 @@ MachineInstance::MachineInstance(
 	  m_machine(source->machine(), {
 		.max_mem = ten->config.max_memory(),
 		.max_cow_mem = ten->config.max_work_memory(),
+		.hugepages = ten->config.ephemeral_hugepages(),
 	  }),
 	  m_tenant(ten), m_inst(inst),
 	  m_is_storage(false),
@@ -100,7 +102,8 @@ MachineInstance::MachineInstance(const MachineInstance& source)
 		.max_mem = source.tenant().config.max_memory(),
 		.max_cow_mem = source.tenant().config.max_work_memory(),
 		.binary = std::string_view{source.machine().binary()},
-		.linearize_memory = true
+		.linearize_memory = true,
+		.hugepages = source.tenant().config.hugepages(),
 	  }),
 	  m_tenant(source.m_tenant), m_inst(source.m_inst),
 	  m_is_storage(false),

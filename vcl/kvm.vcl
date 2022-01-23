@@ -12,6 +12,13 @@ backend default none;
 sub vcl_init {
 	kvm.embed_tenants("""
 		{
+			"hugepages": {
+				"max_time": 4.0,
+				"max_boot_time": 16.0,
+				"max_memory": 262144,
+				"max_work_memory": 256,
+				"hugepages": true
+			},
 			"vpizza.com": {
 				"filename": "/tmp/vpizza",
 				"key": "12daf155b8508edc4a4b8002264d7494",
@@ -25,7 +32,7 @@ sub vcl_init {
 			"xpizza.com": {
 				"filename": "/tmp/xpizza",
 				"key": "12daf155b8508edc4a4b8002264d7494",
-				"group": "test"
+				"group": "hugepages"
 			},
 			"ypizza.com": {
 				"filename": "/tmp/ypizza",
