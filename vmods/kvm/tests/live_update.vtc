@@ -84,7 +84,7 @@ vcl 4.1;
 	}
 } -start
 
-client c1 {
+define m1 sanity_check {
 	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.body == "/helloworld1"
@@ -97,6 +97,10 @@ client c1 {
 	rxresp
 	expect resp.body == "/helloworld3"
 	expect resp.status == 200
+}
+
+client c1 {
+	${m1_sanity_check}
 
 	# We can live update directly from the local filesystem
 	# And we can use VCL to control the response status
@@ -104,18 +108,7 @@ client c1 {
 	rxresp
 	expect resp.status == 201
 
-	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
-	rxresp
-	expect resp.body == "/helloworld1"
-	expect resp.status == 200
-	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
-	rxresp
-	expect resp.body == "/helloworld2"
-	expect resp.status == 200
-	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
-	rxresp
-	expect resp.body == "/helloworld3"
-	expect resp.status == 200
+	${m1_sanity_check}
 
 	# Missing file is a 403 because the live update fails
 	txreq -url "/2" -hdr "Host: xpizza.com"
@@ -127,21 +120,21 @@ client c1 {
 	rxresp
 	expect resp.status == 201
 
-	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
-	rxresp
-	expect resp.body == "/helloworld1"
-	expect resp.status == 200
-	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
-	rxresp
-	expect resp.body == "/helloworld2"
-	expect resp.status == 200
-	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
-	rxresp
-	expect resp.body == "/helloworld3"
-	expect resp.status == 200
+	${m1_sanity_check}
 
 	# Invalid key is a failing request
 	txreq -hdr "Host: xpizza.com" -hdr "X-PostKey: 2" -bodyfrom "${tmpdir}/${testname}"
 	rxresp
 	expect resp.status == 503
+
+	# Cannot use sanity check macro, as the program is unchanged
+	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "/helloworld4"
+	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "/helloworld5"
+	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "/helloworld6"
 } -run

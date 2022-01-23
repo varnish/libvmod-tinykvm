@@ -54,6 +54,7 @@ else()
 	set(SOURCES ${SOURCES}
 		${PATH}/vtc_dns.c
 		${PATH}/vtc_file.c
+		${PATH}/vtc_tls.c
 	)
 endif()
 add_executable(varnishtest ${SOURCES})
@@ -64,7 +65,7 @@ target_compile_definitions(varnishtest PUBLIC VTEST_WITH_VTC_LOGEXPECT=1)
 
 target_link_libraries(varnishtest vapi_static varnish resolv pthread vgz)
 if (VARNISH_PLUS)
-	target_link_libraries(varnishtest mse)
+	target_link_libraries(varnishtest mse ssl sslhelper)
 endif()
 # build varnishtest into the top binary folder
 set_target_properties(varnishtest
