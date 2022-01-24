@@ -6,7 +6,6 @@
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <unistd.h>
-extern "C" long kvm_SetBackend(VRT_CTX, VCL_BACKEND dir);
 using namespace tinykvm;
 //#define VERBOSE_SYSCALLS
 
@@ -68,6 +67,9 @@ void MachineInstance::setup_syscall_interface()
 				return;
 			case 0x10001: // WAIT_FOR_REQUESTS
 				syscall_wait_for_requests(machine, inst);
+				return;
+			case 0x10005: // SET_CACHEABLE
+				syscall_set_cacheable(machine, inst);
 				return;
 			case 0x10020: // HTTP_APPEND
 				syscall_http_append(machine, inst);

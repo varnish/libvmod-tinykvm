@@ -1,3 +1,9 @@
+extern "C" {
+	long kvm_SetBackend(VRT_CTX, VCL_BACKEND dir);
+	void kvm_SetCacheable(VRT_CTX, bool c);
+	void kvm_SetTTL(VRT_CTX, float ttl);
+}
+
 namespace kvm {
 
 static void syscall_register_func(Machine& machine, MachineInstance& inst)
@@ -27,6 +33,18 @@ static void syscall_set_backend(Machine& machine, MachineInstance& inst)
 	auto* dir = inst.directors().item(regs.rdi);
 	kvm_SetBackend(inst.ctx(), dir);
 	regs.rax = 0;
+	machine.set_registers(regs);
+}
+static void syscall_set_cacheable(Machine& machine, MachineInstance& inst)
+{
+	auto regs = machine.registers();
+	if (inst.ctx()->bo) {
+		kvm_SetCacheable(inst.ctx(), regs.rdi);
+		kvm_SetTTL(inst.ctx(), regs.rsi / 1000.0);
+		regs.rax = 0;
+	} else {
+		regs.rax = -1;
+	}
 	machine.set_registers(regs);
 }
 

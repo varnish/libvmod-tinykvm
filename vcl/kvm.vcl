@@ -15,8 +15,8 @@ sub vcl_init {
 			"hugepages": {
 				"max_time": 4.0,
 				"max_boot_time": 16.0,
-				"max_memory": 262144,
-				"max_work_memory": 256,
+				"max_memory": 256,
+				"max_work_memory": 8,
 				"hugepages": true
 			},
 			"vpizza.com": {
@@ -103,7 +103,6 @@ sub vcl_recv {
 	}
 
 	/* Normal request or POST */
-	return (pass);
 }
 
 sub vcl_backend_fetch {
