@@ -1,30 +1,34 @@
 [submodule "varnish-cache-plus"]
 	path = ext/varnish-cache-plus
 	url = git@github.com:varnish/varnish-cache-plus.git
+  branch = vmapi
 [submodule "ext/varnish-cache"]
 	path = ext/varnish-cache
-	url = git@github.com:fwsGonzo/varnish-cache.git
+	url = git@github.com:varnish/varnish-cache.git
 [submodule "FlameGraph"]
 	path = ext/FlameGraph
-	url = https://github.com/brendangregg/FlameGraph
+	url = git@github.com:brendangregg/FlameGraph
 [submodule "ext/h2o"]
 	path = ext/h2o
 	url = git@github.com:h2o/h2o.git
 [submodule "ext/C-Thread-Pool"]
 	path = ext/C-Thread-Pool
-	url = https://github.com/Pithikos/C-Thread-Pool.git
+	url = git@github.com:Pithikos/C-Thread-Pool.git
 [submodule "vmod/waf/modsec/ModSecurity"]
 	path = vmods/waf/modsec/ModSecurity
-	url = https://github.com/SpiderLabs/ModSecurity.git
+	url = git@github.com:SpiderLabs/ModSecurity.git
 [submodule "ext/openssl-cmake"]
 	path = ext/openssl-cmake
-	url = https://github.com/fwsGonzo/openssl-cmake.git
+	url = git@github.com:fwsGonzo/openssl-cmake.git
 [submodule "vmods/riscv/libriscv"]
 	path = vmods/riscv/libriscv
 	url = git@github.com:fwsGonzo/libriscv.git
 [submodule "cmake/sandbox/ext/json"]
 	path = cmake/sandbox/ext/json
-	url = https://github.com/nlohmann/json.git
+	url = git@github.com:nlohmann/json.git
 [submodule "vmods/kvm/tinykvm"]
 	path = vmods/kvm/tinykvm
-	url = git@github.com:fwsGonzo/tinykvm.git
+	url = git@github.com:varnish/tinykvm.git
+[submodule "ext/vmprograms"]
+	path = ext/vmprograms
+	url = git@github.com:fwsGonzo/vmprograms.git

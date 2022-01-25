@@ -1,33 +1,28 @@
 version: 2.1
 jobs:
-  cmake_builds:
-    docker:
-      - image: cimg/base:2020.01
-    working_directory: ~/project
+  build:
+    machine:
+      image: ubuntu-2004:202010-01
+    resource_class: medium
     steps:
-      - run:
-          name: Update ssh config for github.com to use several keys
-          command: |
-            mkdir -p ~/.ssh
-            echo  'Host github.com' >  ~/.ssh/config
-            echo  '    IdentitiesOnly no' >>  ~/.ssh/config
-            git config --global url."ssh://git@github.com".insteadOf "https://github.com" || true
-            git config --global gc.auto 0 || true
+      - add_ssh_keys:
+          fingerprings:
+            - "8c:f1:ee:44:31:65:44:8b:f9:21:ec:a9:10:1c:a0:d9"
+            - "39:f5:32:fb:d2:93:4f:75:14:27:c3:c0:56:bd:f0:8c"
       - checkout
       - run:
-          name: Checkout submodules
+          name: checkout tinykvm, varnish-cache-plus
           command: |
-            ssh-keyscan -H github.com >> ~/.ssh/known_hosts
-            ssh-add -D
-            ssh-add ~/.ssh/id_rsa_9209b808d400acad9bb6e5689e7f083e
-            export REVISION=$CIRCLE_BRANCH
-            export VERSION=$CIRCLE_SHA1
+            GIT_SSH_COMMAND="ssh -i ~/.ssh/id_rsa_8cf1ee443165448bf921eca9101ca0d9" git clone git@github.com:varnish/tinykvm.git vmods/kvm/tinykvm
+            GIT_SSH_COMMAND="ssh -i ~/.ssh/id_rsa_39f532fbd2934f751427c3c056bdf08c" git clone -b vmapi git@github.com:varnish/varnish-cache-plus.git ext/varnish-cache-plus
       - run: bash ./scripts/install_build_deps.sh
       - run: bash ./scripts/repo_setup.sh
       - run: bash ./scripts/cmaketool.sh --vcp=build --no-optimize --build
       - persist_to_workspace:
           root: .
           paths: build ext scripts vmods
+      - store_artifacts:
+          path: build
   riscv_sandbox_tests:
       docker:
           - image: cimg/base:2020.01
@@ -59,12 +54,12 @@ jobs:
               command: "ctest --verbose -R vmod_kvm_ ."
 workflows:
   version: 2
-  cmake_build_system:
+  sledgehammer:
     jobs:
-      - cmake_builds
-      - riscv_sandbox_tests:
-            requires:
-                - cmake_builds
-      - kvm_sandbox_tests:
-            requires:
-                - cmake_builds
+      - build
+      # - riscv_sandbox_tests:
+      #       requires:
+      #           - cmake_builds
+      # - kvm_sandbox_tests:
+      #       requires:
+      #           - cmake_builds
