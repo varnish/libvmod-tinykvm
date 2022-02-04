@@ -21,8 +21,6 @@ jobs:
       - persist_to_workspace:
           root: .
           paths: build ext scripts vmods
-      - store_artifacts:
-          path: build
   riscv_sandbox_tests:
       docker:
           - image: cimg/base:2020.01
