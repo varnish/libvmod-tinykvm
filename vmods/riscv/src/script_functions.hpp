@@ -7,7 +7,7 @@
 using machine_t = Script::machine_t;
 using gaddr_t = Script::gaddr_t;
 
-#define APICALL(func) static void func(machine_t& machine [[maybe_unused]])
+#define APICALL(func) static void func(riscv::Machine<Script::MARCH>& machine [[maybe_unused]])
 
 inline Script& get_script(machine_t& m) noexcept {
 	return *m.get_userdata<Script> ();

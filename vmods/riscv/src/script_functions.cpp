@@ -158,7 +158,7 @@ APICALL(dynamic_call)
 }
 APICALL(remote_call)
 {
-	auto [func] = machine.template sysargs <gaddr_t> ();
+	auto [func] = machine.sysargs <gaddr_t> ();
 	auto& script = get_script(machine);
 	auto& instance = script.instance();
 	auto& remote = instance.storage;
@@ -215,7 +215,7 @@ APICALL(remote_call)
 APICALL(remote_strcall)
 {
 	auto [tramp, func, data, len] =
-		machine.template sysargs <gaddr_t, gaddr_t, gaddr_t, int> ();
+		machine.sysargs <gaddr_t, gaddr_t, gaddr_t, int> ();
 	//printf("Remote stringcall: tramp=0x%X func=0x%X data=0x%X len=%d\n",
 	//	tramp, func, data, len);
 	auto& script = get_script(machine);
@@ -303,7 +303,7 @@ APICALL(set_decision)
 }
 APICALL(set_backend)
 {
-	auto [be] = machine.template sysargs<int> ();
+	auto [be] = machine.sysargs<int> ();
 	auto& script = get_script(machine);
 	auto* dir = script.directors().get(be);
 	machine.set_result(riscv_SetBackend(script.ctx(), dir));
