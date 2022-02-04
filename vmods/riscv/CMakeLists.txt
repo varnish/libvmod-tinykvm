@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.0.2)
+cmake_minimum_required (VERSION 3.8)
 project (vmod C CXX)
 include(../vmod.cmake vmod)
 
@@ -8,7 +8,7 @@ set (RISCV_SOURCES
 	src/vmod_riscv_update.c
 )
 
-add_vmod(vmod_riscv vmod_riscv.vcc "RISC-V machine emulation VMOD"
+add_vmod(vmod_riscv vmod_riscv.vcc "RISC-V sandbox VMOD"
 	${RISCV_SOURCES}
 )
 

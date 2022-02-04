@@ -184,7 +184,9 @@ APICALL(remote_call)
 			const gaddr_t addr = pageno * riscv::Page::size();
 			if (s.within_heap(addr) || s.within_stack(addr)) {
 				auto& pg = s.machine().memory.create_page(pageno);
-				mem.invalidate_page(pageno, pg);
+				// The page is created on the source Machine, but we need
+				// to invalidate the page on the remote Machine too:
+				mem.invalidate_cache(pageno, &pg);
 				return pg;
 			}
 			// Check memory limits before allocating new page
@@ -194,7 +196,7 @@ APICALL(remote_call)
 			throw riscv::MachineException(riscv::OUT_OF_MEMORY,
 				"Out of memory", s.max_memory());
 		});
-	// Reset instruction counter
+	// Reset instruction counter for measuring purposes
 	remote.machine().reset_instruction_counter();
 	// Make storage VM function call
 	remote.call(func);
