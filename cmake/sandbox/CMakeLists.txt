@@ -1,7 +1,7 @@
-cmake_minimum_required (VERSION 3.0.2)
+cmake_minimum_required (VERSION 3.8)
 project (sandbox CXX)
 
-option(SHARED_LIBRISCV "Build the libriscv sandbox PIC" ON)
+option(SHARED_LIBRISCV "Build the RISC-V sandbox as a shared library" ON)
 
 # WARNING: everything!
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++20 -O2 -g")
@@ -30,8 +30,6 @@ target_compile_definitions(sandbox PRIVATE
 
 option(RISCV_EXPERIMENTAL "" ON)
 option(RISCV_SHARED_PT "" ON)
-option(RISCV_EXT_C "" OFF)
-option(RISCV_BINARY_TRANSLATION "" ON)
 
 add_subdirectory(libriscv/lib)
 target_compile_definitions(riscv PUBLIC
