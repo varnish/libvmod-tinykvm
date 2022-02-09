@@ -1,6 +1,5 @@
 #pragma once
 #include "script.hpp"
-#include <atomic>
 #include <mutex>
 namespace riscv {
 	template <int W> struct RSPClient;
@@ -24,9 +23,11 @@ struct MachineInstance
 
 	Script   storage;
 	std::mutex storage_mtx;
+
 	std::unique_ptr<riscv::RSPClient<Script::MARCH>> rspclient;
 	Script* rsp_script = nullptr;
 	std::mutex rsp_mtx;
+
 	/* Lookup tree for ELF symbol names */
 	std::map<std::string, Script::gaddr_t> sym_lookup;
 	/* Index vector for ELF symbol names, used by call_index(..) */

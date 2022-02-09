@@ -1,7 +1,7 @@
 #include "machine_instance.hpp"
 #include <libriscv/rsp_server.hpp>
 // functions available to all machines created during init
-std::vector<const char*> riscv_lookup_wishlist {
+static const std::vector<const char*> riscv_lookup_wishlist {
 	"on_init",
 	"on_recv",
 	"on_hash",
@@ -23,7 +23,6 @@ MachineInstance::MachineInstance(
 	  storage{binary, ctx, vrm, *this, true, debug},
 	  rspclient{nullptr}
 {
-	extern std::vector<const char*> riscv_lookup_wishlist;
 	for (const auto* func : riscv_lookup_wishlist) {
 		/* NOTE: We can't check if addr is 0 here, because
 		   the wishlist applies to ALL machines. */
