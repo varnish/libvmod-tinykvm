@@ -41,7 +41,7 @@ MachineInstance::MachineInstance(
 	try {
 		machine().setup_linux(
 			{"vmod_kvm", name(), storage ? "1" : "0", TenantConfig::guest_state_file},
-			{"LC_TYPE=C", "LC_ALL=C", "USER=root"});
+			ten->config.environ());
 		// Run through main()
 		machine().run();
 		if (!storage) {
