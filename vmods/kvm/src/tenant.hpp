@@ -20,8 +20,8 @@ struct TenantGroup {
 	std::string name;
 	float    max_time; /* Seconds */
 	float    max_boot_time; /* Seconds */
-	uint64_t max_memory;
-	uint32_t max_work_mem;
+	uint64_t max_memory; /* Megabytes */
+	uint32_t max_work_mem; /* Megabytes */
 	size_t   max_concurrency = 8;
 	size_t   max_fd       = 32;
 	size_t   max_backends = 8;
@@ -33,12 +33,7 @@ struct TenantGroup {
 		"LC_TYPE=C", "LC_ALL=C", "USER=root"
 	};
 
-	std::vector<std::string> allowed_paths {
-		"/usr/lib/locale",
-		"/usr/share/locale",
-		"/usr/local/share/espeak-ng-data",
-		"/usr/lib/x86_64-linux-gnu/espeak-ng-data",
-	};
+        std::vector<std::string> allowed_paths;
 
 	vmods_t vmods;
 

@@ -15,17 +15,10 @@ const std::string TenantConfig::guest_state_file = "state";
 TenantConfig::TenantConfig(
 	std::string n, std::string f, std::string k,
 	TenantGroup g, dynfun_map& dfm)
-  : name(n), filename(f), key(k), hash{crc32c_hw(n)}, group{std::move(g)}, dynamic_functions_ref{dfm}
+	: name(n), filename(f), key(k), hash{crc32c_hw(n)}, group{std::move(g)}, dynamic_functions_ref{dfm}
 {
 	this->allowed_file = filename + ".state";
 }
-
-static const TenantGroup test_group {
-	"test",
-	1.0f, /* Seconds */
-	256, /* 256MB main memory */
-	4, /* 4MB working memory */
-};
 
 Tenants& tenancy(VCL_PRIV task)
 {
@@ -73,7 +66,7 @@ TenantInstance* create_temporary_tenant(VCL_PRIV task,
 	const TenantInstance* vrm, const std::string& name)
 {
 	/* Create a new tenant with a temporary name,
-	   and no program file to load. */
+		 and no program file to load. */
 	TenantConfig config{vrm->config};
 	config.name = name;
 	config.filename = "";
@@ -105,27 +98,87 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 	try {
 		const json j = json::parse(vec.begin(), vec.end());
 
-		std::map<std::string, kvm::TenantGroup> groups {
-			{"test", test_group}
-		};
+		std::map<std::string, kvm::TenantGroup> groups {};
 
+		// Iterate through the user-defined tenant configuration.
+		// The configuration can either be a tenant of a group,
+		// or the configuration for group.
+		//
+		// The type of configuration is determined by the presence of specific
+		// keys. If "filename", "key", and "group" are present, then we have the
+		// configuration for a tenant in a group. Otherwise, we assume it is
+		// the configuration for a group.
+		//
+		// The configuration for a group will affect all the tenants that are
+		// associated with that group.
+		//
+		// Tenants are identified through CRC32-C checksums, which means that there
+		// is a miniscule possibility of collisions when adding a million tenants.
+		// But, in practice it should not happen. And the algorithm is entirely
+		// internal and can be changed without breaking anyones setup. Importantly,
+		// CRC32-C is hardware accelerated and faster than string matching.
 		for (const auto& it : j.items())
 		{
 			const auto& obj = it.value();
+			std::string grname;
+			// We either have a group configuration or tenant configuration.
+			// Check for the existence of the group and create it if it does not exist.
+			// The ordering of the tenants can be such that the group configuration
+			// comes after the tenants, or there is no group configuration.
+			//
+			// If the object key is a valid group, we assume this is configuration
+			// that is specific to the group.
+			//
+			// Otherwise, it must be the tenant configuration.
+			if (obj.contains("group")) {
+				grname = obj["group"];
+			} else {
+				grname = it.key();
+			}
+			auto grit = groups.find(grname);
+			if (grit == groups.end()) {
+				const auto& ret = groups.insert(
+						std::pair<std::string,kvm::TenantGroup>(
+							grname, TenantGroup{grname,
+								1.0f, /* 1 second timeout */
+								256, /* 256 MB max memory */
+								4} /* 4 MB max working memory */
+						));
+				grit = ret.first;
+			}
+			auto& group = grit->second;
+			// All group parameters are treated as optional and can be defined in a
+			// tenant configuration or in a group configuration.
+			if (obj.contains("max_time")) {
+				group.max_time = obj["max_time"];
+			}
+			if (obj.contains("max_memory")) {
+				// Limits the memory of the Main VM.
+				group.max_memory = obj["max_memory"];
+			}
+			if (obj.contains("max_work_memory")) {
+				// Limits the memory of an ephemeral VM. Ephemeral VMs are used to handle
+				// requests (and faults in pages one by one using CoW). They are based
+				// off of the bigger Main VMs which use "max_memory" (and are identity-mapped).
+				group.max_work_mem = obj["max_work_memory"];
+			}
+			if (obj.contains("max_boot_time")) {
+				group.max_boot_time = obj["max_boot_time"];
+			}
+			if (obj.contains("max_concurrency")) {
+				group.max_concurrency = obj["max_concurrency"];
+			}
+			if (obj.contains("hugepages")) {
+				group.hugepages = obj["hugepages"];
+			}
+			if (obj.contains("allowed_paths")) {
+				group.allowed_paths = obj["allowed_paths"].get<std::vector<std::string>>();
+			}
+			// Tenant configuration
 			if (obj.contains("filename")
 				&& obj.contains("key")
 				&& obj.contains("group"))
 			{
-				const std::string& grname = obj["group"];
-				auto grit = groups.find(grname);
-				/* Validate the group name */
-				if (grit == groups.end()) {
-					VSL(SLT_Error, 0,
-						"Group '%s' missing for tenant: %s",
-						grname.c_str(), it.key().c_str());
-					continue;
-				}
-				const auto& group = grit->second;
 				/* Use the group data except filename */
 				kvm::load_tenant(ctx, task, kvm::TenantConfig{
 					it.key(),
@@ -134,37 +187,6 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 					group,
 					kvm::tenancy(task).dynamic_functions
 				});
-			} else {
-				if (obj.contains("max_time") &&
-					obj.contains("max_memory") &&
-					obj.contains("max_work_memory"))
-				{
-					auto ins =
-					groups.emplace(std::piecewise_construct,
-						std::forward_as_tuple(it.key()),
-						std::forward_as_tuple(
-							it.key(),
-							obj["max_time"],
-							obj["max_memory"],
-							obj["max_work_memory"]
-						));
-					auto& group = ins.first->second;
-					/* Optional group settings */
-					if (obj.contains("max_boot_time")) {
-						group.max_boot_time = obj["max_boot_time"];
-					}
-					if (obj.contains("max_concurrency")) {
-						group.max_concurrency = obj["max_concurrency"];
-					}
-					if (obj.contains("hugepages")) {
-						group.hugepages = obj["hugepages"];
-					}
-				} else {
-					VSL(SLT_Error, 0,
-						"Tenancy JSON %s: group '%s' has missing fields",
-						source, it.key().c_str());
-					continue;
-				}
 			}
 		}
 	} catch (const std::exception& e) {

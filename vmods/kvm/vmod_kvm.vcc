@@ -20,6 +20,25 @@ Each live-debugging session will use a temporary tenant that does
 not persist changes in the cache.
 
 
+TENANT
+======
+
+A tenant defines a single program for a group. 
+
+GROUP
+======
+
+A group consists of one or more tenants and defines how tenants are executed
+within a virtual machine.
+
+- max_time
+- max_memory
+- max_work_memory
+- max_boot_time
+- max_concurrency
+- hugepages
+- allowed_paths (default: []): a list of paths that the tenant can open/load.
+
 API
 ===
 

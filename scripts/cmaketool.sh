@@ -1,21 +1,20 @@
 #!/bin/bash
-if ! command -v "clang-14" &> /dev/null; then
-	if ! command -v "clang-12" &> /dev/null; then
-		if ! command -v "clang-11" &> /dev/null; then
-			export CC="ccache clang-10"
-			export CXX="ccache clang++-10"
-		else
-			export CC="ccache clang-11"
-			export CXX="ccache clang++-11"
-		fi
-	else
-		export CC="ccache clang-12"
-		export CXX="ccache clang++-12"
-	fi
-else
-	export CC="ccache clang-14"
-	export CXX="ccache clang++-14"
+CLANG_VERSION=10
+if command -v "clang-11" &> /dev/null; then
+	CLANG_VERSION=11
 fi
+if command -v "clang-12" &> /dev/null; then
+	CLANG_VERSION=12
+fi
+if command -v "clang-13" &> /dev/null; then
+	CLANG_VERSION=13
+fi
+if command -v "clang-14" &> /dev/null; then
+	CLANG_VERSION=14
+fi
+echo "Detected Clang version ${CLANG_VERSION}"
+export CC="ccache clang-${CLANG_VERSION}"
+export CXX="ccache clang++-${CLANG_VERSION}"
 BUILD_PATH="$PWD"
 SOURCE_DIR="$PWD"
 
