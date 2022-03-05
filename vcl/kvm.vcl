@@ -86,6 +86,14 @@ sub vcl_recv {
 		set req.http.Host = "xpizza.com";
 		return (hash);
 	}
+	else if (req.url == "/kvmfront") {
+		# Front-end KVM call
+		kvm.vm_callv("xpizza.com", ON_REQUEST);
+		# Hashed response
+		set req.backend_hint = f.backend();
+		set req.http.Host = "file";
+		return (hash);
+	}
 	else if (req.url == "/file") {
 		set req.backend_hint = f.backend();
 		set req.http.Host = "file";
@@ -131,4 +139,7 @@ sub vcl_backend_fetch {
 sub vcl_backend_response {
 	//brotli.compress();
 	//set beresp.do_gzip = true;
+	if (bereq.http.X-KVM-Front) {
+		set beresp.http.X-KVM-Front = bereq.http.X-KVM-Front;
+	}
 }

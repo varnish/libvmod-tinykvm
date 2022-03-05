@@ -113,15 +113,19 @@ static int kvm_forkcall(VRT_CTX, kvm::VMPoolItem* slot,
 	auto& machine = *slot->mi;
 	machine.set_ctx(ctx);
 	try {
-		auto& vm = machine.machine();
-		const auto timeout = machine.tenant().config.max_time();
-		/* Call the backend response function */
-		vm.timed_vmcall(addr, timeout, farg);
-		/* Make sure no SMP work is in-flight. */
-		vm.smp_wait();
+		auto fut = slot->tp.enqueue(
+		[&] () -> long {
+			auto& vm = machine.machine();
+			const auto timeout = machine.tenant().config.max_time();
+			/* Call the guest function at addr */
+			vm.timed_vmcall(addr, timeout, farg);
+			/* Make sure no SMP work is in-flight. */
+			vm.smp_wait();
 
-		auto regs = vm.registers();
-		return regs.rdi;
+			auto regs = vm.registers();
+			return regs.rdi;
+		});
+		return fut.get();
 
 	} catch (const tinykvm::MachineTimeoutException& mte) {
 		fprintf(stderr, "%s: KVM VM timed out (%f seconds)\n",
