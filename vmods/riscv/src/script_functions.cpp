@@ -183,7 +183,7 @@ APICALL(remote_call)
 		[&s = script] (auto& mem, const size_t pageno) -> auto& {
 			const gaddr_t addr = pageno * riscv::Page::size();
 			if (s.within_heap(addr) || s.within_stack(addr)) {
-				auto& pg = s.machine().memory.create_page(pageno);
+				auto& pg = s.machine().memory.create_writable_pageno(pageno);
 				// The page is created on the source Machine, but we need
 				// to invalidate the page on the remote Machine too:
 				mem.invalidate_cache(pageno, &pg);

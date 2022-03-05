@@ -140,7 +140,7 @@ void Script::machine_setup(machine_t& machine, bool init)
 				riscv::OUT_OF_MEMORY, "Out of memory", mem.pages_active());
 		});
 		machine.memory.set_page_write_handler(
-		[this] (auto& mem, riscv::Page& page) -> void {
+		[this] (auto& mem, gaddr_t, riscv::Page& page) -> void {
 			assert(page.has_data() && page.attr.is_cow);
 			/* Pages are allocated from workspace */
 			auto* data =
@@ -149,6 +149,7 @@ void Script::machine_setup(machine_t& machine, bool init)
 				/* Release any already non-owned data */
 				if (page.attr.non_owning)
 					page.m_page.release();
+				page.attr.write = true;
 				page.attr.is_cow = false;
 				page.attr.non_owning = true; /* Avoid calling delete */
 				page.m_page.reset(data);
