@@ -79,7 +79,7 @@ static void init_tenants(VRT_CTX,
 			{"test", TenantGroup{
 				"test",
 				2'500'000,
-				64 * 1024 * 1024, // 64MB max memory
+				32 * 1024 * 1024, // 64MB max memory
 				512 * 1024 * 1024 // 512MB max heap allocations
 			}}
 		};

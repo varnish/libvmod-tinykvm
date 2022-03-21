@@ -40,6 +40,7 @@ public:
 
 	const auto* ctx() const noexcept { return m_ctx; }
 	const auto* vrm() const noexcept { return m_tenant; }
+	const auto& tenant() const noexcept { return *m_tenant; }
 	auto& instance() { return m_inst; }
 	const auto& instance() const { return m_inst; }
 	void set_ctx(const vrt_ctx* ctx) { m_ctx = ctx; }

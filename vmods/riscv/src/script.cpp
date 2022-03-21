@@ -142,11 +142,17 @@ void Script::machine_setup(machine_t& machine, bool init)
 						.user_defined = 1 },
 					data);
 			}
+			// With heap as fallback, to allow bigger VMs
+			const auto mem_usage = mem.owned_pages_active() * riscv::Page::size();
+			if (mem_usage < this->tenant().config.max_memory()) {
+				return mem.allocate_page(pageno);
+			}
 			throw riscv::MachineException(
-				riscv::OUT_OF_MEMORY, "Out of memory", mem.pages_active());
+				riscv::OUT_OF_MEMORY, "Out of memory (max_memory limit reached)",
+					pageno * riscv::Page::size());
 		});
 		machine.memory.set_page_write_handler(
-		[this] (auto& mem, gaddr_t, riscv::Page& page) -> void {
+		[this] (auto& mem, gaddr_t pageno, riscv::Page& page) -> void {
 			assert(page.has_data() && page.attr.is_cow);
 			/* Pages are allocated from workspace */
 			auto* data =
@@ -161,8 +167,15 @@ void Script::machine_setup(machine_t& machine, bool init)
 				page.m_page.reset(data);
 				return;
 			}
+			// With heap as fallback, to allow bigger VMs
+			const auto mem_usage = mem.owned_pages_active() * riscv::Page::size();
+			if (mem_usage < this->tenant().config.max_memory()) {
+				page.make_writable();
+				return;
+			}
 			throw riscv::MachineException(
-				riscv::OUT_OF_MEMORY, "Out of memory", mem.pages_active());
+				riscv::OUT_OF_MEMORY, "Out of memory (max_memory limit reached)",
+					pageno * riscv::Page::size());
 		});
 	}
 	else {
