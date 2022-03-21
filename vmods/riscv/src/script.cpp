@@ -88,16 +88,13 @@ void Script::setup_virtual_memory(bool /*init*/)
 {
 	using namespace riscv;
 	auto& mem = machine().memory;
+	// Use a different arena and stack for the storage machine
 	this->m_heap_base = is_storage() ? SHEAP_BASE : CHEAP_BASE;
 
 	mem.set_stack_initial(stack_begin());
-	// Use a different stack for the storage machine
-	if (this->m_is_storage) {
-		mem.set_stack_initial(mem.stack_initial() - stack_size());
-	}
 	// this separates heap and stack
 	mem.install_shared_page(
-		stack_begin() >> riscv::Page::SHIFT, Page::guard_page());
+		stack_begin() / Page::size(), Page::guard_page());
 }
 
 void Script::machine_initialize()
@@ -121,15 +118,24 @@ void Script::machine_setup(machine_t& machine, bool init)
 	TIMING_LOCATION(t0);
 #endif
 	machine.set_userdata<Script>(this);
+	machine.set_printer(
+		[this] (auto* data, size_t len) {
+			/* TODO: Use VSLb here or disable this completely */
+			printf(">>> %s: %.*s\n", this->name().c_str(), (int) len, data);
+		});
+	machine.set_stdin([] (auto*, size_t) { return 0; });
 
 	if (init == false)
 	{
 		machine.memory.set_page_fault_handler(
-		[this] (auto& mem, size_t pageno) -> riscv::Page& {
+		[this] (auto& mem, size_t pageno, bool init) -> riscv::Page& {
 			/* Pages are allocated from workspace */
 			auto* data =
 				(riscv::PageData*) WS_Alloc(m_ctx->ws, riscv::Page::size());
 			if (LIKELY(data != nullptr)) {
+				if (init) {
+					new (data) riscv::PageData();
+				}
 				return mem.allocate_page(pageno,
 					riscv::PageAttributes{
 						.non_owning = true, // don't delete!
@@ -161,10 +167,11 @@ void Script::machine_setup(machine_t& machine, bool init)
 	}
 	else {
 		machine.memory.set_page_fault_handler(
-			[this] (auto& mem, size_t pageno) -> riscv::Page& {
+			[this] (auto& mem, size_t pageno, bool) -> riscv::Page& {
 				bool dont_fork = false;
-				const size_t STACK_PAGENO = arena_base() >> riscv::Page::SHIFT;
-				if (pageno >= STACK_PAGENO-128 && pageno < STACK_PAGENO) {
+				const size_t stack_pbase = stack_base() / riscv::Page::size();
+				const size_t stack_pend  = stack_begin() / riscv::Page::size();
+				if (pageno >= stack_pbase && pageno < stack_pend) {
 					dont_fork = true;
 				}
 				auto* data = new riscv::PageData {};
@@ -189,8 +196,6 @@ void Script::machine_setup(machine_t& machine, bool init)
 
 	if (init)
 	{
-		if (machine.memory.exit_address() == 0)
-			throw std::runtime_error("The binary is missing a public exit function!");
 		// Full Linux-compatible stack
 		machine.cpu.reset_stack_pointer(); // DONT TOUCH (YES YOU)
 		machine.setup_linux(
@@ -208,7 +213,7 @@ void Script::machine_setup(machine_t& machine, bool init)
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t3);
 #endif
-	machine.setup_native_memory(NATIVE_SYSCALLS_BASE+5, true);
+	machine.setup_native_memory(NATIVE_SYSCALLS_BASE+5);
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t4);
 #endif

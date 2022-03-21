@@ -108,12 +108,14 @@ APICALL(assertion_failed)
 }
 APICALL(print)
 {
-	auto [buffer] = machine.sysargs<riscv::Buffer> ();
-	auto string = buffer.to_string();
-	/* TODO: Use VSLb here or disable this completely */
-	printf(">>> %s: %.*s\n", get_script(machine).name().c_str(),
-		(int) string.size(), string.c_str());
-	machine.set_result(string.size());
+	const auto [buffer] = machine.sysargs<riscv::Buffer> ();
+	if (buffer.is_sequential()) {
+		machine.print(buffer.c_str(), buffer.size());
+	} else {
+		const auto string = buffer.to_string();
+		machine.print(string.c_str(), string.size());
+	}
+	machine.set_result(buffer.size());
 }
 APICALL(shm_log)
 {
@@ -180,7 +182,7 @@ APICALL(remote_call)
 			return m.get_pageno(pageno);
 		});
 	remote.machine().memory.set_page_fault_handler(
-		[&s = script] (auto& mem, const size_t pageno) -> auto& {
+		[&s = script] (auto& mem, const size_t pageno, bool) -> auto& {
 			const gaddr_t addr = pageno * riscv::Page::size();
 			if (s.within_heap(addr) || s.within_stack(addr)) {
 				auto& pg = s.machine().memory.create_writable_pageno(pageno);

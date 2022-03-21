@@ -20,7 +20,6 @@ list(APPEND RISCV_SOURCES
 )
 
 add_library(sandbox STATIC ${RISCV_SOURCES})
-set_target_properties(sandbox PROPERTIES CXX_STANDARD 17)
 target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/include)
 target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/bin/varnishd)
 target_compile_definitions(sandbox PRIVATE
@@ -31,7 +30,6 @@ target_compile_definitions(sandbox PRIVATE
 option(RISCV_BINARY_TRANSLATION "" ON)
 option(RISCV_EXT_C "" OFF)
 option(RISCV_EXPERIMENTAL "" ON)
-option(RISCV_SHARED_PT "" ON)
 
 add_subdirectory(libriscv/lib)
 target_compile_definitions(riscv PUBLIC
