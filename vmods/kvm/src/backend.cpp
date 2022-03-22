@@ -4,6 +4,7 @@
 #include <stdexcept>
 using namespace kvm;
 extern "C" {
+#include "vtim.h"
 #include "kvm_backend.h"
 }
 
@@ -33,18 +34,30 @@ static int16_t sanitize_status_code(int16_t code)
 	throw tinykvm::MachineException("Invalid status code returned by VM program", code);
 }
 
+static inline void kvm_ts(struct vsl_log *vsl, const char *event,
+		double& work, double& prev, double now)
+{
+	VSLb_ts(vsl, event, work, &prev, now);
+	work = now;
+}
+
 extern "C"
 void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 	const char *farg, struct backend_post *post, struct backend_result *result)
 {
+	double t_prev = VTIM_real();
+	double t_work = t_prev;
+
 	auto& machine = *slot->mi;
 	machine.set_ctx(ctx);
+	VSLb(ctx->vsl, SLT_VCL_Log, "tenant: %s", machine.name().c_str());
 	try {
 		const auto& prog = machine.instance();
 		const auto timeout = machine.tenant().config.max_time();
 		auto& vm = machine.machine();
 		auto fut = slot->tp.enqueue(
 		[&] {
+			t_work = VTIM_real();
 			if (post == nullptr) {
 				/* Call the backend compute function */
 				vm.timed_vmcall(prog.entry_at(ProgramEntryIndex::BACKEND_COMP),
@@ -64,6 +77,8 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					timeout, farg,
 					(uint64_t) post->length);
 			}
+			kvm_ts(ctx->vsl, "ProgramCall", t_work, t_prev, VTIM_real());
+
 			/* Make sure no SMP work is in-flight. */
 			vm.smp_wait();
 
@@ -89,8 +104,11 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			result->content_length = clen;
 			result->bufcount = vm.gather_buffers_from_range(
 				result->bufcount, (tinykvm::Machine::Buffer *)result->buffers, cvaddr, clen);
+			kvm_ts(ctx->vsl, "ProgramResponse", t_work, t_prev, VTIM_real());
 		});
+		kvm_ts(ctx->vsl, "ProgramStart", t_work, t_prev, VTIM_real());
 		fut.get();
+		t_work = VTIM_real();
 		return;
 
 	} catch (const tinykvm::MachineTimeoutException& mte) {
