@@ -145,7 +145,8 @@ void Script::machine_setup(machine_t& machine, bool init)
 			// With heap as fallback, to allow bigger VMs
 			const auto mem_usage = mem.owned_pages_active() * riscv::Page::size();
 			if (mem_usage < this->tenant().config.max_memory()) {
-				return mem.allocate_page(pageno);
+				using namespace riscv;
+				return mem.allocate_page(pageno, init ? PageData::INITIALIZED : PageData::UNINITIALIZED);
 			}
 			throw riscv::MachineException(
 				riscv::OUT_OF_MEMORY, "Out of memory (max_memory limit reached)",
