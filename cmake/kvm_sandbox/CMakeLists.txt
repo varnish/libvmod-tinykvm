@@ -50,7 +50,6 @@ if (LTO_ENABLE)
 endif()
 
 add_library(kvm_sandbox STATIC ${KVM_SOURCES})
-set_target_properties(kvm_sandbox PROPERTIES CXX_STANDARD 17)
 target_include_directories(kvm_sandbox PRIVATE ${VARNISH_PATH}/include)
 target_include_directories(kvm_sandbox PRIVATE ${VARNISH_PATH}/bin/varnishd)
 target_link_libraries(kvm_sandbox PRIVATE tinykvm concurrentqueue nlohmann_json stdc++)

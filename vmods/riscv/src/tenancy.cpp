@@ -78,9 +78,9 @@ static void init_tenants(VRT_CTX,
 		std::map<std::string, TenantGroup> groups {
 			{"test", TenantGroup{
 				"test",
-				256000,
-				1 * 1024 * 1024,
-				1 * 1024 * 1024
+				2'500'000,
+				32 * 1024 * 1024, // 64MB max memory
+				512 * 1024 * 1024 // 512MB max heap allocations
 			}}
 		};
 
