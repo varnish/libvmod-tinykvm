@@ -102,6 +102,9 @@ kvmbe_gethdrs(const struct director *dir,
 	struct worker *wrk, struct busyobj *bo)
 {
 	(void)wrk;
+	double t_prev = VTIM_real();
+	double t_work = t_prev;
+
 	CHECK_OBJ_NOTNULL(dir, DIRECTOR_MAGIC);
 	CHECK_OBJ_NOTNULL(bo, BUSYOBJ_MAGIC);
 	CHECK_OBJ_NOTNULL(bo->bereq, HTTP_MAGIC);
@@ -122,21 +125,24 @@ kvmbe_gethdrs(const struct director *dir,
 		.http_bereq  = bo->bereq,
 		.http_beresp = bo->beresp,
 	};
+	kvm_ts(ctx.vsl, "TenantStart", &t_work, &t_prev, VTIM_real());
 
 	struct backend_result *result =
 		(struct backend_result *)WS_Alloc(bo->ws, VMBE_RESULT_SIZE);
 	if (result == NULL) {
-		VSLb(ctx.vsl, SLT_Error, "Backend VM: Out of workspace for result");
+		VSLb(ctx.vsl, SLT_Error, "KVM: Out of workspace for result");
 		return (-1);
 	}
 	result->bufcount = VMBE_NUM_BUFFERS;
 
+	t_work = VTIM_real();
 	struct vmod_kvm_slot *slot =
 		kvm_reserve_machine(&ctx, kvmr->tenant, false);
 	if (slot == NULL) {
-		VSLb(ctx.vsl, SLT_Error, "Backend VM: Unable to reserve machine");
+		VSLb(ctx.vsl, SLT_Error, "KVM: Unable to reserve machine");
 		return (-1);
 	}
+	kvm_ts(ctx.vsl, "TenantReserve", &t_work, &t_prev, VTIM_real());
 
 	struct backend_post *post = NULL;
 	if (kvmr->is_post)
@@ -144,7 +150,7 @@ kvmbe_gethdrs(const struct director *dir,
 		/* Retrieve body by copying directly into backend VM */
 		post = (struct backend_post *)WS_Alloc(bo->ws, sizeof(struct backend_post));
 		if (post == NULL) {
-			VSLb(ctx.vsl, SLT_Error, "Backend VM: Out of workspace for post");
+			VSLb(ctx.vsl, SLT_Error, "KVM: Out of workspace for post");
 			return (-1);
 		}
 		post->ctx = &ctx;
@@ -153,13 +159,16 @@ kvmbe_gethdrs(const struct director *dir,
 		post->process_func = 0x0;
 		post->length  = 0;
 		kvm_get_body(post, bo);
+		kvm_ts(ctx.vsl, "TenantRequestBody", &t_work, &t_prev, VTIM_real());
 	}
 
 	/* Make a backend VM call (with optional POST) */
 	kvm_backend_call(&ctx, slot, kvmr->funcarg, post, result);
+	kvm_ts(ctx.vsl, "TenantProcess", &t_work, &t_prev, VTIM_real());
 
 	/* Status code is sanitized in the backend call */
 	http_PutResponse(bo->beresp, "HTTP/1.1", result->status, NULL);
+
 	/* Allow missing content-type when no content present */
 	if (result->content_length > 0)
 	{
@@ -175,7 +184,7 @@ kvmbe_gethdrs(const struct director *dir,
 
 	bo->htc = WS_Alloc(bo->ws, sizeof *bo->htc);
 	if (bo->htc == NULL) {
-		VSLb(ctx.vsl, SLT_Error, "Backend VM: Out of workspace for HTC");
+		VSLb(ctx.vsl, SLT_Error, "KVM: Out of workspace for HTC");
 		return (-1);
 	}
 	INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
@@ -186,6 +195,7 @@ kvmbe_gethdrs(const struct director *dir,
 	bo->htc->body_status = BS_LENGTH;
 
 	vfp_init(bo);
+	kvm_ts(ctx.vsl, "TenantResponse", &t_work, &t_prev, VTIM_real());
 	return (0);
 }
 
@@ -195,15 +205,16 @@ kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING farg
 	struct vmod_kvm_response *kvmr;
 	kvmr = WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_response));
 	if (kvmr == NULL) {
-		VRT_fail(ctx, "Out of workspace");
+		VRT_fail(ctx, "KVM: Out of workspace");
 		return (NULL);
 	}
 
 	INIT_OBJ(kvmr, KVM_BACKEND_MAGIC);
 	kvmr->priv_key = ctx;
+	// todo: benchmark?
 	kvmr->tenant = kvm_tenant_find(task, tenant);
 	if (kvmr->tenant == NULL) {
-		VRT_fail(ctx, "KVM sandbox says 'No such tenant': %s", tenant);
+		VRT_fail(ctx, "KVM: Tenant not found: %s", tenant);
 		return (NULL);
 	}
 

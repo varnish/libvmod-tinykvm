@@ -13,5 +13,7 @@ extern "C" {
 	char *WS_Printf(struct ws *ws, const char *fmt, ...);
 	void VSL(enum VSL_tag_e tag, uint32_t vxid, const char *fmt, ...);
 	void VSLb(struct vsl_log *, int tag, const char *fmt, ...);
+	void VSLb_ts(struct vsl_log *vsl, const char *event, vtim_real first,
+	    vtim_real *pprev, vtim_real now, ...);
 	typedef struct vmod_priv * VCL_PRIV;
 }
