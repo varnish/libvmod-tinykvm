@@ -57,6 +57,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 		auto& vm = machine.machine();
 		auto fut = slot->tp.enqueue(
 		[&] {
+			kvm_ts(ctx->vsl, "ProgramCall", t_work, t_prev, VTIM_real());
 			if (post == nullptr) {
 				/* Call the backend compute function */
 				vm.timed_vmcall(prog.entry_at(ProgramEntryIndex::BACKEND_COMP),
