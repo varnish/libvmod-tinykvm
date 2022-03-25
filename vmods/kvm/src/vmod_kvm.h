@@ -45,6 +45,9 @@ struct vmod_kvm_response
 	const char *funcarg;
 	uint64_t max_response_size;
 	int16_t is_post;
+
+	double t_prev;
+	double t_work;
 };
 
 struct vmod_kvm_synth
@@ -75,5 +78,4 @@ static inline void kvm_ts(struct vsl_log *vsl, const char *event,
 		double *work, double *prev, double now)
 {
 	VSLb_ts(vsl, event, *work, prev, now);
-	*work = now;
 }

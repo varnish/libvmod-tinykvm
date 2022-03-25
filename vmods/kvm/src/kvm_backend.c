@@ -102,9 +102,6 @@ kvmbe_gethdrs(const struct director *dir,
 	struct worker *wrk, struct busyobj *bo)
 {
 	(void)wrk;
-	double t_prev = VTIM_real();
-	double t_work = t_prev;
-
 	CHECK_OBJ_NOTNULL(dir, DIRECTOR_MAGIC);
 	CHECK_OBJ_NOTNULL(bo, BUSYOBJ_MAGIC);
 	CHECK_OBJ_NOTNULL(bo->bereq, HTTP_MAGIC);
@@ -125,7 +122,9 @@ kvmbe_gethdrs(const struct director *dir,
 		.http_bereq  = bo->bereq,
 		.http_beresp = bo->beresp,
 	};
-	kvm_ts(ctx.vsl, "TenantStart", &t_work, &t_prev, VTIM_real());
+
+	kvmr->t_prev = bo->t_prev;
+	kvm_ts(ctx.vsl, "TenantStart", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 
 	struct backend_result *result =
 		(struct backend_result *)WS_Alloc(bo->ws, VMBE_RESULT_SIZE);
@@ -135,14 +134,13 @@ kvmbe_gethdrs(const struct director *dir,
 	}
 	result->bufcount = VMBE_NUM_BUFFERS;
 
-	t_work = VTIM_real();
 	struct vmod_kvm_slot *slot =
 		kvm_reserve_machine(&ctx, kvmr->tenant, false);
 	if (slot == NULL) {
 		VSLb(ctx.vsl, SLT_Error, "KVM: Unable to reserve machine");
 		return (-1);
 	}
-	kvm_ts(ctx.vsl, "TenantReserve", &t_work, &t_prev, VTIM_real());
+	kvm_ts(ctx.vsl, "TenantReserve", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 
 	struct backend_post *post = NULL;
 	if (kvmr->is_post)
@@ -159,12 +157,12 @@ kvmbe_gethdrs(const struct director *dir,
 		post->process_func = 0x0;
 		post->length  = 0;
 		kvm_get_body(post, bo);
-		kvm_ts(ctx.vsl, "TenantRequestBody", &t_work, &t_prev, VTIM_real());
+		kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 	}
 
 	/* Make a backend VM call (with optional POST) */
 	kvm_backend_call(&ctx, slot, kvmr->funcarg, post, result);
-	kvm_ts(ctx.vsl, "TenantProcess", &t_work, &t_prev, VTIM_real());
+	kvm_ts(ctx.vsl, "TenantProcess", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 
 	/* Status code is sanitized in the backend call */
 	http_PutResponse(bo->beresp, "HTTP/1.1", result->status, NULL);
@@ -195,7 +193,7 @@ kvmbe_gethdrs(const struct director *dir,
 	bo->htc->body_status = BS_LENGTH;
 
 	vfp_init(bo);
-	kvm_ts(ctx.vsl, "TenantResponse", &t_work, &t_prev, VTIM_real());
+	kvm_ts(ctx.vsl, "TenantResponse", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 	return (0);
 }
 
@@ -211,7 +209,8 @@ kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING farg
 
 	INIT_OBJ(kvmr, KVM_BACKEND_MAGIC);
 	kvmr->priv_key = ctx;
-	// todo: benchmark?
+	kvmr->t_work = VTIM_real();
+
 	kvmr->tenant = kvm_tenant_find(task, tenant);
 	if (kvmr->tenant == NULL) {
 		VRT_fail(ctx, "KVM: Tenant not found: %s", tenant);
