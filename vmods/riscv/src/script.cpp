@@ -8,7 +8,7 @@ extern "C" void riscv_SetHash(struct req*, VSHA256_CTX*);
 inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
 static constexpr uint64_t SIGHANDLER_INSN = 60'000;
-static constexpr unsigned NATIVE_SYSCALLS_BASE = 80;
+static constexpr unsigned NATIVE_SYSCALLS_BASE = 580;
 static constexpr bool VERBOSE_ERRORS = true;
 
 //#define ENABLE_TIMING
@@ -218,10 +218,13 @@ void Script::machine_setup(machine_t& machine, bool init)
 			{ "LC_CTYPE=C", "LC_ALL=C", "USER=groot" });
 	}
 
-	// add system call interface
+	// Add system call interfaces
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t2);
 #endif
+	// Newlib support < 500
+	machine.setup_newlib_syscalls();
+	// Custom system call API >= 500
 	machine.setup_native_heap(NATIVE_SYSCALLS_BASE,
 		arena_base(), vrm()->config.max_heap());
 

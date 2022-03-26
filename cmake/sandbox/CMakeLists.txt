@@ -24,13 +24,15 @@ target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/include)
 target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/bin/varnishd)
 
 
-option(RISCV_BINARY_TRANSLATION "" ON)
+option(RISCV_BINARY_TRANSLATION "" OFF)
 option(RISCV_EXT_C "" OFF)
 option(RISCV_EXPERIMENTAL "" ON)
 
 add_subdirectory(libriscv/lib)
+# Make room for Linux ABI and custom ABI
 target_compile_definitions(riscv PUBLIC
-	RISCV_SYSCALLS_MAX=100)
+	RISCV_SYSCALL_EBREAK_NR=499
+	RISCV_SYSCALLS_MAX=600)
 
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 set(JSON_Install    OFF CACHE INTERNAL "")
