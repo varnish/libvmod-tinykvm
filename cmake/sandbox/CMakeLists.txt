@@ -22,9 +22,6 @@ list(APPEND RISCV_SOURCES
 add_library(sandbox STATIC ${RISCV_SOURCES})
 target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/include)
 target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/bin/varnishd)
-target_compile_definitions(sandbox PRIVATE
-	NATIVE_SYSCALLS_BASE=80
-)
 
 
 option(RISCV_BINARY_TRANSLATION "" ON)
@@ -33,8 +30,6 @@ option(RISCV_EXPERIMENTAL "" ON)
 
 add_subdirectory(libriscv/lib)
 target_compile_definitions(riscv PUBLIC
-	RISCV_EBREAK_MEANS_STOP=1
-	RISCV_DISABLE_SYM_LOOKUP=1
 	RISCV_SYSCALLS_MAX=100)
 
 set(JSON_BuildTests OFF CACHE INTERNAL "")

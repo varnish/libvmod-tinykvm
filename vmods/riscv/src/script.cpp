@@ -8,6 +8,7 @@ extern "C" void riscv_SetHash(struct req*, VSHA256_CTX*);
 inline timespec time_now();
 inline long nanodiff(timespec start_time, timespec end_time);
 static constexpr uint64_t SIGHANDLER_INSN = 60'000;
+static constexpr unsigned NATIVE_SYSCALLS_BASE = 80;
 static constexpr bool VERBOSE_ERRORS = true;
 
 //#define ENABLE_TIMING
@@ -205,7 +206,7 @@ void Script::machine_setup(machine_t& machine, bool init)
 
 #ifdef RISCV_DEBUG
 	machine.verbose_instructions = true;
-	machine.verbose_registers = true;
+	//machine.verbose_registers = true;
 #endif
 
 	if (init)
