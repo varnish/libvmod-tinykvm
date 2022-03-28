@@ -90,7 +90,10 @@ void Script::setup_virtual_memory(bool /*init*/)
 	using namespace riscv;
 	auto& mem = machine().memory;
 	// Use a different arena and stack for the storage machine
-	this->m_heap_base = is_storage() ? SHEAP_BASE : CHEAP_BASE;
+	if (is_storage())
+		this->m_heap_base = SHEAP_BASE + stack_size();
+	else
+		this->m_heap_base = machine().memory.mmap_start() + stack_size();
 
 	mem.set_stack_initial(stack_begin());
 	// this separates heap and stack

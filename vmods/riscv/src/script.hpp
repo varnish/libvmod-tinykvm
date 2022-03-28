@@ -13,7 +13,6 @@ public:
 	static constexpr int MARCH = riscv::RISCV32;
 	using gaddr_t = riscv::address_type<MARCH>;
 	using machine_t = riscv::Machine<MARCH>;
-	static constexpr gaddr_t CHEAP_BASE   = 0x40000000;
 	static constexpr gaddr_t SHEAP_BASE   = 0x80000000;
 	static constexpr size_t  REGEX_MAX    = 64;
 	static constexpr size_t  DIRECTOR_MAX = 32;
