@@ -24,6 +24,7 @@ Script::Script(
 		.memory_max = 0,
 	  }),
 	  m_ctx(ctx), m_tenant(vrm), m_inst(inst),
+	  m_heap_base {source.m_heap_base},
 	  m_is_debug(source.is_debug()),
 	  m_sighandler{source.m_sighandler},
 	  m_regex     {vrm->config.max_regex()},
@@ -36,7 +37,7 @@ Script::Script(
 	this->machine_setup(machine(), false);
 
 	/* Transfer allocations from the source machine, to fully replicate heap */
-	source.machine().arena().transfer(machine().arena());
+	machine().transfer_arena_from(source.machine());
 	/* Load the compiled regexes of the source */
 	m_regex.loan_from(source.m_regex);
 	/* Load the directors of the source */
@@ -90,6 +91,8 @@ void Script::setup_virtual_memory(bool /*init*/)
 	using namespace riscv;
 	auto& mem = machine().memory;
 	// Use a different arena and stack for the storage machine
+	// Both values are offset by the stack size to guarantee
+	// room for the entire initial (main thread) stack.
 	if (is_storage())
 		this->m_heap_base = SHEAP_BASE + stack_size();
 	else
@@ -185,65 +188,64 @@ void Script::machine_setup(machine_t& machine, bool init)
 	}
 	else {
 		machine.memory.set_page_fault_handler(
-			[this] (auto& mem, size_t pageno, bool) -> riscv::Page& {
-				bool dont_fork = false;
-				const size_t stack_pbase = stack_base() / riscv::Page::size();
-				const size_t stack_pend  = stack_begin() / riscv::Page::size();
-				if (pageno >= stack_pbase && pageno < stack_pend) {
-					dont_fork = true;
-				}
-				auto* data = new riscv::PageData {};
-				return mem.allocate_page(pageno,
-					riscv::PageAttributes{
-						.dont_fork  = dont_fork,
-						.user_defined = 1 },
-					data);
-			});
+		[this] (auto& mem, size_t pageno, bool) -> riscv::Page& {
+			bool dont_fork = false;
+			const auto stack_pbase = stack_base() / riscv::Page::size();
+			const auto stack_pend  = stack_begin() / riscv::Page::size();
+			if (pageno >= stack_pbase && pageno < stack_pend) {
+				dont_fork = true;
+			}
+			auto* data = new riscv::PageData {};
+			return mem.allocate_page(pageno,
+				riscv::PageAttributes{
+					.dont_fork  = dont_fork,
+					.user_defined = 1 },
+				data);
+		});
 	}
 
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t1);
 #endif
-	// page protections and "hidden" stacks
-	this->setup_virtual_memory(init);
-
-#ifdef RISCV_DEBUG
-	machine.verbose_instructions = true;
-	//machine.verbose_registers = true;
-#endif
-
 	if (init)
 	{
+		// page protections and "hidden" stacks
+		this->setup_virtual_memory(init);
+
+	#ifdef RISCV_DEBUG
+		machine.verbose_instructions = true;
+		//machine.verbose_registers = true;
+	#endif
+
 		// Full Linux-compatible stack
 		machine.cpu.reset_stack_pointer(); // DONT TOUCH (YES YOU)
 		machine.setup_linux(
 			{ name(), m_is_storage ? "1" : "0", is_debug() ? "1" : "0" },
 			{ "LC_CTYPE=C", "LC_ALL=C", "USER=groot" });
-	}
 
-	// Add system call interfaces
-#ifdef ENABLE_TIMING
-	TIMING_LOCATION(t2);
-#endif
-	// Newlib support < 500
-	machine.setup_newlib_syscalls();
-	// Custom system call API >= 500
-	machine.setup_native_heap(NATIVE_SYSCALLS_BASE,
-		arena_base(), vrm()->config.max_heap());
-
-#ifdef ENABLE_TIMING
-	TIMING_LOCATION(t3);
-#endif
-	machine.setup_native_memory(NATIVE_SYSCALLS_BASE+5);
-#ifdef ENABLE_TIMING
-	TIMING_LOCATION(t4);
-#endif
+	#ifdef ENABLE_TIMING
+		TIMING_LOCATION(t2);
+	#endif
+		// Add system call interfaces
+		// Newlib support < 500
+		machine.setup_newlib_syscalls();
+		// Custom system call API >= 500
+		machine.setup_native_heap(NATIVE_SYSCALLS_BASE,
+			arena_base(), vrm()->config.max_heap());
+	#ifdef ENABLE_TIMING
+		TIMING_LOCATION(t3);
+	#endif
+		machine.setup_native_memory(NATIVE_SYSCALLS_BASE+5);
+	#ifdef ENABLE_TIMING
+		TIMING_LOCATION(t4);
+	#endif
 
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t5);
 	printf("[Constr] pagetbl: %ldns, vmem: %ldns, arena: %ldns, nat.mem: %ldns, syscalls: %ldns\n",
 		nanodiff(t0, t1), nanodiff(t1, t2), nanodiff(t2, t3), nanodiff(t3, t4), nanodiff(t4, t5));
 #endif
+	}
 }
 
 void Script::handle_exception(gaddr_t address)

@@ -313,7 +313,7 @@ APICALL(set_backend)
 APICALL(backend_decision)
 {
 	auto [caching, func, farg] =
-		machine.sysargs<gaddr_t, gaddr_t, gaddr_t> ();
+		machine.sysargs<unsigned, gaddr_t, gaddr_t> ();
 	auto& script = get_script(machine);
 	script.set_results("backend", {caching, func, farg}, true);
 	machine.stop();

@@ -318,6 +318,9 @@ int  riscv_current_apply_hash(VRT_CTX)
 
 inline const char* optional_copy(VRT_CTX, const riscv::Buffer& buffer)
 {
+	if (buffer.is_sequential())
+		return buffer.data();
+
 	char* data = (char*) WS_Alloc(ctx->ws, buffer.size());
 	// TODO: move to heap
 	if (data == nullptr)
