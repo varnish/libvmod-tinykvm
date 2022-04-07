@@ -12,6 +12,9 @@ fi
 if command -v "clang-14" &> /dev/null; then
 	CLANG_VERSION=14
 fi
+if command -v "clang-15" &> /dev/null; then
+	CLANG_VERSION=15
+fi
 echo "Detected Clang version ${CLANG_VERSION}"
 export CC="ccache clang-${CLANG_VERSION}"
 export CXX="ccache clang++-${CLANG_VERSION}"
