@@ -3,7 +3,8 @@ set -e
 sudo apt update
 sudo apt install -y \
 	cmake \
-	clang-10 lld-10 \
+	clang-12 lld-12 \
+	libstdc++6 \
 	libbrotli1 \
 	libconfig9 \
 	libnuma1

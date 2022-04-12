@@ -4,6 +4,7 @@
 #include "machine_instance.hpp"
 #define SCRIPT_MAGIC 0x83e59fa5
 
+namespace rvs {
 
 struct SandboxTenant
 {
@@ -49,3 +50,5 @@ struct SandboxTenant
 	/* Hash map of string hashes associated with dyncall handlers */
 	std::unordered_map<uint32_t, ghandler_t> m_dynamic_functions;
 };
+
+} // rvs

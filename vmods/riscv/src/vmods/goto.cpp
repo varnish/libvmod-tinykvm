@@ -1,4 +1,4 @@
-#include "../sandbox.hpp"
+#include "../sandbox_tenant.hpp"
 #include "../varnish.hpp"
 #include <libriscv/util/crc32.hpp>
 extern "C" {
@@ -42,6 +42,8 @@ inline auto* validate_deref(const char** ptr, const char* s) {
 }
 #define vmod_enum(handle, x) \
 	validate_deref((const char **)dlsym(handle, #x), #x)
+
+namespace rvs {
 
 void SandboxTenant::init_vmods(VRT_CTX)
 {
@@ -137,3 +139,5 @@ void SandboxTenant::init_vmods(VRT_CTX)
 			}
 		});
 }
+
+} // rvs

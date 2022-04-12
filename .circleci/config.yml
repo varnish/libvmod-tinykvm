@@ -23,7 +23,7 @@ jobs:
           paths: build ext scripts vmods
   riscv_sandbox_tests:
       docker:
-          - image: cimg/base:2020.01
+          - image: cimg/base:2022.03
       working_directory: ~/project
       steps:
           - attach_workspace:
@@ -55,9 +55,9 @@ workflows:
   sledgehammer:
     jobs:
       - build
-      # - riscv_sandbox_tests:
-      #       requires:
-      #           - cmake_builds
+      - riscv_sandbox_tests:
+          requires:
+              - build
       # - kvm_sandbox_tests:
       #       requires:
       #           - cmake_builds

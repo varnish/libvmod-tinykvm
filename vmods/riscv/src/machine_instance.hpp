@@ -5,6 +5,8 @@ namespace riscv {
 	template <int W> struct RSPClient;
 }
 
+namespace rvs {
+
 struct MachineInstance
 {
 	MachineInstance(std::vector<uint8_t>,
@@ -38,3 +40,5 @@ struct MachineInstance
 	};
 	std::vector<Lookup> sym_vector;
 };
+
+} // rvs

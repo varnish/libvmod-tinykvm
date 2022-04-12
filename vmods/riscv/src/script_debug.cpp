@@ -1,7 +1,9 @@
 #include "script.hpp"
-#include "sandbox.hpp"
+#include "sandbox_tenant.hpp"
 #include <libriscv/rsp_server.hpp>
 #include <mutex>
+
+namespace rvs {
 
 long Script::finish_debugger()
 {
@@ -119,3 +121,5 @@ void Script::run_debugger_loop()
 		}
 	}
 }
+
+} // rvs

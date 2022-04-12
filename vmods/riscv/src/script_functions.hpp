@@ -4,6 +4,8 @@
 #include <type_traits>
 #include <libriscv/util/crc32.hpp>
 
+namespace rvs {
+
 using machine_t = Script::machine_t;
 using gaddr_t = Script::gaddr_t;
 
@@ -58,3 +60,5 @@ inline uint64_t mirror_stack_call(machine_t& machine, Script& remote, gaddr_t fu
 	}
 	return remote.machine().instruction_counter();
 }
+
+} // rvs

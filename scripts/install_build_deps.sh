@@ -6,7 +6,7 @@ DEBIAN_FRONTEND=noninteractive sudo -E apt install -y \
 	cmake \
 	ninja-build \
 	ccache \
-	clang-10 lld-10 \
+	clang-12 lld-12 \
 	python3 python3-pip \
 	libcurl4-openssl-dev \
 	libssl-dev \

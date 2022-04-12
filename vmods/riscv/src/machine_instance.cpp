@@ -1,5 +1,8 @@
 #include "machine_instance.hpp"
 #include <libriscv/rsp_server.hpp>
+
+namespace rvs {
+
 // functions available to all machines created during init
 static const std::vector<const char*> riscv_lookup_wishlist {
 	"on_init",
@@ -35,3 +38,5 @@ MachineInstance::MachineInstance(
 MachineInstance::~MachineInstance()
 {
 }
+
+} // rvs
