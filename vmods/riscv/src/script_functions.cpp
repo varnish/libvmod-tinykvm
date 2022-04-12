@@ -5,8 +5,10 @@
 extern "C" {
 # include "varnish_interface.h"
 }
-static const uint64_t REMOTE_CALL_COST = 4000;
-static const uint16_t DEBUG_PORT = 2159;
+
+namespace rvs {
+	static const uint64_t REMOTE_CALL_COST = 4000;
+	static const uint16_t DEBUG_PORT = 2159;
 
 //#define ENABLE_TIMING
 #ifdef ENABLE_TIMING
@@ -832,7 +834,7 @@ void Script::setup_syscall_interface()
 		FPTR(shm_log),
 		FPTR(breakpoint),
 		FPTR(signal),
-		FPTR(::dynamic_call),
+		FPTR(rvs::dynamic_call),
 		FPTR(remote_call),
 		FPTR(remote_strcall),
 
@@ -891,3 +893,5 @@ long nanodiff(timespec start_time, timespec end_time)
 	assert(end_time.tv_sec == 0); /* We should never use seconds */
 	return end_time.tv_nsec - start_time.tv_nsec;
 }
+
+} // rvs

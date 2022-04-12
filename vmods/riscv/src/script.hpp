@@ -5,6 +5,11 @@
 #include "script_cache.hpp"
 
 struct vrt_ctx;
+struct VSHA256Context;
+struct director;
+struct vre;
+
+namespace rvs {
 struct SandboxTenant;
 struct MachineInstance;
 
@@ -185,3 +190,5 @@ inline long Script::resume(uint64_t cycles)
 	}
 	return -1;
 }
+
+} // rvs

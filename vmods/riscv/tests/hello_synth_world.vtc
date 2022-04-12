@@ -9,19 +9,26 @@ void start(int argc, char** argv)
 	exit(0);
 }
 
-static const char reason[] = "synth";
-
-void on_recv()
+void on_recv(int req, int resp)
 {
+	static const char reason[] = "synth";
 	decision(reason, sizeof(reason)-1, 404);
 }
 
-static const char mime[] = "text/plain";
-static const char text[] = "Hello World";
-
 void on_synth()
 {
-	synth(mime, sizeof(mime)-1, text, sizeof(text)-1);
+	char url[4096];
+	get_url(HDR_REQ, url, sizeof(url));
+
+	if (strcmp(url, "/") == 0) {
+		static const char mime[] = "text/plain";
+		static const char text[] = "Hello World";
+		synth(mime, sizeof(mime)-1, text, sizeof(text)-1);
+	} else {
+		static const char mime[] = "text/plain";
+		static const char text[] = "Not root URL";
+		synth(mime, sizeof(mime)-1, text, sizeof(text)-1);
+	}
 }
 EOF
 bash ${testdir}/build.sh ${tmpdir}/${testname}.cpp ${testdir} ${tmpdir}/${testname}
@@ -71,8 +78,8 @@ client c1 {
 	rxresp
 	expect resp.body == "Hello World"
 	expect resp.status == 404
-	txreq -url "/" -hdr "Host: xpizza.com"
+	txreq -url "/1" -hdr "Host: xpizza.com"
 	rxresp
-	expect resp.body == "Hello World"
+	expect resp.body == "Not root URL"
 	expect resp.status == 404
 } -run

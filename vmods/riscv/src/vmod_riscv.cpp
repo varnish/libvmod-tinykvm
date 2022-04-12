@@ -1,14 +1,13 @@
-#include "sandbox.hpp"
+#include "sandbox_tenant.hpp"
 #include "varnish.hpp"
 extern "C" {
-#  include "riscv_backend.h"
 #  include "update_result.h"
 }
-static bool file_writer(const std::string& file, const std::vector<uint8_t>&);
-static const size_t TOO_SMALL = 3; // vmcalls that can be skipped
 
-extern SandboxTenant* create_temporary_tenant(const SandboxTenant*, const std::string&);
-extern void delete_temporary_tenant(const SandboxTenant*);
+namespace rvs {
+	static const size_t TOO_SMALL = 3; // vmcalls that can be skipped
+	extern SandboxTenant* create_temporary_tenant(const SandboxTenant*, const std::string&);
+	extern void delete_temporary_tenant(const SandboxTenant*);
 
 constexpr update_result
 static_result(const char* text) {
@@ -20,10 +19,40 @@ dynamic_result(const char* text) {
 		[] (update_result* res) { free((void*) res->output); } };
 }
 
+inline Script* get_machine(VRT_CTX, const void* key)
+{
+	auto* priv_task = VRT_priv_task(ctx, key);
+	//printf("priv_task: ctx=%p bo=%p key=%p task=%p\n", ctx, ctx->bo, key, priv_task);
+	if (priv_task->priv && priv_task->len == SCRIPT_MAGIC)
+		return (Script*) priv_task->priv;
+	return nullptr;
+}
+inline Script* get_machine(VRT_CTX)
+{
+	if (ctx->req)
+		return get_machine(ctx, ctx->req);
+	return get_machine(ctx, ctx->bo);
+}
+
+static bool file_writer(const std::string& filename, const std::vector<uint8_t>& binary)
+{
+    FILE* f = fopen(filename.c_str(), "wb");
+    if (f == NULL)
+		return false;
+
+	const size_t n = fwrite(binary.data(), 1, binary.size(), f);
+    fclose(f);
+	return n == binary.size();
+}
+
+} // rvs
+
 extern "C"
 struct update_result
-riscv_update(VRT_CTX, SandboxTenant* vrm, struct update_params *params)
+riscv_update(VRT_CTX, rvs::SandboxTenant* vrm, struct update_params *params)
 {
+	using namespace rvs;
+
 	/* ELF loader will not be run for empty binary */
 	if (UNLIKELY(params->data == nullptr || params->len == 0)) {
 		return static_result("Empty file received");
@@ -142,8 +171,10 @@ riscv_update(VRT_CTX, SandboxTenant* vrm, struct update_params *params)
 }
 
 extern "C"
-Script* riscv_fork(VRT_CTX, const char* tenant, int debug)
+rvs::Script* riscv_fork(VRT_CTX, const char* tenant, int debug)
 {
+	using namespace rvs;
+
 	extern SandboxTenant* tenant_find(VRT_CTX, const char* name);
 	auto* vrm = tenant_find(ctx, tenant);
 	if (UNLIKELY(vrm == nullptr))
@@ -157,31 +188,15 @@ Script* riscv_fork(VRT_CTX, const char* tenant, int debug)
 }
 
 extern "C"
-uint64_t riscv_resolve_name(struct SandboxTenant* vrm, const char* symb)
+uint64_t riscv_resolve_name(rvs::SandboxTenant* vrm, const char* symb)
 {
 	return vrm->lookup(symb);
 }
 
-
-inline Script* get_machine(VRT_CTX, const void* key)
-{
-	auto* priv_task = VRT_priv_task(ctx, key);
-	//printf("priv_task: ctx=%p bo=%p key=%p task=%p\n", ctx, ctx->bo, key, priv_task);
-	if (priv_task->priv && priv_task->len == SCRIPT_MAGIC)
-		return (Script*) priv_task->priv;
-	return nullptr;
-}
-inline Script* get_machine(VRT_CTX)
-{
-	if (ctx->req)
-		return get_machine(ctx, ctx->req);
-	return get_machine(ctx, ctx->bo);
-}
-
 extern "C"
-const struct SandboxTenant* riscv_current_machine(VRT_CTX)
+const rvs::SandboxTenant* riscv_current_machine(VRT_CTX)
 {
-	auto* script = get_machine(ctx);
+	auto* script = rvs::get_machine(ctx);
 	if (script) {
 		return script->vrm();
 	}
@@ -191,6 +206,8 @@ const struct SandboxTenant* riscv_current_machine(VRT_CTX)
 extern "C"
 long riscv_current_call(VRT_CTX, const char* func)
 {
+	using namespace rvs;
+
 	auto* script = get_machine(ctx);
 	if (script) {
 	#ifdef ENABLE_TIMING
@@ -214,6 +231,8 @@ long riscv_current_call(VRT_CTX, const char* func)
 extern "C"
 long riscv_current_call_idx(VRT_CTX, vcall_info info)
 {
+	using namespace rvs;
+
 	auto* script = get_machine(ctx);
 	if (script) {
 		if (info.idx >= 0 && info.idx < script->instance().sym_vector.size())
@@ -252,7 +271,7 @@ long riscv_current_call_idx(VRT_CTX, vcall_info info)
 extern "C"
 long riscv_current_resume(VRT_CTX)
 {
-	auto* script = get_machine(ctx);
+	auto* script = rvs::get_machine(ctx);
 	if (script) {
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);
@@ -270,7 +289,7 @@ long riscv_current_resume(VRT_CTX)
 extern "C"
 const char* riscv_current_name(VRT_CTX)
 {
-	auto* script = get_machine(ctx);
+	auto* script = rvs::get_machine(ctx);
 	if (script)
 		return script->name().c_str();
 	return nullptr;
@@ -278,7 +297,7 @@ const char* riscv_current_name(VRT_CTX)
 extern "C"
 const char* riscv_current_group(VRT_CTX)
 {
-	auto* script = get_machine(ctx);
+	auto* script = rvs::get_machine(ctx);
 	if (script)
 		return script->group().c_str();
 	return nullptr;
@@ -286,7 +305,7 @@ const char* riscv_current_group(VRT_CTX)
 extern "C"
 const char* riscv_current_result(VRT_CTX)
 {
-	auto* script = get_machine(ctx);
+	auto* script = rvs::get_machine(ctx);
 	if (script)
 		return script->want_result();
 	return nullptr;
@@ -294,15 +313,15 @@ const char* riscv_current_result(VRT_CTX)
 extern "C"
 long riscv_current_result_value(VRT_CTX, size_t idx)
 {
-	auto* script = get_machine(ctx);
-	if (script && idx < Script::RESULTS_MAX)
+	auto* script = rvs::get_machine(ctx);
+	if (script && idx < rvs::Script::RESULTS_MAX)
 		return script->want_values().at(idx);
 	return 503;
 }
 extern "C"
 int  riscv_current_is_paused(VRT_CTX)
 {
-	auto* script = get_machine(ctx);
+	auto* script = rvs::get_machine(ctx);
 	if (script)
 		return script->is_paused();
 	return 0;
@@ -310,88 +329,8 @@ int  riscv_current_is_paused(VRT_CTX)
 extern "C"
 int  riscv_current_apply_hash(VRT_CTX)
 {
-	auto* script = get_machine(ctx);
+	auto* script = rvs::get_machine(ctx);
 	if (script)
 		return script->apply_hash();
 	return 0;
-}
-
-inline const char* optional_copy(VRT_CTX, const riscv::Buffer& buffer)
-{
-	if (buffer.is_sequential())
-		return buffer.data();
-
-	char* data = (char*) WS_Alloc(ctx->ws, buffer.size());
-	// TODO: move to heap
-	if (data == nullptr)
-		throw std::runtime_error("Out of workspace");
-	buffer.copy_to(data, buffer.size());
-	return data;
-}
-
-extern "C"
-void riscv_backend_call(VRT_CTX, const void* key, long func, long farg,
-	struct backend_result *result)
-{
-	auto* script = get_machine(ctx, ctx->bo);
-	if (script) {
-		auto* old_ctx = script->ctx();
-		try {
-		#ifdef ENABLE_TIMING
-			TIMING_LOCATION(t1);
-		#endif
-			/* Use backend ctx which can write to beresp */
-			script->set_ctx(ctx);
-			/* Call the backend response function */
-			script->machine().vmcall(func,
-				(Script::gaddr_t) farg, (int) HDR_BEREQ, (int) HDR_BERESP);
-			/* Restore old ctx for backend_response */
-			script->set_ctx(old_ctx);
-
-			/* Get content-type and data */
-			const auto [type, data, datalen] =
-				script->machine().sysargs<riscv::Buffer, Script::gaddr_t, Script::gaddr_t> ();
-			/* Return content-type, data, size */
-			using vBuffer = riscv::vBuffer;
-			result->type = optional_copy(ctx, type);
-			result->tsize = type.size();
-			result->status = 200;
-			result->content_length = datalen;
-			result->bufcount = script->machine().memory.gather_buffers_from_range(
-				result->bufcount, (vBuffer *)result->buffers, data, datalen);
-
-		#ifdef ENABLE_TIMING
-			TIMING_LOCATION(t2);
-			printf("Time spent in backend_call(): %ld ns\n", nanodiff(t1, t2));
-		#endif
-			return;
-		} catch (const riscv::MachineException& e) {
-			fprintf(stderr, "Backend VM exception: %s (data: 0x%lX)\n",
-				e.what(), e.data());
-			VSLb(ctx->vsl, SLT_Error,
-				"Backend VM exception: %s (data: 0x%lX)\n",
-				e.what(), e.data());
-		} catch (const std::exception& e) {
-			fprintf(stderr, "Backend VM exception: %s\n", e.what());
-			VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
-		}
-		script->set_ctx(old_ctx);
-	}
-	/* An error result */
-	new (result) backend_result {nullptr, 0,
-		500, /* Internal server error */
-		0,
-		0, {}
-	};
-}
-
-bool file_writer(const std::string& filename, const std::vector<uint8_t>& binary)
-{
-    FILE* f = fopen(filename.c_str(), "wb");
-    if (f == NULL)
-		return false;
-
-	const size_t n = fwrite(binary.data(), 1, binary.size(), f);
-    fclose(f);
-	return n == binary.size();
 }

@@ -7,8 +7,9 @@ option(SHARED_LIBRISCV "Build the RISC-V sandbox as a shared library" ON)
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++20 -O2 -g")
 
 list(APPEND RISCV_SOURCES
+	src/backend.cpp
 	src/machine_instance.cpp
-	src/sandbox.cpp
+	src/sandbox_tenant.cpp
 	src/script.cpp
 	src/script_debug.cpp
 	src/script_functions.cpp

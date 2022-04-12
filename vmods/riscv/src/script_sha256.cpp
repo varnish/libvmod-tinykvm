@@ -4,6 +4,8 @@ extern "C" {
 #include <vsha256.h>
 }
 
+namespace rvs {
+
 void sha256(machine_t& machine)
 {
 	auto [buffer, dst, dstlen] =
@@ -25,3 +27,5 @@ void sha256(machine_t& machine)
 	machine.copy_to_guest(dst, result, sizeof(result));
 	machine.set_result(VSHA256_LEN);
 }
+
+} // rvs

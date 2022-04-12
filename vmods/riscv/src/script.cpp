@@ -2,14 +2,16 @@
 
 #include <libriscv/native_heap.hpp>
 #include "machine/include_api.hpp"
-#include "sandbox.hpp"
+#include "sandbox_tenant.hpp"
 #include "varnish.hpp"
 extern "C" void riscv_SetHash(struct req*, VSHA256_CTX*);
-inline timespec time_now();
-inline long nanodiff(timespec start_time, timespec end_time);
-static constexpr uint64_t SIGHANDLER_INSN = 60'000;
-static constexpr unsigned NATIVE_SYSCALLS_BASE = 580;
-static constexpr bool VERBOSE_ERRORS = true;
+
+namespace rvs {
+	inline timespec time_now();
+	inline long nanodiff(timespec start_time, timespec end_time);
+	static constexpr uint64_t SIGHANDLER_INSN = 60'000;
+	static constexpr unsigned NATIVE_SYSCALLS_BASE = 580;
+	static constexpr bool VERBOSE_ERRORS = true;
 
 //#define ENABLE_TIMING
 #define TIMING_LOCATION(x) \
@@ -401,3 +403,5 @@ long nanodiff(timespec start_time, timespec end_time)
 	return end_time.tv_nsec - start_time.tv_nsec;
 }
 #endif
+
+} // rvs

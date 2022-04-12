@@ -7,3 +7,5 @@ server/img/**
 ext/work-plus
 
 vcl/kvm_tenants.json
+
+sledgehammer

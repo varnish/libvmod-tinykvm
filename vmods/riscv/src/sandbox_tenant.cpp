@@ -1,7 +1,9 @@
-#include "sandbox.hpp"
+#include "sandbox_tenant.hpp"
 #include "varnish.hpp"
 #include <libriscv/util/crc32.hpp>
 using riscv::crc32;
+
+namespace rvs {
 
 //#define ENABLE_TIMING
 #ifdef ENABLE_TIMING
@@ -149,3 +151,5 @@ std::vector<uint8_t> file_loader(const std::string& filename)
     fclose(f);
     return result;
 }
+
+} // rvs

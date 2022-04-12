@@ -1,12 +1,13 @@
-#include "sandbox.hpp"
+#include "sandbox_tenant.hpp"
 #include "varnish.hpp"
 #include <nlohmann/json.hpp>
-
 using json = nlohmann::json;
-extern std::vector<uint8_t> file_loader(const std::string& filename);
 
-using MapType = std::unordered_map<std::string, struct SandboxTenant*>;
-static MapType temporaries;
+namespace rvs {
+	extern std::vector<uint8_t> file_loader(const std::string& filename);
+
+	using MapType = std::unordered_map<std::string, struct SandboxTenant*>;
+	static MapType temporaries;
 
 inline MapType& tenants(VRT_CTX)
 {
@@ -25,21 +26,6 @@ inline void load_tenant(VRT_CTX, TenantConfig&& config)
 		VRT_fail(ctx, "Exception when creating machine '%s': %s",
 			config.name.c_str(), e.what());
 	}
-}
-
-extern "C"
-SandboxTenant* tenant_find(VRT_CTX, const char* name)
-{
-	auto& map = tenants(ctx);
-	// regular tenants
-	auto it = map.find(name);
-	if (it != map.end())
-		return it->second;
-	// temporary tenants (updates)
-	it = temporaries.find(name);
-	if (it != map.end())
-		return it->second;
-	return nullptr;
 }
 
 SandboxTenant* create_temporary_tenant(
@@ -133,16 +119,33 @@ static void init_tenants(VRT_CTX,
 	}
 }
 
+} // rvs
+
+extern "C"
+rvs::SandboxTenant* tenant_find(VRT_CTX, const char* name)
+{
+	auto& map = rvs::tenants(ctx);
+	// regular tenants
+	auto it = map.find(name);
+	if (it != map.end())
+		return it->second;
+	// temporary tenants (updates)
+	it = rvs::temporaries.find(name);
+	if (it != map.end())
+		return it->second;
+	return nullptr;
+}
+
 extern "C"
 void init_tenants_str(VRT_CTX, const char* str)
 {
 	std::vector<uint8_t> json { str, str + strlen(str) };
-	init_tenants(ctx, json, "string");
+	rvs::init_tenants(ctx, json, "string");
 }
 
 extern "C"
 void init_tenants_file(VRT_CTX, const char* filename)
 {
-	const auto json = file_loader(filename);
-	init_tenants(ctx, json, filename);
+	const auto json = rvs::file_loader(filename);
+	rvs::init_tenants(ctx, json, filename);
 }

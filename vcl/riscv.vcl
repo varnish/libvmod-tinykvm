@@ -31,8 +31,8 @@ sub vcl_recv {
 
 	if (req.url == "/file") {
 		set req.backend_hint = f.backend();
-		// NUMA: "?node=" + utils.numa_node_id() +
-		set req.url = req.url + "?foo=" + utils.fast_random_int(100);
+		set req.url = req.url + "?foo=" + utils.cpu_id();
+		//set req.url = req.url + "?foo=" + utils.fast_random_int(100);
 		return (hash);
 	}
 	/* Easier to work with wrk */
@@ -47,7 +47,8 @@ sub vcl_recv {
 	}
 	else if (req.url == "/z") {
 		set req.http.Host = "zpizza.com";
-		set req.url = req.url + "?foo=" + utils.fast_random_int(100);
+		set req.url = req.url + "?foo=" + utils.cpu_id();
+		//set req.url = req.url + "?foo=" + utils.fast_random_int(100);
 	}
 
 	/* Determine tenant */
