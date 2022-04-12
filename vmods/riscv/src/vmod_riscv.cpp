@@ -343,21 +343,21 @@ void riscv_backend_call(VRT_CTX, const void* key, long func, long farg,
 			/* Use backend ctx which can write to beresp */
 			script->set_ctx(ctx);
 			/* Call the backend response function */
-			script->machine().vmcall(func,
-				(Script::gaddr_t) farg, (int) HDR_BEREQ, (int) HDR_BERESP);
+			auto& machine = script->machine();
+			machine.vmcall(func, (Script::gaddr_t) farg, (int) HDR_BEREQ, (int) HDR_BERESP);
 			/* Restore old ctx for backend_response */
 			script->set_ctx(old_ctx);
 
-			/* Get content-type and data */
-			const auto [type, data, datalen] =
-				script->machine().sysargs<riscv::Buffer, Script::gaddr_t, Script::gaddr_t> ();
-			/* Return content-type, data, size */
+			/* Get content-type, data and status */
+			const auto [status, type, data, datalen] =
+				machine.sysargs<int, riscv::Buffer, Script::gaddr_t, Script::gaddr_t> ();
+			/* Return content-type, status, and iovecs containing data */
 			using vBuffer = riscv::vBuffer;
 			result->type = optional_copy(ctx, type);
 			result->tsize = type.size();
-			result->status = 200;
+			result->status = status;
 			result->content_length = datalen;
-			result->bufcount = script->machine().memory.gather_buffers_from_range(
+			result->bufcount = machine.memory.gather_buffers_from_range(
 				result->bufcount, (vBuffer *)result->buffers, data, datalen);
 
 		#ifdef ENABLE_TIMING
