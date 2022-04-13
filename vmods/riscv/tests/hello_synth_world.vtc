@@ -23,11 +23,11 @@ void on_synth()
 	if (strcmp(url, "/") == 0) {
 		static const char mime[] = "text/plain";
 		static const char text[] = "Hello World";
-		synth(mime, sizeof(mime)-1, text, sizeof(text)-1);
+		synth(200, mime, sizeof(mime)-1, text, sizeof(text)-1);
 	} else {
 		static const char mime[] = "text/plain";
 		static const char text[] = "Not root URL";
-		synth(mime, sizeof(mime)-1, text, sizeof(text)-1);
+		synth(500, mime, sizeof(mime)-1, text, sizeof(text)-1);
 	}
 }
 EOF
@@ -77,9 +77,9 @@ client c1 {
 	txreq -url "/" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.body == "Hello World"
-	expect resp.status == 404
+	expect resp.status == 200
 	txreq -url "/1" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.body == "Not root URL"
-	expect resp.status == 404
+	expect resp.status == 500
 } -run

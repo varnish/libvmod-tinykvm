@@ -18,6 +18,7 @@ struct http {
 	uint8_t        conds;
 };
 
+void http_SetStatus(struct http *hp, uint16_t status);
 void http_SetH(struct http *to, unsigned n, const char *fm);
 void http_UnsetIdx(struct http *hp, unsigned idx);
 unsigned HTTP_FindHdr(const struct http *hp, unsigned l, const char *hdr);

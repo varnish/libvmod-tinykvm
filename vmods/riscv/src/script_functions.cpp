@@ -353,8 +353,11 @@ APICALL(synth)
 	{
 		// Synth responses are always using HDR_RESP
 		auto* hp = get_http(ctx, HDR_RESP);
-		const auto [type, data] = machine.sysargs<riscv::Buffer, riscv::Buffer> ();
+		const auto [status, type, data] = machine.sysargs<uint16_t, riscv::Buffer, riscv::Buffer> ();
+		if (UNLIKELY(status < 100))
+			throw std::runtime_error("Invalid synth status code: " + std::to_string(status));
 
+		http_SetStatus(hp, status);
 		http_PrintfHeader(hp, "Content-Length: %u", data.size());
 		if (type.is_sequential())
 			http_PrintfHeader(hp, "Content-Type: %.*s", (int)type.size(), type.data());
@@ -404,6 +407,15 @@ APICALL(synth)
 		TIMING_LOCATION(t1);
 		printf("Time spent in synth syscall: %ld ns\n", nanodiff(t0, t1));
 #endif
+		return;
+	} else if (ctx->method == VCL_MET_RECV) {
+		auto& script = get_script(machine);
+		// Pause the program until VCL_MET_SYNTH.
+		script.set_result("synth", 100, true);
+		// This will cause a retrigger of this system call once
+		// we are in VCL_MET_SYNTH.
+		machine.cpu.increment_pc(-4);
+		machine.stop();
 		return;
 	}
 	throw std::runtime_error(

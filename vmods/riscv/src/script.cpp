@@ -259,8 +259,11 @@ void Script::handle_exception(gaddr_t address)
 		if constexpr (VERBOSE_ERRORS) {
 		fprintf(stderr, "Script exception: %s (data: 0x%lX)\n",
 			e.what(), e.data());
+		fprintf(stderr, ">>> [%08lu] %s\n",
+			machine().instruction_counter(),
+			machine().cpu.current_instruction_to_string().c_str());
 		fprintf(stderr, ">>> Machine registers:\n[PC\t%08lX] %s\n",
-			(long) machine().cpu.pc(),
+			(long)machine().cpu.pc(),
 			machine().cpu.registers().to_string().c_str());
 		}
 		VRT_fail(m_ctx, "Script exception: %s", e.what());
