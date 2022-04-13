@@ -112,6 +112,10 @@ case $i in
     args="$args -DUSE_MOLD=ON"
     shift
     ;;
+	--disable-mold)
+    args="$args -DUSE_MOLD=OFF"
+    shift
+    ;;
 	--static-kvm)
 	args="$args -DSHARED_KVM=OFF"
     shift
