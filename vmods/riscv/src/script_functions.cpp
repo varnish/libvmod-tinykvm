@@ -351,28 +351,54 @@ APICALL(synth)
 	if (ctx->method == VCL_MET_SYNTH ||
 		ctx->method == VCL_MET_BACKEND_ERROR)
 	{
+		// Synth responses are always using HDR_RESP
 		auto* hp = get_http(ctx, HDR_RESP);
 		const auto [type, data] = machine.sysargs<riscv::Buffer, riscv::Buffer> ();
-		http_PrintfHeader(hp, "Content-Length: %u", data.size());
-		http_PrintfHeader(hp, "Content-Type: %.*s", (int) type.size(), type.to_string().c_str());
 
-		auto* vsb = (struct vsb*) ctx->specific;
+		http_PrintfHeader(hp, "Content-Length: %u", data.size());
+		if (type.is_sequential())
+			http_PrintfHeader(hp, "Content-Type: %.*s", (int)type.size(), type.data());
+		else
+			http_PrintfHeader(hp, "Content-Type: %.*s", (int)type.size(), type.to_string().c_str());
+
+		auto* vsb = (struct vsb *)ctx->specific;
 		assert(vsb != nullptr);
 
+		// riscv::Buffer tries to accumulate the data in a way
+		// that preserves continuity even if it crosses many pages.
+		// Sadly, even if just one data range is different, we need
+		// to sequentialize it.
 		if (data.is_sequential()) {
-			/* we need to get rid of the old data */
+			// Delete any old heap-allocated data
 			if (vsb->s_flags & VSB_DYNAMIC) {
 				free(vsb->s_buf);
 			}
-			vsb->s_buf = (char*) data.c_str();
+			// Make VSB fixed length, which does not call free
+			// XXX: Varnish will literally append a \0 at len.
+			vsb->s_buf = (char *)data.c_str();
 			vsb->s_size = data.size() + 1; /* pretend-zero */
 			vsb->s_len  = data.size();
 			vsb->s_flags = VSB_FIXEDLEN;
 		} else {
-			VSB_clear(vsb);
-			VSB_bcat(vsb, data.to_string().c_str(), data.size());
+			// By using realloc we do not need to delete old data,
+			// although only if s_flags is *not* VSB_FIXEDLEN.
+			// We allocate one more byte for the VCP-appended zero.
+			char* new_buffer = nullptr;
+			if (vsb->s_flags & VSB_DYNAMIC) {
+				new_buffer = (char *)realloc(vsb->s_buf, data.size()+1);
+			} else if (vsb->s_flags & VSB_FIXEDLEN) {
+				new_buffer = (char *)malloc(data.size()+1);
+			} else {
+				throw std::runtime_error("Unable to determine type of synth content buffer");
+			}
+			if (UNLIKELY(new_buffer == nullptr))
+				throw std::runtime_error("Unable to allocate room for synth content buffer");
+			data.copy_to(new_buffer, data.size());
+			vsb->s_buf = new_buffer;
+			vsb->s_size = data.size()+1;
+			vsb->s_len  = data.size();
+			vsb->s_flags = VSB_DYNAMIC;
 		}
-		//VSB_finish(vsb);
 		machine.stop();
 #ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);
@@ -381,7 +407,7 @@ APICALL(synth)
 		return;
 	}
 	throw std::runtime_error(
-	    "Synth can only be used in vcl_synth or vcl_backend_error");
+		"Synth can only be used in vcl_synth or vcl_backend_error");
 }
 APICALL(cacheable)
 {
@@ -744,8 +770,8 @@ APICALL(regex_match)
 	auto [index, buffer] = machine.sysargs<uint32_t, riscv::Buffer> ();
 	auto* vre = get_script(machine).regex().get(index);
 	/* VRE_exec(const vre_t *code, const char *subject, int length,
-	    int startoffset, int options, int *ovector, int ovecsize,
-	    const volatile struct vre_limits *lim) */
+		int startoffset, int options, int *ovector, int ovecsize,
+		const volatile struct vre_limits *lim) */
 	if (buffer.is_sequential()) {
 		machine.set_result(
 			VRE_exec(vre, buffer.c_str(), buffer.size(), 0,
