@@ -5,7 +5,7 @@ cat >${tmpdir}/${testname}.cpp <<-EOF
 #include "riscv_api.hpp"
 
 void start(int argc, char** argv) {
-	exit(0);
+	wait_for_requests();
 }
 
 void on_recv()

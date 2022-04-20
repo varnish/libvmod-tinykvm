@@ -18,13 +18,9 @@ static inline long syscall1(long n, long a0);
 static inline long syscall3(long n, long a0, long a1, long a2);
 static inline long syscall4(long n, long a0, long a1, long a2, long a3);
 
-extern "C" __attribute__((noreturn))
-void exit(int code)
+inline void halt()
 {
-	register long a0 asm("a0") = code;
-
-	asm volatile (".long 0x7ff00073" :: "r"(a0));
-	__builtin_unreachable();
+	asm volatile (".long 0x7ff00073" ::: "memory");
 }
 
 __attribute__((noreturn))
@@ -84,6 +80,17 @@ inline long header_field(int where, int idx, char* buffer, size_t maxlen)
 inline long get_url(int where, char* buffer, size_t maxlen)
 {
 	return header_field(where, 1, buffer, maxlen);
+}
+
+inline void wait_for_requests()
+{
+	register long a0 asm("a0") = (long)&"";
+	register long a1 asm("a1") = 0;
+	register long a2 asm("a2") = 100; // status
+	register long a3 asm("a3") = 1; // 0=unpaused, 1=paused
+	register long syscall_id asm("a7") = ECALL_SET_DECISION;
+
+	asm volatile ("ecall" : : "r"(a0), "r"(a1), "r"(a2), "r"(a3), "r"(syscall_id) : "memory");
 }
 
 extern "C" __attribute__((used, retain))

@@ -110,7 +110,7 @@ private:
 	gaddr_t     m_heap_base = 0;
 
 	std::string m_want_result;
-	std::array<gaddr_t, RESULTS_MAX> m_want_values = {403, 0};
+	std::array<gaddr_t, RESULTS_MAX> m_want_values = {};
 	bool        m_is_paused = false;
 	bool        m_is_storage = false;
 	bool        m_is_debug = false;

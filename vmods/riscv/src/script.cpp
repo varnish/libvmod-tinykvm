@@ -113,6 +113,10 @@ void Script::machine_initialize()
 	// run through the initialization
 	try {
 		machine().simulate<true>(max_instructions());
+		if (!this->is_paused()) {
+			throw std::runtime_error("The machine was not waiting for requests. "
+			"Did you forget to call wait_for_requests()?");
+		}
 	} catch (const riscv::MachineTimeoutException& e) {
 		handle_timeout(machine().cpu.pc());
 		throw;
