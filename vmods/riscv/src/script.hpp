@@ -61,6 +61,7 @@ public:
 	void set_results(const std::string& res, std::array<gaddr_t, RESULTS_MAX> values, bool p) {
 		m_want_result = res; m_want_values = values; m_is_paused = p;
 	}
+	void pause() noexcept { m_is_paused = true; }
 	bool is_paused() const noexcept { return m_is_paused; }
 	bool is_storage() const noexcept { return m_is_storage; }
 	bool is_debug() const noexcept { return m_is_debug; }
@@ -92,13 +93,13 @@ public:
 	Script(const std::vector<uint8_t>&, const vrt_ctx*, const SandboxTenant*, MachineInstance&, bool sto, bool dbg);
 	Script(const Script& source, const vrt_ctx*, const SandboxTenant*, MachineInstance&);
 	~Script();
+	void machine_initialize();
 	bool reset(); // true if the reset was successful
 
 private:
 	void handle_exception(gaddr_t);
 	void handle_timeout(gaddr_t);
 	bool install_binary(const std::string& file, bool shared = true);
-	void machine_initialize();
 	void machine_setup(machine_t&, bool init);
 	void setup_virtual_memory(bool init);
 	static void setup_syscall_interface();

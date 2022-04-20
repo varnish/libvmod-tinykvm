@@ -38,7 +38,7 @@ struct MachineInstance
 		Script::gaddr_t addr;
 		size_t size;
 	};
-	std::vector<Lookup> sym_vector;
+	std::array<Lookup, 12> sym_vector;
 };
 
 } // rvs

@@ -4,11 +4,7 @@ shell {
 cat >${tmpdir}/${testname}.cpp <<-EOF
 #include "riscv_api.hpp"
 
-void start(int argc, char** argv) {
-	wait_for_requests();
-}
-
-void on_recv(int req, int resp)
+static void on_recv(int req, int resp)
 {
 	char url[4096];
 	get_url(req, url, sizeof(url));
@@ -33,6 +29,10 @@ void on_recv(int req, int resp)
 			forge_response(500, mime, sizeof(mime)-1, text, sizeof(text)-1);
 		});
 	}
+}
+
+void start(int argc, char** argv) {
+	wait_for_requests(on_recv);
 }
 EOF
 bash ${testdir}/build.sh ${tmpdir}/${testname}.cpp ${testdir} ${tmpdir}/${testname}

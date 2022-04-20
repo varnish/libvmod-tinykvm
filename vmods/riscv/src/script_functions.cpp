@@ -295,13 +295,25 @@ APICALL(my_name)
 }
 APICALL(set_decision)
 {
-	auto [result, status, paused] =
-		machine.sysargs<riscv::Buffer, gaddr_t, bool> ();
-	auto& script = get_script(machine);
-	if (result.is_sequential()) {
-		script.set_result(result.c_str(), status, paused);
-	} else {
+	if (machine.is_forked())
+	{
+		// A forked VM in any VCL stage
+		auto [result, status, paused] =
+			machine.sysargs<riscv::Buffer, gaddr_t, bool> ();
+		auto& script = get_script(machine);
 		script.set_result(result.to_string(), status, paused);
+	} else {
+		// An initializing tenant VM
+		auto [on_recv] = machine.sysargs<gaddr_t> ();
+		// Set the tenant as paused
+		auto& script = get_script(machine);
+		script.pause();
+		// Overwrite the on_recv function, if set
+		if (on_recv != 0x0) {
+			auto& inst = script.instance();
+			inst.sym_vector.at(1).addr = on_recv;
+			inst.sym_vector.at(1).size = 16;
+		}
 	}
 	machine.stop();
 }

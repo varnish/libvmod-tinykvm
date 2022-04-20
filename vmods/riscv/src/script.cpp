@@ -68,7 +68,6 @@ Script::Script(
 	  m_regex     {vrm->config.max_regex()},
 	  m_directors {vrm->config.max_backends()}
 {
-	this->machine_initialize();
 }
 
 void Script::init()
