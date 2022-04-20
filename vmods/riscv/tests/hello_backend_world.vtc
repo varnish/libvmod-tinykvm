@@ -2,7 +2,7 @@ varnishtest "RISC-V Hello World Backend"
 
 shell {
 cat >${tmpdir}/${testname}.cpp <<-EOF
-#include "mini_api.hpp"
+#include "riscv_api.hpp"
 
 void start(int argc, char** argv)
 {
