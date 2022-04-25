@@ -319,6 +319,14 @@ long riscv_current_result_value(VRT_CTX, size_t idx)
 	return 503;
 }
 extern "C"
+const char* riscv_current_result_string(VRT_CTX, size_t idx)
+{
+	auto* script = rvs::get_machine(ctx);
+	if (script && idx < rvs::Script::RESULTS_MAX)
+		return script->want_workspace_string(idx);
+	return nullptr;
+}
+extern "C"
 int  riscv_current_is_paused(VRT_CTX)
 {
 	auto* script = rvs::get_machine(ctx);

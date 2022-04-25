@@ -2,6 +2,7 @@ vcl 4.1;
 import file;
 import goto;
 import riscv;
+import kvm;
 import std;
 import utils;
 
@@ -22,6 +23,14 @@ sub vcl_init {
 			"zpizza.com": {
 				"filename": "/tmp/riscv_zpizza",
 				"group": "test"
+			}
+		}
+	""");
+	kvm.embed_tenants("""
+		{
+			"ypizza.com": {
+				"filename": "/tmp/ypizza",
+				"key": "12daf155b8508edc4a4b8002264d7494"
 			}
 		}
 	""");
@@ -95,6 +104,14 @@ sub vcl_recv {
 			return (hash);
 		}
 	}
+	else if (riscv.want_result() == "compute") {
+		set req.http.X-KVM-Arg  = riscv.result_as_string(1);
+		if (riscv.result_value(0) == 0) {
+			return (pass);
+		} else {
+			return (hash);
+		}
+	}
 
 	return (synth(403, "No decision made"));
 }
@@ -121,14 +138,21 @@ sub vcl_backend_fetch {
 		return (fetch);
 	}
 
-	if (riscv.fork(bereq.http.Host, bereq.http.X-Debug)) {
-		riscv.vcall(ON_BACKEND_FETCH);
-		if (bereq.http.X-Backend-Func) {
+	if (bereq.http.X-Backend-Func) {
+		if (riscv.fork(bereq.http.Host, bereq.http.X-Debug)) {
+			riscv.vcall(ON_BACKEND_FETCH);
 			set bereq.backend = riscv.vm_backend(
 					bereq.http.X-Backend-Func,
 					bereq.http.X-Backend-Arg);
 			unset bereq.http.X-Decision;
 		}
+	}
+	else if (bereq.http.X-KVM-Arg) {
+		/* Regular request */
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				bereq.url,
+				bereq.http.X-KVM-Arg);
 	}
 }
 

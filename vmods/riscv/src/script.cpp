@@ -353,6 +353,17 @@ bool Script::guest_free(gaddr_t addr)
 	return machine().arena().free(addr) == 0;
 }
 
+const char* Script::want_workspace_string(size_t idx)
+{
+	const auto addr = m_want_values.at(idx);
+	const size_t len = machine().memory.strlen(addr);
+	char* str = (char *)WS_Alloc(m_ctx->ws, len + 1);
+	if (str != nullptr) {
+		machine().memory.memcpy_out(str, addr, len + 1);
+		return str;
+	}
+	return nullptr;
+}
 
 inline void Script::init_sha256()
 {

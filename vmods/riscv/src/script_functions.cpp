@@ -326,10 +326,14 @@ APICALL(set_backend)
 }
 APICALL(backend_decision)
 {
-	auto [caching, func, farg] =
-		machine.sysargs<unsigned, gaddr_t, gaddr_t> ();
+	auto [caching, func, farg, farglen] =
+		machine.sysargs<unsigned, gaddr_t, gaddr_t, gaddr_t> ();
 	auto& script = get_script(machine);
-	script.set_results("backend", {caching, func, farg}, true);
+	if (func != 0x0) {
+		script.set_results("backend", {caching, func, farg}, true);
+	} else {
+		script.set_results("compute", {caching, farg, farglen}, true);
+	}
 	machine.stop();
 }
 APICALL(ban)

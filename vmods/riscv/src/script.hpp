@@ -54,6 +54,7 @@ public:
 	const std::string& name() const noexcept;
 	const std::string& group() const noexcept;
 	auto* want_result() const noexcept { return m_want_result.c_str(); }
+	const char* want_workspace_string(size_t idx);
 	const auto& want_values() const noexcept { return m_want_values; }
 	void set_result(const std::string& res, gaddr_t value, bool p) {
 		m_want_result = res; m_want_values[0] = value; m_is_paused = p;

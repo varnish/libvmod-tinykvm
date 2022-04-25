@@ -113,7 +113,7 @@ $Function INT vm_callv(PRIV_VCL, STRING tenant,
 
 - Call self-registered function in tenant program.
 
-$Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING arg = "")
+$Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING arg0 = "", STRING arg1 = "")
 
 - Returns a backend that will call into the current machine to produce a response.
 - Produces 500 server error if there is not enough memory,
