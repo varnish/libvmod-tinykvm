@@ -154,13 +154,13 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			}
 			if (obj.contains("max_memory")) {
 				// Limits the memory of the Main VM.
-				group.max_memory = obj["max_memory"];
+				group.set_max_memory(obj["max_memory"]);
 			}
 			if (obj.contains("max_work_memory")) {
 				// Limits the memory of an ephemeral VM. Ephemeral VMs are used to handle
 				// requests (and faults in pages one by one using CoW). They are based
 				// off of the bigger Main VMs which use "max_memory" (and are identity-mapped).
-				group.max_work_mem = obj["max_work_memory"];
+				group.set_max_workmem(obj["max_work_memory"]);
 			}
 			if (obj.contains("max_boot_time")) {
 				group.max_boot_time = obj["max_boot_time"];

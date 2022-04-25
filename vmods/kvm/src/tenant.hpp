@@ -37,6 +37,9 @@ struct TenantGroup {
 
 	vmods_t vmods;
 
+	void set_max_memory(uint64_t newmax_mb) { this->max_memory = newmax_mb * 1048576ul; }
+	void set_max_workmem(uint64_t newmax_mb) { this->max_work_mem = newmax_mb * 1048576ul; }
+
 	TenantGroup(std::string n, float t, uint64_t mm, uint64_t mwm, vmods_t&& vm = vmods_t{})
 		: name{n}, max_time(t), max_boot_time(10.0),
 		  max_memory(mm * 1048576ul), max_work_mem(mwm * 1048576ul),
