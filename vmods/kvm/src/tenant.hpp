@@ -33,7 +33,7 @@ struct TenantGroup {
 		"LC_TYPE=C", "LC_ALL=C", "USER=root"
 	};
 
-        std::vector<std::string> allowed_paths;
+	std::vector<std::string> allowed_paths;
 
 	vmods_t vmods;
 
