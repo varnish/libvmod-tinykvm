@@ -111,11 +111,11 @@ APICALL(assertion_failed)
 APICALL(print)
 {
 	const auto [buffer] = machine.sysargs<riscv::Buffer> ();
+	auto& script = get_script(machine);
 	if (buffer.is_sequential()) {
-		machine.print(buffer.c_str(), buffer.size());
+		script.print({buffer.c_str(), buffer.size()});
 	} else {
-		const auto string = buffer.to_string();
-		machine.print(string.c_str(), string.size());
+		script.print(buffer.to_string());
 	}
 	machine.set_result(buffer.size());
 }
@@ -884,7 +884,7 @@ void Script::setup_syscall_interface()
 	static constexpr std::array<const machine_t::syscall_t, ECALL_LAST - SYSCALL_BASE> handlers {
 		FPTR(fail),
 		FPTR(assertion_failed),
-		FPTR(print),
+		FPTR(rvs::print),
 		FPTR(shm_log),
 		FPTR(breakpoint),
 		FPTR(signal),

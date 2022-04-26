@@ -72,9 +72,7 @@ long Script::resume_debugger()
 	instance().rsp_mtx.lock();
 	if (instance().rsp_script == this) {
 		instance().rsp_mtx.unlock();
-		m_currently_debugging = true;
 		this->run_debugger_loop();
-		m_currently_debugging = false;
 	} else {
 		instance().rsp_mtx.unlock();
 	}

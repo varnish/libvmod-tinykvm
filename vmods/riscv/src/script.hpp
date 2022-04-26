@@ -67,6 +67,8 @@ public:
 	bool is_storage() const noexcept { return m_is_storage; }
 	bool is_debug() const noexcept { return m_is_debug; }
 
+	void print(std::string_view text);
+
 	gaddr_t max_memory() const noexcept;
 	gaddr_t stack_begin() const noexcept { return arena_base() - 4096; /* guard page */ }
 	gaddr_t stack_base() const noexcept;
@@ -116,7 +118,7 @@ private:
 	bool        m_is_paused = false;
 	bool        m_is_storage = false;
 	bool        m_is_debug = false;
-	bool        m_currently_debugging = false;
+	bool        m_last_newline = true;
 	gaddr_t     m_sighandler = 0;
 	struct VSHA256Context* m_sha_ctx = nullptr;
 

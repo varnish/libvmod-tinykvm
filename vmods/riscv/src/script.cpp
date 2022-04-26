@@ -133,7 +133,7 @@ void Script::machine_setup(machine_t& machine, bool init)
 	machine.set_printer(
 		[this] (auto* data, size_t len) {
 			/* TODO: Use VSLb here or disable this completely */
-			printf(">>> %s: %.*s\n", this->name().c_str(), (int) len, data);
+			this->print({data, len});
 		});
 	machine.set_stdin([] (auto*, size_t) { return 0; });
 
@@ -305,6 +305,15 @@ void Script::handle_timeout(gaddr_t address)
 			max_instructions(), callsite.name.c_str());
 	}
 	VRT_fail(m_ctx, "Script for '%s' timed out", name().c_str());
+}
+void Script::print(std::string_view text)
+{
+	if (this->m_last_newline) {
+		printf(">>> [%s]: %.*s", name().c_str(), (int)text.size(), text.begin());
+	} else {
+		printf("%.*s", (int)text.size(), text.begin());
+	}
+	this->m_last_newline = (text.back() == '\n');
 }
 void Script::print_backtrace(const gaddr_t addr)
 {

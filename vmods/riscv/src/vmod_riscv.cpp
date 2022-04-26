@@ -240,7 +240,7 @@ long riscv_current_call_idx(VRT_CTX, vcall_info info)
 			auto& entry = script->instance().sym_vector[info.idx];
 			if (UNLIKELY(entry.addr == 0)) {
 				VSLb(ctx->vsl, SLT_Error,
-					"VM call '%s' failed: The function at index %d is not availble",
+					"VM call '%s' skipped: The function at index %d is not available",
 					entry.func, info.idx);
 				return -1;
 			}
