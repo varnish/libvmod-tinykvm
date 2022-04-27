@@ -56,6 +56,8 @@ Script::Script(
 	bool storage, bool debug)
 	: m_machine(binary, {
 		.memory_max = vrm->config.max_memory(),
+		// XXX: Our tests are not built with XO
+		//.enforce_exec_only = true,
 #ifdef RISCV_BINARY_TRANSLATION
 		// Time-saving translator options
 		// NOTE: 0 means translator is disabled (for debugging)
