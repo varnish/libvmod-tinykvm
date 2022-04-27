@@ -176,15 +176,11 @@ rvs::Script* riscv_fork(VRT_CTX, const char* tenant, int debug)
 	using namespace rvs;
 
 	extern SandboxTenant* tenant_find(VRT_CTX, const char* name);
-	auto* vrm = tenant_find(ctx, tenant);
-	if (UNLIKELY(vrm == nullptr))
+	auto* tenptr = tenant_find(ctx, tenant);
+	if (UNLIKELY(tenptr == nullptr))
 		return nullptr;
 
-	auto* script = vrm->vmfork(ctx, debug);
-	if (UNLIKELY(script == nullptr))
-		return nullptr;
-
-	return script;
+	return tenptr->vmfork(ctx, debug);
 }
 
 extern "C"
