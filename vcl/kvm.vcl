@@ -32,7 +32,7 @@ sub vcl_init {
 			"xpizza.com": {
 				"filename": "/tmp/xpizza",
 				"key": "12daf155b8508edc4a4b8002264d7494",
-				"group": "hugepages"
+				"group": "test"
 			},
 			"ypizza.com": {
 				"filename": "/tmp/ypizza",
