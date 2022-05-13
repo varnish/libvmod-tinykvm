@@ -318,7 +318,7 @@ void Script::handle_timeout(gaddr_t address)
 void Script::print(std::string_view text)
 {
 	if (this->m_last_newline) {
-		printf(">>> [%s]: %.*s", name().c_str(), (int)text.size(), text.begin());
+		printf(">>> [%s] %.*s", name().c_str(), (int)text.size(), text.begin());
 	} else {
 		printf("%.*s", (int)text.size(), text.begin());
 	}
