@@ -11,47 +11,14 @@ extern "C" {
 # include <cache/cache_vcl.h>
 }
 #include <curl/curl.h>
-#undef curl_easy_getinfo
-#include <dlfcn.h>
-
-extern "C" {
-	void* VMOD_Handle(struct vmod *);
-	typedef struct vmod *(*vmod_handle_f) ();
-}
 
 namespace kvm {
+typedef size_t (*write_callback)(char *, size_t, size_t, void *);
 
-#define vlookup(x) \
-	auto x = (x ##_t) dlsym(nullptr, #x)
-inline auto* validate_deref(const char** ptr, const char* s) {
-	if (ptr != nullptr)
-		return *ptr;
-	throw std::runtime_error("Invalid pointer for enum: " + std::string(s));
-}
-
-void initialize_vmod_http(VRT_CTX, VCL_PRIV task)
+void initialize_curl(VRT_CTX, VCL_PRIV task)
 {
 	(void) ctx;
-	/* Discover curl. */
-	void* handle = nullptr;
-	if (dlsym(handle, "curl_easy_init") == nullptr) {
-		printf("*** Curl dyncall: CURL NOT FOUND\n");
-		TenantConfig::reset_dynamic_call(task, "curl.fetch");
-		return;
-	}
-
-	typedef CURL* (*curl_easy_init_t) (void);
-	typedef CURLcode (*curl_easy_setopt_t)(CURL *, CURLoption, ...);
-	typedef CURLcode (*curl_easy_perform_t)(CURL *);
-	typedef CURLcode (*curl_easy_getinfo_t)(CURL *, CURLINFO, ...);
-	typedef void (*curl_easy_cleanup_t)(CURL *);
-	typedef size_t (*write_callback)(char *, size_t, size_t, void *);
-	vlookup(curl_easy_init);
-	vlookup(curl_easy_setopt);
-	vlookup(curl_easy_perform);
-	vlookup(curl_easy_getinfo);
-	vlookup(curl_easy_cleanup);
-
+	/* CURL is already linked to libvmod_kvm. */
 	TenantConfig::set_dynamic_call(task, "curl.fetch",
 	[=] (MachineInstance& inst)
 	{

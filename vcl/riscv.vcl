@@ -12,6 +12,10 @@ sub vcl_init {
 	new f = file.init(std.getenv("HOME"));
 	riscv.embed_tenants("""
 		{
+			"vpizza.com": {
+				"filename": "/tmp/riscv_vpizza",
+				"group": "test"
+			},
 			"xpizza.com": {
 				"filename": "/tmp/riscv_xpizza",
 				"group": "test"
@@ -28,6 +32,11 @@ sub vcl_init {
 	""");
 	kvm.embed_tenants("""
 		{
+			"vpizza.com": {
+				"filename": "/tmp/vpizza",
+				"key": "12daf155b8508edc4a4b8002264d7494",
+				"group": "test"
+			},
 			"ypizza.com": {
 				"filename": "/tmp/ypizza",
 				"key": "12daf155b8508edc4a4b8002264d7494",
@@ -91,10 +100,7 @@ sub vcl_recv {
 	riscv.vcall(ON_REQUEST);
 
 	/* Make decision */
-	if (riscv.want_result() == "hash") {
-		return (hash);
-	}
-	else if (riscv.want_result() == "synth") {
+	if (riscv.want_result() == "synth") {
 		return (synth(riscv.want_status()));
 	}
 	else if (riscv.want_result() == "backend") {

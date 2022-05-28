@@ -1,8 +1,6 @@
 vcl 4.1;
-import file;
 import kvm;
 import std;
-import utils;
 
 backend default none;
 
@@ -38,15 +36,6 @@ sub vcl_init {
 			}
 		}
 	""");
-	kvm.embed_tenants("""
-		{
-			"jpizza.com": {
-				"key": "12daf155b8508edc4a4b8002264d7494",
-				"group": "test"
-			}
-		}
-	""");
-	new f = file.init("/tmp");
 }
 
 sub vcl_recv {
@@ -60,38 +49,11 @@ sub vcl_recv {
 	else if (req.url ~ "^/z") {
 		set req.http.Host = "zpizza.com";
 	}
-	else if (req.url ~ "^/j") {
-		set req.http.Host = "jpizza.com";
-		return (pass);
-	}
 	else if (req.url == "/v") {
 		set req.http.Host = "vpizza.com";
 	}
 	else if (req.url == "/w") {
 		set req.http.Host = "wpizza.com";
-	}
-	else if (req.url == "/hash") {
-		set req.http.Host = "xpizza.com";
-		return (hash);
-	}
-	else if (req.url == "/kvmfront") {
-		# Front-end KVM call
-		kvm.vm_callv("xpizza.com", ON_REQUEST);
-		# Hashed response
-		set req.backend_hint = f.backend();
-		set req.http.Host = "file";
-		return (hash);
-	}
-	else if (req.url == "/file") {
-		set req.backend_hint = f.backend();
-		set req.http.Host = "file";
-		return (pass);
-	}
-	else if (req.url == "/fbench") {
-		set req.backend_hint = f.backend();
-		set req.http.Host = "file";
-		set req.url = "/file?foo=" + utils.fast_random_int(100);
-		return (hash);
 	}
 	else if (req.http.Host ~ "^.+\..+:\d+$") {
 		/* This will preserve good Host headers */

@@ -175,14 +175,15 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 				group.allowed_paths = obj["allowed_paths"].get<std::vector<std::string>>();
 			}
 			// Tenant configuration
-			if (obj.contains("filename")
-				&& obj.contains("key")
-				&& obj.contains("group"))
+			if (obj.contains("key") && obj.contains("group"))
 			{
+				/* Filenames are optional. */
+				std::string filename = "";
+				if (obj.contains("filename")) filename = obj["filename"];
 				/* Use the group data except filename */
 				kvm::load_tenant(ctx, task, kvm::TenantConfig{
 					it.key(),
-					obj["filename"],
+					filename,
 					obj["key"],
 					group,
 					kvm::tenancy(task).dynamic_functions

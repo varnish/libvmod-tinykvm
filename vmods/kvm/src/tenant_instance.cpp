@@ -18,8 +18,18 @@ TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 		MachineInstance::kvm_initialize();
 	}
 
+	/* Check if the tenant has a program. */
+	if (conf.filename.empty()) {
+		VSL(SLT_Error, 0,
+			"No filename specified for '%s'. Send new program.",
+			conf.name.c_str());
+		fprintf(stderr,
+			"No filename specified for '%s'. Send new program.\n",
+			conf.name.c_str());
+		return;
+	}
 	/* Check if we can read the program filename. */
-	if (access(conf.filename.c_str(), R_OK)) {
+	else if (access(conf.filename.c_str(), R_OK)) {
 		VSL(SLT_Error, 0,
 			"Missing program or invalid path for '%s'. Send new program.",
 			conf.name.c_str());
