@@ -2,15 +2,15 @@ varnishtest "RISC-V Faulty Loop Test"
 
 shell {
 cat >${tmpdir}/${testname}.cpp <<-EOF
-#include "mini_api.hpp"
+#include "riscv_api.hpp"
 
-void start(int argc, char** argv) {
-	exit(0);
-}
-
-void on_recv()
+static void on_recv(int, int)
 {
 	while(1);
+}
+
+void start(int argc, char** argv) {
+	wait_for_requests(on_recv);
 }
 EOF
 bash ${testdir}/build.sh ${tmpdir}/${testname}.cpp ${testdir} ${tmpdir}/${testname}

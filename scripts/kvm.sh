@@ -8,6 +8,6 @@ mkdir -p $NTMP
 # fixes VMOD cache bugs
 rm -rf /tmp/varnishd/*
 
-source $file --vcp=build --optimize --static-kvm --build $@ --run -a :8080 -f vcl/kvm.vcl -F -n $NTMP -p $BWS
-#source $file --vcp=build --no-optimize --static-kvm --mold --build $@ --run -a :8080 -f vcl/kvm.vcl -F -n $NTMP -p $BWS
-#source $file --vcp=build --no-optimize --debug --single-process --static-kvm --mold --build $@ --run -a :8080 -f vcl/kvm.vcl -F -n $NTMP -p $BWS
+#source $file --vcp=build --optimize --static-kvm --build $@ --run -a :8080 -f vcl/kvm.vcl -F -n $NTMP -p $BWS
+source $file --vcp=build --no-optimize --static-kvm --shared-riscv --mold --build $@ --run -a :8080 -f vcl/kvm_example.vcl -F -n $NTMP -p $BWS
+#source $file --vcp=build --no-optimize --debug --single-process --shared-kvm --disable-mold --build $@ --run -a :8080 -f vcl/kvm.vcl -F -n $NTMP -p $BWS

@@ -36,21 +36,25 @@ void SandboxTenant::init()
 	Script::init();
 }
 
+static inline void* get_priv_key(VRT_CTX) {
+	if (ctx->req) return ctx->req;
+	return ctx->bo;
+}
+
 Script* SandboxTenant::vmfork(VRT_CTX, bool debug)
 {
-	void* priv_key = ctx->req;
-	auto* priv_task = VRT_priv_task(ctx, (priv_key) ? priv_key : ctx->bo);
+	auto* priv_task = VRT_priv_task(ctx, get_priv_key(ctx));
 	if (!priv_task->priv)
 	{
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t0);
 	#endif
 		std::shared_ptr<MachineInstance> prog;
-		if (!debug)
+		if (LIKELY(!debug))
 			prog = this->program;
 		else
 			prog = this->debug_program;
-		/* First-time tenants could have no prog */
+		/* First-time tenants could have no program loaded */
 		if (UNLIKELY(prog == nullptr))
 			return nullptr;
 		/* Allocate Script on workspace, and construct it in-place */
@@ -59,6 +63,7 @@ Script* SandboxTenant::vmfork(VRT_CTX, bool debug)
 			VRT_fail(ctx, "Out of workspace");
 			return nullptr;
 		}
+		// Make sure Script* is 16-byte aligned
 		saddr = (saddr + 0xF) & ~(uintptr_t)0xF;
 		auto* script = (Script*) saddr;
 

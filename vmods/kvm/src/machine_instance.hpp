@@ -94,7 +94,6 @@ private:
 	ProgramInstance* m_inst;
 	bool        m_is_storage = false;
 	bool        m_is_debug = false;
-	bool        m_currently_debugging = false;
 	bool        m_waiting_for_requests = false;
 	uint16_t    m_result = 0;
 	gaddr_t     m_sighandler = 0;

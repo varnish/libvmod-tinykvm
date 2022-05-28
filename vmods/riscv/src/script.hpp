@@ -54,6 +54,7 @@ public:
 	const std::string& name() const noexcept;
 	const std::string& group() const noexcept;
 	auto* want_result() const noexcept { return m_want_result.c_str(); }
+	const char* want_workspace_string(size_t idx);
 	const auto& want_values() const noexcept { return m_want_values; }
 	void set_result(const std::string& res, gaddr_t value, bool p) {
 		m_want_result = res; m_want_values[0] = value; m_is_paused = p;
@@ -61,9 +62,12 @@ public:
 	void set_results(const std::string& res, std::array<gaddr_t, RESULTS_MAX> values, bool p) {
 		m_want_result = res; m_want_values = values; m_is_paused = p;
 	}
+	void pause() noexcept { m_is_paused = true; }
 	bool is_paused() const noexcept { return m_is_paused; }
 	bool is_storage() const noexcept { return m_is_storage; }
 	bool is_debug() const noexcept { return m_is_debug; }
+
+	void print(std::string_view text);
 
 	gaddr_t max_memory() const noexcept;
 	gaddr_t stack_begin() const noexcept { return arena_base() - 4096; /* guard page */ }
@@ -92,13 +96,13 @@ public:
 	Script(const std::vector<uint8_t>&, const vrt_ctx*, const SandboxTenant*, MachineInstance&, bool sto, bool dbg);
 	Script(const Script& source, const vrt_ctx*, const SandboxTenant*, MachineInstance&);
 	~Script();
+	void machine_initialize();
 	bool reset(); // true if the reset was successful
 
 private:
 	void handle_exception(gaddr_t);
 	void handle_timeout(gaddr_t);
 	bool install_binary(const std::string& file, bool shared = true);
-	void machine_initialize();
 	void machine_setup(machine_t&, bool init);
 	void setup_virtual_memory(bool init);
 	static void setup_syscall_interface();
@@ -110,11 +114,11 @@ private:
 	gaddr_t     m_heap_base = 0;
 
 	std::string m_want_result;
-	std::array<gaddr_t, RESULTS_MAX> m_want_values = {403, 0};
+	std::array<gaddr_t, RESULTS_MAX> m_want_values = {};
 	bool        m_is_paused = false;
 	bool        m_is_storage = false;
 	bool        m_is_debug = false;
-	bool        m_currently_debugging = false;
+	bool        m_last_newline = true;
 	gaddr_t     m_sighandler = 0;
 	struct VSHA256Context* m_sha_ctx = nullptr;
 

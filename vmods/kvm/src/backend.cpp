@@ -42,7 +42,7 @@ static inline void kvm_ts(struct vsl_log *vsl, const char *event,
 
 extern "C"
 void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
-	const char *farg, struct backend_post *post, struct backend_result *result)
+	const char *farg[2], struct backend_post *post, struct backend_result *result)
 {
 	double t_prev = VTIM_real();
 	double t_work = VTIM_real();
@@ -61,7 +61,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			if (post == nullptr) {
 				/* Call the backend compute function */
 				vm.timed_vmcall(prog.entry_at(ProgramEntryIndex::BACKEND_COMP),
-					timeout, farg,
+					timeout, farg[0], farg[1],
 					(int) HDR_BEREQ, (int) HDR_BERESP);
 			} else if (post->process_func == 0x0) {
 				/* Call the backend POST function */
@@ -69,12 +69,12 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				if (UNLIKELY(vm_entry_addr == 0x0))
 					throw std::runtime_error("The POST callback has not been registered");
 				vm.timed_vmcall(vm_entry_addr,
-					timeout, farg,
+					timeout, farg[0],
 					(uint64_t) post->address, (uint64_t) post->length);
 			} else {
 				/* Call the backend streaming POST function */
 				vm.timed_vmcall(prog.entry_at(ProgramEntryIndex::BACKEND_STREAM),
-					timeout, farg,
+					timeout, farg[0],
 					(uint64_t) post->length);
 			}
 			kvm_ts(ctx->vsl, "ProgramResponse", t_work, t_prev, VTIM_real());

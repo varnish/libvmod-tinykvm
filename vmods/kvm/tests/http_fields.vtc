@@ -6,10 +6,10 @@ cat >${tmpdir}/${testname}.c <<-EOF
 #include <string.h>
 #include "kvm_api.h"
 
-static void my_backend(const char *arg, int req, int resp)
+static void my_backend(const char *arg1, char *arg2, int req, int resp)
 {
 	http_append(resp, "X-Value: 5", 10);
-	backend_response_str(200, "text/plain", arg);
+	backend_response_str(200, "text/plain", arg1);
 }
 
 int main(int argc, char **argv)

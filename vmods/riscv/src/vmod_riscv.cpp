@@ -176,15 +176,11 @@ rvs::Script* riscv_fork(VRT_CTX, const char* tenant, int debug)
 	using namespace rvs;
 
 	extern SandboxTenant* tenant_find(VRT_CTX, const char* name);
-	auto* vrm = tenant_find(ctx, tenant);
-	if (UNLIKELY(vrm == nullptr))
+	auto* tenptr = tenant_find(ctx, tenant);
+	if (UNLIKELY(tenptr == nullptr))
 		return nullptr;
 
-	auto* script = vrm->vmfork(ctx, debug);
-	if (UNLIKELY(script == nullptr))
-		return nullptr;
-
-	return script;
+	return tenptr->vmfork(ctx, debug);
 }
 
 extern "C"
@@ -240,7 +236,7 @@ long riscv_current_call_idx(VRT_CTX, vcall_info info)
 			auto& entry = script->instance().sym_vector[info.idx];
 			if (UNLIKELY(entry.addr == 0)) {
 				VSLb(ctx->vsl, SLT_Error,
-					"VM call '%s' failed: The function at index %d is not availble",
+					"VM call '%s' skipped: The function at index %d is not available",
 					entry.func, info.idx);
 				return -1;
 			}
@@ -317,6 +313,14 @@ long riscv_current_result_value(VRT_CTX, size_t idx)
 	if (script && idx < rvs::Script::RESULTS_MAX)
 		return script->want_values().at(idx);
 	return 503;
+}
+extern "C"
+const char* riscv_current_result_string(VRT_CTX, size_t idx)
+{
+	auto* script = rvs::get_machine(ctx);
+	if (script && idx < rvs::Script::RESULTS_MAX)
+		return script->want_workspace_string(idx);
+	return nullptr;
 }
 extern "C"
 int  riscv_current_is_paused(VRT_CTX)

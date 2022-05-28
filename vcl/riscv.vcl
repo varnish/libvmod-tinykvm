@@ -2,6 +2,7 @@ vcl 4.1;
 import file;
 import goto;
 import riscv;
+import kvm;
 import std;
 import utils;
 
@@ -11,6 +12,10 @@ sub vcl_init {
 	new f = file.init(std.getenv("HOME"));
 	riscv.embed_tenants("""
 		{
+			"vpizza.com": {
+				"filename": "/tmp/riscv_vpizza",
+				"group": "test"
+			},
 			"xpizza.com": {
 				"filename": "/tmp/riscv_xpizza",
 				"group": "test"
@@ -22,6 +27,28 @@ sub vcl_init {
 			"zpizza.com": {
 				"filename": "/tmp/riscv_zpizza",
 				"group": "test"
+			}
+		}
+	""");
+	kvm.embed_tenants("""
+		{
+			"vpizza.com": {
+				"filename": "/tmp/vpizza",
+				"key": "12daf155b8508edc4a4b8002264d7494",
+				"group": "test"
+			},
+			"ypizza.com": {
+				"filename": "/tmp/ypizza",
+				"key": "12daf155b8508edc4a4b8002264d7494",
+				"group": "test",
+				"allowed_paths": [
+					"/usr/lib/x86_64-linux-gnu/espeak-ng-data/espeak-ng-data",
+					"/usr/lib/x86_64-linux-gnu/espeak-ng-data",
+					"/usr/lib/locale/locale-archive",
+					"/usr/share/locale/locale.alias",
+					"/usr/lib/locale/C.utf8/LC_CTYPE",
+					"/usr/lib/locale/C.UTF-8/LC_CTYPE"
+				]
 			}
 		}
 	""");
@@ -42,7 +69,7 @@ sub vcl_recv {
 		//set req.url = req.url + "?foo=" + utils.thread_id();
 		//set req.url = req.url + "?foo=" + utils.fast_random_int(100);
 	}
-	else if (req.url == "/y") {
+	else if (req.url ~ "/y") {
 		set req.http.Host = "ypizza.com";
 	}
 	else if (req.url == "/z") {
@@ -56,13 +83,6 @@ sub vcl_recv {
 
 		/* Live update mechanism */
 		if (req.method == "POST") {
-			if (req.url == "/") {
-				set req.backend_hint = riscv.live_update(req.http.Host, 15MB);
-			} else if (req.url == "/debug") {
-				set req.backend_hint = riscv.live_debug(req.http.Host, 15MB);
-			} else {
-				return (synth(403));
-			}
 			std.cache_req_body(15MB);
 			return (pass);
 		}
@@ -80,15 +100,20 @@ sub vcl_recv {
 	riscv.vcall(ON_REQUEST);
 
 	/* Make decision */
-	if (riscv.want_result() == "hash") {
-		return (hash);
-	}
-	else if (riscv.want_result() == "synth") {
+	if (riscv.want_result() == "synth") {
 		return (synth(riscv.want_status()));
 	}
 	else if (riscv.want_result() == "backend") {
 		set req.http.X-Backend-Func = riscv.result_value(1);
 		set req.http.X-Backend-Arg  = riscv.result_value(2);
+		if (riscv.result_value(0) == 0) {
+			return (pass);
+		} else {
+			return (hash);
+		}
+	}
+	else if (riscv.want_result() == "compute") {
+		set req.http.X-KVM-Arg  = riscv.result_as_string(1);
 		if (riscv.result_value(0) == 0) {
 			return (pass);
 		} else {
@@ -118,17 +143,38 @@ sub vcl_synth {
 
 sub vcl_backend_fetch {
 	if (bereq.method == "POST") {
+		if (bereq.http.X-KVM && bereq.http.X-PostKey) {
+			/* KVM Live update POST */
+			set bereq.backend = kvm.live_update(
+				bereq.http.Host, bereq.http.X-PostKey, 20MB);
+		}
+		else if (bereq.url == "/") {
+			set bereq.backend = riscv.live_update(
+				bereq.http.Host, 15MB);
+		} else if (bereq.url == "/debug") {
+			set bereq.backend = riscv.live_debug(
+				bereq.http.Host, 15MB);
+		} else {
+			return (fail);
+		}
 		return (fetch);
 	}
 
-	if (riscv.fork(bereq.http.Host, bereq.http.X-Debug)) {
-		riscv.vcall(ON_BACKEND_FETCH);
-		if (bereq.http.X-Backend-Func) {
+	if (bereq.http.X-Backend-Func) {
+		if (riscv.fork(bereq.http.Host, bereq.http.X-Debug)) {
+			riscv.vcall(ON_BACKEND_FETCH);
 			set bereq.backend = riscv.vm_backend(
 					bereq.http.X-Backend-Func,
 					bereq.http.X-Backend-Arg);
 			unset bereq.http.X-Decision;
 		}
+	}
+	else if (bereq.http.X-KVM-Arg) {
+		/* Regular request */
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				bereq.url,
+				bereq.http.X-KVM-Arg);
 	}
 }
 

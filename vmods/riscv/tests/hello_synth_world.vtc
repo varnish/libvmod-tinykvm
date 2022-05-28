@@ -2,14 +2,9 @@ varnishtest "RISC-V Hello World Synth"
 
 shell {
 cat >${tmpdir}/${testname}.cpp <<-EOF
-#include "mini_api.hpp"
+#include "riscv_api.hpp"
 
-void start(int argc, char** argv)
-{
-	exit(0);
-}
-
-void on_recv(int req, int resp)
+static void on_recv(int req, int resp)
 {
 	static const char reason[] = "synth";
 	decision(reason, sizeof(reason)-1, 404);
@@ -23,12 +18,16 @@ void on_synth()
 	if (strcmp(url, "/") == 0) {
 		static const char mime[] = "text/plain";
 		static const char text[] = "Hello World";
-		synth(mime, sizeof(mime)-1, text, sizeof(text)-1);
+		synth(200, mime, sizeof(mime)-1, text, sizeof(text)-1);
 	} else {
 		static const char mime[] = "text/plain";
 		static const char text[] = "Not root URL";
-		synth(mime, sizeof(mime)-1, text, sizeof(text)-1);
+		synth(500, mime, sizeof(mime)-1, text, sizeof(text)-1);
 	}
+}
+
+void start(int argc, char** argv) {
+	wait_for_requests(on_recv);
 }
 EOF
 bash ${testdir}/build.sh ${tmpdir}/${testname}.cpp ${testdir} ${tmpdir}/${testname}
@@ -77,9 +76,9 @@ client c1 {
 	txreq -url "/" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.body == "Hello World"
-	expect resp.status == 404
+	expect resp.status == 200
 	txreq -url "/1" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.body == "Not root URL"
-	expect resp.status == 404
+	expect resp.status == 500
 } -run

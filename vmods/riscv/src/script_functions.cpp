@@ -111,11 +111,11 @@ APICALL(assertion_failed)
 APICALL(print)
 {
 	const auto [buffer] = machine.sysargs<riscv::Buffer> ();
+	auto& script = get_script(machine);
 	if (buffer.is_sequential()) {
-		machine.print(buffer.c_str(), buffer.size());
+		script.print({buffer.c_str(), buffer.size()});
 	} else {
-		const auto string = buffer.to_string();
-		machine.print(string.c_str(), string.size());
+		script.print(buffer.to_string());
 	}
 	machine.set_result(buffer.size());
 }
@@ -295,13 +295,25 @@ APICALL(my_name)
 }
 APICALL(set_decision)
 {
-	auto [result, status, paused] =
-		machine.sysargs<riscv::Buffer, gaddr_t, bool> ();
-	auto& script = get_script(machine);
-	if (result.is_sequential()) {
-		script.set_result(result.c_str(), status, paused);
-	} else {
+	if (machine.is_forked())
+	{
+		// A forked VM in any VCL stage
+		auto [result, status, paused] =
+			machine.sysargs<riscv::Buffer, gaddr_t, bool> ();
+		auto& script = get_script(machine);
 		script.set_result(result.to_string(), status, paused);
+	} else {
+		// An initializing tenant VM
+		auto [on_recv] = machine.sysargs<gaddr_t> ();
+		// Set the tenant as paused
+		auto& script = get_script(machine);
+		script.pause();
+		// Overwrite the on_recv function, if set
+		if (on_recv != 0x0) {
+			auto& inst = script.instance();
+			inst.sym_vector.at(1).addr = on_recv;
+			inst.sym_vector.at(1).size = 16;
+		}
 	}
 	machine.stop();
 }
@@ -314,10 +326,14 @@ APICALL(set_backend)
 }
 APICALL(backend_decision)
 {
-	auto [caching, func, farg] =
-		machine.sysargs<unsigned, gaddr_t, gaddr_t> ();
+	auto [caching, func, farg, farglen] =
+		machine.sysargs<unsigned, gaddr_t, gaddr_t, gaddr_t> ();
 	auto& script = get_script(machine);
-	script.set_results("backend", {caching, func, farg}, true);
+	if (func != 0x0) {
+		script.set_results("backend", {caching, func, farg}, true);
+	} else {
+		script.set_results("compute", {caching, farg, farglen}, true);
+	}
 	machine.stop();
 }
 APICALL(ban)
@@ -351,37 +367,75 @@ APICALL(synth)
 	if (ctx->method == VCL_MET_SYNTH ||
 		ctx->method == VCL_MET_BACKEND_ERROR)
 	{
+		// Synth responses are always using HDR_RESP
 		auto* hp = get_http(ctx, HDR_RESP);
-		const auto [type, data] = machine.sysargs<riscv::Buffer, riscv::Buffer> ();
-		http_PrintfHeader(hp, "Content-Length: %u", data.size());
-		http_PrintfHeader(hp, "Content-Type: %.*s", (int) type.size(), type.to_string().c_str());
+		const auto [status, type, data] = machine.sysargs<uint16_t, riscv::Buffer, riscv::Buffer> ();
+		if (UNLIKELY(status < 100))
+			throw std::runtime_error("Invalid synth status code: " + std::to_string(status));
 
-		auto* vsb = (struct vsb*) ctx->specific;
+		http_SetStatus(hp, status);
+		http_PrintfHeader(hp, "Content-Length: %u", data.size());
+		if (type.is_sequential())
+			http_PrintfHeader(hp, "Content-Type: %.*s", (int)type.size(), type.data());
+		else
+			http_PrintfHeader(hp, "Content-Type: %.*s", (int)type.size(), type.to_string().c_str());
+
+		auto* vsb = (struct vsb *)ctx->specific;
 		assert(vsb != nullptr);
 
+		// riscv::Buffer tries to accumulate the data in a way
+		// that preserves continuity even if it crosses many pages.
+		// Sadly, even if just one data range is different, we need
+		// to sequentialize it.
 		if (data.is_sequential()) {
-			/* we need to get rid of the old data */
+			// Delete any old heap-allocated data
 			if (vsb->s_flags & VSB_DYNAMIC) {
 				free(vsb->s_buf);
 			}
-			vsb->s_buf = (char*) data.c_str();
+			// Make VSB fixed length, which does not call free
+			// XXX: Varnish will literally append a \0 at len.
+			vsb->s_buf = (char *)data.c_str();
 			vsb->s_size = data.size() + 1; /* pretend-zero */
 			vsb->s_len  = data.size();
 			vsb->s_flags = VSB_FIXEDLEN;
 		} else {
-			VSB_clear(vsb);
-			VSB_bcat(vsb, data.to_string().c_str(), data.size());
+			// By using realloc we do not need to delete old data,
+			// although only if s_flags is *not* VSB_FIXEDLEN.
+			// We allocate one more byte for the VCP-appended zero.
+			char* new_buffer = nullptr;
+			if (vsb->s_flags & VSB_DYNAMIC) {
+				new_buffer = (char *)realloc(vsb->s_buf, data.size()+1);
+			} else if (vsb->s_flags & VSB_FIXEDLEN) {
+				new_buffer = (char *)malloc(data.size()+1);
+			} else {
+				throw std::runtime_error("Unable to determine type of synth content buffer");
+			}
+			if (UNLIKELY(new_buffer == nullptr))
+				throw std::runtime_error("Unable to allocate room for synth content buffer");
+			data.copy_to(new_buffer, data.size());
+			vsb->s_buf = new_buffer;
+			vsb->s_size = data.size()+1;
+			vsb->s_len  = data.size();
+			vsb->s_flags = VSB_DYNAMIC;
 		}
-		//VSB_finish(vsb);
 		machine.stop();
 #ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);
 		printf("Time spent in synth syscall: %ld ns\n", nanodiff(t0, t1));
 #endif
 		return;
+	} else if (ctx->method == VCL_MET_RECV) {
+		auto& script = get_script(machine);
+		// Pause the program until VCL_MET_SYNTH.
+		script.set_result("synth", 100, true);
+		// This will cause a retrigger of this system call once
+		// we are in VCL_MET_SYNTH.
+		machine.cpu.increment_pc(-4);
+		machine.stop();
+		return;
 	}
 	throw std::runtime_error(
-	    "Synth can only be used in vcl_synth or vcl_backend_error");
+		"Synth can only be used in vcl_synth or vcl_backend_error");
 }
 APICALL(cacheable)
 {
@@ -744,8 +798,8 @@ APICALL(regex_match)
 	auto [index, buffer] = machine.sysargs<uint32_t, riscv::Buffer> ();
 	auto* vre = get_script(machine).regex().get(index);
 	/* VRE_exec(const vre_t *code, const char *subject, int length,
-	    int startoffset, int options, int *ovector, int ovecsize,
-	    const volatile struct vre_limits *lim) */
+		int startoffset, int options, int *ovector, int ovecsize,
+		const volatile struct vre_limits *lim) */
 	if (buffer.is_sequential()) {
 		machine.set_result(
 			VRE_exec(vre, buffer.c_str(), buffer.size(), 0,
@@ -830,7 +884,7 @@ void Script::setup_syscall_interface()
 	static constexpr std::array<const machine_t::syscall_t, ECALL_LAST - SYSCALL_BASE> handlers {
 		FPTR(fail),
 		FPTR(assertion_failed),
-		FPTR(print),
+		FPTR(rvs::print),
 		FPTR(shm_log),
 		FPTR(breakpoint),
 		FPTR(signal),

@@ -50,7 +50,7 @@ void ProgramInstance::set_entry_at(const int idx, gaddr_t addr)
 }
 
 Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
-	TenantInstance* tenant, std::shared_ptr<ProgramInstance>& prog)
+	TenantInstance*, std::shared_ptr<ProgramInstance>& prog)
 {
 	VMPoolItem* slot = nullptr;
 	m_vmqueue.wait_dequeue(slot);

@@ -1,23 +1,30 @@
 #!/bin/bash
-CLANG_VERSION=10
+CLANG="clang"
+CLANGPP="clang++"
 if command -v "clang-11" &> /dev/null; then
-	CLANG_VERSION=11
+	CLANG="clang-11"
+	CLANGPP="clang++-11"
 fi
 if command -v "clang-12" &> /dev/null; then
-	CLANG_VERSION=12
+	CLANG="clang-12"
+	CLANGPP="clang++-12"
 fi
 if command -v "clang-13" &> /dev/null; then
-	CLANG_VERSION=13
+	CLANG="clang-13"
+	CLANGPP="clang++-13"
 fi
 if command -v "clang-14" &> /dev/null; then
-	CLANG_VERSION=14
+	CLANG="clang-14"
+	CLANGPP="clang++-14"
 fi
-if command -v "clang-15" &> /dev/null; then
-	CLANG_VERSION=15
-fi
-echo "Detected Clang version ${CLANG_VERSION}"
-export CC="ccache clang-${CLANG_VERSION}"
-export CXX="ccache clang++-${CLANG_VERSION}"
+# WARNING: Produces too new debug info for GDB
+#if command -v "clang-15" &> /dev/null; then
+#	CLANG="clang-15"
+#	CLANGPP="clang++-15"
+#fi
+echo "Detected Clang: ${CLANG}, ${CLANGPP}"
+export CC="ccache ${CLANG}"
+export CXX="ccache ${CLANGPP}"
 BUILD_PATH="$PWD"
 SOURCE_DIR="$PWD"
 
@@ -110,6 +117,10 @@ case $i in
     ;;
 	--mold)
     args="$args -DUSE_MOLD=ON"
+    shift
+    ;;
+	--disable-mold)
+    args="$args -DUSE_MOLD=OFF"
     shift
     ;;
 	--static-kvm)

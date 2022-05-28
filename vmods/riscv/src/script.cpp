@@ -56,6 +56,8 @@ Script::Script(
 	bool storage, bool debug)
 	: m_machine(binary, {
 		.memory_max = vrm->config.max_memory(),
+		// XXX: Our tests are not built with XO
+		//.enforce_exec_only = true,
 #ifdef RISCV_BINARY_TRANSLATION
 		// Time-saving translator options
 		// NOTE: 0 means translator is disabled (for debugging)
@@ -68,7 +70,6 @@ Script::Script(
 	  m_regex     {vrm->config.max_regex()},
 	  m_directors {vrm->config.max_backends()}
 {
-	this->machine_initialize();
 }
 
 void Script::init()
@@ -113,6 +114,10 @@ void Script::machine_initialize()
 	// run through the initialization
 	try {
 		machine().simulate<true>(max_instructions());
+		if (!this->is_paused()) {
+			throw std::runtime_error("The machine was not waiting for requests. "
+			"Did you forget to call wait_for_requests()?");
+		}
 	} catch (const riscv::MachineTimeoutException& e) {
 		handle_timeout(machine().cpu.pc());
 		throw;
@@ -128,11 +133,12 @@ void Script::machine_setup(machine_t& machine, bool init)
 #endif
 	machine.set_userdata<Script>(this);
 	machine.set_printer(
-		[this] (auto* data, size_t len) {
+		[] (const machine_t& m, auto* data, size_t len) {
+			auto* script = m.get_userdata<Script> ();
 			/* TODO: Use VSLb here or disable this completely */
-			printf(">>> %s: %.*s\n", this->name().c_str(), (int) len, data);
+			script->print({data, len});
 		});
-	machine.set_stdin([] (auto*, size_t) { return 0; });
+	machine.set_stdin([] (const auto&, auto*, size_t) -> long { return 0; });
 
 	if (init == false)
 	{
@@ -161,6 +167,7 @@ void Script::machine_setup(machine_t& machine, bool init)
 				riscv::OUT_OF_MEMORY, "Out of memory (max_memory limit reached)",
 					pageno * riscv::Page::size());
 		});
+		// Copy-on-write handling
 		machine.memory.set_page_write_handler(
 		[this] (auto& mem, gaddr_t pageno, riscv::Page& page) -> void {
 			assert(page.has_data() && page.attr.is_cow);
@@ -168,13 +175,10 @@ void Script::machine_setup(machine_t& machine, bool init)
 			auto* data =
 				(riscv::PageData*) WS_Copy(m_ctx->ws, page.data(), page.size());
 			if (LIKELY(data != nullptr)) {
-				/* Release any already non-owned data */
-				if (page.attr.non_owning)
-					page.m_page.release();
+				/* Replace old data with new non-owned data */
+				page.new_data(data, false);
 				page.attr.write = true;
 				page.attr.is_cow = false;
-				page.attr.non_owning = true; /* Avoid calling delete */
-				page.m_page.reset(data);
 				return;
 			}
 			// With heap as fallback, to allow bigger VMs
@@ -229,9 +233,17 @@ void Script::machine_setup(machine_t& machine, bool init)
 		TIMING_LOCATION(t2);
 	#endif
 		// Add system call interfaces
+		machine.on_unhandled_syscall = [] (auto& m, int num) {
+			auto* script = m.template get_userdata<Script>();
+			const std::string text =
+				"Unhandled system call: " + std::to_string(num);
+			script->print(text);
+		};
 		// Newlib support < 500
 		machine.setup_newlib_syscalls();
 		// Custom system call API >= 500
+		// NOTE: We do not need to setup_native_heap in the forked
+		// VMs because it the heap transfer will re-create the arena.
 		machine.setup_native_heap(NATIVE_SYSCALLS_BASE,
 			arena_base(), vrm()->config.max_heap());
 	#ifdef ENABLE_TIMING
@@ -247,8 +259,8 @@ void Script::machine_setup(machine_t& machine, bool init)
 	printf("[Constr] pagetbl: %ldns, vmem: %ldns, arena: %ldns, nat.mem: %ldns, syscalls: %ldns\n",
 		nanodiff(t0, t1), nanodiff(t1, t2), nanodiff(t2, t3), nanodiff(t3, t4), nanodiff(t4, t5));
 #endif
-	}
-}
+	} // init
+} // machine_setup()
 
 void Script::handle_exception(gaddr_t address)
 {
@@ -259,8 +271,11 @@ void Script::handle_exception(gaddr_t address)
 		if constexpr (VERBOSE_ERRORS) {
 		fprintf(stderr, "Script exception: %s (data: 0x%lX)\n",
 			e.what(), e.data());
+		fprintf(stderr, ">>> [%08lu] %s\n",
+			machine().instruction_counter(),
+			machine().cpu.current_instruction_to_string().c_str());
 		fprintf(stderr, ">>> Machine registers:\n[PC\t%08lX] %s\n",
-			(long) machine().cpu.pc(),
+			(long)machine().cpu.pc(),
 			machine().cpu.registers().to_string().c_str());
 		}
 		VRT_fail(m_ctx, "Script exception: %s", e.what());
@@ -299,6 +314,15 @@ void Script::handle_timeout(gaddr_t address)
 			max_instructions(), callsite.name.c_str());
 	}
 	VRT_fail(m_ctx, "Script for '%s' timed out", name().c_str());
+}
+void Script::print(std::string_view text)
+{
+	if (this->m_last_newline) {
+		printf(">>> [%s] %.*s", name().c_str(), (int)text.size(), text.begin());
+	} else {
+		printf("%.*s", (int)text.size(), text.begin());
+	}
+	this->m_last_newline = (text.back() == '\n');
 }
 void Script::print_backtrace(const gaddr_t addr)
 {
@@ -347,6 +371,17 @@ bool Script::guest_free(gaddr_t addr)
 	return machine().arena().free(addr) == 0;
 }
 
+const char* Script::want_workspace_string(size_t idx)
+{
+	const auto addr = m_want_values.at(idx);
+	const size_t len = machine().memory.strlen(addr);
+	char* str = (char *)WS_Alloc(m_ctx->ws, len + 1);
+	if (str != nullptr) {
+		machine().memory.memcpy_out(str, addr, len + 1);
+		return str;
+	}
+	return nullptr;
+}
 
 inline void Script::init_sha256()
 {

@@ -153,8 +153,13 @@ $Function INT     want_status()
 
 $Function INT     result_value(INT index)
 
-- Returns the a special result value that the guest VM can set.
+- Returns a special result value that the guest VM can set.
 - Returns zero (0) if no status has been set.
+
+$Function STRING  result_as_string(INT index)
+
+- Returns the a special result value that the guest VM can set.
+- Returns NULL (0) if no status has been set.
 
 $Function BOOL    want_resume()
 

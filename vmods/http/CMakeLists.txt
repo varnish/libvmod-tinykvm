@@ -6,16 +6,10 @@ set (PATH ${VARNISH_SOURCE_DIR}/lib/libvmod_http)
 
 add_vmod(vmod_http ${PATH}/vmod_http.vcc "HTTP VMOD"
 	${PATH}/vmod_http.c
-	${PATH}/http_alloc.c
-	${PATH}/http_context.c
-	${PATH}/http_handle.c
-	${PATH}/http_header.c
-	${PATH}/http_io.c
-	${PATH}/http_object.c
+	${PATH}/http_engine.c
 	${PATH}/http_params.c
-	${PATH}/http_pool.c
+	${PATH}/http_req.c
 	${PATH}/http_url.c
-	${PATH}/http_utils.c
 )
 target_link_libraries(vmod_http curl)
 

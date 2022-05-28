@@ -8,7 +8,7 @@
 #include "vcl.h"
 #include "vcc_if.h"
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
-	const char *farg, struct backend_post *, struct backend_result *);
+	const char *farg[2], struct backend_post *, struct backend_result *);
 extern void kvm_get_body(struct backend_post *, struct busyobj *);
 
 static void v_matchproto_(vdi_panic_f)
@@ -198,7 +198,8 @@ kvmbe_gethdrs(const struct director *dir,
 }
 
 static struct vmod_kvm_response *
-kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING farg)
+kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant,
+	VCL_STRING arg0, VCL_STRING arg1)
 {
 	struct vmod_kvm_response *kvmr;
 	kvmr = WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_response));
@@ -217,7 +218,8 @@ kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING farg
 		return (NULL);
 	}
 
-	kvmr->funcarg = farg;
+	kvmr->funcarg[0] = arg0;
+	kvmr->funcarg[1] = arg1;
 	kvmr->max_response_size = 0;
 	kvmr->is_post = 0;
 
@@ -233,12 +235,13 @@ kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING farg
 	return (kvmr);
 }
 
-VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING farg)
+VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task, VCL_STRING tenant,
+	VCL_STRING arg0, VCL_STRING arg1)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
 	struct vmod_kvm_response *kvmr =
-		kvm_response_director(ctx, task, tenant, farg);
+		kvm_response_director(ctx, task, tenant, arg0, arg1);
 
 	if (kvmr != NULL) {
 		return (&kvmr->dir);
@@ -253,7 +256,7 @@ VCL_BACKEND vmod_vm_post_backend(VRT_CTX, VCL_PRIV task,
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
 	struct vmod_kvm_response *kvmr =
-		kvm_response_director(ctx, task, tenant, farg);
+		kvm_response_director(ctx, task, tenant, farg, "");
 
 	if (kvmr != NULL) {
 		kvmr->is_post = 1;
