@@ -41,7 +41,6 @@ set(VARNISHD_SOURCES
 	${VD_PATH}/cache/cache_vrt_var.c
 	${VD_PATH}/cache/cache_vrt_vmod.c
 	${VD_PATH}/cache/cache_wrk.c
-	${VD_PATH}/cache/cache_ws.c
 	${VD_PATH}/common/common_vsc.c
 	${VD_PATH}/common/common_vsmw.c
 	${VD_PATH}/hash/hash_classic.c
@@ -118,6 +117,7 @@ if (VARNISH_PLUS)
 		${VD_PATH}/cache/cache_vcl_vrt.c
 		${VD_PATH}/cache/cache_vst.c
 		${VD_PATH}/cache/cache_vpi_ykey.c
+		${VD_PATH}/cache/cache_ws.c
 		${VD_PATH}/cache/cache_ykey.c
 		${VD_PATH}/common/common_vtls_sni.c
 		${VD_PATH}/mgt/mgt_pool.c
@@ -156,7 +156,11 @@ else()
         ${VD_PATH}/cache/cache_vrt_filter.c
         ${VD_PATH}/cache/cache_vrt_vcl.c
         ${VD_PATH}/cache/cache_vpi.c
+		${VD_PATH}/cache/cache_ws_common.c
+		${VD_PATH}/cache/cache_ws.c
+		${VD_PATH}/common/common_vext.c
         ${VD_PATH}/mgt/mgt_symtab.c
+		${VD_PATH}/storage/storage_debug.c
     )
 endif()
 if (WORKSPACE_EMULATOR)

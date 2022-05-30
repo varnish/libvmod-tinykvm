@@ -109,6 +109,8 @@ if (VARNISH_PLUS)
 	target_link_libraries(varnish brotlidec brotlienc pcre m)
 else()
 	target_link_libraries(varnish pcre2-8 m)
+	# Brilliant idea to require this random global define
+	target_compile_definitions(varnish PUBLIC _lint=1)
 endif()
 #set_property(TARGET varnish PROPERTY POSITION_INDEPENDENT_CODE 1)
 

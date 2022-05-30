@@ -57,7 +57,7 @@ void varnishd_initialize(const char* vcl_path)
 	char feature_siproc[128];
 #ifndef VARNISH_PLUS
 	snprintf(feature_siproc, sizeof(feature_siproc),
-		"debug=+execute_mode");
+		"debug=+single_proc");
 #else
 	snprintf(feature_siproc, sizeof(feature_siproc), "debug=none");
 #endif

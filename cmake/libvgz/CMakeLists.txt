@@ -15,5 +15,10 @@ add_library(vgz ${VGZ_SOURCES})
 target_include_directories(vgz PUBLIC ${VGZ_PATH})
 
 if (VARNISH_PLUS)
-    target_compile_definitions(vgz PUBLIC z_off_t=long)
+	target_compile_definitions(vgz PUBLIC z_off_t=long)
+else()
+	# What on earth is going on over there...
+	set_source_files_properties(
+		${VGZ_PATH}/crc32.c
+	PROPERTIES COMPILE_DEFINITIONS intptr_t=long)
 endif()
