@@ -18,10 +18,10 @@ if command -v "clang-14" &> /dev/null; then
 	CLANGPP="clang++-14"
 fi
 # WARNING: Produces too new debug info for GDB
-#if command -v "clang-15" &> /dev/null; then
-#	CLANG="clang-15"
-#	CLANGPP="clang++-15"
-#fi
+if command -v "clang-15" &> /dev/null; then
+	CLANG="clang-15"
+	CLANGPP="clang++-15"
+fi
 echo "Detected Clang: ${CLANG}, ${CLANGPP}"
 export CC="ccache ${CLANG}"
 export CXX="ccache ${CLANGPP}"

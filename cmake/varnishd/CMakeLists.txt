@@ -94,16 +94,16 @@ set(VARNISHD_SOURCES
 	${VD_PATH}/waiter/cache_waiter_poll.c
 	${VD_PATH}/waiter/cache_waiter_ports.c
 	${VD_PATH}/waiter/mgt_waiter.c
-    # persistent storage
-    #${VD_PATH}/storage/mgt_storage_persistent.c
+	# persistent storage
+	#${VD_PATH}/storage/mgt_storage_persistent.c
 	#${VD_PATH}/storage/storage_persistent.c
 	#${VD_PATH}/storage/storage_persistent_silo.c
 	#{VD_PATH}/storage/storage_persistent_subr.c
-    # nodist
+	# nodist
 	builtin_vcl.c
 )
 if (VARNISH_PLUS)
-    list (APPEND VARNISHD_SOURCES
+	list (APPEND VARNISHD_SOURCES
 		${VD_PATH}/cache/cache_accounting.c
 		${VD_PATH}/cache/cache_brotli.c
 		${VD_PATH}/cache/cache_brotli_vfp.c
@@ -149,19 +149,23 @@ if (VARNISH_PLUS)
 		${VD_PATH}/vmod_util/vmod_util.c
 		${VD_PATH}/vmod_util/waf_util.c
 		${VD_PATH}/vmod_util/xbody_util.c
-    )
+	)
 else()
 	list (APPEND VARNISHD_SOURCES
 		${VD_PATH}/cache/cache_conn_pool.c
-        ${VD_PATH}/cache/cache_vrt_filter.c
-        ${VD_PATH}/cache/cache_vrt_vcl.c
-        ${VD_PATH}/cache/cache_vpi.c
+		${VD_PATH}/cache/cache_vrt_filter.c
+		${VD_PATH}/cache/cache_vrt_vcl.c
+		${VD_PATH}/cache/cache_vpi.c
 		${VD_PATH}/cache/cache_ws_common.c
 		${VD_PATH}/cache/cache_ws.c
 		${VD_PATH}/common/common_vext.c
-        ${VD_PATH}/mgt/mgt_symtab.c
+		${VD_PATH}/mgt/mgt_symtab.c
 		${VD_PATH}/storage/storage_debug.c
-    )
+	)
+	list (REMOVE_ITEM VARNISHD_SOURCES
+		${VD_PATH}/mgt/mgt_param_bits.c
+		${VD_PATH}/mgt/mgt_param_tbl.c
+	)
 endif()
 if (WORKSPACE_EMULATOR)
 	list (REMOVE_ITEM VARNISHD_SOURCES
@@ -179,39 +183,39 @@ target_include_directories(genhufdec PUBLIC ${VARNISH_PATH}/bin/varnishd)
 target_include_directories(genhufdec PUBLIC ${VARNISH_PATH}/include)
 target_link_libraries(genhufdec varnish)
 if (SANITIZE)
-    target_link_libraries(genhufdec "${SANITIZE_FLAGS}")
+	target_link_libraries(genhufdec "${SANITIZE_FLAGS}")
 endif()
 
 add_custom_command(
-        OUTPUT vhp_hufdec.h
-        COMMAND genhufdec > vhp_hufdec.h
-        DEPENDS genhufdec
-    )
+		OUTPUT vhp_hufdec.h
+		COMMAND genhufdec > vhp_hufdec.h
+		DEPENDS genhufdec
+	)
 add_custom_target(vhp_gen_hufdec ALL
-        DEPENDS vhp_hufdec.h
+		DEPENDS vhp_hufdec.h
 )
 
 ## Generate the built-in VCL C-file ##
 add_custom_command(
-        OUTPUT builtin_vcl.c
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/builtin_vcl.py ${VD_PATH}/builtin.vcl builtin_vcl.c
-        DEPENDS ${VD_PATH}/builtin.vcl
-    )
+		OUTPUT builtin_vcl.c
+		COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/builtin_vcl.py ${VD_PATH}/builtin.vcl builtin_vcl.c
+		DEPENDS ${VD_PATH}/builtin.vcl
+	)
 add_custom_target(generate_builtin_vcl
-        DEPENDS builtin_vcl.c
+		DEPENDS builtin_vcl.c
 )
 
 if (VARNISH_PLUS)
-    ## libvarnish_sslhelper library ##
-    set(SSLH_PATH ${LIBPATH}/libvarnish_sslhelper)
-    set(SSLH_SOURCES ${SSLH_PATH}/vsslh.c
-                )
-    add_library(sslhelper ${SSLH_SOURCES})
-    target_include_directories(sslhelper PRIVATE ${VARNISH_PATH}/include)
+	## libvarnish_sslhelper library ##
+	set(SSLH_PATH ${LIBPATH}/libvarnish_sslhelper)
+	set(SSLH_SOURCES ${SSLH_PATH}/vsslh.c
+				)
+	add_library(sslhelper ${SSLH_SOURCES})
+	target_include_directories(sslhelper PRIVATE ${VARNISH_PATH}/include)
 
-    ## LMDB library ##
-    set(LMDB_PATH ${LIBPATH}/liblmdb/LMDB_0.9.23)
-    set(LMDB_SOURCES
+	## LMDB library ##
+	set(LMDB_PATH ${LIBPATH}/liblmdb/LMDB_0.9.23)
+	set(LMDB_SOURCES
 		${LMDB_PATH}/mdb.c
 		${LMDB_PATH}/mdb_dump.c
 		${LMDB_PATH}/mdb_stat.c
@@ -219,9 +223,9 @@ if (VARNISH_PLUS)
 		${LMDB_PATH}/mdb_load.c
 		${LMDB_PATH}/midl.c
 	)
-    add_library(lmdb ${LMDB_SOURCES})
-    target_compile_definitions(lmdb PUBLIC _XOPEN_SOURCE=700)
-    target_include_directories(lmdb PUBLIC ${LMDB_PATH})
+	add_library(lmdb ${LMDB_SOURCES})
+	target_compile_definitions(lmdb PUBLIC _XOPEN_SOURCE=700)
+	target_include_directories(lmdb PUBLIC ${LMDB_PATH})
 	if (SANITIZE)
 		target_compile_options(lmdb PRIVATE "${SANITIZE_FLAGS}")
 	endif()
@@ -240,7 +244,7 @@ if (LIBFUZZER)
 		fuzz/hpack.c
 		fuzz/varnish_http.c
 		${THPOOL_PATH}/thpool.c
-    )
+	)
 	set(FUZZER "HTTP" CACHE STRING "Fuzzer mode (HTTP1, HTTP2, PROXY1, PROXY2, ...)")
 	message(STATUS "Fuzzing mode is set to: ${FUZZER}")
 	# define VARNISH_PLUS for fuzzer sources, when enabled
@@ -273,7 +277,7 @@ add_dependencies(varnishd vhp_gen_hufdec generate_builtin_vcl)
 target_link_libraries(varnishd vcc varnish vgz)
 target_link_libraries(varnishd config pthread ssl crypto dl)
 if (VARNISH_PLUS)
-    target_link_libraries(varnishd mse numa lmdb sslhelper jemalloc)
+	target_link_libraries(varnishd mse numa lmdb sslhelper jemalloc)
 endif()
 # build varnishd into the top binary folder
 set_target_properties(varnishd
@@ -281,8 +285,8 @@ set_target_properties(varnishd
 )
 
 if (SANITIZE)
-    target_compile_options(vcc      PRIVATE "${SANITIZE_FLAGS}")
-    target_compile_options(varnishd PUBLIC  "${SANITIZE_FLAGS}")
+	target_compile_options(vcc      PRIVATE "${SANITIZE_FLAGS}")
+	target_compile_options(varnishd PUBLIC  "${SANITIZE_FLAGS}")
 	set(SANITIZER_FRIENDLY_MODE TRUE)
 endif()
 if (SANITIZER_FRIENDLY_MODE)
@@ -291,30 +295,30 @@ if (SANITIZER_FRIENDLY_MODE)
 endif()
 
 if (LIBFUZZER)
-    if (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
-        message(FATAL_ERROR "You can only use Clang when libfuzzer is enabled")
-    endif()
+	if (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
+		message(FATAL_ERROR "You can only use Clang when libfuzzer is enabled")
+	endif()
 	target_include_directories(varnishd PRIVATE ${THPOOL_PATH})
-    target_compile_options(varnishd PUBLIC ${FUZZER_CFLAGS})
+	target_compile_options(varnishd PUBLIC ${FUZZER_CFLAGS})
 	target_link_libraries(varnishd ${FUZZER_LFLAGS})
-    set_source_files_properties(
-        ${VD_PATH}/mgt/mgt_child.c
-        ${VD_PATH}/mgt/mgt_main.c
+	set_source_files_properties(
+		${VD_PATH}/mgt/mgt_child.c
+		${VD_PATH}/mgt/mgt_main.c
 		${VD_PATH}/mgt/mgt_param_tbl.c
-    PROPERTIES COMPILE_DEFINITIONS LIBFUZZER_ENABLED=1)
+	PROPERTIES COMPILE_DEFINITIONS LIBFUZZER_ENABLED=1)
 	target_compile_definitions(varnishd PRIVATE DONT_DLCLOSE_VMODS=1)
 endif()
 
 # libfuzzer is a C++ project, so we need the ability to enable libc++ and LLD
 if (LIBCPP)
-    target_link_libraries(varnishd "-stdlib=libc++ -fuse-ld=lld")
+	target_link_libraries(varnishd "-stdlib=libc++ -fuse-ld=lld")
 endif()
 
 if (SINGLE_PROCESS OR LIBFUZZER)
-    set_source_files_properties(
+	set_source_files_properties(
 		${VD_PATH}/mgt/mgt_child.c
-        ${VD_PATH}/mgt/mgt_vcc.c
-    PROPERTIES COMPILE_FLAGS -DSINGLE_PROCESS_MODE)
+		${VD_PATH}/mgt/mgt_vcc.c
+	PROPERTIES COMPILE_FLAGS -DSINGLE_PROCESS_MODE)
 endif()
 
 if (WORKSPACE_EMULATOR)

@@ -22,34 +22,34 @@ void varnishd_initialize(const char* vcl_path)
 	char* client_path = malloc(128);
 	snprintf(client_path, 128, "/tmp/varnishd_%u.sock", getpid());
 	varnishd_client_path = client_path;
-    // clock_step is modified by mgt_main, so make it writable
-    char cs_buffer[64];
-    snprintf(cs_buffer, sizeof(cs_buffer), "clock_step=99999");
-    // timeout idle is modified by mgt_main, make it writable
-    char ti_buffer[64];
-    snprintf(ti_buffer, sizeof(ti_buffer), "timeout_idle=0.001");
+	// clock_step is modified by mgt_main, so make it writable
+	char cs_buffer[64];
+	snprintf(cs_buffer, sizeof(cs_buffer), "clock_step=99999");
 	// timeout idle is modified by mgt_main, make it writable
-    char lbt_buffer[64];
-    snprintf(lbt_buffer, sizeof(lbt_buffer), "last_byte_timeout=0.01");
+	char ti_buffer[64];
+	snprintf(ti_buffer, sizeof(ti_buffer), "timeout_idle=0.001");
+	// timeout idle is modified by mgt_main, make it writable
+	char lbt_buffer[64];
+	snprintf(lbt_buffer, sizeof(lbt_buffer), "last_byte_timeout=0.01");
 	// the tiny workspace used by connections
-    char ws_buffer[128];
-    snprintf(ws_buffer, sizeof(ws_buffer),
+	char ws_buffer[128];
+	snprintf(ws_buffer, sizeof(ws_buffer),
 			"workspace_session=512");
 	// threadpool min buffer
-    char tpmin_buffer[128];
-    snprintf(tpmin_buffer, sizeof(tpmin_buffer),
+	char tpmin_buffer[128];
+	snprintf(tpmin_buffer, sizeof(tpmin_buffer),
 			"thread_pool_min=%d", varnishd_threadpool_size);
 	// threadpool max buffer
-    char tpmax_buffer[128];
-    snprintf(tpmax_buffer, sizeof(tpmax_buffer),
+	char tpmax_buffer[128];
+	snprintf(tpmax_buffer, sizeof(tpmax_buffer),
 			"thread_pool_max=%d", varnishd_threadpool_size);
 	// vmod path
-    char vmod_folder[512];
-    snprintf(vmod_folder, sizeof(vmod_folder),
+	char vmod_folder[512];
+	snprintf(vmod_folder, sizeof(vmod_folder),
 		"vmod_path=%s", get_current_dir_name());
-    // temp folder
-    char vd_folder[128];
-    snprintf(vd_folder, sizeof(vd_folder), "/tmp/varnishd_%d", getpid());
+	// temp folder
+	char vd_folder[128];
+	snprintf(vd_folder, sizeof(vd_folder), "/tmp/varnishd_%d", getpid());
 	// feature http2
 	char feature_http2[128];
 	snprintf(feature_http2, sizeof(feature_http2), "feature=-http2");
@@ -61,14 +61,18 @@ void varnishd_initialize(const char* vcl_path)
 #else
 	snprintf(feature_siproc, sizeof(feature_siproc), "debug=none");
 #endif
-    // client and cli ports
-    char portline[128];
-    snprintf(portline, sizeof(portline), portopts, varnishd_client_path);
-    const uint16_t cli_port = 25000 + (getpid() & 0x3FFF);
-    char cli_portline[64];
-    snprintf(cli_portline, sizeof(cli_portline), ":%u", cli_port);
-    // arguments to varnishd
-    const char* args[] = {
+	// feature: disable logging
+	char feature_vslflush[512];
+	snprintf(feature_vslflush, sizeof(feature_vslflush),
+		"vsl_flush=off");
+	// client and cli ports
+	char portline[128];
+	snprintf(portline, sizeof(portline), portopts, varnishd_client_path);
+	const uint16_t cli_port = 25000 + (getpid() & 0x3FFF);
+	char cli_portline[64];
+	snprintf(cli_portline, sizeof(cli_portline), ":%u", cli_port);
+	// arguments to varnishd
+	const char* args[] = {
 		"varnishd", "-a", portline,
 		"-T", cli_portline,
 		"-F",
@@ -76,6 +80,7 @@ void varnishd_initialize(const char* vcl_path)
 		"-p", vmod_folder,
 		"-p", feature_http2,
 		"-p", feature_siproc,
+		"-p", feature_vslflush,
 		"-p", ti_buffer,
 #ifdef VARNISH_PLUS
 		"-p", lbt_buffer,
@@ -86,17 +91,17 @@ void varnishd_initialize(const char* vcl_path)
 		"-p", tpmax_buffer,
 		// -b must be last (see below)
 		"-b", ":8081",
-    };
+	};
 
 	const int argc = sizeof(args) / sizeof(args[0]);
 	// replace backend with VCL when needed
-    if (vcl_path != NULL) {
-        args[argc-2] = "-f";
-        args[argc-1] = vcl_path;
-    }
+	if (vcl_path != NULL) {
+		args[argc-2] = "-f";
+		args[argc-1] = vcl_path;
+	}
 	for (int i = 0; i < argc; i++) {
 		printf("%s ", args[i]);
 	}
 	printf("\n");
-    varnishd_main(argc, args);
+	varnishd_main(argc, args);
 }
