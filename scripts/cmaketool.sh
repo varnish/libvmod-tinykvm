@@ -18,14 +18,15 @@ if command -v "clang-14" &> /dev/null; then
 	CLANGPP="clang++-14"
 fi
 # WARNING: Produces too new debug info for GDB
-if command -v "clang-15" &> /dev/null; then
-	CLANG="clang-15"
-	CLANGPP="clang++-15"
-fi
+#if command -v "clang-15" &> /dev/null; then
+#	CLANG="clang-15"
+#	CLANGPP="clang++-15"
+#fi
 echo "Detected Clang: ${CLANG}, ${CLANGPP}"
 export CC="ccache ${CLANG}"
 export CXX="ccache ${CLANGPP}"
 BUILD_PATH="$PWD"
+DEBUG_PATH="/tmp/varnishd"
 SOURCE_DIR="$PWD"
 
 # TODO: scrutinize me
@@ -102,9 +103,10 @@ case $i in
 	do_gprof=true
     shift
     ;;
-	--debug)
+	--debug=*)
     args="$args -DCMAKE_BUILD_TYPE=Debug -DLTO_ENABLE=OFF -DNATIVE=OFF"
 	do_debug=true
+	DEBUG_PATH="${i#*=}"
     shift
     ;;
 	--optimize)
@@ -225,7 +227,7 @@ if [ "$run" = true ] ; then
 	pushd $BUILD_PATH/$folder
 
 	if [ "$do_debug" = true ] ; then
-		gdb --args ./varnishd "$@"
+		gdb --cd="$DEBUG_PATH" --args "$BUILD_PATH/$folder/varnishd" "$@"
 	else
 		[ "$VERBOSE" ] && echo "$preargs ./varnishd $@"
 		$preargs ./varnishd "$@"

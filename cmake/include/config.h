@@ -289,11 +289,11 @@
 
 /* C compiler command line for VCL code */
 #if defined(LIBFUZZER_ENABLED)
-#define VCC_CC "exec clang-15 -g -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -shared -fno-omit-frame-pointer -fsanitize=fuzzer,address,undefined -Wl,-x -o %o %s"
+#define VCC_CC "exec clang-12 -ggdb3 -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -fexceptions -shared -fno-omit-frame-pointer -fsanitize=fuzzer,address,undefined -Wl,-x -o %o %s"
 #elif defined(SANITIZERS_ENABLED)
-#define VCC_CC "exec clang-15 -g -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -shared -fno-omit-frame-pointer -fsanitize=address,undefined -Wl,-x -o %o %s"
+#define VCC_CC "exec clang-12 -ggdb3 -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -fexceptions -shared -fno-omit-frame-pointer -fsanitize=address,undefined -Wl,-x -o %o %s"
 #else
-#define VCC_CC "exec gcc -g -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -shared -Wl,-x -o %o %s"
+#define VCC_CC "exec gcc -ggdb3 -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -fexceptions -shared -Wl,-x -o %o %s"
 #endif
 
 /* Default warnings for VCC. */
