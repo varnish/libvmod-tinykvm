@@ -33,5 +33,5 @@ add_vmod_tests(vmod_kvm kvm
 	tests/stateful_buffered_storage.vtc
 	tests/vmcommit.vtc
 	tests/allowed_paths.vtc
-	tests/max_work_memory.vtc
+	#tests/max_work_memory.vtc
 )

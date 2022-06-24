@@ -27,7 +27,6 @@ MachineInstance::MachineInstance(
 	  m_machine(binary, {
 		.max_mem = ten->config.max_memory(),
 		.max_cow_mem = ten->config.max_work_memory(),
-		.timeout = ten->config.max_boot_time(),
 		.hugepages = ten->config.hugepages(),
 	  }),
 	  m_tenant(ten), m_inst(inst),
@@ -43,7 +42,7 @@ MachineInstance::MachineInstance(
 			{"vmod_kvm", name(), storage ? "1" : "0", TenantConfig::guest_state_file},
 			ten->config.environ());
 		// Run through main()
-		machine().run();
+		machine().run( ten->config.max_boot_time() );
 		if (!storage) {
 			// Make sure the program is waiting for requests
 			if (!is_waiting_for_requests()) {
