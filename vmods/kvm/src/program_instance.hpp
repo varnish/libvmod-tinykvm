@@ -93,23 +93,17 @@ public:
 	long live_update_call(const vrt_ctx*,
 		gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc);
 
-	/* Replace a running program with another */
-	void commit_instance_live(
-		std::shared_ptr<MachineInstance>& new_inst);
-
 	const std::vector<uint8_t> binary;
 	/* Ready-made _main_ VM that can be forked into many small VMs */
-	std::shared_ptr<MachineInstance> main_vm;
+	MachineInstance main_vm;
 
 	/* Ticket-machine that gives access rights to VMs. */
 	moodycamel::BlockingConcurrentQueue<VMPoolItem*> m_vmqueue;
 	/* Simple container for VMs. */
 	std::deque<VMPoolItem> m_vms;
 
-	/* Single storage VM that is mutable and identity-mapped. */
-	MachineInstance  storage;
-	/* Queue of work to happen on storage VM. Bottleneck. */
-	tinykvm::ThreadPool m_storage_queue;
+	/* Queue of work to happen on main VM. Bottleneck. */
+	tinykvm::ThreadPool m_main_queue;
 	/* Tasks executed in storage after someone leaves storage VM. */
 	std::vector<std::future<long>> m_async_tasks;
 	/* Entry points in the tenants program. Handlers for all types of

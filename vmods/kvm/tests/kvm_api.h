@@ -109,6 +109,9 @@ storage_call(storage_func, const void* src, size_t, void* dst, size_t);
 extern long
 storage_callv(storage_func, size_t n, const struct virtbuffer[n], void* dst, size_t);
 
+extern void
+call_mutably(storage_func func) { storage_call(func, NULL, 0, NULL, 0); }
+
 /* Create an async task that is scheduled to run next in storage. The
    new task waits until other tasks are done before starting a new one,
    which will block the current thread, making this a blocking call. */
@@ -121,10 +124,6 @@ storage_return(const void* data, size_t len);
 
 static inline void
 storage_return_nothing(void) { storage_return(NULL, 0); }
-
-/* Record the current state into a new VM, and make that
-   VM handle future requests. WARNING: RCU, Racy. */
-extern long vmcommit(void);
 
 /* Start multi-processing using @n vCPUs on given function,
    forwarding up to 4 integral/pointer arguments.
@@ -279,13 +278,6 @@ asm(".global storage_return\n" \
 ".type storage_return, function\n" \
 "storage_return:\n" \
 "	mov $0xFFFF, %eax\n" \
-"	out %eax, $0\n" \
-"   ret\n");
-
-asm(".global vmcommit\n" \
-".type vmcommit, function\n" \
-"vmcommit:\n" \
-"	mov $0x1070A, %eax\n" \
 "	out %eax, $0\n" \
 "   ret\n");
 

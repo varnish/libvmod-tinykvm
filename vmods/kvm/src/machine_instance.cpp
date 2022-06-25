@@ -22,7 +22,7 @@ void MachineInstance::kvm_initialize()
 MachineInstance::MachineInstance(
 	const std::vector<uint8_t>& binary, const vrt_ctx* ctx,
 	const TenantInstance* ten, ProgramInstance* inst,
-	bool storage, bool debug)
+	bool debug)
 	: m_ctx(ctx),
 	  m_machine(binary, {
 		.max_mem = ten->config.max_memory(),
@@ -30,7 +30,7 @@ MachineInstance::MachineInstance(
 		.hugepages = ten->config.hugepages(),
 	  }),
 	  m_tenant(ten), m_inst(inst),
-	  m_is_storage(storage), m_is_debug(debug),
+	  m_is_debug(debug),
 	  m_fd        {ten->config.max_fd(), "File descriptors"},
 	  m_regex     {ten->config.max_regex(), "Regex handles"},
 	  m_directors {ten->config.max_backends(), "Directors"}
@@ -39,20 +39,17 @@ MachineInstance::MachineInstance(
 	machine().set_printer(get_vsl_printer());
 	try {
 		machine().setup_linux(
-			{"vmod_kvm", name(), storage ? "1" : "0", TenantConfig::guest_state_file},
+			{"vmod_kvm", name(), "1", TenantConfig::guest_state_file},
 			ten->config.environ());
 		// Run through main()
 		machine().run( ten->config.max_boot_time() );
-		if (!storage) {
-			// Make sure the program is waiting for requests
-			if (!is_waiting_for_requests()) {
-				throw std::runtime_error("Program did not wait for requests");
-			}
-			// Make forkable
-			machine().prepare_copy_on_write();
-		} else {
-			printf("Program for tenant %s is loaded\n", name().c_str());
+		// Make sure the program is waiting for requests
+		if (!is_waiting_for_requests()) {
+			throw std::runtime_error("Program did not wait for requests");
 		}
+		// Make forkable (with working memory)
+		machine().prepare_copy_on_write(65536);
+		printf("Program for tenant %s is loaded\n", name().c_str());
 	} catch (...) {
 		fprintf(stderr,
 			"Error: Machine not initialized properly: %s\n", name().c_str());
@@ -61,22 +58,20 @@ MachineInstance::MachineInstance(
 }
 
 MachineInstance::MachineInstance(
-	std::shared_ptr<MachineInstance>& source, const vrt_ctx* ctx,
+	const MachineInstance& source, const vrt_ctx* ctx,
 	const TenantInstance* ten, ProgramInstance* inst)
 	: m_ctx(ctx),
-	  m_machine(source->machine(), {
+	  m_machine(source.machine(), {
 		.max_mem = ten->config.max_memory(),
 		.max_cow_mem = ten->config.max_work_memory(),
 		.hugepages = ten->config.ephemeral_hugepages(),
 	  }),
 	  m_tenant(ten), m_inst(inst),
-	  m_is_storage(false),
-	  m_is_debug(source->is_debug()),
-	  m_sighandler{source->m_sighandler},
+	  m_is_debug(source.is_debug()),
+	  m_sighandler{source.m_sighandler},
 	  m_fd        {ten->config.max_fd(), "File descriptors"},
 	  m_regex     {ten->config.max_regex(), "Regex handles"},
-	  m_directors {ten->config.max_backends(), "Directors"},
-	  m_mach_ref {source}
+	  m_directors {ten->config.max_backends(), "Directors"}
 {
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t0);
@@ -84,38 +79,15 @@ MachineInstance::MachineInstance(
 	machine().set_userdata<MachineInstance> (this);
 	machine().set_printer(get_vsl_printer());
 	/* Load the fds of the source */
-	m_fd.reset_and_loan(source->m_fd);
+	m_fd.reset_and_loan(source.m_fd);
 	/* Load the compiled regexes of the source */
-	m_regex.reset_and_loan(source->m_regex);
+	m_regex.reset_and_loan(source.m_regex);
 	/* Load the directors of the source */
-	m_directors.reset_and_loan(source->m_directors);
+	m_directors.reset_and_loan(source.m_directors);
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t1);
 	printf("Total time in MachineInstance constr body: %ldns\n", nanodiff(t0, t1));
 #endif
-}
-
-MachineInstance::MachineInstance(const MachineInstance& source)
-	: m_ctx(source.ctx()),
-	  m_machine(source.machine(), {
-		.max_mem = source.tenant().config.max_memory(),
-		.max_cow_mem = source.tenant().config.max_work_memory(),
-		.binary = std::string_view{source.machine().binary()},
-		.linearize_memory = true,
-		.hugepages = source.tenant().config.hugepages(),
-	  }),
-	  m_tenant(source.m_tenant), m_inst(source.m_inst),
-	  m_is_storage(false),
-	  m_is_debug(source.is_debug()),
-	  m_sighandler{source.m_sighandler},
-	  m_fd        {m_tenant->config.max_fd(), "File descriptors"},
-	  m_regex     {m_tenant->config.max_regex(), "Regex handles"},
-	  m_directors {m_tenant->config.max_backends(), "Directors"}
-{
-	machine().set_userdata<MachineInstance> (this);
-	machine().set_printer(get_vsl_printer());
-	/* XXX: Handle file descriptors */
-	machine().prepare_copy_on_write();
 }
 
 void MachineInstance::tail_reset()
@@ -133,29 +105,25 @@ void MachineInstance::tail_reset()
 	if (this->is_debug()) {
 		//this->stop_debugger();
 	}
-
-	/* Unref active machine to be sure it is destructed before the program */
-	m_mach_ref = nullptr;
 }
 void MachineInstance::reset_to(const vrt_ctx* ctx,
-	std::shared_ptr<MachineInstance>& source)
+	MachineInstance& source)
 {
-	this->m_mach_ref = source;
 	this->m_ctx = ctx;
 	//m_tenant = source->m_tenant;
-	machine().reset_to(source->machine(), {
+	machine().reset_to(source.machine(), {
 		.max_mem = tenant().config.max_memory(),
 		.max_cow_mem = tenant().config.max_work_memory(),
 	});
-	m_inst   = source->m_inst;
-	m_sighandler = source->m_sighandler;
+	m_inst   = source.m_inst;
+	m_sighandler = source.m_sighandler;
 
 	/* Load the fds of the source */
-	m_fd.reset_and_loan(source->m_fd);
+	m_fd.reset_and_loan(source.m_fd);
 	/* Load the compiled regexes of the source */
-	m_regex.reset_and_loan(source->m_regex);
+	m_regex.reset_and_loan(source.m_regex);
 	/* Load the directors of the source */
-	m_directors.reset_and_loan(source->m_directors);
+	m_directors.reset_and_loan(source.m_directors);
 	/* XXX: Todo: reset more stuff */
 }
 

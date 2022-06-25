@@ -86,9 +86,6 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10709: // STORAGE TASK
 				syscall_storage_task(machine, inst);
 				return;
-			case 0x1070A: // VMCOMMIT
-				syscall_vmcommit(machine, inst);
-				return;
 			case 0x10710: // MULTIPROCESS
 				syscall_multiprocess(machine, inst);
 				return;

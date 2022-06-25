@@ -85,25 +85,6 @@ static void syscall_storage_task(Machine& machine, MachineInstance& inst)
 	machine.set_registers(regs);
 }
 
-static void syscall_vmcommit(Machine& machine, MachineInstance& inst)
-{
-	auto regs = machine.registers();
-	try {
-		// 1. Make a linearized copy of this machine
-		auto new_machine = std::make_shared<MachineInstance>(inst);
-		// 2. Perform the live update process on new program
-		inst.instance().commit_instance_live(new_machine);
-		VSLb(inst.ctx()->vsl, SLT_VCL_Log,
-			"vmcommit: New %s program committed and ready",
-			inst.name().c_str());
-		regs.rax = 0;
-	} catch (const std::exception& e) {
-		fprintf(stderr, "VMCommit exception: %s\n", e.what());
-		regs.rax = -1;
-	}
-	machine.set_registers(regs);
-}
-
 static void syscall_multiprocess(Machine& machine, MachineInstance&)
 {
 	auto regs = machine.registers();

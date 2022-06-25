@@ -12,16 +12,12 @@ ProgramInstance::ProgramInstance(
 	const vrt_ctx* ctx, TenantInstance* ten,
 	bool debug)
 	: binary{std::move(elf)},
-	  main_vm{std::make_shared<MachineInstance>(binary, ctx, ten, this, false, debug)},
-	  storage{binary, ctx, ten, this, true, debug},
-	  m_storage_queue {1},
+	  main_vm{binary, ctx, ten, this, debug},
+	  m_main_queue {1},
 	  rspclient{nullptr}
 {
-	if (!main_vm->is_waiting_for_requests()) {
+	if (!main_vm.is_waiting_for_requests()) {
 		throw std::runtime_error("The main program was not waiting for requests. Did you forget to call 'wait_for_requests()'?");
-	}
-	if (!storage.is_waiting_for_requests()) {
-		throw std::runtime_error("The storage program was not waiting for requests. Did you forget to call 'wait_for_requests()'?");
 	}
 
 	const size_t max_vms = ten->config.group.max_concurrency;
@@ -37,8 +33,7 @@ ProgramInstance::~ProgramInstance()
 
 uint64_t ProgramInstance::lookup(const char* name) const
 {
-	assert(main_vm);
-	return main_vm->resolve_address(name);
+	return main_vm.resolve_address(name);
 }
 ProgramInstance::gaddr_t ProgramInstance::entry_at(const int idx) const
 {
@@ -83,10 +78,10 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 	if (UNLIKELY(res_addr + res_size < res_addr))
 		return -1;
 
-	auto future = m_storage_queue.enqueue(
+	auto future = m_main_queue.enqueue(
 	[&] () -> long
 	{
-		auto& stm = storage.machine();
+		auto& stm = main_vm.machine();
 		uint64_t vaddr = stm.stack_address();
 
 		for (size_t i = 0; i < n; i++) {
@@ -104,8 +99,8 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 
 		/* We need to use the CTX from the current program */
 		auto& inst = *src.get_userdata<MachineInstance>();
-		storage.set_ctx(inst.ctx());
-		assert(storage.ctx());
+		main_vm.set_ctx(inst.ctx());
+		assert(main_vm.ctx());
 
 		try {
 #ifdef TINYKVM_FAST_EXECUTION_TIMEOUT
@@ -148,14 +143,14 @@ long ProgramInstance::async_storage_call(gaddr_t func, gaddr_t arg)
 	m_async_tasks.clear();
 
 	m_async_tasks.push_back(
-		m_storage_queue.enqueue(
+		m_main_queue.enqueue(
 	[=] () -> long
 	{
-		auto& stm = storage.machine();
-		const uint64_t new_stack = storage.machine().stack_address();
+		auto& stm = main_vm.machine();
+		const uint64_t new_stack = main_vm.machine().stack_address();
 
 		/* This vmcall has no attached VRT_CTX. */
-		storage.set_ctx(nullptr);
+		main_vm.set_ctx(nullptr);
 
 		try {
 #ifdef TINYKVM_FAST_EXECUTION_TIMEOUT
@@ -189,15 +184,15 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 		unsigned long long len;
 	};
 
-	auto future = m_storage_queue.enqueue(
+	auto future = m_main_queue.enqueue(
 	[&] () -> SerializeResult
 	{
 		try {
 			/* Serialize data in the old machine */
-			storage.set_ctx(ctx);
-			auto& old_machine = storage.machine();
+			main_vm.set_ctx(ctx);
+			auto& old_machine = main_vm.machine();
 			old_machine.timed_vmcall(func,
-				storage.tenant().config.max_time());
+				main_vm.tenant().config.max_time());
 			/* Get serialized data */
 			auto regs = old_machine.registers();
 			auto data_addr = regs.rdi;
@@ -218,11 +213,11 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 	if (res.data == nullptr)
 		return -1;
 
-	auto& new_machine = new_prog.storage.machine();
+	auto& new_machine = new_prog.main_vm.machine();
 	/* Begin resume procedure */
-	new_prog.storage.set_ctx(ctx);
+	new_prog.main_vm.set_ctx(ctx);
 	new_machine.timed_vmcall(newfunc,
-		new_prog.storage.tenant().config.max_time(),
+		new_prog.main_vm.tenant().config.max_time(),
 		(uint64_t)res.len);
 	auto new_regs = new_machine.registers();
 	/* The machine should be calling STOP with rsi=dst_data */
@@ -235,15 +230,6 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 		new_machine.run();
 	}
 	return 0;
-}
-
-void ProgramInstance::commit_instance_live(
-	std::shared_ptr<MachineInstance>& new_inst)
-{
-	/* Make a reference to the current program, keeping it alive */
-	std::shared_ptr<MachineInstance> current = this->main_vm;
-
-	std::atomic_exchange(&this->main_vm, new_inst);
 }
 
 } // kvm

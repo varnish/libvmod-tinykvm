@@ -6,26 +6,21 @@ cat >${tmpdir}/${testname}.c <<-EOF
 #include "kvm_api.h"
 
 static int counter = 0;
-static void my_storage(size_t n, struct virtbuffer buffers[n], size_t reslen)
+static void my_storage()
 {
-	struct virtbuffer *hello_string = &buffers[0];
 	counter ++;
-	((char *)hello_string->data)[11] = '0' + (counter % 10);
-	/* Data contains the inputs */
-	storage_return(hello_string->data, hello_string->len);
+	storage_return_nothing();
 }
 
-static void my_backend(const char *arg)
+static void my_backend(char *arg)
 {
-	const struct virtbuffer buffers[1] = {
-		{.data = TRUST_ME(arg), .len = strlen(arg)}
-	};
 	char result[256];
-	const long rlen =
-		storage_callv(my_storage, 1, buffers, result, sizeof(result));
+	call_mutably(my_storage);
+
+	arg[11] = '0' + (counter % 10);
 
 	const char ctype[] = "text/plain";
-	backend_response(200, ctype, sizeof(ctype)-1, result, rlen);
+	backend_response(200, ctype, sizeof(ctype)-1, arg, strlen(arg));
 }
 
 int main()

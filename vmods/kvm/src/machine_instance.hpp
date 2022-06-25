@@ -52,7 +52,6 @@ public:
 	const std::string& name() const noexcept;
 	const std::string& group() const noexcept;
 
-	bool is_storage() const noexcept { return m_is_storage; }
 	bool is_debug() const noexcept { return m_is_debug; }
 	gaddr_t max_memory() const noexcept;
 
@@ -73,12 +72,11 @@ public:
 	void open_debugger(uint16_t);
 
 	static void kvm_initialize();
-	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool sto, bool dbg);
-	MachineInstance(std::shared_ptr<MachineInstance>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*);
-	MachineInstance(const MachineInstance& source);
+	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool dbg);
+	MachineInstance(const MachineInstance&, const vrt_ctx*, const TenantInstance*, ProgramInstance*);
 	~MachineInstance();
 	void tail_reset();
-	void reset_to(const vrt_ctx*, std::shared_ptr<MachineInstance>&);
+	void reset_to(const vrt_ctx*, MachineInstance&);
 
 private:
 	static void setup_syscall_interface();
@@ -92,7 +90,6 @@ private:
 	machine_t m_machine;
 	const TenantInstance* m_tenant = nullptr;
 	ProgramInstance* m_inst;
-	bool        m_is_storage = false;
 	bool        m_is_debug = false;
 	bool        m_waiting_for_requests = false;
 	uint16_t    m_result = 0;
@@ -102,9 +99,6 @@ private:
 	Cache<int> m_fd;
 	Cache<vre*> m_regex;
 	Cache<const director*> m_directors;
-
-	/* Perform deferred live update after storage handling */
-	std::shared_ptr<MachineInstance> m_mach_ref = nullptr;
 };
 
 } // kvm
