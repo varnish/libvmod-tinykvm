@@ -10,5 +10,5 @@ mkdir -p $NTMP
 rm -rf /tmp/varnishd/*
 
 #source $file --vcp=build --optimize --static-kvm --build $@ --run -a :8080 -f vcl/kvm.vcl -F -n $NTMP -p $BWS
-source $file --vcp=build --no-optimize --static-kvm --shared-riscv --mold --build $@ --run -a :8080 -f vcl/kvm_example.vcl -F -n $NTMP -p $BWS
+source $file --vcp=build --no-optimize --static-kvm --shared-riscv --mold --build $@ --run -a :8080 -f vcl/kvm.vcl -F -n $NTMP -p $BWS
 #source $file --vcp=build_debug --no-optimize --sanitize --debug=$NTMP --single-process --static-kvm --disable-mold --build $@ --run -a :8080 -f vcl/kvm.vcl -F -n $NTMP -p $BWS -p $TPS

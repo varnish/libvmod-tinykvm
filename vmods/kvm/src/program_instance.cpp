@@ -10,9 +10,9 @@ namespace kvm {
 VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
 	const vrt_ctx* ctx, TenantInstance* ten, ProgramInstance* prog)
 {
+	// Spawn forked VM on dedicated thread, blocking.
 	tp.enqueue(
-	[&] () -> long
-	{
+	[&] () -> long {
 		this->mi = std::make_unique<MachineInstance> (
 			main_vm, ctx, ten, prog);
 		return 0;
@@ -31,6 +31,12 @@ ProgramInstance::ProgramInstance(
 	if (!main_vm.is_waiting_for_requests()) {
 		throw std::runtime_error("The main program was not waiting for requests. Did you forget to call 'wait_for_requests()'?");
 	}
+
+	// Migrate main VM to dedicated thread.
+	m_main_queue.enqueue(
+	[this] {
+		main_vm.machine().migrate_to_this_thread();
+	}).get();
 
 	const size_t max_vms = ten->config.group.max_concurrency;
 	for (size_t i = 0; i < max_vms; i++) {

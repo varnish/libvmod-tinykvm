@@ -46,7 +46,7 @@ sub vcl_init {
 			}
 		}
 	""");
-	new f = file.init("/tmp");
+	new f = file.init(std.getenv("HOME") + "/");
 }
 
 sub vcl_recv {
@@ -78,17 +78,14 @@ sub vcl_recv {
 		# Front-end KVM call
 		kvm.vm_callv("xpizza.com", ON_REQUEST);
 		# Hashed response
-		set req.backend_hint = f.backend();
 		set req.http.Host = "file";
 		return (hash);
 	}
 	else if (req.url == "/file") {
-		set req.backend_hint = f.backend();
 		set req.http.Host = "file";
 		return (pass);
 	}
 	else if (req.url == "/fbench") {
-		set req.backend_hint = f.backend();
 		set req.http.Host = "file";
 		set req.url = "/file?foo=" + utils.fast_random_int(100);
 		return (hash);
@@ -109,6 +106,7 @@ sub vcl_backend_fetch {
 		return (fetch);
 	}
 	else if (bereq.http.Host == "file") {
+		set bereq.backend = f.backend();
 		return (fetch);
 	}
 	else if (bereq.method == "POST") {
