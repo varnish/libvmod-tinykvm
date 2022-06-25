@@ -73,9 +73,9 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 	#endif
 		std::shared_ptr<ProgramInstance> prog;
 		if (LIKELY(!debug))
-			prog = this->program;
+			prog = std::atomic_load(&this->program);
 		else
-			prog = this->debug_program;
+			prog = std::atomic_load(&this->debug_program);
 		// First-time tenants could have no program loaded
 		if (UNLIKELY(prog == nullptr)) {
 			VRT_fail(ctx, "vmreserve: Missing program for %s. Not uploaded?",
@@ -176,9 +176,9 @@ void TenantInstance::commit_program_live(
 	std::shared_ptr<ProgramInstance> current;
 	/* Make a reference to the current program, keeping it alive */
 	if (!new_prog->main_vm.is_debug()) {
-		current = this->program;
+		current = std::atomic_load(&this->program);
 	} else {
-		current = this->debug_program;
+		current = std::atomic_load(&this->debug_program);
 	}
 
 	if (current != nullptr && !storage) {
