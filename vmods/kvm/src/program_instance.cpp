@@ -7,6 +7,18 @@
 
 namespace kvm {
 
+VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
+	const vrt_ctx* ctx, TenantInstance* ten, ProgramInstance* prog)
+{
+	tp.enqueue(
+	[&] () -> long
+	{
+		this->mi = std::make_unique<MachineInstance> (
+			main_vm, ctx, ten, prog);
+		return 0;
+	}).get();
+}
+
 ProgramInstance::ProgramInstance(
 	std::vector<uint8_t> elf,
 	const vrt_ctx* ctx, TenantInstance* ten,
@@ -22,8 +34,9 @@ ProgramInstance::ProgramInstance(
 
 	const size_t max_vms = ten->config.group.max_concurrency;
 	for (size_t i = 0; i < max_vms; i++) {
-		m_vms.emplace_back(
-			new MachineInstance{main_vm, ctx, ten, this});
+		// Instantiate forked VMs on dedicated threads,
+		// in order to prevent KVM migrations.
+		m_vms.emplace_back(main_vm, ctx, ten, this);
 		m_vmqueue.enqueue(&m_vms.back());
 	}
 }
