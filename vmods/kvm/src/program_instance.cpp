@@ -122,21 +122,11 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 		assert(main_vm.ctx());
 
 		try {
-#ifdef TINYKVM_FAST_EXECUTION_TIMEOUT
-			constexpr uint32_t ONE_SECOND = 62'500'000;
-			const uint32_t ticks = ONE_SECOND
-#else
-			const uint32_t ticks = 0;
-#endif
 			tinykvm::tinykvm_x86regs regs;
-			stm.setup_call(regs, func, ticks, new_stack,
+			stm.setup_call(regs, func, new_stack,
 				(uint64_t)n, (uint64_t)stm_bufaddr, (uint64_t)res_size);
 			stm.set_registers(regs);
-#ifdef TINYKVM_FAST_EXECUTION_TIMEOUT
-			stm.run();
-#else
 			stm.run(1.0);
-#endif
 			/* Get the result buffer and length (capped to res_size) */
 			regs = stm.registers();
 			const gaddr_t st_res_buffer = regs.rdi;
@@ -172,21 +162,11 @@ long ProgramInstance::async_storage_call(gaddr_t func, gaddr_t arg)
 		main_vm.set_ctx(nullptr);
 
 		try {
-#ifdef TINYKVM_FAST_EXECUTION_TIMEOUT
-			constexpr uint32_t ONE_SECOND = 62'500'000;
-			const uint32_t ticks = ONE_SECOND
-#else
-			const uint32_t ticks = 0;
-#endif
 			tinykvm::tinykvm_x86regs regs;
-			stm.setup_call(regs, func, ticks, new_stack,
+			stm.setup_call(regs, func, new_stack,
 				(uint64_t)arg);
 			stm.set_registers(regs);
-#ifdef TINYKVM_FAST_EXECUTION_TIMEOUT
-			stm.run();
-#else
 			stm.run(1.0);
-#endif
 			return 0;
 		} catch (...) {
 			return -1;

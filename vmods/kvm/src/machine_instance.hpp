@@ -1,6 +1,5 @@
 #pragma once
 #include <cassert>
-#include <functional>
 #include <tinykvm/machine.hpp>
 #include "instance_cache.hpp"
 
