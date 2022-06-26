@@ -77,6 +77,15 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10100:
 				syscall_set_backend(machine, inst);
 				return;
+			case 0x10700: // SHARED_MEMORY_AREA
+				syscall_shared_memory(machine, inst);
+				return;
+			case 0x10701: // STORAGE_MEMORY_SHARED
+				syscall_storage_mem_shared(machine, inst);
+				return;
+			case 0x10702: // ALL_MEMORY_SHARED
+				syscall_all_mem_shared(machine, inst);
+				return;
 			case 0x10707: // STORAGE CALL BUFFER
 				syscall_storage_callb(machine, inst);
 				return;

@@ -28,6 +28,7 @@ MachineInstance::MachineInstance(
 		.max_mem = ten->config.max_memory(),
 		.max_cow_mem = ten->config.max_work_memory(),
 		.hugepages = ten->config.hugepages(),
+		.master_direct_memory_writes = false,
 	  }),
 	  m_tenant(ten), m_inst(inst),
 	  m_is_debug(debug),
@@ -39,7 +40,7 @@ MachineInstance::MachineInstance(
 	machine().set_printer(get_vsl_printer());
 	try {
 		machine().setup_linux(
-			{"vmod_kvm", name(), "1", TenantConfig::guest_state_file},
+			{"vmod_kvm", name(), TenantConfig::guest_state_file},
 			ten->config.environ());
 		// Run through main()
 		machine().run( ten->config.max_boot_time() );
@@ -47,8 +48,11 @@ MachineInstance::MachineInstance(
 		if (!is_waiting_for_requests()) {
 			throw std::runtime_error("Program did not wait for requests");
 		}
+		// Global shared memory boundary
+		uint64_t shm_boundary = shared_memory_boundary();
+		if (m_global_shared_memory) shm_boundary = machine().stack_address();
 		// Make forkable (with working memory)
-		machine().prepare_copy_on_write(65536);
+		machine().prepare_copy_on_write(65536, shm_boundary);
 		printf("Program for tenant %s is loaded\n", name().c_str());
 	} catch (...) {
 		fprintf(stderr,
@@ -145,6 +149,16 @@ const std::string& MachineInstance::name() const noexcept {
 }
 const std::string& MachineInstance::group() const noexcept {
 	return tenant().config.group.name;
+}
+
+uint64_t MachineInstance::shared_memory_boundary() const noexcept
+{
+	/* For VMs < 4GB this works well enough. */
+	return tenant().config.group.max_memory - shared_memory_size();
+}
+uint64_t MachineInstance::shared_memory_size() const noexcept
+{
+	return tenant().config.group.shared_memory << 20u;
 }
 
 tinykvm::Machine::printer_func MachineInstance::get_vsl_printer() const

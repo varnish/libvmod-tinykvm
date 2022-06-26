@@ -156,6 +156,11 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 				// Limits the memory of the Main VM.
 				group.set_max_memory(obj["max_memory"]);
 			}
+			if (obj.contains("shared_memory")) {
+				// Sets the size of shared memory between VMs.
+				// Cannot be larger than max memory.
+				group.set_max_memory(obj["shared_memory"]);
+			}
 			if (obj.contains("max_work_memory")) {
 				// Limits the memory of an ephemeral VM. Ephemeral VMs are used to handle
 				// requests (and faults in pages one by one using CoW). They are based

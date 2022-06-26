@@ -137,7 +137,10 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			}
 			/* Run the function to the end, allowing cleanup */
 			stm.run(1.0);
-			return st_res_size;
+			/* If res_addr is zero, we will just return the
+			   length provided by storage as-is, to allow some
+			   communication without a buffer. */
+			return (res_addr != 0) ? st_res_size : regs.rsi;
 		} catch (...) {
 			return -1;
 		}

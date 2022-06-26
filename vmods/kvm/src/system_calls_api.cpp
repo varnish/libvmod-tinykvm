@@ -48,6 +48,30 @@ static void syscall_set_cacheable(Machine& machine, MachineInstance& inst)
 	machine.set_registers(regs);
 }
 
+static void syscall_shared_memory(Machine& machine, MachineInstance& inst)
+{
+	auto regs = machine.registers();
+	regs.rax = inst.shared_memory_boundary();
+	regs.rdx = inst.shared_memory_size();
+	machine.set_registers(regs);
+}
+
+static void syscall_storage_mem_shared(Machine& machine, MachineInstance& inst)
+{
+	auto regs = machine.registers();
+	inst.machine().set_main_memory_writable(true);
+	regs.rax = 0;
+	machine.set_registers(regs);
+}
+
+static void syscall_all_mem_shared(Machine& machine, MachineInstance& inst)
+{
+	auto regs = machine.registers();
+	inst.set_global_memory_shared(true);
+	regs.rax = 0;
+	machine.set_registers(regs);
+}
+
 static void syscall_storage_callb(Machine& machine, MachineInstance& inst)
 {
 	auto regs = machine.registers();

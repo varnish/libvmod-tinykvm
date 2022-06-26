@@ -53,6 +53,9 @@ public:
 
 	bool is_debug() const noexcept { return m_is_debug; }
 	gaddr_t max_memory() const noexcept;
+	gaddr_t shared_memory_boundary() const noexcept;
+	gaddr_t shared_memory_size() const noexcept;
+	void set_global_memory_shared(bool v) noexcept { m_global_shared_memory = v; }
 
 	void wait_for_requests() { m_waiting_for_requests = true; }
 	bool is_waiting_for_requests() const noexcept { return m_waiting_for_requests; }
@@ -91,6 +94,7 @@ private:
 	ProgramInstance* m_inst;
 	bool        m_is_debug = false;
 	bool        m_waiting_for_requests = false;
+	bool        m_global_shared_memory = false;
 	uint16_t    m_result = 0;
 	gaddr_t     m_sighandler = 0;
 	VSHA256Context* m_sha_ctx = nullptr;
