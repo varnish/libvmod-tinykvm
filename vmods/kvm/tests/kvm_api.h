@@ -16,7 +16,7 @@ extern void register_func(int, ...);
  *  int main()
  *  {
  *  	printf("Hello World\n"); // Will be logged
- *  	set_backend_get(my_request_handler);
+ *  	set_backend_get(my_get_request_handler);
  *  	wait_for_requests();
  *  }
  *
@@ -28,9 +28,9 @@ extern void register_func(int, ...);
  * Register callbacks for various modes of operations:
 **/
 static inline void set_on_recv(void(*f)(const char*)) { register_func(0, f); }
-static inline void set_backend_get(void(*f)(const char*, int, int)) { register_func(1, f); }
+static inline void set_backend_get(void(*f)(const char*, const char*, int, int)) { register_func(1, f); }
 static inline void set_backend_post(void(*f)(const char*, const uint8_t*, size_t)) { register_func(2, f); }
-static inline void set_backend_stream_post(void(*f)(const uint8_t*, size_t)) { register_func(3, f); }
+static inline void set_backend_stream_post(long(*f)(const uint8_t*, size_t)) { register_func(3, f); }
 
 static inline void set_on_live_update(void(*f)()) { register_func(4, f); }
 static inline void set_on_live_restore(void(*f)(size_t)) { register_func(5, f); }
@@ -72,6 +72,16 @@ extern void
 http_append(int where, const char*, size_t);
 
 /**
+ * Varnish caching configuration
+ *
+**/
+extern long
+syscall_set_cacheable(int cached, long ttl_milliseconds);
+static inline long set_cacheable(int cached, float ttl) {
+	return syscall_set_cacheable(cached, ttl * 1000);
+}
+
+/**
  * Storage program
  *
  * Every tenant has a storage program that is initialized separately (and in
@@ -109,8 +119,8 @@ storage_call(storage_func, const void* src, size_t, void* dst, size_t);
 extern long
 storage_callv(storage_func, size_t n, const struct virtbuffer[n], void* dst, size_t);
 
-extern void
-call_mutably(storage_func func) { storage_call(func, NULL, 0, NULL, 0); }
+static long
+storage_call0(storage_func func) { return storage_call(func, NULL, 0, NULL, 0); }
 
 /* Create an async task that is scheduled to run next in storage. The
    new task waits until other tasks are done before starting a new one,
@@ -124,6 +134,30 @@ storage_return(const void* data, size_t len);
 
 static inline void
 storage_return_nothing(void) { storage_return(NULL, 0); }
+
+/* Shared memory between all VMs. Globally visible to
+   all VMs, and reads/writes are immediately seen
+   by both storage and request VMs. */
+struct shared_memory_info {
+	void* ptr;
+	uint64_t size;
+};
+extern struct shared_memory_info shared_memory_area();
+
+/* From the point of calling this function, any new
+   pages written to in the mutable storage VM will
+   be globally visible immediately, shared with
+   all request VMs in a one-sided way. */
+extern void make_storage_memory_shared();
+
+/* If called during main() routine, it will cause
+   global memory to be fully shared among everyone,
+   not including the main stacks, which are separate.
+   Effectively, memory will behave as if you are
+   running a normal Linux program, and all VMs were
+   threads sharing the same memory. */
+extern void make_all_memory_shared();
+
 
 /* Start multi-processing using @n vCPUs on given function,
    forwarding up to 4 integral/pointer arguments.
@@ -240,6 +274,13 @@ asm(".global wait_for_requests\n" \
 "	mov $0x10001, %eax\n" \
 "	out %eax, $0\n");
 
+asm(".global syscall_set_cacheable\n" \
+".type syscall_set_cacheable, function\n" \
+"syscall_set_cacheable:\n" \
+"	mov $0x10005, %eax\n" \
+"	out %eax, $0\n" \
+"	ret");
+
 asm(".global http_append\n" \
 ".type http_append, function\n" \
 "http_append:\n" \
@@ -252,6 +293,27 @@ asm(".global backend_response\n" \
 "backend_response:\n" \
 "	mov $0xFFFF, %eax\n" \
 "	out %eax, $0\n");
+
+asm(".global shared_memory_area\n" \
+".type shared_memory_area, function\n" \
+"shared_memory_area:\n" \
+"	mov $0x10700, %eax\n" \
+"	out %eax, $0\n" \
+"   ret\n");
+
+asm(".global make_storage_memory_shared\n" \
+".type make_storage_memory_shared, function\n" \
+"make_storage_memory_shared:\n" \
+"	mov $0x10701, %eax\n" \
+"	out %eax, $0\n" \
+"   ret\n");
+
+asm(".global make_all_memory_shared\n" \
+".type make_all_memory_shared, function\n" \
+"make_all_memory_shared:\n" \
+"	mov $0x10702, %eax\n" \
+"	out %eax, $0\n" \
+"   ret\n");
 
 asm(".global storage_call\n" \
 ".type storage_call, function\n" \

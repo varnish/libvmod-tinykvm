@@ -14,8 +14,7 @@ static void my_storage()
 
 static void my_backend(char *arg)
 {
-	char result[256];
-	call_mutably(my_storage);
+	storage_call0(my_storage);
 
 	arg[11] = '0' + (counter % 10);
 
@@ -25,6 +24,10 @@ static void my_backend(char *arg)
 
 int main()
 {
+	// With this enabled we can see the global memory of
+	// the storage VM without copying data out.
+	make_storage_memory_shared();
+
 	set_backend_get(my_backend);
 	wait_for_requests();
 }
