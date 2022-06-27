@@ -8,9 +8,6 @@
 [submodule "FlameGraph"]
 	path = ext/FlameGraph
 	url = git@github.com:brendangregg/FlameGraph
-[submodule "ext/h2o"]
-	path = ext/h2o
-	url = git@github.com:h2o/h2o.git
 [submodule "ext/C-Thread-Pool"]
 	path = ext/C-Thread-Pool
 	url = git@github.com:Pithikos/C-Thread-Pool.git
