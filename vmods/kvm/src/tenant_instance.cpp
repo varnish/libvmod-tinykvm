@@ -171,7 +171,7 @@ void TenantInstance::serialize_storage_state(
 }
 
 void TenantInstance::commit_program_live(
-	std::shared_ptr<ProgramInstance>& new_prog, bool storage) const
+	std::shared_ptr<ProgramInstance>& new_prog) const
 {
 	std::shared_ptr<ProgramInstance> current;
 	/* Make a reference to the current program, keeping it alive */
@@ -181,11 +181,12 @@ void TenantInstance::commit_program_live(
 		current = std::atomic_load(&this->debug_program);
 	}
 
-	if (current != nullptr && !storage) {
+	if (current != nullptr) {
 		TenantInstance::serialize_storage_state(
 			new_prog->main_vm.ctx(), current, new_prog);
 	}
 
+	/* Swap out old program with new program. */
 	if (!new_prog->main_vm.is_debug())
 	{
 		std::atomic_exchange(&this->program, new_prog);

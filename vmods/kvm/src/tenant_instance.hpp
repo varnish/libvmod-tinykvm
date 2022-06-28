@@ -18,11 +18,10 @@ public:
 
 	void dynamic_call(uint32_t hash, MachineInstance&) const;
 
-	/* Used by vmcommit system call to replace the main VM with a new
-	   one based on the current active VM, including from a request VM
-	   or a storage VM. */
+	/* Used by live update mechanism to replace the main VM with a new
+	   one that was HTTP POSTed by a tenant while Varnish is running. */
 	void commit_program_live(
-		std::shared_ptr<ProgramInstance>& new_prog, bool storage) const;
+		std::shared_ptr<ProgramInstance>& new_prog) const;
 
 	/* If the tenants program employ serialization callbacks, we can
 	   serialize the important bits of the current program and then
