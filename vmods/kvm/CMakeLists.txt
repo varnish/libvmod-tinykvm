@@ -29,6 +29,7 @@ add_vmod_tests(vmod_kvm kvm
 	tests/main_arguments.vtc
 	tests/not_found.vtc
 	tests/program_not_ready.vtc
+	tests/rotate_vcl.vtc
 	tests/stateful_storage.vtc
 	tests/stateful_buffered_storage.vtc
 	tests/allowed_paths.vtc
