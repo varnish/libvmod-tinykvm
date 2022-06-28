@@ -78,6 +78,7 @@ struct TenantConfig
 
 	TenantConfig(std::string n, std::string f, std::string k,
 		TenantGroup g, dynfun_map& dfm);
+	~TenantConfig();
 
 	/* One allowed file for persistence / state-keeping */
 	std::string allowed_file;

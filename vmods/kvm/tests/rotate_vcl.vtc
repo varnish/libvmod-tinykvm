@@ -58,14 +58,18 @@ define m1 make_requests {
 	expect resp.status == 200
 }
 
-client c1 -repeat 60 {
+client c1 -repeat 50 {
 	${m1_make_requests}
 	${m1_make_requests}
 } -start
 
-loop 10 {
+loop 25 {
 	varnish v1 -cliok "vcl.use vcl1"
+	varnish v1 -cliok "vcl.state vcl2 cold"
+	varnish v1 -cliok "vcl.state vcl2 auto"
 	varnish v1 -cliok "vcl.use vcl2"
+	varnish v1 -cliok "vcl.state vcl1 cold"
+	varnish v1 -cliok "vcl.state vcl1 auto"
 }
 
 client c1 -wait

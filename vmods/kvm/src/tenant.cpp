@@ -20,6 +20,8 @@ TenantConfig::TenantConfig(
 	this->allowed_file = filename + ".state";
 }
 
+TenantConfig::~TenantConfig() {}
+
 Tenants& tenancy(VCL_PRIV task)
 {
 	if (LIKELY(task->priv != nullptr)) {
@@ -27,6 +29,9 @@ Tenants& tenancy(VCL_PRIV task)
 	}
 	task->priv = new Tenants{};
 	task->len  = KVM_TENANTS_MAGIC;
+	task->free = [] (void* priv) {
+		delete (Tenants*)priv;
+	};
 	return *(Tenants *)task->priv;
 }
 
@@ -39,14 +44,14 @@ bool TenantConfig::begin_dyncall_initialization(VCL_PRIV task)
 }
 
 static inline bool load_tenant(
-	VRT_CTX, VCL_PRIV task, kvm::TenantConfig&& config)
+	VRT_CTX, VCL_PRIV task, const kvm::TenantConfig& config)
 {
 	try {
 		auto& tcy = tenancy(task);
 		const uint32_t hash = crc32c_hw(config.name);
 
 		const auto [it, inserted] =
-			tcy.tenants.try_emplace(hash, ctx, config);
+			tcy.tenants.try_emplace(hash, ctx, std::move(config));
 		if (UNLIKELY(!inserted)) {
 			throw std::runtime_error("Tenant already existed: " + config.name);
 		}
@@ -137,13 +142,15 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			}
 			auto grit = groups.find(grname);
 			if (grit == groups.end()) {
-				const auto& ret = groups.insert(
-						std::pair<std::string,kvm::TenantGroup>(
-							grname, TenantGroup{grname,
-								1.0f, /* 1 second timeout */
-								256, /* 256 MB max memory */
-								4} /* 4 MB max working memory */
-						));
+				const auto& ret = groups.emplace(
+					std::piecewise_construct,
+					std::forward_as_tuple(grname),
+					std::forward_as_tuple(
+						grname,
+						1.0f, /* 1 second timeout */
+						256, /* 256 MB max memory */
+						4 /* 4 MB max working memory */
+				));
 				grit = ret.first;
 			}
 			auto& group = grit->second;
