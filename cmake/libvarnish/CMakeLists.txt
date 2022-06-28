@@ -1,6 +1,7 @@
 set (LIBPATH ${VARNISH_PATH}/lib)
 set (VARNISHD_PATH ${VARNISH_PATH}/bin/varnishd)
 
+set(OVERRIDE_VMOD_API "" CACHE STRING "Overrides vmod_api string")
 set(VSTATE_DIR "/tmp/varnishd" CACHE STRING "Default state directory")
 set(VMOD_DIR   "/opt/varnish/lib/varnish-plus/vmods" CACHE STRING "Default VMOD directory")
 set(VCL_DIR    "/opt/varnish/share/varnish-plus/vcl" CACHE STRING "Default VCL directory")
@@ -10,6 +11,9 @@ execute_process(COMMAND git rev-parse HEAD
 				WORKING_DIRECTORY ${VARNISH_PATH}
 				OUTPUT_VARIABLE GIT_REPO_VERSION
 				OUTPUT_STRIP_TRAILING_WHITESPACE)
+if (OVERRIDE_VMOD_API)
+	set(GIT_REPO_VERSION "${OVERRIDE_VMOD_API}")
+endif()
 configure_file("vcs_version.h.in" "${CMAKE_BINARY_DIR}/vcs_version.h")
 configure_file("vmod_abi.h.in" "${CMAKE_BINARY_DIR}/vmod_abi.h")
 

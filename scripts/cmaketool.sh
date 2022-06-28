@@ -33,6 +33,7 @@ SOURCE_DIR="$PWD"
 preargs=
 args="-DVCL_DIR=$PWD -DSYSTEM_OPENSSL=ON -DPython3_EXECUTABLE=/usr/bin/python3"
 vcp="OFF"
+vmod_api=""
 do_build=false
 do_clean=false
 do_gprof=false
@@ -46,7 +47,7 @@ set -e
 setup_build() {
 	mkdir -p $BUILD_PATH/$folder
 	pushd $BUILD_PATH/$folder
-	cmake $SOURCE_DIR -G Ninja -DVARNISH_PLUS=$vcp -DVMOD_DIR=$PWD -DUSE_LLD=ON $args
+	cmake $SOURCE_DIR -G Ninja -DVARNISH_PLUS=$vcp -DVMOD_DIR=$PWD -DUSE_LLD=ON $args -DOVERRIDE_VMOD_API="$vmod_api"
 	popd
 }
 
@@ -147,6 +148,10 @@ case $i in
     ;;
 	--single-process)
 	do_singleproc=true
+    shift
+	;;
+	--override-vmods=*)
+	vmod_api="${i#*=}"
     shift
     ;;
 	--disable-numa)
