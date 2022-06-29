@@ -32,6 +32,7 @@ public:
 		std::shared_ptr<ProgramInstance>& inst);
 
 	TenantInstance(const vrt_ctx*, const TenantConfig&);
+	long wait_for_initialization();
 
 	/* Initialized during vcl_init */
 	const uint64_t magic = 0xb385716f486938e6;

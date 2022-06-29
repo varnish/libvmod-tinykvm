@@ -202,6 +202,12 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 				});
 			}
 		}
+
+		/* Finish initialization */
+		for (auto& tenant : tenancy(task).tenants) {
+			tenant.second.wait_for_initialization();
+		}
+
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
 			"vmod_kvm: Exception when loading tenants from %s: %s",

@@ -54,6 +54,12 @@ TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 		this->program = nullptr;
 	}
 }
+long TenantInstance::wait_for_initialization()
+{
+	if (program != nullptr)
+		return program->wait_for_initialization();
+	return 0;
+}
 
 VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 {
@@ -175,7 +181,7 @@ void TenantInstance::commit_program_live(
 {
 	std::shared_ptr<ProgramInstance> current;
 	/* Make a reference to the current program, keeping it alive */
-	if (!new_prog->main_vm.is_debug()) {
+	if (!new_prog->main_vm->is_debug()) {
 		current = std::atomic_load(&this->program);
 	} else {
 		current = std::atomic_load(&this->debug_program);
@@ -183,11 +189,11 @@ void TenantInstance::commit_program_live(
 
 	if (current != nullptr) {
 		TenantInstance::serialize_storage_state(
-			new_prog->main_vm.ctx(), current, new_prog);
+			new_prog->main_vm->ctx(), current, new_prog);
 	}
 
 	/* Swap out old program with new program. */
-	if (!new_prog->main_vm.is_debug())
+	if (!new_prog->main_vm->is_debug())
 	{
 		std::atomic_exchange(&this->program, new_prog);
 	} else {

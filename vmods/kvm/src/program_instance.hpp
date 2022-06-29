@@ -59,6 +59,7 @@ public:
 	ProgramInstance(std::vector<uint8_t>,
 		const vrt_ctx*, TenantInstance*, bool debug = false);
 	~ProgramInstance();
+	long wait_for_initialization();
 
 	/* Look up the address of the given name (function or object)
 	   in the currently running program. The operation is very
@@ -95,7 +96,7 @@ public:
 
 	const std::vector<uint8_t> binary;
 	/* Ready-made _main_ VM that can be forked into many small VMs */
-	MachineInstance main_vm;
+	std::unique_ptr<MachineInstance> main_vm;
 
 	/* Ticket-machine that gives access rights to VMs. */
 	moodycamel::BlockingConcurrentQueue<VMPoolItem*> m_vmqueue;
@@ -119,6 +120,8 @@ public:
 	std::unique_ptr<tinykvm::RSPClient> rspclient;
 	MachineInstance* rsp_script = nullptr;
 	std::mutex rsp_mtx;
+
+	std::future<long> m_future;
 };
 
 } // kvm

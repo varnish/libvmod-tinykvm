@@ -40,6 +40,7 @@ kvm_live_update(VRT_CTX, kvm::TenantInstance* ten, struct update_params *params)
 		const auto& live_binary = inst->binary;
 
 		/* Complex dance to replace the currently running program */
+		inst->wait_for_initialization();
 		ten->commit_program_live(inst);
 
 	#ifdef ENABLE_TIMING

@@ -13,9 +13,13 @@ VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
 	// Spawn forked VM on dedicated thread, blocking.
 	tp.enqueue(
 	[&] () -> long {
-		this->mi = std::make_unique<MachineInstance> (
-			main_vm, ctx, ten, prog);
-		return 0;
+		try {
+			this->mi = std::make_unique<MachineInstance> (
+				main_vm, ctx, ten, prog);
+			return 0;
+		} catch (...) {
+			return -1;
+		}
 	}).get();
 }
 
@@ -24,35 +28,47 @@ ProgramInstance::ProgramInstance(
 	const vrt_ctx* ctx, TenantInstance* ten,
 	bool debug)
 	: binary{std::move(elf)},
-	  main_vm{binary, ctx, ten, this, debug},
 	  m_main_queue {1},
 	  rspclient{nullptr}
 {
-	if (!main_vm.is_waiting_for_requests()) {
-		throw std::runtime_error("The main program was not waiting for requests. Did you forget to call 'wait_for_requests()'?");
-	}
+	this->m_future = m_main_queue.enqueue(
+	[=] () -> long {
+		try {
+			main_vm = std::make_unique<MachineInstance>
+				(binary, ctx, ten, this, debug);
 
-	// Migrate main VM to dedicated thread.
-	m_main_queue.enqueue(
-	[this] {
-		main_vm.machine().migrate_to_this_thread();
-	}).get();
+			const size_t max_vms = ten->config.group.max_concurrency;
+			for (size_t i = 0; i < max_vms; i++) {
+				// Instantiate forked VMs on dedicated threads,
+				// in order to prevent KVM migrations.
+				m_vms.emplace_back(*main_vm, ctx, ten, this);
+				m_vmqueue.enqueue(&m_vms.back());
+			}
+		} catch (...) {
+			return -1;
+		}
 
-	const size_t max_vms = ten->config.group.max_concurrency;
-	for (size_t i = 0; i < max_vms; i++) {
-		// Instantiate forked VMs on dedicated threads,
-		// in order to prevent KVM migrations.
-		m_vms.emplace_back(main_vm, ctx, ten, this);
-		m_vmqueue.enqueue(&m_vms.back());
-	}
+		return 0;
+	});
 }
 ProgramInstance::~ProgramInstance()
 {
 }
 
+long ProgramInstance::wait_for_initialization()
+{
+	auto code = this->m_future.get();
+
+	if (!main_vm->is_waiting_for_requests()) {
+		throw std::runtime_error("The main program was not waiting for requests. Did you forget to call 'wait_for_requests()'?");
+	}
+
+	return code;
+}
+
 uint64_t ProgramInstance::lookup(const char* name) const
 {
-	return main_vm.resolve_address(name);
+	return main_vm->resolve_address(name);
 }
 ProgramInstance::gaddr_t ProgramInstance::entry_at(const int idx) const
 {
@@ -71,7 +87,7 @@ Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 	assert(slot && ctx);
 
 	/* Reset and reference the active program. */
-	slot->mi->reset_to(ctx, prog->main_vm);
+	slot->mi->reset_to(ctx, *prog->main_vm);
 
 	/* This creates a self-reference, which ensures that open
 	   Machine instances will keep the program instance alive. */
@@ -100,7 +116,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 	auto future = m_main_queue.enqueue(
 	[&] () -> long
 	{
-		auto& stm = main_vm.machine();
+		auto& stm = main_vm->machine();
 		uint64_t vaddr = stm.stack_address();
 
 		for (size_t i = 0; i < n; i++) {
@@ -118,8 +134,8 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 
 		/* We need to use the CTX from the current program */
 		auto& inst = *src.get_userdata<MachineInstance>();
-		main_vm.set_ctx(inst.ctx());
-		assert(main_vm.ctx());
+		main_vm->set_ctx(inst.ctx());
+		assert(main_vm->ctx());
 
 		try {
 			tinykvm::tinykvm_x86regs regs;
@@ -158,11 +174,11 @@ long ProgramInstance::async_storage_call(gaddr_t func, gaddr_t arg)
 		m_main_queue.enqueue(
 	[=] () -> long
 	{
-		auto& stm = main_vm.machine();
-		const uint64_t new_stack = main_vm.machine().stack_address();
+		auto& stm = main_vm->machine();
+		const uint64_t new_stack = main_vm->machine().stack_address();
 
 		/* This vmcall has no attached VRT_CTX. */
-		main_vm.set_ctx(nullptr);
+		main_vm->set_ctx(nullptr);
 
 		try {
 			tinykvm::tinykvm_x86regs regs;
@@ -191,10 +207,10 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 	{
 		try {
 			/* Serialize data in the old machine */
-			main_vm.set_ctx(ctx);
-			auto& old_machine = main_vm.machine();
+			main_vm->set_ctx(ctx);
+			auto& old_machine = main_vm->machine();
 			old_machine.timed_vmcall(func,
-				main_vm.tenant().config.max_time());
+				main_vm->tenant().config.max_time());
 			/* Get serialized data */
 			auto regs = old_machine.registers();
 			auto data_addr = regs.rdi;
@@ -215,11 +231,11 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 	if (res.data == nullptr)
 		return -1;
 
-	auto& new_machine = new_prog.main_vm.machine();
+	auto& new_machine = new_prog.main_vm->machine();
 	/* Begin resume procedure */
-	new_prog.main_vm.set_ctx(ctx);
+	new_prog.main_vm->set_ctx(ctx);
 	new_machine.timed_vmcall(newfunc,
-		new_prog.main_vm.tenant().config.max_time(),
+		new_prog.main_vm->tenant().config.max_time(),
 		(uint64_t)res.len);
 	auto new_regs = new_machine.registers();
 	/* The machine should be calling STOP with rsi=dst_data */
