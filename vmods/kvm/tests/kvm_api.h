@@ -71,6 +71,9 @@ backend_response_str(int16_t status, const char *ctype, const char *content)
 extern void
 http_append(int where, const char*, size_t);
 
+static inline void
+http_append_str(int where, const char* str) { http_append(where, str, strlen(str)); }
+
 /**
  * Varnish caching configuration
  *
@@ -234,6 +237,8 @@ DYNAMIC_CALL(goto_dns, 0x746238D2)
    a non-zero value and the struct contents is undefined. */
 struct curl_opts {
 	long   status;
+	size_t post_buflen;
+	void  *post_buffer;
 	size_t content_length;
 	void  *content;
 	long   ctlen;
