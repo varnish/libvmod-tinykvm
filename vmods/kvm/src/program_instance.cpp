@@ -59,6 +59,10 @@ long ProgramInstance::wait_for_initialization()
 {
 	auto code = this->m_future.get();
 
+	if (main_vm == nullptr) {
+		throw std::runtime_error("The program failed to initialize. Check logs for crash?");
+	}
+
 	if (!main_vm->is_waiting_for_requests()) {
 		throw std::runtime_error("The main program was not waiting for requests. Did you forget to call 'wait_for_requests()'?");
 	}
