@@ -202,8 +202,8 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 	gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc)
 {
 	struct SerializeResult {
-		std::unique_ptr<char[]>  data;
-		unsigned long long len;
+		uint64_t data;
+		uint64_t len;
 	};
 
 	auto future = m_main_queue.enqueue(
@@ -220,19 +220,17 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 			auto data_addr = regs.rdi;
 			auto data_len  = regs.rsi;
 			if (data_addr + data_len < data_addr) {
-				return {nullptr, 0};
+				return {0, 0};
 			}
-			char* data = new char[data_len];
-			old_machine.copy_from_guest(data, data_addr, data_len);
-			return {std::unique_ptr<char[]> (data), data_len};
+			return {data_addr, data_len};
 		} catch (...) {
 			/* We have to make sure Varnish is not taken down */
-			return {nullptr, 0};
+			return {0x0, 0};
 		}
 	});
 
-	SerializeResult res = future.get();
-	if (res.data == nullptr)
+	SerializeResult from = future.get();
+	if (from.data == 0x0)
 		return -1;
 
 	auto new_future = new_prog.m_main_queue.enqueue(
@@ -242,22 +240,28 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 			auto &new_machine = new_prog.main_vm->machine();
 			/* Begin resume procedure */
 			new_prog.main_vm->set_ctx(ctx);
+
 			new_machine.timed_vmcall(newfunc,
 				new_prog.main_vm->tenant().config.max_time(),
-				(uint64_t)res.len);
-			auto new_regs = new_machine.registers();
+				(uint64_t)from.len);
+
+			auto regs = new_machine.registers();
 			/* The machine should be calling STOP with rsi=dst_data */
-			auto res_data = new_regs.rdi;
-			auto res_size = std::min(new_regs.rsi, res.len);
+			auto res_data = regs.rdi;
+			auto res_size = std::min((uint64_t)regs.rsi, from.len);
 			if (res_data != 0x0)
 			{ // Just a courtesy, we *do* check permissions.
-				new_machine.copy_to_guest(
-					res_data, res.data.get(), res_size);
+				auto& old_machine = main_vm->machine();
+				new_machine.copy_from_machine(
+					res_data, old_machine, from.data, res_size);
 				/* Resume the new machine, allowing it to deserialize data */
 				new_machine.run(2.0);
+				return res_size;
 			}
 			return 0;
-		} catch (...) {
+		}
+		catch (...)
+		{
 			return -1;
 		}
 	});

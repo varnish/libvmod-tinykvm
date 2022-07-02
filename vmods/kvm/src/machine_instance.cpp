@@ -48,13 +48,26 @@ MachineInstance::MachineInstance(
 		if (!is_waiting_for_requests()) {
 			throw std::runtime_error("Program did not wait for requests");
 		}
+
 		// Global shared memory boundary
 		uint64_t shm_boundary = shared_memory_boundary();
 		if (m_global_shared_memory) shm_boundary = machine().stack_address();
+
 		// Make forkable (with working memory)
-		machine().prepare_copy_on_write(65536, shm_boundary);
+		// TODO: Tenant config variable for storage memory
+		machine().prepare_copy_on_write(
+			ten->config.max_work_memory(), shm_boundary);
+
+		// Set new vmcall stack base lower than current RSP, in
+		// order to avoid trampling stack-allocated things in main.
+		auto rsp = machine().registers().rsp;
+		rsp &= ~0xFLL;
+		machine().set_stack_address(rsp);
+
 		printf("Program for tenant %s is loaded\n", name().c_str());
-	} catch (...) {
+	}
+	catch (...)
+	{
 		fprintf(stderr,
 			"Error: Machine not initialized properly: %s\n", name().c_str());
 		throw; /* IMPORTANT: Re-throw */

@@ -165,7 +165,10 @@ void TenantInstance::serialize_storage_state(
 		{
 			VSLb(ctx->vsl, SLT_VCL_Log,
 				"Live-update serialization will be performed");
-			old->live_update_call(ctx, old_ser_func, *inst, new_deser_func);
+			long res =
+				old->live_update_call(ctx, old_ser_func, *inst, new_deser_func);
+			VSLb(ctx->vsl, SLT_VCL_Log,
+				 "Transferred %ld bytes", res);
 		} else {
 			VSLb(ctx->vsl, SLT_VCL_Log,
 				"Live-update deserialization skipped (new program lacks restorer)");
