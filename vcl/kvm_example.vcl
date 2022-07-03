@@ -13,7 +13,8 @@ sub vcl_init {
 		},
 		"test.com": {
 			"key": "123",
-			"group": "test"
+			"group": "test",
+			"filename": "/tmp/test"
 		}
 	}""");
 }
