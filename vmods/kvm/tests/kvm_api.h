@@ -122,7 +122,7 @@ storage_call(storage_func, const void* src, size_t, void* dst, size_t);
 extern long
 storage_callv(storage_func, size_t n, const struct virtbuffer[n], void* dst, size_t);
 
-static long
+static inline long
 storage_call0(storage_func func) { return storage_call(func, NULL, 0, NULL, 0); }
 
 /* Create an async task that is scheduled to run next in storage. The
@@ -147,20 +147,22 @@ struct shared_memory_info {
 };
 extern struct shared_memory_info shared_memory_area();
 
-/* From the point of calling this function, any new
-   pages written to in the mutable storage VM will
-   be globally visible immediately, shared with
-   all request VMs in a one-sided way. */
-extern void make_storage_memory_shared();
-
 /* If called during main() routine, it will cause
    global memory to be fully shared among everyone,
    not including the main stacks, which are separate.
    Effectively, memory will behave as if you are
-   running a normal Linux program, and all VMs were
-   threads sharing the same memory. */
+   running a normal Linux program, and all requests
+   were threads sharing the same memory. It is no
+   longer necessary to call into storage, however it
+   may still be useful to invoke async storage calls. */
 extern void make_all_memory_shared();
 
+/* From the point of calling this function, any new
+   pages written to in the mutable storage will
+   be globally visible immediately, shared with
+   all request VMs in a one-sided way. Due to this
+   one-sidedness, it has to be used with caution. */
+extern void make_storage_memory_shared();
 
 /* Start multi-processing using @n vCPUs on given function,
    forwarding up to 4 integral/pointer arguments.
@@ -237,8 +239,8 @@ DYNAMIC_CALL(goto_dns, 0x746238D2)
    a non-zero value and the struct contents is undefined. */
 struct curl_opts {
 	long   status;
-	size_t post_buflen;
-	void  *post_buffer;
+	size_t      post_buflen;
+	const void *post_buffer;
 	size_t content_length;
 	void  *content;
 	long   ctlen;

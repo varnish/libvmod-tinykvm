@@ -128,8 +128,10 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			if (res == 0 && ctype != nullptr) {
 				const size_t ctlen = std::min(strlen(ctype)+1, (size_t)opres.ct_length);
 				opres.ct_length = ctlen;
-				inst.machine().copy_to_guest(g_buffer + offsetof(opresult, ctype), ctype, ctlen);
-			} else {
+				std::memcpy(opres.ctype, ctype, ctlen);
+			}
+			else
+			{
 				opres.ct_length = 0;
 			}
 			inst.machine().copy_to_guest(g_buffer, &opres, sizeof(opres));
