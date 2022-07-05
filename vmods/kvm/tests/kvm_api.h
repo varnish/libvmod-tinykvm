@@ -1,7 +1,6 @@
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
-#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,7 +60,7 @@ backend_response(int16_t status, const void *t, uintptr_t, const void *c, uintpt
 static inline void
 backend_response_str(int16_t status, const char *ctype, const char *content)
 {
-	backend_response(status, ctype, strlen(ctype), content, strlen(content));
+	backend_response(status, ctype, __builtin_strlen(ctype), content, __builtin_strlen(content));
 }
 
 /**
@@ -72,7 +71,7 @@ extern void
 http_append(int where, const char*, size_t);
 
 static inline void
-http_append_str(int where, const char* str) { http_append(where, str, strlen(str)); }
+http_append_str(int where, const char *str) { http_append(where, str, __builtin_strlen(str)); }
 
 /**
  * Varnish caching configuration
