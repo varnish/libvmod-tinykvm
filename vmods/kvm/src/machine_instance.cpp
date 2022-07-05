@@ -39,6 +39,14 @@ MachineInstance::MachineInstance(
 	machine().set_userdata<MachineInstance> (this);
 	machine().set_printer(get_vsl_printer());
 	try {
+		/* Some run-times are quite buggy. Zig makes a calculation on
+		   RSP and the loadable segments in order to find img_base.
+		   This calculation results in a panic when the stack is
+		   below the program and heap. Workaround: Move above. */
+		static const size_t stack_size = 0x400000;
+		auto stack = machine().mmap_allocate(stack_size);
+		machine().set_stack_address(stack + stack_size);
+		// Build stack, auxvec, envp and program arguments
 		machine().setup_linux(
 			{"vmod_kvm", name(), TenantConfig::guest_state_file},
 			ten->config.environ());
@@ -66,10 +74,12 @@ MachineInstance::MachineInstance(
 
 		printf("Program for tenant %s is loaded\n", name().c_str());
 	}
-	catch (...)
+	catch (const std::exception& e)
 	{
 		fprintf(stderr,
-			"Error: Machine not initialized properly: %s\n", name().c_str());
+			"Machine not initialized properly: %s\n", name().c_str());
+		fprintf(stderr,
+			"Error: %s\n", e.what());
 		throw; /* IMPORTANT: Re-throw */
 	}
 }

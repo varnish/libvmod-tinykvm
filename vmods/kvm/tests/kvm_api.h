@@ -243,7 +243,7 @@ struct curl_opts {
 	const void *post_buffer;
 	size_t content_length;
 	void  *content;
-	long   ctlen;
+	size_t ctlen;
 	char   ctype[256];
 };
 DYNAMIC_CALL(curl_fetch, 0xB86011FB, const char*, size_t, struct curl_opts*)

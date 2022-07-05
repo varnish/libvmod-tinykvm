@@ -13,7 +13,7 @@ void initialize_vmods(const vrt_ctx* ctx, VCL_PRIV task)
 	if (!TenantConfig::begin_dyncall_initialization(task))
 		return;
 
-	initialize_vmod_goto(ctx, task);
+	//initialize_vmod_goto(ctx, task);
 	initialize_curl(ctx, task);
 #ifdef KVM_FACEDETECTION
 	initialize_facedetect(ctx, task);

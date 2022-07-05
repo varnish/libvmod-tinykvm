@@ -227,7 +227,21 @@ void MachineInstance::setup_syscall_interface()
 			machine.set_registers(regs);
 		});
 	Machine::install_syscall_handler(
-		217, [] (Machine& machine) { // GETDENTS64
+		79, [](Machine &machine) { // GETCWD
+			auto &inst = *machine.get_userdata<MachineInstance>();
+			auto regs = machine.registers();
+
+			const char fakepath[] = "/";
+			if (sizeof(fakepath) <= regs.rsi) {
+				machine.copy_to_guest(regs.rdi, fakepath, sizeof(fakepath));
+				regs.rax = regs.rdi;
+			} else {
+				regs.rax = 0;
+			}
+			machine.set_registers(regs);
+		});
+	Machine::install_syscall_handler(
+		217, [](Machine &machine) { // GETDENTS64
 			auto& inst = *machine.get_userdata<MachineInstance>();
 			auto regs = machine.registers();
 
@@ -235,7 +249,8 @@ void MachineInstance::setup_syscall_interface()
 
 			char buffer[2048];
 			regs.rax = syscall(SYS_getdents64, fd, buffer, sizeof(buffer));
-			if (regs.rax > 0) {
+			if (regs.rax > 0)
+			{
 				machine.copy_to_guest(regs.rsi, buffer, regs.rax);
 			}
 			SYSPRINT("GETDENTS64 to vfd=%lld, fd=%d, data=0x%llX = %lld\n",

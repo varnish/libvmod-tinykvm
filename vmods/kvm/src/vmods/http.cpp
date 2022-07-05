@@ -125,8 +125,10 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			res = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &opres.status);
 			const char* ctype = nullptr;
 			res = curl_easy_getinfo(curl, CURLINFO_CONTENT_TYPE, &ctype);
+			/* We have an expectation of at least 256 bytes available for
+			   writing back Content-Type, directly into opres structure. */
 			if (res == 0 && ctype != nullptr) {
-				const size_t ctlen = std::min(strlen(ctype)+1, (size_t)opres.ct_length);
+				const size_t ctlen = std::min(strlen(ctype)+1, 256ul);
 				opres.ct_length = ctlen;
 				std::memcpy(opres.ctype, ctype, ctlen);
 			}

@@ -149,7 +149,7 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 						grname,
 						1.0f, /* 1 second timeout */
 						256, /* 256 MB max memory */
-						4 /* 4 MB max working memory */
+						32 /* 32 MB max working memory */
 				));
 				grit = ret.first;
 			}
