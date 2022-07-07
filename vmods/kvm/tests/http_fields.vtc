@@ -14,6 +14,8 @@ static void my_backend(const char *url, const char *arg2, int req, int resp)
 	/* Test overwriting a header field. */
 	if (strcasecmp(url, "/test2") == 0) {
 		http_setf(resp, "X-OtherValue: 7", 15);
+		/* This will unset the field. */
+		http_setf(resp, "X-Value", 7);
 	}
 
 	backend_response_str(200, "text/plain", url);
@@ -64,7 +66,7 @@ client c1 {
 	expect resp.status == 200
 	txreq -url "/test2" -hdr "Host: xpizza.com"
 	rxresp
-	expect resp.http.X-Value == "5"
+	expect resp.http.X-Value == <undef>
 	expect resp.http.X-OtherValue == "7"
 	expect resp.body == "/test2"
 	expect resp.status == 200

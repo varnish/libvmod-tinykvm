@@ -21,7 +21,7 @@ struct http {
 	uint8_t        conds;
 };
 
-#define HDR_FIRST     6
+#define HDR_FIRST     5
 #define HDR_INVALID   UINT32_MAX
 
 namespace kvm {
@@ -101,29 +101,35 @@ http_findhdr(const struct http *hp, unsigned l, const char *hdr)
 	}
 	return 0;
 }
+static void
+http_unsetat(struct http *hp, unsigned idx)
+{
+	unsigned count;
+
+	assert(idx >= HDR_FIRST); /* Avoid proto fields */
+	assert(idx < hp->field_count); /* Out of bounds */
+
+	/* Inefficient, but preserves order (assuming sorted?) */
+	count = hp->field_count - idx - 1;
+	memmove(&hp->field_array[idx], &hp->field_array[idx + 1], count * sizeof *hp->field_array);
+	memmove(&hp->field_flags[idx], &hp->field_flags[idx + 1], count * sizeof *hp->field_flags);
+	hp->field_count--;
+}
 
 inline uint32_t field_length(const txt& field)
 {
 	return field.end - field.begin;
 }
 
-static long
-http_header_append(MachineInstance& inst, int where, uint64_t addr, uint32_t len)
+static unsigned
+http_header_append(struct http* hp, const char* val, uint32_t len)
 {
-	auto* hp = get_http(inst.ctx(), (gethdr_e) where);
-
-	auto* val = (char*) WS_Alloc(inst.ctx()->ws, len+1);
-	if (val == nullptr)
-		throw std::runtime_error("Unable to make room for HTTP header field");
-	inst.machine().copy_from_guest(val, addr, len);
-	val[len] = 0;
-
 	if (UNLIKELY(hp->field_count >= hp->fields_max)) {
 		VSLb(hp->vsl, SLT_LostHeader, "%.*s", (int) len, val);
 		return HDR_INVALID;
 	}
 
-	const int idx = hp->field_count++;
+	const unsigned idx = hp->field_count++;
 	http_SetH(hp, idx, val);
 	return idx;
 }
@@ -131,7 +137,17 @@ http_header_append(MachineInstance& inst, int where, uint64_t addr, uint32_t len
 static void syscall_http_append(Machine& machine, MachineInstance& inst)
 {
 	auto regs = machine.registers();
-	regs.rax = http_header_append(inst, regs.rdi, regs.rsi, regs.rdx);
+	auto *hp = get_http(inst.ctx(), (gethdr_e)regs.rdi);
+	const uint64_t addr = regs.rsi;
+	const uint32_t len = regs.rdx;
+
+	auto *val = (char *)WS_Alloc(inst.ctx()->ws, len + 1);
+	if (val == nullptr)
+		throw std::runtime_error("Unable to make room for HTTP header field");
+	inst.machine().copy_from_guest(val, addr, len);
+	val[len] = 0;
+
+	regs.rax = http_header_append(hp, val, len);
 	machine.set_registers(regs);
 }
 
@@ -141,6 +157,11 @@ static void syscall_http_set(Machine &machine, MachineInstance &inst)
 	const int where = regs.rdi;
 	const uint64_t g_what = regs.rsi;
 	const uint16_t g_wlen = regs.rdx;
+	if (UNLIKELY(g_what == 0x0 || g_wlen == 0)) {
+		regs.rax = 0;
+		machine.set_registers(regs);
+		return;
+	}
 
 	auto *hp = get_http(inst.ctx(), (gethdr_e)where);
 
@@ -157,7 +178,7 @@ static void syscall_http_set(Machine &machine, MachineInstance &inst)
 		const size_t namelen = colon - buffer;
 
 		/* Look for a header with an existing name */
-		unsigned index = http_findhdr(hp, namelen, buffer);
+		const auto index = http_findhdr(hp, namelen, buffer);
 		if (index > 0)
 		{
 			auto &field = hp->field_array[index];
@@ -167,13 +188,18 @@ static void syscall_http_set(Machine &machine, MachineInstance &inst)
 		}
 		else /* Not found, append. */
 		{
-			const int idx = hp->field_count++;
-			http_SetH(hp, idx, buffer); /* Inefficient */
-			regs.rax = idx;
+			regs.rax = http_header_append(hp, buffer, g_wlen);
 		}
 	}
 	else {
-		regs.rax = -1;
+		/* No colon: Try UNSET (a little bit inefficient) */
+		const auto index = http_findhdr(hp, g_wlen, buffer);
+		if (index > 0) {
+			http_unsetat(hp, index);
+			regs.rax = index;
+		} else {
+			regs.rax = 0;
+		}
 	}
 	/* Return value: Index of header field */
 	machine.set_registers(regs);
