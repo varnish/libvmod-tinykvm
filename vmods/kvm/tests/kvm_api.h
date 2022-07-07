@@ -68,10 +68,16 @@ backend_response_str(int16_t status, const char *ctype, const char *content)
  *
 **/
 extern void
-http_append(int where, const char*, size_t);
+http_appendf(int where, const char*, size_t);
 
 static inline void
-http_append_str(int where, const char *str) { http_append(where, str, __builtin_strlen(str)); }
+http_append_str(int where, const char *str) { http_appendf(where, str, __builtin_strlen(str)); }
+
+extern long
+http_setf(int where, const char *what, size_t len);
+
+extern long
+http_findf(int where, const char* what, size_t, const char* outb, size_t outl);
 
 /**
  * Varnish caching configuration
@@ -287,10 +293,24 @@ asm(".global syscall_set_cacheable\n" \
 "	out %eax, $0\n" \
 "	ret");
 
-asm(".global http_append\n" \
-".type http_append, function\n" \
-"http_append:\n" \
+asm(".global http_appendf\n" \
+".type http_appendf, function\n" \
+"http_appendf:\n" \
 "	mov $0x10020, %eax\n" \
+"	out %eax, $0\n" \
+"	ret");
+
+asm(".global http_setf\n" \
+".type http_setf, function\n" \
+"http_setf:\n" \
+"	mov $0x10021, %eax\n" \
+"	out %eax, $0\n" \
+"	ret");
+
+asm(".global http_findf\n" \
+".type http_findf, function\n" \
+"http_findf:\n" \
+"	mov $0x10022, %eax\n" \
 "	out %eax, $0\n" \
 "	ret");
 

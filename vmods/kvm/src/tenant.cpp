@@ -203,9 +203,22 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			}
 		}
 
-		/* Finish initialization */
-		for (auto& tenant : tenancy(task).tenants) {
-			tenant.second.wait_for_initialization();
+		/* Finish initialization, but do not VRT_fail if program
+		   initialization failed. It is a recoverable error. */
+		for (auto& it : tenancy(task).tenants) {
+			auto& tenant = it.second;
+			try {
+				tenant.wait_for_initialization();
+			}
+			catch (const std::exception &e) {
+				VSL(SLT_Error, 0,
+					"Exception when creating machine '%s': %s",
+					tenant.config.name.c_str(), e.what());
+				fprintf(stderr,
+						"Exception when creating machine '%s': %s\n",
+						tenant.config.name.c_str(), e.what());
+				tenant.program = nullptr;
+			}
 		}
 
 	} catch (const std::exception& e) {

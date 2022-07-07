@@ -1,7 +1,6 @@
 extern "C" {
 	void http_SetH(struct http *to, unsigned n, const char *fm);
 	void http_UnsetIdx(struct http *hp, unsigned idx);
-	unsigned HTTP_FindHdr(const struct http *hp, unsigned l, const char *hdr);
 	void http_PrintfHeader(struct http *to, const char *fmt, ...);
 }
 struct txt {
@@ -87,6 +86,21 @@ get_field(VRT_CTX, int where, uint32_t index)
 	}
 	throw std::out_of_range("Header field index not in bounds");
 }
+static unsigned
+http_findhdr(const struct http *hp, unsigned l, const char *hdr)
+{
+	for (unsigned u = HDR_FIRST; u < hp->field_count; u++)
+	{
+		if (hp->field_array[u].end < hp->field_array[u].begin + l + 1)
+			continue;
+		if (hp->field_array[u].begin[l] != ':')
+			continue;
+		if (strncasecmp(hdr, hp->field_array[u].begin, l))
+			continue;
+		return u;
+	}
+	return 0;
+}
 
 inline uint32_t field_length(const txt& field)
 {
@@ -118,6 +132,84 @@ static void syscall_http_append(Machine& machine, MachineInstance& inst)
 {
 	auto regs = machine.registers();
 	regs.rax = http_header_append(inst, regs.rdi, regs.rsi, regs.rdx);
+	machine.set_registers(regs);
+}
+
+static void syscall_http_set(Machine &machine, MachineInstance &inst)
+{
+	auto regs = machine.registers();
+	const int where = regs.rdi;
+	const uint64_t g_what = regs.rsi;
+	const uint16_t g_wlen = regs.rdx;
+
+	auto *hp = get_http(inst.ctx(), (gethdr_e)where);
+
+	/* Read out *what* from guest */
+	auto *buffer = (char *)WS_Alloc(inst.ctx()->ws, g_wlen + 1);
+	if (buffer == nullptr)
+		throw std::runtime_error("Unable to make room for HTTP header field");
+	inst.machine().copy_from_guest(buffer, g_what, g_wlen);
+	buffer[g_wlen] = 0;
+
+	/* Find the ':' in the buffer */
+	const char* colon = strchr(buffer, ':');
+	if (colon != nullptr) {
+		const size_t namelen = colon - buffer;
+
+		/* Look for a header with an existing name */
+		unsigned index = http_findhdr(hp, namelen, buffer);
+		if (index > 0)
+		{
+			auto &field = hp->field_array[index];
+			field.begin = buffer;
+			field.end   = buffer + g_wlen;
+			regs.rax = index;
+		}
+		else /* Not found, append. */
+		{
+			const int idx = hp->field_count++;
+			http_SetH(hp, idx, buffer); /* Inefficient */
+			regs.rax = idx;
+		}
+	}
+	else {
+		regs.rax = -1;
+	}
+	/* Return value: Index of header field */
+	machine.set_registers(regs);
+}
+
+static void syscall_http_find(Machine &machine, MachineInstance &inst)
+{
+	auto regs = machine.registers();
+	const int where = regs.rdi;
+	const uint64_t g_what = regs.rsi;
+	const uint16_t g_wlen = regs.rdx;
+
+	auto* hp = get_http(inst.ctx(), (gethdr_e)where);
+
+	/* Read out *what* from guest */
+	auto* buffer = (char *)WS_Alloc(inst.ctx()->ws, g_wlen + 1);
+	if (buffer == nullptr)
+		throw std::runtime_error("Unable to make room for HTTP header field");
+	inst.machine().copy_from_guest(buffer, g_what, g_wlen);
+	buffer[g_wlen] = 0;
+
+	/* Find the header field by its name */
+	unsigned index = http_findhdr(hp, g_wlen, buffer);
+	if (index > 0)
+	{
+		const uint64_t g_dest    = regs.rcx;
+		const uint64_t g_destlen = regs.r8;
+		const auto& field = hp->field_array[index];
+		const uint64_t flen = field.end - field.begin;
+		const uint64_t size = std::min(flen, g_destlen);
+		inst.machine().copy_to_guest(g_dest, field.begin, size);
+		regs.rax = size;
+	} else {
+		regs.rax = -1;
+	}
+
 	machine.set_registers(regs);
 }
 

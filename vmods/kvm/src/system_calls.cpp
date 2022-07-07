@@ -74,6 +74,12 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10020: // HTTP_APPEND
 				syscall_http_append(machine, inst);
 				return;
+			case 0x10021: // HTTP_SET
+				syscall_http_set(machine, inst);
+				return;
+			case 0x10022: // HTTP_FIND
+				syscall_http_find(machine, inst);
+				return;
 			case 0x10100:
 				syscall_set_backend(machine, inst);
 				return;
@@ -228,7 +234,6 @@ void MachineInstance::setup_syscall_interface()
 		});
 	Machine::install_syscall_handler(
 		79, [](Machine &machine) { // GETCWD
-			auto &inst = *machine.get_userdata<MachineInstance>();
 			auto regs = machine.registers();
 
 			const char fakepath[] = "/";

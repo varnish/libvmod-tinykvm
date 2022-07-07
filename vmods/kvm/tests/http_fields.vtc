@@ -6,15 +6,21 @@ cat >${tmpdir}/${testname}.c <<-EOF
 #include <string.h>
 #include "kvm_api.h"
 
-static void my_backend(const char *arg1, char *arg2, int req, int resp)
+static void my_backend(const char *url, const char *arg2, int req, int resp)
 {
-	http_append(resp, "X-Value: 5", 10);
-	backend_response_str(200, "text/plain", arg1);
+	http_appendf(resp, "X-Value: 5", 10);
+	http_setf(resp, "X-OtherValue: 6", 15);
+
+	/* Test overwriting a header field. */
+	if (strcasecmp(url, "/test2") == 0) {
+		http_setf(resp, "X-OtherValue: 7", 15);
+	}
+
+	backend_response_str(200, "text/plain", url);
 }
 
-int main(int argc, char **argv)
+int main()
 {
-	printf("Hello from %s!\n", argv[1]);
 	set_backend_get(my_backend);
 	wait_for_requests();
 }
@@ -29,15 +35,13 @@ vcl 4.1;
 	backend default none;
 
 	sub vcl_init {
-		kvm.embed_tenants("""
-			{
-				"xpizza.com": {
-					"filename": "${tmpdir}/${testname}",
-					"key": "",
-					"group": "test"
-				}
+		kvm.embed_tenants("""{
+			"xpizza.com": {
+				"filename": "${tmpdir}/${testname}",
+				"key": "",
+				"group": "test"
 			}
-		""");
+		}""");
 	}
 
 	sub vcl_recv {
@@ -47,19 +51,21 @@ vcl 4.1;
 	sub vcl_backend_fetch {
 		set bereq.backend = kvm.vm_backend(
 				bereq.http.Host,
-				"Hello World");
+				bereq.url);
 	}
 } -start
 
 client c1 {
-	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+	txreq -url "/test1" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.http.X-Value == "5"
-	expect resp.body == "Hello World"
+	expect resp.http.X-OtherValue == "6"
+	expect resp.body == "/test1"
 	expect resp.status == 200
-	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+	txreq -url "/test2" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.http.X-Value == "5"
-	expect resp.body == "Hello World"
+	expect resp.http.X-OtherValue == "7"
+	expect resp.body == "/test2"
 	expect resp.status == 200
 } -run
