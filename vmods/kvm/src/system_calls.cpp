@@ -113,6 +113,9 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10713: // MULTIPROCESS_WAIT
 				syscall_multiprocess_wait(machine, inst);
 				return;
+			case 0x10A00: // GET_MEMINFO
+				syscall_memory_info(machine, inst);
+				return;
 			default:
 				syscall_unknown(machine, inst, scall);
 		}

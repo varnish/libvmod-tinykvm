@@ -223,6 +223,14 @@ extern long multiprocess_wait();
    multi-processing operation. */
 extern int vcpuid() __attribute__((const));
 
+struct meminfo {
+	uint64_t max_memory;
+	uint64_t max_workmem;
+	uint64_t workmem_upper;
+	uint64_t workmem_current;
+};
+extern void get_meminfo(struct meminfo*);
+
 /* This cannot be used when KVM is used as a backend */
 #ifndef KVM_API_ALREADY_DEFINED
 #define DYNAMIC_CALL(name, hash, ...) \
@@ -402,7 +410,14 @@ asm(".global vcpuid\n" \
 "vcpuid:\n" \
 "	mov %gs:(0x0), %eax\n" \
 "   ret\n");
-#endif
+
+asm(".global get_meminfo\n" \
+".type get_meminfo, function\n" \
+"get_meminfo:\n" \
+"	mov $0x10A00, %eax\n" \
+"	out %eax, $0\n" \
+"   ret\n");
+#endif // KVM_API_ALREADY_DEFINED
 
 #ifdef __cplusplus
 }

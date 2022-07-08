@@ -212,4 +212,22 @@ static void syscall_multiprocess_wait(Machine& machine, MachineInstance&)
 	machine.set_registers(regs);
 }
 
+static void syscall_memory_info(Machine &machine, MachineInstance &inst)
+{
+	const struct {
+		uint64_t max_memory;
+		uint64_t max_workmem;
+		uint64_t workmem_upper;
+		uint64_t workmem_current;
+	} meminfo {
+		.max_memory = inst.tenant().config.max_memory(),
+		.max_workmem = inst.tenant().config.max_work_memory(),
+		.workmem_upper = machine.banked_memory_capacity_bytes(),
+		.workmem_current = machine.banked_memory_bytes(),
+	};
+	auto regs = machine.registers();
+	machine.copy_to_guest(regs.rdi, &meminfo, sizeof(meminfo));
+	machine.set_registers(regs);
+}
+
 } // kvm

@@ -52,8 +52,7 @@ public:
 	const std::string& group() const noexcept;
 
 	bool is_debug() const noexcept { return m_is_debug; }
-	gaddr_t max_memory() const noexcept;
-	gaddr_t shared_memory_boundary() const noexcept;
+ 	gaddr_t shared_memory_boundary() const noexcept;
 	gaddr_t shared_memory_size() const noexcept;
 	void set_global_memory_shared(bool v) noexcept { m_global_shared_memory = v; }
 
