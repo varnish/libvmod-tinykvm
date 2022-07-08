@@ -60,7 +60,10 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			kvm_ts(ctx->vsl, "ProgramCall", t_work, t_prev, VTIM_real());
 			if (post == nullptr) {
 				/* Call the backend compute function */
-				vm.timed_vmcall(prog.entry_at(ProgramEntryIndex::BACKEND_COMP),
+				auto vm_entry_addr = prog.entry_at(ProgramEntryIndex::BACKEND_COMP);
+				if (UNLIKELY(vm_entry_addr == 0x0))
+					throw std::runtime_error("The GET callback has not been registered");
+				vm.timed_vmcall(vm_entry_addr,
 					timeout, farg[0], farg[1],
 					(int) HDR_BEREQ, (int) HDR_BERESP);
 			} else if (post->process_func == 0x0) {
