@@ -45,7 +45,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 	const char *farg[2], struct backend_post *post, struct backend_result *result)
 {
 	double t_prev = VTIM_real();
-	double t_work = VTIM_real();
+	double t_work = t_prev;
 
 	auto& machine = *slot->mi;
 	machine.set_ctx(ctx);
@@ -148,18 +148,18 @@ int kvm_backend_stream(struct backend_post *post,
 	try {
 		auto& vm = mi.machine();
 
-		const uint64_t GADDR = 0x40000;
-
 		/* Copy the data segment into VM */
-		vm.copy_to_guest(GADDR, data_ptr, data_len);
+		const uint64_t g_addr = vm.mmap_allocate(data_len);
+		vm.copy_to_guest(g_addr, data_ptr, data_len);
 
 		/* Call the backend streaming function */
 		const auto timeout = mi.tenant().config.max_time();
 		vm.timed_vmcall(mi.instance().entry_at(ProgramEntryIndex::BACKEND_STREAM),
-			timeout, (uint64_t) GADDR, (uint64_t) data_len,
+			timeout, (uint64_t) g_addr, (uint64_t) data_len,
 			(uint64_t) post->length, !!last);
 
-		/* Get content-type and data */
+		/* Verify that the VM consumed all the bytes.
+		   RDI gets set by the exit system call, AX is trampled. */
 		auto regs = vm.registers();
 		return (regs.rdi == (uint64_t)data_len) ? 0 : -1;
 

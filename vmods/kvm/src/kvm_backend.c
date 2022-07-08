@@ -153,7 +153,7 @@ kvmbe_gethdrs(const struct director *dir,
 		}
 		post->ctx = &ctx;
 		post->slot = slot;
-		post->address = 0x40000; /* FIXME: 256kb userspace boundary */
+		post->address = 0x10000; /* XXX: 64kb userspace boundary */
 		post->process_func = 0x0;
 		post->length  = 0;
 		kvm_get_body(post, bo);
