@@ -20,6 +20,7 @@ struct backend_post {
 	const struct vrt_ctx *ctx;
 	struct vmod_kvm_slot *slot;
 	uint64_t address;
+	uint64_t capacity;
 	size_t length;
 	uint64_t process_func;
 	uint64_t func;

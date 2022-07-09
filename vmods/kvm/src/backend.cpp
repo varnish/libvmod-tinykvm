@@ -67,6 +67,8 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					timeout, farg[0], farg[1],
 					(int) HDR_BEREQ, (int) HDR_BERESP);
 			} else if (post->process_func == 0x0) {
+				/* Try to reduce POST mmap allocation */
+				vm.mmap_relax(post->address, post->capacity, post->length);
 				/* Call the backend POST function */
 				auto vm_entry_addr = prog.entry_at(ProgramEntryIndex::BACKEND_POST);
 				if (UNLIKELY(vm_entry_addr == 0x0))

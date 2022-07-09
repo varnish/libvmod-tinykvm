@@ -155,8 +155,9 @@ kvmbe_gethdrs(const struct director *dir,
 		post->ctx = &ctx;
 		post->slot = slot;
 		post->address = kvm_allocate_memory(slot, POST_BUFFER); /* Buffer bytes */
-		post->process_func = 0x0;
+		post->capacity = POST_BUFFER;
 		post->length  = 0;
+		post->process_func = 0x0;
 		kvm_get_body(post, bo);
 		kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 	}
