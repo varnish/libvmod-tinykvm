@@ -7,6 +7,7 @@
 #include <vtim.h>
 #include "vcl.h"
 #include "vcc_if.h"
+extern uint64_t kvm_allocate_memory(KVM_SLOT, uint64_t bytes);
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
 	const char *farg[2], struct backend_post *, struct backend_result *);
 extern void kvm_get_body(struct backend_post *, struct busyobj *);
@@ -153,7 +154,7 @@ kvmbe_gethdrs(const struct director *dir,
 		}
 		post->ctx = &ctx;
 		post->slot = slot;
-		post->address = 0x10000; /* XXX: 64kb userspace boundary */
+		post->address = kvm_allocate_memory(slot, POST_BUFFER); /* Buffer bytes */
 		post->process_func = 0x0;
 		post->length  = 0;
 		kvm_get_body(post, bo);

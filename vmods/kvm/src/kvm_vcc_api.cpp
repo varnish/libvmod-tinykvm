@@ -41,6 +41,12 @@ int kvm_copy_to_machine(kvm::VMPoolItem* slot,
 	}
 }
 
+extern "C"
+uint64_t kvm_allocate_memory(kvm::VMPoolItem* slot, uint64_t bytes)
+{
+	return slot->mi->machine().mmap_allocate(bytes);
+}
+
 struct vmod_kvm_synth
 {
 	struct vsb *vsb;

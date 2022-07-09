@@ -1,3 +1,4 @@
+static const uint64_t POST_BUFFER = (1UL << 28); /* 256MB */
 
 struct VMBuffer {
 	const char *data;
