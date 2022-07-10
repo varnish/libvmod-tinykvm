@@ -35,14 +35,7 @@ sub vcl_backend_fetch {
 			bereq.http.Host, bereq.http.X-LiveUpdate, 20MB);
 		return (fetch);
 	}
-	else if (bereq.method == "POST") {
-		/* Regular POST */
-		set bereq.backend = kvm.vm_post_backend(
-			bereq.http.Host,
-			bereq.url);
-		return (fetch);
-	}
-	/* Regular request */
+	/* Regular GET/POST request */
 	set bereq.backend = kvm.vm_backend(
 			bereq.http.Host,
 			bereq.url);

@@ -39,7 +39,9 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		 * rdx  = result buffer
 		**/
 		const uint64_t g_buffer = regs.rdx;
-		const int TIMEOUT = 8;
+		const int CONN_TIMEOUT = 5;
+		const int READ_TIMEOUT = 8;
+		constexpr bool VERBOSE_CURL = false;
 
 		/* URL */
 		std::string url;
@@ -61,7 +63,9 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		opres.content_addr = inst.machine().mmap();
 		const bool is_post = (opres.post_addr != 0x0 && opres.post_buflen != 0x0);
 
+		if constexpr (VERBOSE_CURL) {
 		printf("Curl: %s (%s)\n", url.c_str(), is_post ? "POST" : "GET");
+		}
 
 		writeop op {
 			.machine = inst.machine(),
@@ -70,7 +74,8 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 
 		CURL *curl = curl_easy_init();
 		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-		curl_easy_setopt(curl, CURLOPT_TIMEOUT, TIMEOUT); /* Seconds */
+		curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, CONN_TIMEOUT);
+		curl_easy_setopt(curl, CURLOPT_TIMEOUT, READ_TIMEOUT); /* Seconds */
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, (write_callback)
 		[] (char *ptr, size_t size, size_t nmemb, void *poop) -> size_t {
 			auto& woop = *(writeop *)poop;
@@ -139,7 +144,10 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			inst.machine().copy_to_guest(g_buffer, &opres, sizeof(opres));
 			regs.rax = 0;
 		} else {
-			regs.rax = -1;
+			if constexpr (VERBOSE_CURL) {
+				printf("cURL error: %d\n", res);
+			}
+			regs.rax = -res;
 		}
 		curl_easy_cleanup(curl);
 		inst.machine().set_registers(regs);
