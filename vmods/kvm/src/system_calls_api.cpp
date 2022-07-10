@@ -27,6 +27,12 @@ static void syscall_wait_for_requests(Machine& machine, MachineInstance& inst)
 	}
 }
 
+static void syscall_backend_response(Machine &machine, MachineInstance &inst)
+{
+	inst.finish_backend_call();
+	machine.stop();
+}
+
 static void syscall_set_backend(Machine& machine, MachineInstance& inst)
 {
 	auto regs = machine.registers();

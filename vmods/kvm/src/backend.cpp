@@ -58,6 +58,9 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 		auto fut = slot->tp.enqueue(
 		[&] {
 			kvm_ts(ctx->vsl, "ProgramCall", t_work, t_prev, VTIM_real());
+			/* Enforce that guest program calls the backend_response system call. */
+			machine.begin_backend_call();
+
 			if (post == nullptr) {
 				/* Call the backend compute function */
 				auto vm_entry_addr = prog.entry_at(ProgramEntryIndex::BACKEND_COMP);
@@ -86,6 +89,10 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 
 			/* Make sure no SMP work is in-flight. */
 			vm.smp_wait();
+
+			if (UNLIKELY(!machine.backend_response_called())) {
+				throw std::runtime_error("HTTP response not set. Program crashed? Check logs!");
+			}
 
 			/* Get content-type and data */
 			auto regs = vm.registers();

@@ -58,8 +58,12 @@ public:
 
 	void wait_for_requests() { m_waiting_for_requests = true; }
 	bool is_waiting_for_requests() const noexcept { return m_waiting_for_requests; }
-	void set_result(uint8_t value) noexcept { m_result = value; }
-	auto result() const noexcept { return m_result; }
+	/* With this we can enforce that certain syscalls have been invoked before
+	   we even check the validity of responses. This makes sure that crashes does
+	   not accidentally produce valid responses, which can cause confusion. */
+	void begin_backend_call() { m_backend_response_called = false; }
+	void finish_backend_call() { m_backend_response_called = true; }
+	bool backend_response_called() const noexcept { return m_backend_response_called; }
 
 	void init_sha256();
 	void hash_buffer(const char* buffer, int len);
@@ -93,6 +97,7 @@ private:
 	ProgramInstance* m_inst;
 	bool        m_is_debug = false;
 	bool        m_waiting_for_requests = false;
+	bool        m_backend_response_called = false;
 	bool        m_global_shared_memory = false;
 	uint16_t    m_result = 0;
 	gaddr_t     m_sighandler = 0;

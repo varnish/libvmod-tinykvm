@@ -325,7 +325,7 @@ asm(".global http_findf\n" \
 asm(".global backend_response\n" \
 ".type backend_response, function\n" \
 "backend_response:\n" \
-"	mov $0xFFFF, %eax\n" \
+"	mov $0x10010, %eax\n" \
 "	out %eax, $0\n");
 
 asm(".global shared_memory_area\n" \

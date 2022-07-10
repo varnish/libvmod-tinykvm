@@ -71,6 +71,9 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10005: // SET_CACHEABLE
 				syscall_set_cacheable(machine, inst);
 				return;
+			case 0x10010: // BACKEND_RESPONSE
+				syscall_backend_response(machine, inst);
+				return;
 			case 0x10020: // HTTP_APPEND
 				syscall_http_append(machine, inst);
 				return;
