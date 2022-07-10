@@ -3,17 +3,18 @@ $Module kvm 3 "High-Performance KVM Sandbox For VCL"
 DESCRIPTION
 ===========
 
-vmod_kvm allows using ultra-low overhead virtual machines
-directly from VCL, that runs native x86 machine code.
-Each machine lives in complete separation and cannot affect any other.
+vmod_kvm allows using ultra-low overhead sandboxed programs
+directly from VCL, that runs native 64-bit x86 machine code.
+Each machine lives in complete separation and does affect any other
+programs or the general operation of the cache.
 Machines communicate with Varnish using a system call API that covers
-all the basic tasks that tenants want to perform.
+all the operational tasks that tenants are allowed to perform.
 
 The VMOD is configured by specifying a list of tenants with
-each having a program path. Tenants do not need to have an
+each having a program. Tenants do not need to have an
 existing program for Varnish to start. New programs can be
 uploaded while Varnish is running and will not affect the
-run-time performance of the cache.
+run-time availability or performance of the cache.
 
 Additionally, it is possible to live-debug programs in production.
 Each live-debugging session will use a temporary tenant that does
@@ -121,31 +122,11 @@ $Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING arg0 = "", STRING a
 
 	set bereq.backend = kvm.vm_backend(bereq.http.Host, bereq.url);
 
-$Function BACKEND vm_post_backend(PRIV_VCL, STRING tenant, STRING arg = "")
-
-- Returns a backend that will retrieve a POST body first,
-  then call into a KVM VM with the body as argument, and then produce a response.
-- Produces 500 server error if there is not enough memory,
-  a limit is hit, or an error is produced.
-- When the processing function is provided, the backend will be streaming
-  the request body data into the VM by calling the processing function on
-  each data segment. The processing function will need to return the
-  length processed to confirm that it was handled.
-  When the last streamed segment has been received, the processing Function
-  will have the 'last' argument set to 1. Finally, the regular POST function
-  will be called with the data argument removed, and the final length passed.
-  In the final call a backend response must be provided. Streaming is more
-  memory efficient and makes processing possible on big data, but it requires
-  the data processor to be able to work with segmented data.
-
-	set bereq.backend = kvm.vm_post_backend("xpizza.com", bereq.url);
-
-  Regular POST function prototype:
-    my_post_backend(const char *arg, void *data, size_t len)
-
-
-  Prototypes for streaming:
-  - Processing function:
-    my_streaming_function(void *data, size_t len, size_t processed, int last)
-  - Final function:
-    my_streaming_response(const char *arg, size_t len)
+- If the client sends a POST request, it returns a backend that will
+  retrieve a POST body first, then call into a KVM program with the body
+  and length as arguments. A response must be produced as normal.
+- The VMOD will call the POST function in the program, instead of the
+  normal GET function.
+- If a streaming function is registered, the VMOD will call the streaming
+  function in the program for each data segment it receives, and then finally
+  it will call the POST function at the end with the whole data segment.

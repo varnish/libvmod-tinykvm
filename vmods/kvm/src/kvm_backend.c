@@ -144,7 +144,9 @@ kvmbe_gethdrs(const struct director *dir,
 	kvm_ts(ctx.vsl, "TenantReserve", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 
 	struct backend_post *post = NULL;
-	if (kvmr->is_post)
+	/* The HTTP method is stored in the first header field. */
+	const bool is_post = strcmp(bo->bereq->hd[0].b, "POST") == 0;
+	if (is_post)
 	{
 		/* Retrieve body by copying directly into backend VM */
 		post = (struct backend_post *)WS_Alloc(bo->ws, sizeof(struct backend_post));
@@ -223,7 +225,6 @@ kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant,
 	kvmr->funcarg[0] = arg0;
 	kvmr->funcarg[1] = arg1;
 	kvmr->max_response_size = 0;
-	kvmr->is_post = 0;
 
 	struct director *dir = &kvmr->dir;
 	INIT_OBJ(dir, DIRECTOR_MAGIC);
@@ -246,22 +247,6 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task, VCL_STRING tenant,
 		kvm_response_director(ctx, task, tenant, arg0, arg1);
 
 	if (kvmr != NULL) {
-		return (&kvmr->dir);
-	}
-
-	return (NULL);
-}
-
-VCL_BACKEND vmod_vm_post_backend(VRT_CTX, VCL_PRIV task,
-	VCL_STRING tenant, VCL_STRING farg)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-
-	struct vmod_kvm_response *kvmr =
-		kvm_response_director(ctx, task, tenant, farg, "");
-
-	if (kvmr != NULL) {
-		kvmr->is_post = 1;
 		return (&kvmr->dir);
 	}
 

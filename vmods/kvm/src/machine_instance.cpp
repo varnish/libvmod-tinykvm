@@ -42,8 +42,9 @@ MachineInstance::MachineInstance(
 		/* Some run-times are quite buggy. Zig makes a calculation on
 		   RSP and the loadable segments in order to find img_base.
 		   This calculation results in a panic when the stack is
-		   below the program and heap. Workaround: Move above. */
-		static const size_t stack_size = 0x400000;
+		   below the program and heap. Workaround: Move above.
+		   TOOD: Make sure we have room for it, using memory limits. */
+		static const size_t stack_size = 0x200000; /* 2MB */
 		auto stack = machine().mmap_allocate(stack_size);
 		machine().set_stack_address(stack + stack_size);
 		// Build stack, auxvec, envp and program arguments
