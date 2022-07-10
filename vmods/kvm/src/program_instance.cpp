@@ -29,6 +29,7 @@ ProgramInstance::ProgramInstance(
 	bool debug)
 	: binary{std::move(elf)},
 	  m_main_queue {1},
+	  entry_address {},
 	  rspclient{nullptr}
 {
 	this->m_future = m_main_queue.enqueue(

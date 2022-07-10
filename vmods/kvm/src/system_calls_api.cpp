@@ -12,6 +12,10 @@ static void syscall_register_func(Machine& machine, MachineInstance& inst)
 	auto regs = machine.registers();
 	//printf("register_func: Function %lld is now 0x%llX\n",
 	//	regs.rdi, regs.rsi);
+	const uint64_t KERNEL_END = machine.kernel_end_address();
+	if (UNLIKELY(regs.rsi < KERNEL_END)) {
+		throw std::runtime_error("Invalid address for register_func provided");
+	}
 	inst.instance().set_entry_at(regs.rdi, regs.rsi);
 	regs.rax = 0;
 	machine.set_registers(regs);
