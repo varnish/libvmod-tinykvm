@@ -233,7 +233,7 @@ static void syscall_http_find(Machine &machine, MachineInstance &inst)
 		inst.machine().copy_to_guest(g_dest, field.begin, size);
 		regs.rax = size;
 	} else {
-		regs.rax = -1;
+		regs.rax = 0;
 	}
 
 	machine.set_registers(regs);
