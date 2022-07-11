@@ -14,7 +14,6 @@ extern void register_func(int, ...);
  * Example:
  *  int main()
  *  {
- *  	printf("Hello World\n"); // Will be logged
  *  	set_backend_get(my_get_request_handler);
  *  	wait_for_requests();
  *  }
@@ -92,27 +91,32 @@ static inline long set_cacheable(int cached, float ttl) {
 /**
  * Storage program
  *
- * Every tenant has a storage program that is initialized separately (and in
- * the same way as the main program) at the start. This program has a ton
- * of memory and is always available. Both the main and the storage programs
- * are running the same original program provided by the tenant at the start,
- * but they can diverge greatly over time.
+ * Every tenant has storage. Storage is the program itself as it was
+ * initialized at the start. If your tenant has 1GB memory, then storage is
+ * 1GB of memory too. Request VMs are based off of the state of
+ * storage, even as it changes. Storage is just like a normal Linux program
+ * in that any changes you make are never unmade. This program has a ton
+ * of memory and is always available.
  * To access storage you can use any of the API calls below when handling a
  * request. The access is serialized, meaning only one request can access the
  * storage at a time. Because of this, one should try to keep the number and
  * the duration of the calls low, preferrably calculating as much as possible
  * before making any storage accesses.
+ * It is also possible to access storage only to make persistent changes, while
+ * accessing global variables in the request VMs as needed afterwards. To
+ * enable this mode call make_storage_memory_shared() from main. Be cautious
+ * of race conditions, as always.
  *
  * When calling into the storage program the data you provide will be copied into
  * the VM, and the response you give back will be copied back into the request-
  * handling VM. This is extra overhead, but safe.
  * The purpose of the storage VM is to enable mutable state. That is, you are
- * able to make live changes to your storage VM, which persists across
+ * able to make live changes to your storage, which persists across time and
  * requests. You can also serialize the state across live updates so that it
- * can be persisted when you have program updates. And finally, it can be
+ * can be persisted through program updates. And finally, it can be
  * saved to a file (with a very specific name) on the servers disk, so that
  * it can be persisted across normal server updates and reboots.
-**/
+ **/
 
 /* Vector-based serialized call into storage VM */
 struct virtbuffer {
