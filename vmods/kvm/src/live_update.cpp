@@ -41,7 +41,7 @@ kvm_live_update(VRT_CTX, kvm::TenantInstance* ten, struct update_params *params)
 
 		/* Complex dance to replace the currently running program */
 		inst->wait_for_initialization();
-		ten->commit_program_live(inst);
+		ten->commit_program_live(ctx, inst);
 
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);

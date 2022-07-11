@@ -20,7 +20,7 @@ struct writeop {
 	uint64_t dst;
 };
 struct readop {
-	tinykvm::Machine& machine;
+	tinykvm::Machine* machine;
 	uint64_t src;
 	size_t   bytes;
 };
@@ -80,19 +80,24 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		[] (char *ptr, size_t size, size_t nmemb, void *poop) -> size_t {
 			auto& woop = *(writeop *)poop;
 			const size_t total = size * nmemb;
-			woop.machine.copy_to_guest(woop.dst, ptr, total);
-			woop.dst += total;
-			return total;
+			try {
+				woop.machine.copy_to_guest(woop.dst, ptr, total);
+				woop.dst += total;
+				return total;
+			} catch (...) {
+				return 0;
+			}
 		});
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &op);
 
 		/* Optional POST: We need a valid buffer and size. */
+		readop rop;
 		if (is_post)
 		{
 			curl_easy_setopt(curl, CURLOPT_POST, 1);
 			curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, opres.post_buflen);
-			readop rop {
-				.machine = inst.machine(),
+			rop = readop {
+				.machine = &inst.machine(),
 				.src = opres.post_addr,
 				.bytes = opres.post_buflen,
 			};
@@ -100,9 +105,13 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			[] (char *ptr, size_t size, size_t nmemb, void *poop) -> size_t {
 				auto& rop = *(readop *)poop;
 				const size_t total = std::min(rop.bytes, size * nmemb);
-				rop.machine.copy_from_guest(ptr, rop.src, total);
-				rop.src += total;
-				return total;
+				try {
+					rop.machine->copy_from_guest(ptr, rop.src, total);
+					rop.src += total;
+					return total;
+				} catch (...) {
+					return 0;
+				}
 			});
 			curl_easy_setopt(curl, CURLOPT_READDATA, &rop);
 

@@ -179,7 +179,7 @@ void TenantInstance::serialize_storage_state(
 	}
 }
 
-void TenantInstance::commit_program_live(
+void TenantInstance::commit_program_live(VRT_CTX,
 	std::shared_ptr<ProgramInstance>& new_prog) const
 {
 	std::shared_ptr<ProgramInstance> current;
@@ -192,7 +192,7 @@ void TenantInstance::commit_program_live(
 
 	if (current != nullptr) {
 		TenantInstance::serialize_storage_state(
-			new_prog->main_vm->ctx(), current, new_prog);
+			ctx, current, new_prog);
 	}
 
 	/* Swap out old program with new program. */

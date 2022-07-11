@@ -20,7 +20,7 @@ public:
 
 	/* Used by live update mechanism to replace the main VM with a new
 	   one that was HTTP POSTed by a tenant while Varnish is running. */
-	void commit_program_live(
+	void commit_program_live(const vrt_ctx *,
 		std::shared_ptr<ProgramInstance>& new_prog) const;
 
 	/* If the tenants program employ serialization callbacks, we can
