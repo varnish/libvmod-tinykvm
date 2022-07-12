@@ -105,7 +105,7 @@ public:
 	std::deque<VMPoolItem> m_vms;
 
 	/* Tasks executed in storage outside an active request. */
-	std::vector<std::future<long>> m_async_tasks;
+	std::deque<std::future<long>> m_async_tasks;
 	std::mutex m_async_mtx;
 
 	/* Queue of work to happen on main VM. Bottleneck. */

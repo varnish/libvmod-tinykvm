@@ -52,6 +52,7 @@ public:
 	const std::string& group() const noexcept;
 
 	bool is_debug() const noexcept { return m_is_debug; }
+	bool is_storage() const noexcept { return m_is_storage; }
  	gaddr_t shared_memory_boundary() const noexcept;
 	gaddr_t shared_memory_size() const noexcept;
 	void set_global_memory_shared(bool v) noexcept { m_global_shared_memory = v; }
@@ -96,6 +97,7 @@ private:
 	const TenantInstance* m_tenant = nullptr;
 	ProgramInstance* m_inst;
 	bool        m_is_debug = false;
+	bool        m_is_storage = false;
 	bool        m_waiting_for_requests = false;
 	bool        m_backend_response_called = false;
 	bool        m_global_shared_memory = false;

@@ -147,7 +147,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			stm.setup_call(regs, func, new_stack,
 				(uint64_t)n, (uint64_t)stm_bufaddr, (uint64_t)res_size);
 			stm.set_registers(regs);
-			stm.run(1.0);
+			stm.run(3.0);
 			/* Get the result buffer and length (capped to res_size) */
 			regs = stm.registers();
 			const gaddr_t st_res_buffer = regs.rdi;
@@ -157,7 +157,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 				src.copy_from_machine(res_addr, stm, st_res_buffer, st_res_size);
 			}
 			/* Run the function to the end, allowing cleanup */
-			stm.run(1.0);
+			stm.run(3.0);
 			/* If res_addr is zero, we will just return the
 			   length provided by storage as-is, to allow some
 			   communication without a buffer. */
@@ -173,9 +173,10 @@ long ProgramInstance::async_storage_call(gaddr_t func, gaddr_t arg)
 {
 	std::scoped_lock lock(m_async_mtx);
 	// Block and finish previous async tasks
-	// TODO: Read the return value of the tasks to detect errors
-	// TODO: Avoid the last task in case it is still active
- 	m_async_tasks.clear();
+	// Avoid the last task in case it is still active
+	while (m_async_tasks.size() > 1)
+		// TODO: Read the return value of the tasks to detect errors
+ 		m_async_tasks.pop_front();
 
 	m_async_tasks.push_back(
 		m_main_queue.enqueue(
@@ -192,7 +193,7 @@ long ProgramInstance::async_storage_call(gaddr_t func, gaddr_t arg)
 			stm.setup_call(regs, func, new_stack,
 				(uint64_t)arg);
 			stm.set_registers(regs);
-			stm.run(1.0);
+			stm.run(3.0);
 			return 0;
 		} catch (...) {
 			return -1;

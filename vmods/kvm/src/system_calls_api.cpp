@@ -85,27 +85,33 @@ static void syscall_all_mem_shared(Machine& machine, MachineInstance& inst)
 static void syscall_storage_callb(Machine& machine, MachineInstance& inst)
 {
 	auto regs = machine.registers();
-	VirtBuffer buffers[1];
-	buffers[0] = {
-		.addr = (uint64_t)regs.rsi,  // src
-		.len  = (uint64_t)regs.rdx   // len
-	};
-	regs.rax = inst.instance().storage_call(machine,
-	/*  func      buf vector    dst     dstsize */
-		regs.rdi, 1, buffers, regs.rcx, regs.r8);
+	if (!inst.is_storage()) {
+		VirtBuffer buffers[1];
+		buffers[0] = {
+			.addr = (uint64_t)regs.rsi,  // src
+			.len  = (uint64_t)regs.rdx   // len
+		};
+		regs.rax = inst.instance().storage_call(machine,
+		/*  func      buf vector    dst     dstsize */
+			regs.rdi, 1, buffers, regs.rcx, regs.r8);
+	} else {
+		/* Prevent deadlock waiting for storage, while in storage. */
+		regs.rax = -1;
+	}
 	machine.set_registers(regs);
 }
 static void syscall_storage_callv(Machine& machine, MachineInstance& inst)
 {
 	auto regs = machine.registers();
 	const size_t n = regs.rsi;
-	if (n <= 64) {
+	if (!inst.is_storage() && n <= 64) {
 		VirtBuffer buffers[64];
 		machine.copy_from_guest(buffers, regs.rdx, n * sizeof(VirtBuffer));
 		regs.rax = inst.instance().storage_call(machine,
 		/*  func      buf vector    dst     dstsize */
 			regs.rdi, n, buffers, regs.rcx, regs.r8);
 	} else {
+		/* Prevent deadlock waiting for storage, while in storage. */
 		regs.rax = -1;
 	}
 	machine.set_registers(regs);

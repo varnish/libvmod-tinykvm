@@ -32,6 +32,7 @@ MachineInstance::MachineInstance(
 	  }),
 	  m_tenant(ten), m_inst(inst),
 	  m_is_debug(debug),
+	  m_is_storage(true),
 	  m_fd        {ten->config.max_fd(), "File descriptors"},
 	  m_regex     {ten->config.max_regex(), "Regex handles"},
 	  m_directors {ten->config.max_backends(), "Directors"}
@@ -96,6 +97,7 @@ MachineInstance::MachineInstance(
 	  }),
 	  m_tenant(ten), m_inst(inst),
 	  m_is_debug(source.is_debug()),
+	  m_is_storage(false),
 	  m_sighandler{source.m_sighandler},
 	  m_fd        {ten->config.max_fd(), "File descriptors"},
 	  m_regex     {ten->config.max_regex(), "Regex handles"},
