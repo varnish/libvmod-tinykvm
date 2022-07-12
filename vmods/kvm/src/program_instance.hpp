@@ -1,5 +1,6 @@
 #pragma once
 #include "machine_instance.hpp"
+#include "utils/cpptime.hpp"
 #include <blockingconcurrentqueue.h>
 
 namespace kvm {
@@ -103,13 +104,21 @@ public:
 	/* Simple container for VMs. */
 	std::deque<VMPoolItem> m_vms;
 
+	/* Tasks executed in storage outside an active request. */
+	std::vector<std::future<long>> m_async_tasks;
+	std::mutex m_async_mtx;
+
 	/* Queue of work to happen on main VM. Bottleneck. */
 	tinykvm::ThreadPool m_main_queue;
-	/* Tasks executed in storage after someone leaves storage VM. */
-	std::vector<std::future<long>> m_async_tasks;
+
 	/* Entry points in the tenants program. Handlers for all types of
 	   requests, serialization mechanisms and related functionality. */
 	std::array<gaddr_t, (size_t)ProgramEntryIndex::TOTAL_ENTRIES> entry_address;
+
+	/* The timer system needs to be destroyed before any of the other
+	   things, like the storage and request VMs. Timers carry capture
+	   storage referring to the other program members. */
+	cpptime::TimerSystem m_timer_system;
 
 	/* Live debugging feature using the GDB RSP protocol.
 	   Debugging allows stepping through the tenants program line by line

@@ -101,8 +101,11 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10708: // STORAGE CALL VECTOR
 				syscall_storage_callv(machine, inst);
 				return;
-			case 0x10709: // STORAGE TASK
+			case 0x10709: // ASYNC_STORAGE TASK
 				syscall_storage_task(machine, inst);
+				return;
+			case 0x1070A: // STOP_STORAGE TASK
+				syscall_stop_storage_task(machine, inst);
 				return;
 			case 0x10710: // MULTIPROCESS
 				syscall_multiprocess(machine, inst);

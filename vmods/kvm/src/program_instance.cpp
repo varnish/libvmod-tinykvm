@@ -171,16 +171,18 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 
 long ProgramInstance::async_storage_call(gaddr_t func, gaddr_t arg)
 {
+	std::scoped_lock lock(m_async_mtx);
 	// Block and finish previous async tasks
 	// TODO: Read the return value of the tasks to detect errors
-	m_async_tasks.clear();
+	// TODO: Avoid the last task in case it is still active
+ 	m_async_tasks.clear();
 
 	m_async_tasks.push_back(
 		m_main_queue.enqueue(
 	[=] () -> long
 	{
 		auto& stm = main_vm->machine();
-		const uint64_t new_stack = main_vm->machine().stack_address();
+		const uint64_t new_stack = stm.stack_address();
 
 		/* This vmcall has no attached VRT_CTX. */
 		main_vm->set_ctx(nullptr);

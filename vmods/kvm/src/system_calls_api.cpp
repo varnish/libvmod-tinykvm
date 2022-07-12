@@ -113,9 +113,36 @@ static void syscall_storage_callv(Machine& machine, MachineInstance& inst)
 static void syscall_storage_task(Machine& machine, MachineInstance& inst)
 {
 	auto regs = machine.registers();
-	regs.rax = inst.instance().async_storage_call(
-	/*  func      argument */
-		regs.rdi, regs.rsi);
+	const uint64_t function = regs.rdi;
+	const uint64_t argument = regs.rsi;
+	const uint64_t start  = regs.rdx;
+	const uint64_t period = regs.rcx;
+	if (start == 0 && period == 0) {
+		regs.rax = inst.instance().async_storage_call(
+			function, argument);
+	} else {
+		/* XXX: Racy spam avoidance of async tasks. */
+		auto *prog = &inst.instance();
+		if (prog->m_timer_system.racy_count() < 40) {
+			regs.rax = prog->m_timer_system.add(
+				std::chrono::milliseconds(start),
+				[=](auto)
+				{
+					prog->async_storage_call(
+						function, argument);
+				},
+				std::chrono::milliseconds(period));
+		} else {
+			/* TODO: Log the reason behind the failure. */
+			regs.rax = -1;
+		}
+	}
+	machine.set_registers(regs);
+}
+static void syscall_stop_storage_task(Machine &machine, MachineInstance &inst)
+{
+	auto regs = machine.registers();
+	regs.rax = inst.instance().m_timer_system.remove(regs.rdi);
 	machine.set_registers(regs);
 }
 
