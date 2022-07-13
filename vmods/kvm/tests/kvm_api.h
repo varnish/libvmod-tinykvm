@@ -261,14 +261,19 @@ DYNAMIC_CALL(goto_dns, 0x746238D2)
    calling the function. The fetcher will fill out the structure if the
    fetch succeeds. If a serious error is encountered, the function returns
    a non-zero value and the struct contents is undefined. */
+struct curl_fields {
+	const char *ptr[8];
+	uint16_t    len[8];
+};
 struct curl_opts {
 	long   status;
 	size_t      post_buflen;
 	const void *post_buffer;
-	size_t content_length;
+	struct curl_fields *fields;
 	void  *content;
-	size_t ctlen;
-	char   ctype[256];
+	uint32_t content_length;
+	uint32_t ctlen;
+	char   ctype[128];
 };
 DYNAMIC_CALL(curl_fetch, 0xB86011FB, const char*, size_t, struct curl_opts*)
 

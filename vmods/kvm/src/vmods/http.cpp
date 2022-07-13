@@ -3,6 +3,7 @@
 #include "../varnish.hpp"
 #include <cassert>
 #include <cstring>
+#include <array>
 #include <stdexcept>
 
 typedef struct oaref oaref_t;
@@ -48,17 +49,40 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		url.resize(regs.rsi);
 		inst.machine().copy_from_guest(url.data(), regs.rdi, regs.rsi);
 
+		constexpr size_t CONTENT_TYPE_LEN = 128;
+		constexpr size_t CURL_FIELDS_NUM = 8;
+		struct opfields {
+			uint64_t addr[CURL_FIELDS_NUM];
+			uint16_t len[CURL_FIELDS_NUM];
+		};
 		struct opresult {
 			long status;
 			uint64_t post_buflen;
 			uint64_t post_addr;
-			uint64_t content_length;
+			uint64_t fields;
 			uint64_t content_addr;
-			uint64_t ct_length;
-			char     ctype[256];
+			uint32_t content_length;
+			uint32_t ct_length;
+			char     ctype[CONTENT_TYPE_LEN];
 		};
 		opresult opres;
 		inst.machine().copy_from_guest(&opres, g_buffer, sizeof(opresult));
+
+		// Retrieve request header fields into string vector
+		std::array<std::string, CURL_FIELDS_NUM> fields;
+		if (opres.fields != 0x0) {
+			opfields of;
+			inst.machine().copy_from_guest(&of, opres.fields, sizeof(of));
+			/* Iterate through all the request fields. */
+			for (size_t i = 0; i < CURL_FIELDS_NUM; i++) {
+				if (of.addr[i] != 0x0 && of.len[i] != 0x0) {
+					// Add to our temporary request field vector
+					fields[i].resize(of.len[i]);
+					inst.machine().copy_from_guest(fields[i].data(), of.addr[i], of.len[i]);
+				}
+			}
+		}
+
 		// XXX: Fixme, mmap is basic/unreliable
 		opres.content_addr = inst.machine().mmap();
 		const bool is_post = (opres.post_addr != 0x0 && opres.post_buflen != 0x0);
@@ -90,7 +114,18 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		});
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &op);
 
+		/* Request header fields. */
+		struct curl_slist *req_list = NULL;
+		if (opres.fields != 0x0) {
+			for (const auto& field : fields) {
+				if (!field.empty())
+					req_list = curl_slist_append(req_list, field.c_str());
+			}
+			curl_easy_setopt(curl, CURLOPT_HTTPHEADER, req_list);
+		}
+
 		/* Optional POST: We need a valid buffer and size. */
+		struct curl_slist *post_list = NULL;
 		readop rop;
 		if (is_post)
 		{
@@ -116,15 +151,14 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			curl_easy_setopt(curl, CURLOPT_READDATA, &rop);
 
 			/* Optional Content-Type for POST. */
-			if (opres.ct_length != 0 && opres.ct_length < 256) {
+			if (opres.ct_length != 0 && opres.ct_length < CONTENT_TYPE_LEN) {
 				/* Copy Content-Type from guest opres into string. */
 				std::string ct = "Content-Type: ";
 				ct.resize(ct.size() + opres.ct_length);
 				inst.machine().copy_from_guest(&ct[14], g_buffer + offsetof(opresult, ctype), opres.ct_length);
 
-				struct curl_slist *list = NULL;
-				list = curl_slist_append(list, ct.c_str());
-				curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
+				post_list = curl_slist_append(post_list, ct.c_str());
+				curl_easy_setopt(curl, CURLOPT_HTTPHEADER, post_list);
 			}
 		}
 
@@ -139,10 +173,10 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			res = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &opres.status);
 			const char* ctype = nullptr;
 			res = curl_easy_getinfo(curl, CURLINFO_CONTENT_TYPE, &ctype);
-			/* We have an expectation of at least 256 bytes available for
+			/* We have an expectation of at least CONTENT_TYPE_LEN bytes available for
 			   writing back Content-Type, directly into opres structure. */
 			if (res == 0 && ctype != nullptr) {
-				const size_t ctlen = std::min(strlen(ctype)+1, 256ul);
+				const size_t ctlen = std::min(strlen(ctype)+1, CONTENT_TYPE_LEN);
 				opres.ct_length = ctlen;
 				std::memcpy(opres.ctype, ctype, ctlen);
 			}
@@ -159,6 +193,8 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			regs.rax = -res;
 		}
 		curl_easy_cleanup(curl);
+		curl_slist_free_all(req_list);
+		curl_slist_free_all(post_list);
 		inst.machine().set_registers(regs);
 	});
 }
