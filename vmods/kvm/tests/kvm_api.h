@@ -134,14 +134,16 @@ storage_callv(storage_func, size_t n, const struct virtbuffer[n], void* dst, siz
 static inline long
 storage_call0(storage_func func) { return storage_call(func, NULL, 0, NULL, 0); }
 
-/* Create an async task that is scheduled to run next in storage. The
-   new task waits until other tasks are done before starting a new one,
+/* Create a task in storage that is scheduled to run next. The new
+   task waits until other tasks are done before starting a new one,
    which will block the current thread, making this a blocking call.
    If start or period is set, the task will be scheduled to run after
    start milliseconds, and then run every period milliseconds. The
-   system call returns the timer id. */
+   system call returns the timer id.
+   If async is enabled, it is possible re-enter storage. NB: Watch out
+   for race conditions! */
 extern long
-async_storage_task(void (*task)(void* arg), void* arg, uint64_t start, uint64_t period);
+storage_task(void (*task)(void* arg), void* arg, int async, uint64_t start, uint64_t period);
 
 /* Stop a scheduled task. Returns TRUE on success. */
 extern long
@@ -379,9 +381,9 @@ asm(".global storage_callv\n" \
 "	out %eax, $0\n" \
 "   ret\n");
 
-asm(".global async_storage_task\n" \
-".type async_storage_task, function\n" \
-"async_storage_task:\n" \
+asm(".global storage_task\n" \
+".type storage_task, function\n" \
+"storage_task:\n" \
 "	mov $0x10709, %eax\n" \
 "	out %eax, $0\n" \
 "   ret\n");

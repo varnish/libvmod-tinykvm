@@ -6,6 +6,8 @@
 #include <tinykvm/rsp_client.hpp>
 
 namespace kvm {
+static constexpr uint64_t EXTRA_CPU_STACK_SIZE = 0x100000;
+static constexpr int EXTRA_CPU_ID = 16;
 
 VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
 	const vrt_ctx* ctx, TenantInstance* ten, ProgramInstance* prog)
@@ -29,6 +31,7 @@ ProgramInstance::ProgramInstance(
 	bool debug)
 	: binary{std::move(elf)},
 	  m_main_queue {1},
+	  m_main_async_queue {1},
 	  entry_address {},
 	  rspclient{nullptr}
 {
@@ -37,6 +40,9 @@ ProgramInstance::ProgramInstance(
 		try {
 			main_vm = std::make_unique<MachineInstance>
 				(binary, ctx, ten, this, debug);
+
+			main_vm_extra_cpu_stack = EXTRA_CPU_STACK_SIZE +
+				main_vm->machine().mmap_allocate(EXTRA_CPU_STACK_SIZE);
 
 			const size_t max_vms = ten->config.group.max_concurrency;
 			for (size_t i = 0; i < max_vms; i++) {
@@ -169,36 +175,72 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 	return future.get();
 }
 
-long ProgramInstance::async_storage_call(gaddr_t func, gaddr_t arg)
+long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 {
 	std::scoped_lock lock(m_async_mtx);
-	// Block and finish previous async tasks
 	// Avoid the last task in case it is still active
 	while (m_async_tasks.size() > 1)
 		// TODO: Read the return value of the tasks to detect errors
- 		m_async_tasks.pop_front();
+		m_async_tasks.pop_front();
 
-	m_async_tasks.push_back(
-		m_main_queue.enqueue(
-	[=] () -> long
+	// Block and finish previous async tasks
+	if (async == false)
 	{
-		auto& stm = main_vm->machine();
-		const uint64_t new_stack = stm.stack_address();
+		m_async_tasks.push_back(
+			m_main_queue.enqueue(
+		[=] () -> long
+		{
+			auto& stm = main_vm->machine();
+			const uint64_t new_stack = stm.stack_address();
 
-		/* This vmcall has no attached VRT_CTX. */
-		main_vm->set_ctx(nullptr);
+			/* This vmcall has no attached VRT_CTX. */
+			main_vm->set_ctx(nullptr);
 
-		try {
-			tinykvm::tinykvm_x86regs regs;
-			stm.setup_call(regs, func, new_stack,
-				(uint64_t)arg);
-			stm.set_registers(regs);
-			stm.run(3.0);
-			return 0;
-		} catch (...) {
-			return -1;
-		}
-	}));
+			try {
+				tinykvm::tinykvm_x86regs regs;
+				stm.setup_call(regs, func, new_stack,
+					(uint64_t)arg);
+				stm.set_registers(regs);
+				stm.run(3.0);
+				return 0;
+			} catch (...) {
+				return -1;
+			}
+		}));
+	} else {
+		/* Use separate queue: m_main_async_queue. */
+		m_async_tasks.push_back(
+			m_main_async_queue.enqueue(
+		[=] () -> long
+		{
+			/* This vmcall has no attached VRT_CTX. */
+			main_vm->set_ctx(nullptr);
+
+			try {
+				if (!main_vm_extra_cpu) {
+					main_vm_extra_cpu.reset(new tinykvm::vCPU);
+					main_vm_extra_cpu->smp_init(EXTRA_CPU_ID, main_vm->machine());
+				}
+				tinykvm::tinykvm_x86regs regs;
+				main_vm->machine().setup_call(regs, func,
+					main_vm_extra_cpu_stack, (uint64_t)arg);
+				main_vm_extra_cpu->set_registers(regs);
+				//printf("Working from vCPU %d, RIP=0x%llX  FUN=0x%llX  RSP=0x%llX  ARG=0x%llX\n",
+				//	   main_vm_extra_cpu->cpu_id, regs.rip, regs.r15, regs.rsp, regs.rsi);
+
+				main_vm_extra_cpu->run(3.0);
+				return 0;
+			}
+			catch (const tinykvm::MachineException& me) {
+				printf("Async storage task error: %s (0x%lX)\n",
+					me.what(), me.data());
+				return -1;
+			} catch (const std::exception& e) {
+				printf("Async storage task error: %s\n", e.what());
+				return -1;
+			}
+		}));
+	}
 	return 0;
 }
 

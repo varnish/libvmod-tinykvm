@@ -47,89 +47,89 @@ void MachineInstance::sanitize_file(char* buffer, size_t buflen)
 	throw std::runtime_error("Writable file must be the provided state file");
 }
 
-static void syscall_unknown(Machine& machine, MachineInstance& inst, unsigned scall)
+static void syscall_unknown(vCPU& cpu, MachineInstance& inst, unsigned scall)
 {
 	printf("%s: Unhandled system call %u\n",
 		inst.name().c_str(), scall);
-	auto regs = machine.registers();
+	auto regs = cpu.registers();
 	regs.rax = -ENOSYS;
-	machine.set_registers(regs);
+	cpu.set_registers(regs);
 }
 
 void MachineInstance::setup_syscall_interface()
 {
 	Machine::install_unhandled_syscall_handler(
-	[] (Machine& machine, unsigned scall) {
-		auto& inst = *machine.get_userdata<MachineInstance>();
+	[] (vCPU& cpu, unsigned scall) {
+		auto& inst = *cpu.machine().get_userdata<MachineInstance>();
 		switch (scall) {
 			case 0x10000: // REGISTER_FUNC
-				syscall_register_func(machine, inst);
+				syscall_register_func(cpu, inst);
 				return;
 			case 0x10001: // WAIT_FOR_REQUESTS
-				syscall_wait_for_requests(machine, inst);
+				syscall_wait_for_requests(cpu, inst);
 				return;
 			case 0x10005: // SET_CACHEABLE
-				syscall_set_cacheable(machine, inst);
+				syscall_set_cacheable(cpu, inst);
 				return;
 			case 0x10010: // BACKEND_RESPONSE
-				syscall_backend_response(machine, inst);
+				syscall_backend_response(cpu, inst);
 				return;
 			case 0x10020: // HTTP_APPEND
-				syscall_http_append(machine, inst);
+				syscall_http_append(cpu, inst);
 				return;
 			case 0x10021: // HTTP_SET
-				syscall_http_set(machine, inst);
+				syscall_http_set(cpu, inst);
 				return;
 			case 0x10022: // HTTP_FIND
-				syscall_http_find(machine, inst);
+				syscall_http_find(cpu, inst);
 				return;
 			case 0x10100:
-				syscall_set_backend(machine, inst);
+				syscall_set_backend(cpu, inst);
 				return;
 			case 0x10700: // SHARED_MEMORY_AREA
-				syscall_shared_memory(machine, inst);
+				syscall_shared_memory(cpu, inst);
 				return;
 			case 0x10701: // STORAGE_MEMORY_SHARED
-				syscall_storage_mem_shared(machine, inst);
+				syscall_storage_mem_shared(cpu, inst);
 				return;
 			case 0x10702: // ALL_MEMORY_SHARED
-				syscall_all_mem_shared(machine, inst);
+				syscall_all_mem_shared(cpu, inst);
 				return;
 			case 0x10707: // STORAGE CALL BUFFER
-				syscall_storage_callb(machine, inst);
+				syscall_storage_callb(cpu, inst);
 				return;
 			case 0x10708: // STORAGE CALL VECTOR
-				syscall_storage_callv(machine, inst);
+				syscall_storage_callv(cpu, inst);
 				return;
 			case 0x10709: // ASYNC_STORAGE TASK
-				syscall_storage_task(machine, inst);
+				syscall_storage_task(cpu, inst);
 				return;
 			case 0x1070A: // STOP_STORAGE TASK
-				syscall_stop_storage_task(machine, inst);
+				syscall_stop_storage_task(cpu, inst);
 				return;
 			case 0x10710: // MULTIPROCESS
-				syscall_multiprocess(machine, inst);
+				syscall_multiprocess(cpu, inst);
 				return;
 			case 0x10711: // MULTIPROCESS_ARRAY
-				syscall_multiprocess_array(machine, inst);
+				syscall_multiprocess_array(cpu, inst);
 				return;
 			case 0x10712: // MULTIPROCESS_CLONE
-				syscall_multiprocess_clone(machine, inst);
+				syscall_multiprocess_clone(cpu, inst);
 				return;
 			case 0x10713: // MULTIPROCESS_WAIT
-				syscall_multiprocess_wait(machine, inst);
+				syscall_multiprocess_wait(cpu, inst);
 				return;
 			case 0x10A00: // GET_MEMINFO
-				syscall_memory_info(machine, inst);
+				syscall_memory_info(cpu, inst);
 				return;
 			default:
-				syscall_unknown(machine, inst, scall);
+				syscall_unknown(cpu, inst, scall);
 		}
 	});
 	Machine::install_syscall_handler(
-		0, [] (Machine& machine) { // READ
-			auto& inst = *machine.get_userdata<MachineInstance>();
-			auto regs = machine.registers();
+		0, [] (vCPU& cpu) { // READ
+			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
+			auto regs = cpu.registers();
 			SYSPRINT("READ to fd=%lld, data=0x%llX, size=%llu\n",
 				regs.rdi, regs.rsi, regs.rdx);
 			// TODO: Make proper tenant setting for file sizes
@@ -141,16 +141,16 @@ void MachineInstance::setup_syscall_interface()
 				/* TODO: Use fragmented readv buffer */
 				ssize_t res = read(fd, buffer.get(), regs.rdx);
 				if (res > 0) {
-					machine.copy_to_guest(regs.rsi, buffer.get(), res);
+					cpu.machine().copy_to_guest(regs.rsi, buffer.get(), res);
 				}
 				regs.rax = res;
 			}
-			machine.set_registers(regs);
+			cpu.set_registers(regs);
 		});
 	Machine::install_syscall_handler(
-		1, [] (Machine& machine) { // WRITE
-			auto& inst = *machine.get_userdata<MachineInstance>();
-			auto regs = machine.registers();
+		1, [] (vCPU& cpu) { // WRITE
+			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
+			auto regs = cpu.registers();
 			const int    fd = regs.rdi;
 			const size_t bytes = regs.rdx;
 			SYSPRINT("WRITE to fd=%lld, data=0x%llX, size=%llu\n",
@@ -159,18 +159,18 @@ void MachineInstance::setup_syscall_interface()
 			if (fd == 1 || fd == 2) {
 				if (bytes > 1024*64) {
 					regs.rax = -1;
-					machine.set_registers(regs);
+					cpu.set_registers(regs);
 					return;
 				}
 			}
 			else if (bytes > 1024*1024*4) {
 				regs.rax = -1;
-				machine.set_registers(regs);
+				cpu.set_registers(regs);
 				return;
 			}
 			// TODO: Use gather-buffers and writev instead
 			auto buffer = std::unique_ptr<char[]> (new char[bytes]);
-			machine.copy_from_guest(buffer.get(), regs.rsi, bytes);
+			cpu.machine().copy_from_guest(buffer.get(), regs.rsi, bytes);
 
 			if (fd != 1 && fd != 2) {
 				/* Ignore writes outside of stdout and stderr */
@@ -178,15 +178,15 @@ void MachineInstance::setup_syscall_interface()
 				regs.rax = write(fd, buffer.get(), bytes);
 			}
 			else {
-				machine.print(buffer.get(), bytes);
+				cpu.machine().print(buffer.get(), bytes);
 				regs.rax = bytes;
 			}
-			machine.set_registers(regs);
+			cpu.set_registers(regs);
 		});
 	Machine::install_syscall_handler(
-		3, [] (Machine& machine) { // CLOSE
-			auto& inst = *machine.get_userdata<MachineInstance>();
-			auto regs = machine.registers();
+		3, [] (vCPU& cpu) { // CLOSE
+			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
+			auto regs = cpu.registers();
 			SYSPRINT("CLOSE to fd=%lld\n", regs.rdi);
 
 			int idx = inst.m_fd.find(regs.rdi);
@@ -197,16 +197,16 @@ void MachineInstance::setup_syscall_interface()
 			} else {
 				regs.rax = -1;
 			}
-			machine.set_registers(regs);
+			cpu.set_registers(regs);
 		});
 	Machine::install_syscall_handler(
-		4, [] (Machine& machine) { // STAT
-			auto& inst = *machine.get_userdata<MachineInstance>();
-			auto regs = machine.registers();
+		4, [] (vCPU& cpu) { // STAT
+			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
+			auto regs = cpu.registers();
 			const auto vpath = regs.rdi;
 
 			char path[256];
-			machine.copy_from_guest(path, vpath, sizeof(path));
+			cpu.machine().copy_from_guest(path, vpath, sizeof(path));
 			inst.sanitize_path(path, sizeof(path));
 
 			struct stat vstat;
@@ -214,50 +214,50 @@ void MachineInstance::setup_syscall_interface()
 			SYSPRINT("STAT to path=%s, data=0x%llX = %lld\n",
 				path, regs.rsi, regs.rax);
 			if (regs.rax == 0) {
-				machine.copy_to_guest(regs.rsi, &vstat, sizeof(vstat));
+				cpu.machine().copy_to_guest(regs.rsi, &vstat, sizeof(vstat));
 			}
-			machine.set_registers(regs);
+			cpu.set_registers(regs);
 		});
 	Machine::install_syscall_handler(
-		5, [] (Machine& machine) { // FSTAT
-			auto& inst = *machine.get_userdata<MachineInstance>();
-			auto regs = machine.registers();
+		5, [] (vCPU& cpu) { // FSTAT
+			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
+			auto regs = cpu.registers();
 
 			int fd = inst.m_fd.translate(regs.rdi);
 			struct stat vstat;
 			regs.rax = fstat(fd, &vstat);
 			if (regs.rax == 0) {
-				machine.copy_to_guest(regs.rsi, &vstat, sizeof(vstat));
+				cpu.machine().copy_to_guest(regs.rsi, &vstat, sizeof(vstat));
 			}
 			SYSPRINT("FSTAT to vfd=%lld, fd=%d, data=0x%llX = %lld\n",
 				regs.rdi, fd, regs.rsi, regs.rax);
-			machine.set_registers(regs);
+			cpu.set_registers(regs);
 		});
 	Machine::install_syscall_handler(
-		8, [] (Machine& machine) { // LSEEK
-			auto& inst = *machine.get_userdata<MachineInstance>();
-			auto regs = machine.registers();
+		8, [] (vCPU& cpu) { // LSEEK
+			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
+			auto regs = cpu.registers();
 			int fd = inst.m_fd.translate(regs.rdi);
 			regs.rax = lseek(fd, regs.rsi, regs.rdx);
-			machine.set_registers(regs);
+			cpu.set_registers(regs);
 		});
 	Machine::install_syscall_handler(
-		79, [](Machine &machine) { // GETCWD
-			auto regs = machine.registers();
+		79, [](vCPU& cpu) { // GETCWD
+			auto regs = cpu.registers();
 
 			const char fakepath[] = "/";
 			if (sizeof(fakepath) <= regs.rsi) {
-				machine.copy_to_guest(regs.rdi, fakepath, sizeof(fakepath));
+				cpu.machine().copy_to_guest(regs.rdi, fakepath, sizeof(fakepath));
 				regs.rax = regs.rdi;
 			} else {
 				regs.rax = 0;
 			}
-			machine.set_registers(regs);
+			cpu.set_registers(regs);
 		});
 	Machine::install_syscall_handler(
-		217, [](Machine &machine) { // GETDENTS64
-			auto& inst = *machine.get_userdata<MachineInstance>();
-			auto regs = machine.registers();
+		217, [](vCPU& cpu) { // GETDENTS64
+			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
+			auto regs = cpu.registers();
 
 			int fd = inst.m_fd.translate(regs.rdi);
 
@@ -265,22 +265,22 @@ void MachineInstance::setup_syscall_interface()
 			regs.rax = syscall(SYS_getdents64, fd, buffer, sizeof(buffer));
 			if (regs.rax > 0)
 			{
-				machine.copy_to_guest(regs.rsi, buffer, regs.rax);
+				cpu.machine().copy_to_guest(regs.rsi, buffer, regs.rax);
 			}
 			SYSPRINT("GETDENTS64 to vfd=%lld, fd=%d, data=0x%llX = %lld\n",
 				regs.rdi, fd, regs.rsi, regs.rax);
-			machine.set_registers(regs);
+			cpu.set_registers(regs);
 		});
 	Machine::install_syscall_handler(
-		257, [] (Machine& machine) { // OPENAT
-			auto& inst = *machine.get_userdata<MachineInstance>();
-			auto regs = machine.registers();
+		257, [] (vCPU& cpu) { // OPENAT
+			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
+			auto regs = cpu.registers();
 
 			const auto vpath = regs.rsi;
 			const int  flags = regs.rdx;
 
 			char path[PATH_MAX];
-			machine.copy_from_guest(path, vpath, sizeof(path));
+			cpu.machine().copy_from_guest(path, vpath, sizeof(path));
 			bool write_flags = (flags & (O_WRONLY | O_RDWR)) != 0x0;
 			if (!write_flags)
 			{
@@ -294,7 +294,7 @@ void MachineInstance::setup_syscall_interface()
 					if (fd > 0) {
 						inst.m_fd.manage(fd, 0x1000 + fd);
 						regs.rax = 0x1000 + fd;
-						machine.set_registers(regs);
+						cpu.set_registers(regs);
 						return;
 					} else {
 						regs.rax = -1;
@@ -323,15 +323,15 @@ void MachineInstance::setup_syscall_interface()
 					regs.rax = -1;
 				}
 			}
-			machine.set_registers(regs);
+			cpu.set_registers(regs);
 		});
 	Machine::install_output_handler(
-	[] (Machine& machine, unsigned port, unsigned data)
+	[] (vCPU& cpu, unsigned port, unsigned data)
 	{
-		auto& inst = *machine.get_userdata<MachineInstance>();
+		auto& inst = *cpu.machine().get_userdata<MachineInstance>();
 		switch (port) {
 			case 0x1: /* Dynamic calls */
-				inst.tenant().dynamic_call(data, inst);
+				inst.tenant().dynamic_call(data, cpu, inst);
 				break;
 		}
 	});

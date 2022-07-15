@@ -134,9 +134,9 @@ http_header_append(struct http* hp, const char* val, uint32_t len)
 	return idx;
 }
 
-static void syscall_http_append(Machine& machine, MachineInstance& inst)
+static void syscall_http_append(vCPU& cpu, MachineInstance& inst)
 {
-	auto regs = machine.registers();
+	auto regs = cpu.machine().registers();
 	auto *hp = get_http(inst.ctx(), (gethdr_e)regs.rdi);
 	const uint64_t addr = regs.rsi;
 	const uint32_t len = regs.rdx;
@@ -148,18 +148,18 @@ static void syscall_http_append(Machine& machine, MachineInstance& inst)
 	val[len] = 0;
 
 	regs.rax = http_header_append(hp, val, len);
-	machine.set_registers(regs);
+	cpu.machine().set_registers(regs);
 }
 
-static void syscall_http_set(Machine &machine, MachineInstance &inst)
+static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
 {
-	auto regs = machine.registers();
+	auto regs = cpu.machine().registers();
 	const int where = regs.rdi;
 	const uint64_t g_what = regs.rsi;
 	const uint16_t g_wlen = regs.rdx;
 	if (UNLIKELY(g_what == 0x0 || g_wlen == 0)) {
 		regs.rax = 0;
-		machine.set_registers(regs);
+		cpu.machine().set_registers(regs);
 		return;
 	}
 
@@ -202,12 +202,12 @@ static void syscall_http_set(Machine &machine, MachineInstance &inst)
 		}
 	}
 	/* Return value: Index of header field */
-	machine.set_registers(regs);
+	cpu.machine().set_registers(regs);
 }
 
-static void syscall_http_find(Machine &machine, MachineInstance &inst)
+static void syscall_http_find(vCPU& cpu, MachineInstance &inst)
 {
-	auto regs = machine.registers();
+	auto regs = cpu.machine().registers();
 	const int where = regs.rdi;
 	const uint64_t g_what = regs.rsi;
 	const uint16_t g_wlen = regs.rdx;
@@ -236,7 +236,7 @@ static void syscall_http_find(Machine &machine, MachineInstance &inst)
 		regs.rax = 0;
 	}
 
-	machine.set_registers(regs);
+	cpu.machine().set_registers(regs);
 }
 
 } // kvm

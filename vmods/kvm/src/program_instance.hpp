@@ -89,7 +89,7 @@ public:
 		gaddr_t func, size_t n, VirtBuffer[], gaddr_t, size_t);
 
 	/* Async serialized vmcall into storage VM. */
-	long async_storage_call(gaddr_t func, gaddr_t arg);
+	long async_storage_call(bool async, gaddr_t func, gaddr_t arg);
 
 	/* Serialized call into storage VM during live update */
 	long live_update_call(const vrt_ctx*,
@@ -98,6 +98,9 @@ public:
 	const std::vector<uint8_t> binary;
 	/* Ready-made _main_ VM that can be forked into many small VMs */
 	std::unique_ptr<MachineInstance> main_vm;
+	/* Extra vCPU used for async storage tasks */
+	std::unique_ptr<tinykvm::vCPU> main_vm_extra_cpu = nullptr;
+	uint64_t main_vm_extra_cpu_stack = 0x0;
 
 	/* Ticket-machine that gives access rights to VMs. */
 	moodycamel::BlockingConcurrentQueue<VMPoolItem*> m_vmqueue;
@@ -110,6 +113,8 @@ public:
 
 	/* Queue of work to happen on main VM. Bottleneck. */
 	tinykvm::ThreadPool m_main_queue;
+	/* Separate queue for async calls into main VM. */
+	tinykvm::ThreadPool m_main_async_queue;
 
 	/* Entry points in the tenants program. Handlers for all types of
 	   requests, serialization mechanisms and related functionality. */

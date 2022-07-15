@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 typedef struct vmod_priv * VCL_PRIV;
+namespace tinykvm { struct vCPU; }
 
 namespace kvm {
 class MachineInstance;
@@ -49,7 +50,7 @@ struct TenantGroup {
 
 struct TenantConfig
 {
-	using ghandler_t = std::function<void(MachineInstance&)>;
+	using ghandler_t = std::function<void(MachineInstance&, tinykvm::vCPU&)>;
 	using dynfun_map = std::map<uint32_t, ghandler_t>;
 
 	std::string    name;

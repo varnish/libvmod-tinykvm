@@ -3,6 +3,7 @@
 #include <memory>
 #include "tenant.hpp"
 struct vrt_ctx;
+namespace tinykvm { struct vCPU; }
 
 namespace kvm {
 class MachineInstance;
@@ -16,7 +17,7 @@ public:
 
 	uint64_t lookup(const char* name) const;
 
-	void dynamic_call(uint32_t hash, MachineInstance&) const;
+	void dynamic_call(uint32_t hash, tinykvm::vCPU&, MachineInstance&) const;
 
 	/* Used by live update mechanism to replace the main VM with a new
 	   one that was HTTP POSTed by a tenant while Varnish is running. */

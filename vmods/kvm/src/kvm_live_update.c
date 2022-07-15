@@ -111,7 +111,7 @@ kvm_updater_be_gethdrs(const struct director *dir,
 
 	if (result_len > kvmu->max_binary_size)
 	{
-		http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
+		http_PutResponse(bo->beresp, "HTTP/1.1", 503, "Binary too large");
 		VSB_destroy(&vsb);
 		return (-1);
 	}

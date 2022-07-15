@@ -31,9 +31,9 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 	(void) ctx;
 	/* CURL is already linked to libvmod_kvm. */
 	TenantConfig::set_dynamic_call(task, "curl.fetch",
-	[=] (MachineInstance& inst)
+	[=] (MachineInstance& inst, tinykvm::vCPU& vcpu)
 	{
-		auto regs = inst.machine().registers();
+		auto regs = vcpu.registers();
 		/**
 		 * rdi = URL
 		 * rsi = URL length
@@ -47,7 +47,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		/* URL */
 		std::string url;
 		url.resize(regs.rsi);
-		inst.machine().copy_from_guest(url.data(), regs.rdi, regs.rsi);
+		vcpu.machine().copy_from_guest(url.data(), regs.rdi, regs.rsi);
 
 		constexpr size_t CONTENT_TYPE_LEN = 128;
 		constexpr size_t CURL_FIELDS_NUM = 8;
@@ -66,25 +66,25 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			char     ctype[CONTENT_TYPE_LEN];
 		};
 		opresult opres;
-		inst.machine().copy_from_guest(&opres, g_buffer, sizeof(opresult));
+		vcpu.machine().copy_from_guest(&opres, g_buffer, sizeof(opresult));
 
 		// Retrieve request header fields into string vector
 		std::array<std::string, CURL_FIELDS_NUM> fields;
 		if (opres.fields != 0x0) {
 			opfields of;
-			inst.machine().copy_from_guest(&of, opres.fields, sizeof(of));
+			vcpu.machine().copy_from_guest(&of, opres.fields, sizeof(of));
 			/* Iterate through all the request fields. */
 			for (size_t i = 0; i < CURL_FIELDS_NUM; i++) {
 				if (of.addr[i] != 0x0 && of.len[i] != 0x0) {
 					// Add to our temporary request field vector
 					fields[i].resize(of.len[i]);
-					inst.machine().copy_from_guest(fields[i].data(), of.addr[i], of.len[i]);
+					vcpu.machine().copy_from_guest(fields[i].data(), of.addr[i], of.len[i]);
 				}
 			}
 		}
 
 		// XXX: Fixme, mmap is basic/unreliable
-		opres.content_addr = inst.machine().mmap();
+		opres.content_addr = vcpu.machine().mmap();
 		const bool is_post = (opres.post_addr != 0x0 && opres.post_buflen != 0x0);
 
 		if constexpr (VERBOSE_CURL) {
@@ -92,8 +92,8 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		}
 
 		writeop op {
-			.machine = inst.machine(),
-			.dst   = inst.machine().mmap(),
+			.machine = vcpu.machine(),
+			.dst   = vcpu.machine().mmap(),
 		};
 
 		CURL *curl = curl_easy_init();
@@ -168,7 +168,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			opres.content_length = op.dst - opres.content_addr;
 			/* Adjust and set new mmap base */
 			op.dst += 0xFFF; op.dst &= ~0xFFFL;
-			inst.machine().mmap() = op.dst;
+			vcpu.machine().mmap() = op.dst;
 			/* Get response status and Content-Type */
 			res = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &opres.status);
 			const char* ctype = nullptr;
@@ -184,7 +184,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			{
 				opres.ct_length = 0;
 			}
-			inst.machine().copy_to_guest(g_buffer, &opres, sizeof(opres));
+			vcpu.machine().copy_to_guest(g_buffer, &opres, sizeof(opres));
 			regs.rax = 0;
 		} else {
 			if constexpr (VERBOSE_CURL) {
@@ -195,7 +195,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		curl_easy_cleanup(curl);
 		curl_slist_free_all(req_list);
 		curl_slist_free_all(post_list);
-		inst.machine().set_registers(regs);
+		vcpu.set_registers(regs);
 	});
 }
 
