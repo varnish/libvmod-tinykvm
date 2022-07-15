@@ -39,6 +39,9 @@ MachineInstance::MachineInstance(
 {
 	machine().set_userdata<MachineInstance> (this);
 	machine().set_printer(get_vsl_printer());
+}
+void MachineInstance::initialize()
+{
 	try {
 		/* Some run-times are quite buggy. Zig makes a calculation on
 		   RSP and the loadable segments in order to find img_base.
@@ -51,9 +54,9 @@ MachineInstance::MachineInstance(
 		// Build stack, auxvec, envp and program arguments
 		machine().setup_linux(
 			{"vmod_kvm", name(), TenantConfig::guest_state_file},
-			ten->config.environ());
+			tenant().config.environ());
 		// Run through main()
-		machine().run( ten->config.max_boot_time() );
+		machine().run( tenant().config.max_boot_time() );
 		// Make sure the program is waiting for requests
 		if (!is_waiting_for_requests()) {
 			throw std::runtime_error("Program did not wait for requests");
@@ -66,7 +69,7 @@ MachineInstance::MachineInstance(
 		// Make forkable (with working memory)
 		// TODO: Tenant config variable for storage memory
 		machine().prepare_copy_on_write(
-			ten->config.max_work_memory(), shm_boundary);
+			tenant().config.max_work_memory(), shm_boundary);
 
 		// Set new vmcall stack base lower than current RSP, in
 		// order to avoid trampling stack-allocated things in main.

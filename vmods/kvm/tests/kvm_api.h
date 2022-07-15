@@ -12,24 +12,32 @@ extern void register_func(int, ...);
  * handle different types of requests, like GET, POST and streaming POST.
  *
  * Example:
- *  int main()
- *  {
- *  	set_backend_get(my_get_request_handler);
+ *   static void on_get(const char* url, const char*, int, int)
+ *   {
+ *      backend_response_str(200, "text/plain", "OK");
+ *   }
+ *   int main()
+ *   {
+ *  	set_backend_get(on_get);
  *  	wait_for_requests();
- *  }
+ *   }
  *
  * The example above will register a function called 'my_request_handler' as
  * the function that will get called on every single GET request. When the
  * main body is completed, we call 'wait_for_requests()' to signal that
  * the program has successfully initialized, and is ready to handle requests.
+ * The system will then pause the VM and freeze everything. The frozen state
+ * will be restored on every request.
  *
  * Register callbacks for various modes of operations:
-**/
+ **/
 static inline void set_on_recv(void(*f)(const char*)) { register_func(0, f); }
 static inline void set_backend_get(void(*f)(const char*, const char*, int, int)) { register_func(1, f); }
 static inline void set_backend_post(void(*f)(const char*, const uint8_t*, size_t)) { register_func(2, f); }
 static inline void set_backend_stream_post(long(*f)(const uint8_t*, size_t)) { register_func(3, f); }
 
+/* When uploading a new program, there is an opportunity to pass on
+   state to the next program, using the live update and restore callbacks. */
 static inline void set_on_live_update(void(*f)()) { register_func(4, f); }
 static inline void set_on_live_restore(void(*f)(size_t)) { register_func(5, f); }
 
@@ -46,7 +54,7 @@ extern void wait_for_requests();
  * conclude the request.
  *
  * Example:
- *  static void my_request_handler(const char* url, int req, int resp)
+ *  static void on_get(const char* url, const char *arg, int req, int resp)
  *  {
  *  	const char *ctype = "text/plain";
  *  	const char *cont = "Hello World";
@@ -69,14 +77,17 @@ backend_response_str(int16_t status, const char *ctype, const char *content)
 extern void
 http_appendf(int where, const char*, size_t);
 
+/* Append a new header field. */
 static inline void
 http_append_str(int where, const char *str) { http_appendf(where, str, __builtin_strlen(str)); }
 
+/* Set or overwrite an existing header field. */
 extern long
 http_setf(int where, const char *what, size_t len);
 
+/* Retrieve a field from an existing header based on the key. */
 extern long
-http_findf(int where, const char* what, size_t, const char* outb, size_t outl);
+http_findf(int where, const char *key, size_t, const char *outb, size_t outl);
 
 /**
  * Varnish caching configuration
@@ -141,15 +152,24 @@ storage_call0(storage_func func) { return storage_call(func, NULL, 0, NULL, 0); 
    start milliseconds, and then run every period milliseconds. The
    system call returns the timer id.
    If async is enabled, it is possible re-enter storage. NB: Watch out
-   for race conditions! */
+   for race conditions!
+   If it is a periodic task, it will return a task id. */
 extern long
 storage_task(void (*task)(void* arg), void* arg, int async, uint64_t start, uint64_t period);
 
-/* Stop a scheduled task. Returns TRUE on success. */
+/* Async storage tasks happen even while storage is entered somewhere
+   else. It is a re-entrant call, so watch out for race conditions.
+   This functions allows scheduling work from storage even if it
+   very busy in ordinary requests, or you are fetching directly
+   from Varnish where the request would try to enter storage. */
+static inline long
+async_storage_task(void (*task)(void *arg), void *arg) { return storage_task(task, arg, 1, 0, 0); }
+
+/* Stop a previously scheduled task. Returns TRUE on success. */
 extern long
 stop_storage_task(long task);
 
-/* Used to return data from storage functions */
+/* Used to return data from storage functions. */
 extern void
 storage_return(const void* data, size_t len);
 

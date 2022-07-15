@@ -44,6 +44,8 @@ ProgramInstance::ProgramInstance(
 			main_vm_extra_cpu_stack = EXTRA_CPU_STACK_SIZE +
 				main_vm->machine().mmap_allocate(EXTRA_CPU_STACK_SIZE);
 
+			main_vm->initialize();
+
 			const size_t max_vms = ten->config.group.max_concurrency;
 			for (size_t i = 0; i < max_vms; i++) {
 				// Instantiate forked VMs on dedicated threads,

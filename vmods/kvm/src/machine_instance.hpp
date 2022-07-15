@@ -80,6 +80,7 @@ public:
 	static void kvm_initialize();
 	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool dbg);
 	MachineInstance(const MachineInstance&, const vrt_ctx*, const TenantInstance*, ProgramInstance*);
+	void initialize();
 	~MachineInstance();
 	void tail_reset();
 	void reset_to(const vrt_ctx*, MachineInstance&);
