@@ -41,6 +41,11 @@ static inline void set_backend_stream_post(long(*f)(const uint8_t*, size_t)) { r
 static inline void set_on_live_update(void(*f)()) { register_func(4, f); }
 static inline void set_on_live_restore(void(*f)(size_t)) { register_func(5, f); }
 
+/* When an exception happens that terminates the request it is possible to
+   produce a custom response instead of a generic HTTP 500. There is very
+   limited time to produce the response, typically 1.0 seconds. */
+static inline void set_on_error(void (*f)(const char *, const char *)) { register_func(6, f); }
+
 /* Wait for requests without terminating machine. Call this just before
    the end of int main(). */
 extern void wait_for_requests();

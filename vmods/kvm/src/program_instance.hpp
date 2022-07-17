@@ -36,6 +36,7 @@ enum class ProgramEntryIndex : uint8_t {
 	BACKEND_STREAM = 3,
 	LIVEUPD_SERIALIZE = 4,
 	LIVEUPD_DESERIALIZE = 5,
+	ON_ERROR = 6,
 	TOTAL_ENTRIES
 };
 

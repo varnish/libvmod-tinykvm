@@ -16,8 +16,10 @@ endif()
 
 # VCL import name is "kvm"
 add_vmod_tests(vmod_kvm kvm
+	tests/allowed_paths.vtc
 	tests/alternate_programs.vtc
 	tests/empty.vtc
+	tests/error_handling.vtc
 	tests/failing_program.vtc
 	tests/hello_backend_world.vtc
 	#tests/hello_synth_world.vtc
@@ -33,6 +35,5 @@ add_vmod_tests(vmod_kvm kvm
 	tests/rotate_vcl.vtc
 	tests/stateful_storage.vtc
 	tests/stateful_buffered_storage.vtc
-	tests/allowed_paths.vtc
 	#tests/max_work_memory.vtc
 )

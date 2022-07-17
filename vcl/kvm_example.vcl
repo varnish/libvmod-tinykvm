@@ -9,10 +9,10 @@ sub vcl_init {
 			"group": "test",
 			"filename": "/tmp/test",
 
-			"max_time": 4.0,
+			"max_time": 60.0,
 			"max_boot_time": 16.0,
-			"max_memory": 256,
-			"max_work_memory": 64,
+			"max_memory": 512,
+			"max_work_memory": 512,
 			"hugepages": false
 		}
 	}""");
