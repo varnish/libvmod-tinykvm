@@ -1,5 +1,6 @@
 #pragma once
 #include "machine_instance.hpp"
+#include "settings.hpp"
 #include "utils/cpptime.hpp"
 #include <blockingconcurrentqueue.h>
 
@@ -20,7 +21,7 @@ struct VMPoolItem {
 	// VM instance
 	std::unique_ptr<MachineInstance> mi;
 	// Communicate with this VM using single thread pool
-	tinykvm::ThreadPool tp {1};
+	tinykvm::ThreadPool tp {1, REQUEST_VM_NICE, false};
 	// Reference that keeps active program alive
 	std::shared_ptr<ProgramInstance> prog_ref = nullptr;
 };

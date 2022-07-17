@@ -1,5 +1,6 @@
 #include "tenant_instance.hpp"
 #include "program_instance.hpp"
+#include "settings.hpp"
 #include "varnish.hpp"
 #include <stdexcept>
 using namespace kvm;
@@ -7,7 +8,6 @@ extern "C" {
 #include "vtim.h"
 #include "kvm_backend.h"
 }
-static constexpr float ERROR_HANDLING_TIMEOUT = 1.0f;
 
 static void memory_error_handling(VRT_CTX, const tinykvm::MemoryException& e)
 {

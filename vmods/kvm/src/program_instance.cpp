@@ -1,13 +1,12 @@
 #include "program_instance.hpp"
 #include "tenant_instance.hpp"
 #include "gettid.hpp"
+#include "settings.hpp"
 #include "varnish.hpp"
 #include <cstring>
 #include <tinykvm/rsp_client.hpp>
 
 namespace kvm {
-static constexpr uint64_t EXTRA_CPU_STACK_SIZE = 0x100000;
-static constexpr int EXTRA_CPU_ID = 16;
 
 VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
 	const vrt_ctx* ctx, TenantInstance* ten, ProgramInstance* prog)
@@ -30,8 +29,8 @@ ProgramInstance::ProgramInstance(
 	const vrt_ctx* ctx, TenantInstance* ten,
 	bool debug)
 	: binary{std::move(elf)},
-	  m_main_queue {1},
-	  m_main_async_queue {1},
+	  m_main_queue {1, STORAGE_VM_NICE, false},
+	  m_main_async_queue {1, ASYNC_STORAGE_NICE, ASYNC_STORAGE_LOWPRIO},
 	  entry_address {},
 	  rspclient{nullptr}
 {
@@ -155,7 +154,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			stm.setup_call(regs, func, new_stack,
 				(uint64_t)n, (uint64_t)stm_bufaddr, (uint64_t)res_size);
 			stm.set_registers(regs);
-			stm.run(3.0);
+			stm.run(STORAGE_TIMEOUT);
 			/* Get the result buffer and length (capped to res_size) */
 			regs = stm.registers();
 			const gaddr_t st_res_buffer = regs.rdi;
@@ -165,7 +164,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 				src.copy_from_machine(res_addr, stm, st_res_buffer, st_res_size);
 			}
 			/* Run the function to the end, allowing cleanup */
-			stm.run(3.0);
+			stm.run(STORAGE_CLEANUP_TIMEOUT);
 			/* If res_addr is zero, we will just return the
 			   length provided by storage as-is, to allow some
 			   communication without a buffer. */
@@ -203,7 +202,7 @@ long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 				stm.setup_call(regs, func, new_stack,
 					(uint64_t)arg);
 				stm.set_registers(regs);
-				stm.run(3.0);
+				stm.run(ASYNC_STORAGE_TIMEOUT);
 				return 0;
 			} catch (...) {
 				return -1;
@@ -230,7 +229,7 @@ long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 				//printf("Working from vCPU %d, RIP=0x%llX  FUN=0x%llX  RSP=0x%llX  ARG=0x%llX\n",
 				//	   main_vm_extra_cpu->cpu_id, regs.rip, regs.r15, regs.rsp, regs.rsi);
 
-				main_vm_extra_cpu->run(3.0);
+				main_vm_extra_cpu->run(ASYNC_STORAGE_TIMEOUT);
 				return 0;
 			}
 			catch (const tinykvm::MachineException& me) {
@@ -261,8 +260,7 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 			/* Serialize data in the old machine */
 			main_vm->set_ctx(ctx);
 			auto& old_machine = main_vm->machine();
-			old_machine.timed_vmcall(func,
-				main_vm->tenant().config.max_time());
+			old_machine.timed_vmcall(func, STORAGE_TIMEOUT);
 			/* Get serialized data */
 			auto regs = old_machine.registers();
 			auto data_addr = regs.rdi;
@@ -289,8 +287,7 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 			/* Begin resume procedure */
 			new_prog.main_vm->set_ctx(ctx);
 
-			new_machine.timed_vmcall(newfunc,
-				new_prog.main_vm->tenant().config.max_time(),
+			new_machine.timed_vmcall(newfunc, STORAGE_TIMEOUT,
 				(uint64_t)from.len);
 
 			auto regs = new_machine.registers();
