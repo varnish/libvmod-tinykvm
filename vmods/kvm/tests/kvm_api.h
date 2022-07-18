@@ -14,7 +14,8 @@ extern void register_func(int, ...);
  * Example:
  *   static void on_get(const char* url)
  *   {
- *      backend_response_str(200, "text/plain", "OK");
+ *      http_setf(BERESP, "X-Hello: World", 14);
+ *      backend_response_str(200, "text/plain", "Hello World!");
  *   }
  *   int main()
  *   {
@@ -93,7 +94,11 @@ http_append_str(int where, const char *str) { http_appendf(where, str, __builtin
 extern long
 http_setf(int where, const char *what, size_t len);
 
-/* Retrieve a field from an existing header based on the key. */
+/* Unset an existing header field by key. */
+static inline long
+http_unsetf(int where, const char *key, size_t len) { return http_setf(where, key, len); }
+
+/* Retrieve a header field by key. */
 extern long
 http_findf(int where, const char *key, size_t, const char *outb, size_t outl);
 
