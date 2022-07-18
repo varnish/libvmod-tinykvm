@@ -150,20 +150,17 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 		assert(main_vm->ctx());
 
 		try {
-			tinykvm::tinykvm_x86regs regs;
-			stm.setup_call(regs, func, new_stack,
+			stm.timed_reentry_stack(func, new_stack, STORAGE_TIMEOUT,
 				(uint64_t)n, (uint64_t)stm_bufaddr, (uint64_t)res_size);
-			stm.set_registers(regs);
-			stm.run(STORAGE_TIMEOUT);
 			/* Get the result buffer and length (capped to res_size) */
-			regs = stm.registers();
+			auto regs = stm.registers();
 			const gaddr_t st_res_buffer = regs.rdi;
 			const uint64_t st_res_size  = (regs.rsi < res_size) ? regs.rsi : res_size;
 			if (res_addr != 0x0 && st_res_buffer != 0x0) {
 				/* Copy from the storage machine back into tenant VM instance */
 				src.copy_from_machine(res_addr, stm, st_res_buffer, st_res_size);
 			}
-			/* Run the function to the end, allowing cleanup */
+			/* Resume, run the function to the end, allowing cleanup */
 			stm.run(STORAGE_CLEANUP_TIMEOUT);
 			/* If res_addr is zero, we will just return the
 			   length provided by storage as-is, to allow some
@@ -192,17 +189,13 @@ long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 		[=] () -> long
 		{
 			auto& stm = main_vm->machine();
-			const uint64_t new_stack = stm.stack_address();
 
 			/* This vmcall has no attached VRT_CTX. */
 			main_vm->set_ctx(nullptr);
 
 			try {
-				tinykvm::tinykvm_x86regs regs;
-				stm.setup_call(regs, func, new_stack,
+				stm.timed_reentry(func, ASYNC_STORAGE_TIMEOUT,
 					(uint64_t)arg);
-				stm.set_registers(regs);
-				stm.run(ASYNC_STORAGE_TIMEOUT);
 				return 0;
 			} catch (...) {
 				return -1;
@@ -214,22 +207,19 @@ long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 			m_main_async_queue.enqueue(
 		[=] () -> long
 		{
+			auto& stm = main_vm->machine();
+
 			/* This vmcall has no attached VRT_CTX. */
 			main_vm->set_ctx(nullptr);
 
 			try {
 				if (!main_vm_extra_cpu) {
 					main_vm_extra_cpu.reset(new tinykvm::vCPU);
-					main_vm_extra_cpu->smp_init(EXTRA_CPU_ID, main_vm->machine());
+					main_vm_extra_cpu->smp_init(EXTRA_CPU_ID, stm);
 				}
-				tinykvm::tinykvm_x86regs regs;
-				main_vm->machine().setup_call(regs, func,
-					main_vm_extra_cpu_stack, (uint64_t)arg);
-				main_vm_extra_cpu->set_registers(regs);
-				//printf("Working from vCPU %d, RIP=0x%llX  FUN=0x%llX  RSP=0x%llX  ARG=0x%llX\n",
-				//	   main_vm_extra_cpu->cpu_id, regs.rip, regs.r15, regs.rsp, regs.rsi);
-
-				main_vm_extra_cpu->run(ASYNC_STORAGE_TIMEOUT);
+				stm.timed_reentry_stack(func, main_vm_extra_cpu_stack,
+					ASYNC_STORAGE_TIMEOUT,
+					(uint64_t)arg);
 				return 0;
 			}
 			catch (const tinykvm::MachineException& me) {
