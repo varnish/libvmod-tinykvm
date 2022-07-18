@@ -24,7 +24,7 @@ struct TenantGroup {
 	uint64_t max_memory; /* Megabytes */
 	uint32_t max_work_mem; /* Megabytes */
 	uint64_t shared_memory = 64; /* Megabytes */
-	size_t   max_concurrency = 8;
+	size_t   max_concurrency = 4;
 	size_t   max_fd       = 32;
 	size_t   max_backends = 8;
 	size_t   max_regex    = 32;

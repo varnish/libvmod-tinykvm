@@ -177,8 +177,8 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			if (obj.contains("max_boot_time")) {
 				group.max_boot_time = obj["max_boot_time"];
 			}
-			if (obj.contains("max_concurrency")) {
-				group.max_concurrency = obj["max_concurrency"];
+			if (obj.contains("concurrency")) {
+				group.max_concurrency = obj["concurrency"];
 			}
 			if (obj.contains("hugepages")) {
 				group.hugepages = obj["hugepages"];

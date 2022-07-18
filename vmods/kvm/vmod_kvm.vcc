@@ -4,10 +4,10 @@ DESCRIPTION
 ===========
 
 vmod_kvm allows using ultra-low overhead sandboxed programs
-directly from VCL, that runs native 64-bit x86 machine code.
-Each machine lives in complete separation and does affect any other
-programs or the general operation of the cache.
-Machines communicate with Varnish using a system call API that covers
+directly from VCL. They are native 64-bit Linux programs.
+Each tenant lives in complete separation and does not affect any
+other tenants or the general operation of the cache.
+Programs communicate with Varnish using a provded API that covers
 all the operational tasks that tenants are allowed to perform.
 
 The VMOD is configured by specifying a list of tenants with
@@ -32,11 +32,11 @@ GROUP
 A group consists of one or more tenants and defines how tenants are executed
 within a virtual machine.
 
+- concurrency: The number of available request VMs
+- max_memory: The size of the main storage memory
+- max_work_memory: The size of the memory for each request VM
 - max_time
-- max_memory
-- max_work_memory
 - max_boot_time
-- max_concurrency
 - hugepages
 - allowed_paths (default: []): a list of paths that the tenant can open/load.
 
@@ -64,10 +64,10 @@ $Function VOID embed_tenants(PRIV_VCL, STRING json)
 
 $Function BOOL tenant_is_ready(PRIV_VCL, STRING tenant)
 
-- Returns true if the tenants current program was initialized properly.
+- Returns true if a given tenant has a properly initialized program.
 - Sending a new program by live update that fails will not replace
-  the current program. The only way a program can fail to be ready is
-  when the program provided at startup is either missing or failing.
+  the current program. The only way a tenant can fail to be ready is
+  when there is no program provided or it was failing at startup.
 
 $Function BACKEND live_update(PRIV_VCL, STRING tenant, STRING key, BYTES max_size = 50MB)
 
@@ -78,20 +78,17 @@ $Function BACKEND live_update(PRIV_VCL, STRING tenant, STRING key, BYTES max_siz
   to POST programs. It does not have to be used, but it has
   to match the key used for the tenant in the JSON structure.
 - Example:
-	sub vcl_recv {
-		if (req.method == "POST") {
-			set req.backend_hint = kvm.live_update(req.http.Host, 15MB);
-			std.cache_req_body(15MB);
-			return (pass);
-		}
-	}
 	sub vcl_backend_fetch {
-		if (bereq.method == "POST") {
+		if (bereq.method == "POST" && bereq.http.X-LiveUpdate) {
+			set bereq.backend = kvm.live_update(
+				bereq.http.Host, bereq.http.X-LiveUpdate, 100MB);
 			return (fetch);
 		}
 	}
 
 $Function BOOL live_update_file(PRIV_VCL, STRING tenant, STRING filename)
+
+- Provide a new program for a tenant from the local filesystem.
 
 $Function BACKEND live_debug(PRIV_VCL, STRING tenant, STRING key, BYTES max_size = 2097152)
 
@@ -99,14 +96,7 @@ $Function BACKEND live_debug(PRIV_VCL, STRING tenant, STRING key, BYTES max_size
 - Whenever a request triggers a breakpoint, open a port
   for GDB remote debugging.
 
-$Function INT vm_call(PRIV_VCL, STRING tenant, STRING func, STRING arg = "")
-
-- Looks up tenant, forks a new VM, calls the provided function,
-  and then returns the result from the call.
-- Subsequent calls on the same task will yield the same VM.
-- Use this to make a VCL decision, eg. return (synth ...).
-
-$Function INT vm_callv(PRIV_VCL, STRING tenant,
+$Function INT vm_call(PRIV_VCL, STRING tenant,
 		ENUM {
 			ON_REQUEST
 		} func = "ON_REQUEST",
@@ -114,7 +104,7 @@ $Function INT vm_callv(PRIV_VCL, STRING tenant,
 
 - Call self-registered function in tenant program.
 
-$Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING arg0 = "", STRING arg1 = "")
+$Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING url)
 
 - Returns a backend that will call into the current machine to produce a response.
 - Produces 500 server error if there is not enough memory,

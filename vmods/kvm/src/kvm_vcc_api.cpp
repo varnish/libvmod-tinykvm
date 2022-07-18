@@ -155,15 +155,6 @@ static int kvm_forkcall(VRT_CTX, kvm::VMPoolItem* slot,
 }
 
 extern "C"
-int kvm_call(VRT_CTX, kvm::VMPoolItem* slot,
-	const char *func, const char *farg)
-{
-	assert(func && farg);
-	const auto addr = slot->mi->tenant().lookup(func);
-	return kvm_forkcall(ctx, slot, addr, farg);
-}
-
-extern "C"
 int kvm_callv(VRT_CTX, kvm::VMPoolItem* slot,
 	const int index, const char *farg)
 {

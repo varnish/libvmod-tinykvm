@@ -203,7 +203,7 @@ kvmbe_gethdrs(const struct director *dir,
 
 static struct vmod_kvm_response *
 kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant,
-	VCL_STRING arg0, VCL_STRING arg1)
+	VCL_STRING url)
 {
 	struct vmod_kvm_response *kvmr;
 	kvmr = WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_response));
@@ -222,8 +222,8 @@ kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant,
 		return (NULL);
 	}
 
-	kvmr->funcarg[0] = arg0;
-	kvmr->funcarg[1] = arg1;
+	kvmr->funcarg[0] = url;
+	kvmr->funcarg[1] = NULL;
 	kvmr->max_response_size = 0;
 
 	struct director *dir = &kvmr->dir;
@@ -238,13 +238,13 @@ kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant,
 	return (kvmr);
 }
 
-VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task, VCL_STRING tenant,
-	VCL_STRING arg0, VCL_STRING arg1)
+VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
+	VCL_STRING tenant, VCL_STRING url)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
 	struct vmod_kvm_response *kvmr =
-		kvm_response_director(ctx, task, tenant, arg0, arg1);
+		kvm_response_director(ctx, task, tenant, url);
 
 	if (kvmr != NULL) {
 		return (&kvmr->dir);
