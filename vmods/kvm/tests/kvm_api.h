@@ -12,7 +12,7 @@ extern void register_func(int, ...);
  * handle different types of requests, like GET, POST and streaming POST.
  *
  * Example:
- *   static void on_get(const char* url, const char*, int, int)
+ *   static void on_get(const char* url)
  *   {
  *      backend_response_str(200, "text/plain", "OK");
  *   }
@@ -32,7 +32,7 @@ extern void register_func(int, ...);
  * Register callbacks for various modes of operations:
  **/
 static inline void set_on_recv(void(*f)(const char*)) { register_func(0, f); }
-static inline void set_backend_get(void(*f)(const char*, const char*, int, int)) { register_func(1, f); }
+static inline void set_backend_get(void(*f)(const char*)) { register_func(1, f); }
 static inline void set_backend_post(void(*f)(const char*, const uint8_t*, size_t)) { register_func(2, f); }
 static inline void set_backend_stream_post(long(*f)(const uint8_t*, size_t)) { register_func(3, f); }
 
@@ -79,6 +79,9 @@ backend_response_str(int16_t status, const char *ctype, const char *content)
  * HTTP header field manipulation
  *
 **/
+static const int BEREQ  = 4;
+static const int BERESP = 5;
+
 extern void
 http_appendf(int where, const char*, size_t);
 

@@ -6,16 +6,16 @@ cat >${tmpdir}/${testname}.c <<-EOF
 #include <string.h>
 #include "kvm_api.h"
 
-static void my_backend(const char *url, const char *arg2, int req, int resp)
+static void on_get(const char *url)
 {
-	http_appendf(resp, "X-Value: 5", 10);
-	http_setf(resp, "X-OtherValue: 6", 15);
+	http_appendf(BERESP, "X-Value: 5", 10);
+	http_setf(BERESP, "X-OtherValue: 6", 15);
 
 	/* Test overwriting a header field. */
 	if (strcasecmp(url, "/test2") == 0) {
-		http_setf(resp, "X-OtherValue: 7", 15);
+		http_setf(BERESP, "X-OtherValue: 7", 15);
 		/* This will unset the field. */
-		http_setf(resp, "X-Value", 7);
+		http_setf(BERESP, "X-Value", 7);
 	}
 
 	backend_response_str(200, "text/plain", url);
@@ -23,7 +23,7 @@ static void my_backend(const char *url, const char *arg2, int req, int resp)
 
 int main()
 {
-	set_backend_get(my_backend);
+	set_backend_get(on_get);
 	wait_for_requests();
 }
 EOF

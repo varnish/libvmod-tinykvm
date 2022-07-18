@@ -90,7 +90,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 			auto vm_entry_addr = prog.entry_at(ProgramEntryIndex::ON_ERROR);
 			if (UNLIKELY(vm_entry_addr == 0x0))
 				throw std::runtime_error("The GET callback has not been registered");
-			vm.timed_vmcall(vm_entry_addr,
+			vm.timed_reentry(vm_entry_addr,
 				ERROR_HANDLING_TIMEOUT, farg[0], exception);
 
 			/* Make sure no SMP work is in-flight. */
@@ -157,8 +157,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				if (UNLIKELY(vm_entry_addr == 0x0))
 					throw std::runtime_error("The GET callback has not been registered");
 				vm.timed_vmcall(vm_entry_addr,
-					timeout, farg[0], farg[1],
-					(int) HDR_BEREQ, (int) HDR_BERESP);
+					timeout, farg[0]);
 			} else if (post->process_func == 0x0) {
 				/* Try to reduce POST mmap allocation */
 				vm.mmap_relax(post->address, post->capacity, post->length);
@@ -230,7 +229,8 @@ int kvm_backend_stream(struct backend_post *post,
 		const uint64_t g_addr = vm.mmap_allocate(data_len);
 		vm.copy_to_guest(g_addr, data_ptr, data_len);
 
-		/* Call the backend streaming function */
+		/* Call the backend streaming function.
+		   NOTE: We can use timed_reentry here after first call. */
 		const auto timeout = mi.tenant().config.max_time();
 		vm.timed_vmcall(mi.instance().entry_at(ProgramEntryIndex::BACKEND_STREAM),
 			timeout, (uint64_t) g_addr, (uint64_t) data_len,
