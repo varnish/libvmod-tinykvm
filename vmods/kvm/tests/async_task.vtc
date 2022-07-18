@@ -1,0 +1,96 @@
+varnishtest "KVM Backend: Basic async task test"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include <string.h>
+#include <stdio.h>
+#include "kvm_api.h"
+
+static int counter = 0;
+static void my_task(void *arg)
+{
+	(void) arg;
+	__sync_fetch_and_add(&counter, 1);
+}
+
+static void on_get(const char *url)
+{
+	static const char ctype[] = "text/plain";
+
+	if (strcmp(url, "/task") == 0) {
+		async_storage_task(my_task, NULL);
+		backend_response(200, ctype, sizeof(ctype)-1, "OK", 2);
+	}
+	char buffer[24];
+	snprintf(buffer, sizeof(buffer),
+		"Count: %d", counter);
+
+	backend_response(200, ctype, sizeof(ctype)-1, buffer, strlen(buffer));
+}
+
+int main()
+{
+	// With this enabled we can see the global memory of
+	// the storage VM without copying data out.
+	make_storage_memory_shared();
+
+	set_backend_get(on_get);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""{
+			"xpizza.com": {
+				"filename": "${tmpdir}/${testname}",
+				"key": "",
+				"group": "test"
+			}
+		}""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				bereq.url);
+	}
+} -start
+
+client c1 {
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Count: 0"
+	expect resp.status == 200
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Count: 0"
+	expect resp.status == 200
+
+	txreq -url "/task" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "OK"
+	expect resp.status == 200
+
+	delay 0.5
+
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Count: 1"
+	expect resp.status == 200
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Count: 1"
+	expect resp.status == 200
+} -run

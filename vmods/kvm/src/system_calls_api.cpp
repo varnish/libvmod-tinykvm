@@ -130,7 +130,7 @@ static void syscall_storage_task(vCPU& cpu, MachineInstance& inst)
 	} else {
 		/* XXX: Racy spam avoidance of async tasks. */
 		auto *prog = &inst.instance();
-		if (prog->m_timer_system.racy_count() < 40) {
+		if (prog->m_timer_system.racy_count() < STORAGE_TASK_MAX_TIMERS) {
 			regs.rax = prog->m_timer_system.add(
 				std::chrono::milliseconds(start),
 				[=](auto)
