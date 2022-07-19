@@ -2,6 +2,7 @@
 #include "kvm_live_update.h"
 
 #include <malloc.h>
+#include <stdio.h>
 #include "vcl.h"
 #include "vcc_if.h"
 

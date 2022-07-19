@@ -1,6 +1,5 @@
 #include "program_instance.hpp"
 #include "tenant_instance.hpp"
-#include "gettid.hpp"
 #include "settings.hpp"
 #include "varnish.hpp"
 #include <cstring>
