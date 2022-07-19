@@ -8,6 +8,7 @@ extern "C" {
 #include "vtim.h"
 #include "kvm_backend.h"
 }
+static constexpr bool VERBOSE_BACKEND = false;
 
 static void memory_error_handling(VRT_CTX, const tinykvm::MemoryException& e)
 {
@@ -147,6 +148,9 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 		auto& vm = machine.machine();
 		auto fut = slot->tp.enqueue(
 		[&] {
+			if constexpr (VERBOSE_BACKEND) {
+				printf("Begin backend GET %s\n", farg[0]);
+			}
 			kvm_ts(ctx->vsl, "ProgramCall", t_work, t_prev, VTIM_real());
 			/* Enforce that guest program calls the backend_response system call. */
 			machine.begin_backend_call();
@@ -179,6 +183,9 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			/* Make sure no SMP work is in-flight. */
 			vm.smp_wait();
 
+			if constexpr (VERBOSE_BACKEND) {
+				printf("Finish backend GET %s\n", farg[0]);
+			}
 			fetch_result(machine, result);
 
 			kvm_ts(ctx->vsl, "ProgramProcess", t_work, t_prev, VTIM_real());

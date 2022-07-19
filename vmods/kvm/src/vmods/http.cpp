@@ -42,6 +42,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		const uint64_t g_buffer = regs.rdx;
 		const int CONN_TIMEOUT = 5;
 		const int READ_TIMEOUT = 8;
+		constexpr uint64_t CURL_BUFFER_MAX = 1UL << 25; /* 32 MB */
 		constexpr bool VERBOSE_CURL = false;
 
 		/* URL */
@@ -84,7 +85,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		}
 
 		// XXX: Fixme, mmap is basic/unreliable
-		opres.content_addr = vcpu.machine().mmap();
+		opres.content_addr = vcpu.machine().mmap_allocate(CURL_BUFFER_MAX);
 		const bool is_post = (opres.post_addr != 0x0 && opres.post_buflen != 0x0);
 
 		if constexpr (VERBOSE_CURL) {
@@ -93,7 +94,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 
 		writeop op {
 			.machine = vcpu.machine(),
-			.dst   = vcpu.machine().mmap(),
+			.dst     = opres.content_addr,
 		};
 
 		CURL *curl = curl_easy_init();
@@ -166,9 +167,8 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		if (res == 0) {
 			/* Calculate content length */
 			opres.content_length = op.dst - opres.content_addr;
-			/* Adjust and set new mmap base */
-			op.dst += 0xFFF; op.dst &= ~0xFFFL;
-			vcpu.machine().mmap() = op.dst;
+			/* Adjust and set new mmap base. TODO: Log failed relaxations */
+			vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, opres.content_length);
 			/* Get response status and Content-Type */
 			res = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &opres.status);
 			const char* ctype = nullptr;
@@ -185,6 +185,9 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 				opres.ct_length = 0;
 			}
 			vcpu.machine().copy_to_guest(g_buffer, &opres, sizeof(opres));
+			if constexpr (VERBOSE_CURL) {
+				printf("cURL transfer complete, %u bytes\n", opres.content_length);
+			}
 			regs.rax = 0;
 		} else {
 			if constexpr (VERBOSE_CURL) {

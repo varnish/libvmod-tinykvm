@@ -6,6 +6,7 @@
 #include <tinykvm/rsp_client.hpp>
 
 namespace kvm {
+static constexpr bool VERBOSE_STORAGE_TASK = false;
 
 VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
 	const vrt_ctx* ctx, TenantInstance* ten, ProgramInstance* prog)
@@ -124,9 +125,15 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 	if (UNLIKELY(res_addr + res_size < res_addr))
 		return -1;
 
+	if constexpr (VERBOSE_STORAGE_TASK) {
+		printf("Storage task on main queue\n");
+	}
 	auto future = m_main_queue.enqueue(
 	[&] () -> long
 	{
+		if constexpr (VERBOSE_STORAGE_TASK) {
+			printf("-> Storage task on main queue ENTERED\n");
+		}
 		auto& stm = main_vm->machine();
 		uint64_t vaddr = stm.stack_address();
 
@@ -141,7 +148,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 		const uint64_t stm_bufaddr = vaddr;
 		stm.copy_to_guest(stm_bufaddr, buffers, n * sizeof(VirtBuffer));
 
-		const uint64_t new_stack = vaddr;
+		const uint64_t new_stack = vaddr & ~0xFL;
 
 		/* We need to use the CTX from the current program */
 		auto& inst = *src.get_userdata<MachineInstance>();
@@ -149,6 +156,10 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 		assert(main_vm->ctx());
 
 		try {
+			if constexpr (VERBOSE_STORAGE_TASK) {
+				printf("Storage task calling 0x%lX with stack 0x%lX\n",
+					func, new_stack);
+			}
 			stm.timed_reentry_stack(func, new_stack, STORAGE_TIMEOUT,
 				(uint64_t)n, (uint64_t)stm_bufaddr, (uint64_t)res_size);
 			/* Get the result buffer and length (capped to res_size) */
@@ -164,8 +175,19 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			/* If res_addr is zero, we will just return the
 			   length provided by storage as-is, to allow some
 			   communication without a buffer. */
-			return (res_addr != 0) ? st_res_size : regs.rsi;
-		} catch (...) {
+			const auto retval = (res_addr != 0) ? st_res_size : regs.rsi;
+
+			if constexpr (VERBOSE_STORAGE_TASK) {
+				printf("<- Storage task on main queue returning %llu to 0x%lX\n",
+					retval, st_res_buffer);
+			}
+			return retval;
+
+		} catch (const std::exception& e) {
+			if constexpr (VERBOSE_STORAGE_TASK) {
+				printf("<- Storage task on main queue failed: %s\n",
+					e.what());
+			}
 			return -1;
 		}
 	});
@@ -187,16 +209,28 @@ long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 			m_main_queue.enqueue(
 		[=] () -> long
 		{
+			if constexpr (VERBOSE_STORAGE_TASK) {
+				printf("-> Async task on main queue\n");
+			}
 			auto& stm = main_vm->machine();
 
 			/* This vmcall has no attached VRT_CTX. */
 			main_vm->set_ctx(nullptr);
 
 			try {
+				if constexpr (VERBOSE_STORAGE_TASK) {
+					printf("Calling 0x%lX\n", func);
+				}
 				stm.timed_reentry(func, ASYNC_STORAGE_TIMEOUT,
 					(uint64_t)arg);
+				if constexpr (VERBOSE_STORAGE_TASK) {
+					printf("<- Async task finished 0x%lX\n", func);
+				}
 				return 0;
-			} catch (...) {
+			} catch (const std::exception& e) {
+				if constexpr (VERBOSE_STORAGE_TASK) {
+					printf("<- Async task failure: %s\n", e.what());
+				}
 				return -1;
 			}
 		}));
@@ -206,6 +240,9 @@ long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 			m_main_async_queue.enqueue(
 		[=] () -> long
 		{
+			if constexpr (VERBOSE_STORAGE_TASK) {
+				printf("-> Async task on async queue\n");
+			}
 			auto& stm = main_vm->machine();
 
 			/* This vmcall has no attached VRT_CTX. */
@@ -216,9 +253,21 @@ long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 					main_vm_extra_cpu.reset(new tinykvm::vCPU);
 					main_vm_extra_cpu->smp_init(EXTRA_CPU_ID, stm);
 				}
-				stm.timed_reentry_stack(func, main_vm_extra_cpu_stack,
-					ASYNC_STORAGE_TIMEOUT,
-					(uint64_t)arg);
+				if constexpr (VERBOSE_STORAGE_TASK) {
+					printf("Calling 0x%lX with stack 0x%lX\n",
+						func, main_vm_extra_cpu_stack);
+				}
+				/* For the love of GOD don't try to change this to
+				   a timed_reentry_stack call *again*. This function
+				   specfically uses *main_vm_extra_cpu*. */
+				tinykvm::tinykvm_x86regs regs;
+				stm.setup_call(regs, func, main_vm_extra_cpu_stack, (uint64_t)arg);
+				//regs.rip = stm.reentry_address();
+				main_vm_extra_cpu->set_registers(regs);
+				main_vm_extra_cpu->run(ASYNC_STORAGE_TIMEOUT);
+				if constexpr (VERBOSE_STORAGE_TASK) {
+					printf("<- Async task finished 0x%lX\n", func);
+				}
 				return 0;
 			}
 			catch (const tinykvm::MachineException& me) {
@@ -247,15 +296,16 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 	{
 		try {
 			/* Serialize data in the old machine */
-			main_vm->set_ctx(ctx);
-			auto& old_machine = main_vm->machine();
-			old_machine.timed_vmcall(func, STORAGE_TIMEOUT);
-			/* Get serialized data */
-			auto regs = old_machine.registers();
-			auto data_addr = regs.rdi;
-			auto data_len  = regs.rsi;
-			if (data_addr + data_len < data_addr) {
-				return {0, 0};
+				main_vm->set_ctx(ctx);
+				auto &old_machine = main_vm->machine();
+				old_machine.timed_vmcall(func, STORAGE_TIMEOUT);
+				/* Get serialized data */
+				auto regs = old_machine.registers();
+				auto data_addr = regs.rdi;
+				auto data_len = regs.rsi;
+				if (data_addr + data_len < data_addr)
+				{
+					return {0, 0};
 			}
 			return {data_addr, data_len};
 		} catch (...) {
