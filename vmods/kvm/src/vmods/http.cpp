@@ -52,14 +52,21 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 
 		constexpr size_t CONTENT_TYPE_LEN = 128;
 		constexpr size_t CURL_FIELDS_NUM = 8;
+		struct curl_options {
+			uint64_t  interface;
+			uint64_t  unused;
+			int       tcp_fast_open;
+			uint32_t  resume_from;
+		};
 		struct opfields {
 			uint64_t addr[CURL_FIELDS_NUM];
 			uint16_t len[CURL_FIELDS_NUM];
 		};
 		struct opresult {
-			long status;
-			uint64_t post_buflen;
+			uint32_t status;
+			uint32_t post_buflen;
 			uint64_t post_addr;
+			uint64_t options;
 			uint64_t fields;
 			uint64_t content_addr;
 			uint32_t content_length;
@@ -114,6 +121,24 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			}
 		});
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &op);
+
+		/* Extra cURL options. */
+		if (opres.options != 0x0)
+		{
+			struct curl_options options;
+			inst.machine().copy_from_guest(&options, opres.options, sizeof(options));
+			/* Custom interface/source IP. */
+			if (options.interface != 0x0) {
+				char ifname[64];
+				inst.machine().copy_from_guest(ifname, options.interface, sizeof(ifname));
+				ifname[sizeof(ifname)-1] = 0;
+				curl_easy_setopt(curl, CURLOPT_INTERFACE, ifname);
+			}
+			/* Enable TCP Fast Open. */
+			if (options.tcp_fast_open) {
+				curl_easy_setopt(curl, CURLOPT_TCP_FASTOPEN, 1);
+			}
+		}
 
 		/* Request header fields. */
 		struct curl_slist *req_list = NULL;
@@ -170,7 +195,9 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			/* Adjust and set new mmap base. TODO: Log failed relaxations */
 			vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, opres.content_length);
 			/* Get response status and Content-Type */
-			res = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &opres.status);
+			long status;
+			res = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
+			opres.status = status;
 			const char* ctype = nullptr;
 			res = curl_easy_getinfo(curl, CURLINFO_CONTENT_TYPE, &ctype);
 			/* We have an expectation of at least CONTENT_TYPE_LEN bytes available for
