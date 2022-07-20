@@ -1,4 +1,4 @@
-varnishtest "KVM Backend: Basic live update test"
+varnishtest "KVM Backend: Basic storage test"
 
 shell {
 cat >${tmpdir}/${testname}.c <<-EOF
@@ -14,7 +14,7 @@ static void my_storage()
 
 static void my_backend(char *arg)
 {
-	storage_call0(my_storage);
+	storage_call(my_storage, NULL, 0, NULL, 0);
 
 	arg[11] = '0' + (counter % 10);
 

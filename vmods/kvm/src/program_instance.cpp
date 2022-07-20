@@ -152,8 +152,8 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 
 		/* We need to use the CTX from the current program */
 		auto& inst = *src.get_userdata<MachineInstance>();
-		main_vm->set_ctx(inst.ctx());
-		assert(main_vm->ctx());
+		//main_vm->set_ctx(inst.ctx());
+		//assert(main_vm->ctx());
 
 		try {
 			if constexpr (VERBOSE_STORAGE_TASK) {

@@ -36,5 +36,6 @@ add_vmod_tests(vmod_kvm kvm
 	tests/rotate_vcl.vtc
 	tests/stateful_storage.vtc
 	tests/stateful_buffered_storage.vtc
+	tests/storage_failure.vtc
 	#tests/max_work_memory.vtc
 )

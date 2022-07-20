@@ -1,0 +1,91 @@
+varnishtest "KVM Backend: Storage failure test"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include <string.h>
+#include "kvm_api.h"
+
+static void storage_test1() {
+    http_appendf(BERESP, "X-Hello: World", 14);
+}
+static void storage_test2() {
+	storage_call(storage_test2, NULL, 0, NULL, 0);
+}
+static void storage_test3(void *arg) {
+	storage_call(storage_test2, NULL, 0, NULL, 0);
+}
+static void storage_test4(void *arg) {
+	async_storage_task(storage_test4, NULL);
+}
+
+static void my_backend(const char *url)
+{
+	if (strcmp(url, "/1") == 0)
+		storage_call(storage_test1, NULL, 0, NULL, 0);
+	else if (strcmp(url, "/2") == 0)
+		storage_call(storage_test2, NULL, 0, NULL, 0);
+	else if (strcmp(url, "/3") == 0)
+		async_storage_task(storage_test3, NULL);
+	else if (strcmp(url, "/4") == 0)
+		async_storage_task(storage_test4, NULL);
+	else
+		asm("ud2");
+
+	const char ctype[] = "text/plain";
+	backend_response(200, ctype, sizeof(ctype)-1, "Hello World", 11);
+}
+
+int main()
+{
+	set_backend_get(my_backend);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""{
+			"xpizza.com": {
+				"filename": "${tmpdir}/${testname}",
+				"key": "",
+				"group": "test"
+			}
+		}""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				bereq.url);
+	}
+} -start
+
+client c1 {
+	txreq -url "/1" -hdr "Host: xpizza.com"
+	rxresp
+    expect resp.http.X-Hello == <undef>
+	expect resp.status == 200
+
+	txreq -url "/2" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 200
+
+	txreq -url "/3" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 200
+
+	txreq -url "/4" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 200
+} -run

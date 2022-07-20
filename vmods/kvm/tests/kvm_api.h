@@ -149,14 +149,13 @@ struct virtbuffer {
 };
 typedef void (*storage_func) (size_t n, struct virtbuffer[n], size_t res);
 
+/* Transfer an array to storage, transfer output into @dst. */
 extern long
-storage_call(storage_func, const void* src, size_t, void* dst, size_t);
+storage_call(storage_func, const void *src, size_t, void *dst, size_t);
 
+/* Transfer an array of buffers to storage, transfer output into @dst. */
 extern long
 storage_callv(storage_func, size_t n, const struct virtbuffer[n], void* dst, size_t);
-
-static inline long
-storage_call0(storage_func func) { return storage_call(func, NULL, 0, NULL, 0); }
 
 /* Create a task in storage that is scheduled to run next. The new
    task waits until other tasks are done before starting a new one,
