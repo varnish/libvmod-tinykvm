@@ -50,7 +50,7 @@ inline bool is_valid_index(const http* hp, unsigned idx) {
 inline http*
 get_http(VRT_CTX, int where)
 {
-	if (ctx == nullptr) {
+	if (UNLIKELY(ctx == nullptr)) {
 		throw std::runtime_error("Missing VRT_CTX in get_http");
 	}
 	struct http* hp = nullptr;

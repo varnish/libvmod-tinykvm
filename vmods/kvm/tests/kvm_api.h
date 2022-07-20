@@ -168,7 +168,17 @@ storage_call0(storage_func func) { return storage_call(func, NULL, 0, NULL, 0); 
    for race conditions!
    If it is a periodic task, it will return a task id. */
 extern long
-storage_task(void (*task)(void* arg), void* arg, int async, uint64_t start, uint64_t period);
+sys_storage_task(void (*task)(void* arg), void* arg, int async, uint64_t start, uint64_t period);
+
+/* Schedule a storage task to happen outside of request handling. */
+static inline long
+storage_task(void (*task)(void *arg), void *arg) { return sys_storage_task(task, arg, 0, 0, 0); }
+
+/* Schedule a storage task to happen at some point outside of request handling. */
+static inline long
+schedule_storage_task(void (*task)(void *arg), void *arg, float start, float period) {
+	return sys_storage_task(task, arg, 0, start * 1000, period * 1000);
+}
 
 /* Async storage tasks happen even while storage is entered somewhere
    else. It is a re-entrant call, so watch out for race conditions.
@@ -176,7 +186,7 @@ storage_task(void (*task)(void* arg), void* arg, int async, uint64_t start, uint
    very busy in ordinary requests, or you are fetching directly
    from Varnish where the request would try to enter storage. */
 static inline long
-async_storage_task(void (*task)(void *arg), void *arg) { return storage_task(task, arg, 1, 0, 0); }
+async_storage_task(void (*task)(void *arg), void *arg) { return sys_storage_task(task, arg, 1, 0, 0); }
 
 /* Stop a previously scheduled task. Returns TRUE on success. */
 extern long
@@ -421,9 +431,9 @@ asm(".global storage_callv\n" \
 "	out %eax, $0\n" \
 "   ret\n");
 
-asm(".global storage_task\n" \
-".type storage_task, function\n" \
-"storage_task:\n" \
+asm(".global sys_storage_task\n" \
+".type sys_storage_task, function\n" \
+"sys_storage_task:\n" \
 "	mov $0x10709, %eax\n" \
 "	out %eax, $0\n" \
 "   ret\n");
