@@ -53,9 +53,14 @@ ProgramInstance::ProgramInstance(
 				m_vmqueue.enqueue(&m_vms.back());
 			}
 		} catch (...) {
+			/* Make sure we signal that there is no program, if the
+			   program fails to intialize. */
+			main_vm = nullptr;
 			return -1;
 		}
 
+		/* We do not have a storage CTX after this point. */
+		main_vm->set_ctx(nullptr);
 		return 0;
 	});
 }
@@ -150,11 +155,6 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 
 		const uint64_t new_stack = vaddr & ~0xFL;
 
-		/* We need to use the CTX from the current program */
-		auto& inst = *src.get_userdata<MachineInstance>();
-		//main_vm->set_ctx(inst.ctx());
-		//assert(main_vm->ctx());
-
 		try {
 			if constexpr (VERBOSE_STORAGE_TASK) {
 				printf("Storage task calling 0x%lX with stack 0x%lX\n",
@@ -214,9 +214,6 @@ long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 			}
 			auto& stm = main_vm->machine();
 
-			/* This vmcall has no attached VRT_CTX. */
-			main_vm->set_ctx(nullptr);
-
 			try {
 				if constexpr (VERBOSE_STORAGE_TASK) {
 					printf("Calling 0x%lX\n", func);
@@ -244,9 +241,6 @@ long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 				printf("-> Async task on async queue\n");
 			}
 			auto& stm = main_vm->machine();
-
-			/* This vmcall has no attached VRT_CTX. */
-			main_vm->set_ctx(nullptr);
 
 			try {
 				if (!main_vm_extra_cpu) {

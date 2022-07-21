@@ -5,6 +5,7 @@ include(../vmod.cmake vmod)
 
 add_vmod(vmod_kvm vmod_kvm.vcc "KVM Userspace Emulator VMOD"
 	src/vmod_kvm.c
+	src/vmod_kvm_adns.c
 	src/kvm_backend.c
 	src/kvm_live_update.c
 	src/kvm_post.c

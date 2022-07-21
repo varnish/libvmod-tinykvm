@@ -55,6 +55,7 @@ if (NOT VARNISH_PLUS)
 else()
 	list (APPEND SOURCES
 		${LIBPATH}/libvarnish/binary_heap.c
+		${LIBPATH}/libvarnish/vjsn.c
 	)
 endif()
 
@@ -98,11 +99,11 @@ endforeach()
 set_source_files_properties(${VSC_COMPILED} PROPERTIES GENERATED TRUE)
 
 ## libvarnish library ##
-add_library(varnish ${SOURCES} ${VSC_COMPILED})
+add_library(varnish STATIC ${SOURCES} ${VSC_COMPILED})
 target_include_directories(varnish PUBLIC ${VARNISHD_PATH})
 target_include_directories(varnish PUBLIC ${VARNISH_PATH}/include)
 target_include_directories(varnish PUBLIC ${CONFIG_PATH})
-target_include_directories(varnish PUBLIC ${CMAKE_BINARY_DIR})
+target_include_directories(varnish PUBLIC ${CMAKE_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 target_compile_definitions(varnish PUBLIC _XOPEN_SOURCE=700)
 target_compile_definitions(varnish PUBLIC VARNISH_STATE_DIR="${VSTATE_DIR}")
 target_compile_definitions(varnish PUBLIC VARNISH_VMOD_DIR="${VMOD_DIR}")

@@ -43,6 +43,8 @@ within a virtual machine.
 API
 ===
 
+$Event vmod_event
+
 $Function VOID load_tenants(PRIV_VCL, STRING filename)
 
 - Load tenants from file

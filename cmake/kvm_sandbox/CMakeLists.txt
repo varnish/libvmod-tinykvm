@@ -3,9 +3,10 @@ project (kvm_sandbox CXX)
 
 option(SHARED_KVM "Build the KVM sandbox PIC" ON)
 option(KVM_FACEDETECTION "" OFF)
+option(KVM_ADNS "" OFF)
 
 # WARNING: everything!
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++20 -O2 -g")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++20 -O2 -g3")
 
 set(KVM_SOURCES
 	src/backend.cpp
@@ -29,6 +30,11 @@ set(KVM_SOURCES
 if (KVM_FACEDETECTION)
 	list(APPEND KVM_SOURCES
 		src/vmods/facedetect.cpp
+	)
+endif()
+if (KVM_ADNS)
+	list(APPEND KVM_SOURCES
+		src/adns.cpp
 	)
 endif()
 
@@ -57,6 +63,10 @@ target_link_libraries(kvm_sandbox PRIVATE tinykvm curl concurrentqueue nlohmann_
 if (SHARED_KVM)
 	set_property(TARGET tinykvm PROPERTY POSITION_INDEPENDENT_CODE 1)
 	set_property(TARGET kvm_sandbox PROPERTY POSITION_INDEPENDENT_CODE 1)
+endif()
+if (KVM_ADNS)
+	target_link_libraries(kvm_sandbox PRIVATE adns)
+	target_compile_definitions(kvm_sandbox PRIVATE VMOD_EVENT_ENABLED=1)
 endif()
 if (DEBUGGING)
     target_compile_options(tinykvm PUBLIC -O0 -ggdb3)
