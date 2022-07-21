@@ -31,6 +31,7 @@ public:
 	static constexpr size_t  DIRECTOR_MAX = 32;
 	static constexpr size_t  RESULTS_MAX  = 3;
 
+	void print(std::string_view text);
 	void dynamic_call(uint32_t hash);
 
 	auto& regex() { return m_regex; }
@@ -91,7 +92,7 @@ private:
 	void handle_timeout(gaddr_t);
 	void sanitize_path(char*, size_t);
 	void sanitize_file(char*, size_t);
-	tinykvm::Machine::printer_func get_vsl_printer() const;
+	tinykvm::Machine::printer_func get_vsl_printer();
 
 	const vrt_ctx* m_ctx;
 	machine_t m_machine;
@@ -102,7 +103,7 @@ private:
 	bool        m_waiting_for_requests = false;
 	bool        m_backend_response_called = false;
 	bool        m_global_shared_memory = false;
-	uint16_t    m_result = 0;
+	bool        m_last_newline = true;
 	gaddr_t     m_sighandler = 0;
 	VSHA256Context* m_sha_ctx = nullptr;
 

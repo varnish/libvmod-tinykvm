@@ -1,5 +1,6 @@
 #include "machine_instance.hpp"
 #include "tenant_instance.hpp"
+#include "settings.hpp"
 #include "varnish.hpp"
 extern "C" int close(int);
 extern void setup_kvm_system_calls();
@@ -48,9 +49,8 @@ void MachineInstance::initialize()
 		   This calculation results in a panic when the stack is
 		   below the program and heap. Workaround: Move above.
 		   TOOD: Make sure we have room for it, using memory limits. */
-		static const size_t stack_size = 0x200000; /* 2MB */
-		auto stack = machine().mmap_allocate(stack_size);
-		machine().set_stack_address(stack + stack_size);
+		auto stack = machine().mmap_allocate(MAIN_STACK_SIZE);
+		machine().set_stack_address(stack + MAIN_STACK_SIZE);
 		// Build stack, auxvec, envp and program arguments
 		machine().setup_linux(
 			{"vmod_kvm", name(), TenantConfig::guest_state_file},
@@ -190,7 +190,16 @@ uint64_t MachineInstance::shared_memory_size() const noexcept
 	return tenant().config.group.shared_memory << 20u;
 }
 
-tinykvm::Machine::printer_func MachineInstance::get_vsl_printer() const
+void MachineInstance::print(std::string_view text)
+{
+	if (this->m_last_newline) {
+		printf(">>> [%s] %.*s", name().c_str(), (int)text.size(), text.begin());
+	} else {
+		printf("%.*s", (int)text.size(), text.begin());
+	}
+	this->m_last_newline = (text.back() == '\n');
+}
+tinykvm::Machine::printer_func MachineInstance::get_vsl_printer()
 {
 	/* NOTE: Guests will "always" end with newlines */
 	return [this] (const char* buffer, size_t len) {
@@ -198,7 +207,7 @@ tinykvm::Machine::printer_func MachineInstance::get_vsl_printer() const
 		if (buffer + len < buffer || len == 0)
 			return;
 		if (this->ctx()) {
-			/* Simultaneous printing is not possible with SMP. */
+			/* Simultaneous logging is not possible with SMP. */
 			const bool smp = machine().smp_active();
 			auto* vsl = this->ctx()->vsl;
 			if (vsl != nullptr && !smp) {
@@ -207,7 +216,7 @@ tinykvm::Machine::printer_func MachineInstance::get_vsl_printer() const
 				return;
 			}
 		}
-		printf("%s says: %.*s", name().c_str(), (int)len, buffer);
+		this->print({buffer, len});
 	};
 }
 

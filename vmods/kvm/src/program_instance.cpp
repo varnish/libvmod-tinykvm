@@ -339,7 +339,7 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 				new_machine.copy_from_machine(
 					res_data, old_machine, from.data, res_size);
 				/* Resume the new machine, allowing it to deserialize data */
-				new_machine.run(2.0);
+				new_machine.run(STORAGE_DESERIALIZE_TIMEOUT);
 				return res_size;
 			}
 			return 0;

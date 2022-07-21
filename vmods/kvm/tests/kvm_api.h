@@ -202,10 +202,26 @@ storage_return_nothing(void) { storage_return(NULL, 0); }
    all VMs, and reads/writes are immediately seen
    by both storage and request VMs. */
 struct shared_memory_info {
-	void* ptr;
-	uint64_t size;
+	uint64_t ptr;
+	uint64_t end;
 };
 extern struct shared_memory_info shared_memory_area();
+
+/* Allocate pointers to shared memory with given size and alignment. */
+#define SHM_ALLOC_BYTES(x) internal_shm_alloc(x, 8)
+#define SHM_ALLOC_TYPE(x) internal_shm_alloc(sizeof(x), _Alignof(x))
+static inline void * internal_shm_alloc(size_t size, size_t align) {
+	static struct shared_memory_info info;
+	if (info.ptr == 0x0) {
+		info = shared_memory_area();
+	}
+	char *p = (char *)((info.ptr + (align-1)) & ~(uint64_t)(align-1));
+	info.ptr = (uint64_t)&p[size];
+	if ((uint64_t)p + size <= info.end)
+		return p;
+	else
+		return NULL;
+}
 
 /* If called during main() routine, it will cause
    global memory to be fully shared among everyone,

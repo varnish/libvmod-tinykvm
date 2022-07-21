@@ -62,7 +62,7 @@ static void syscall_shared_memory(vCPU& cpu, MachineInstance& inst)
 {
 	auto regs = cpu.registers();
 	regs.rax = inst.shared_memory_boundary();
-	regs.rdx = inst.shared_memory_size();
+	regs.rdx = inst.shared_memory_boundary() + inst.shared_memory_size();
 	cpu.set_registers(regs);
 }
 
