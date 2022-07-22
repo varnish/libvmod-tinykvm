@@ -108,14 +108,14 @@ static void error_handling(kvm::VMPoolItem* slot,
 		VSLb(ctx->vsl, SLT_Error,
 			"%s: Backend VM timed out (%f seconds)",
 			machine.name().c_str(), mte.seconds());
+	} catch (const tinykvm::MemoryException& e) {
+		memory_error_handling(ctx, e);
 	} catch (const tinykvm::MachineException& e) {
 		fprintf(stderr, "%s: Backend VM exception: %s (data: 0x%lX)\n",
 			machine.name().c_str(), e.what(), e.data());
 		VSLb(ctx->vsl, SLT_Error,
 			"%s: Backend VM exception: %s (data: 0x%lX)",
 			machine.name().c_str(), e.what(), e.data());
-	} catch (const tinykvm::MemoryException& e) {
-		memory_error_handling(ctx, e);
 	} catch (const std::exception& e) {
 		fprintf(stderr, "Backend VM exception: %s\n", e.what());
 		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
@@ -202,16 +202,16 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			machine.name().c_str(), mte.seconds());
 		/* Try again if on_error has been set, otherwise 500. */
 		error_handling(slot, farg, result, mte.what());
+	} catch (const tinykvm::MemoryException& e) {
+		memory_error_handling(ctx, e);
+		/* Try again if on_error has been set, otherwise 500. */
+		error_handling(slot, farg, result, e.what());
 	} catch (const tinykvm::MachineException& e) {
 		fprintf(stderr, "%s: Backend VM exception: %s (data: 0x%lX)\n",
 			machine.name().c_str(), e.what(), e.data());
 		VSLb(ctx->vsl, SLT_Error,
 			"%s: Backend VM exception: %s (data: 0x%lX)",
 			machine.name().c_str(), e.what(), e.data());
-		/* Try again if on_error has been set, otherwise 500. */
-		error_handling(slot, farg, result, e.what());
-	} catch (const tinykvm::MemoryException& e) {
-		memory_error_handling(ctx, e);
 		/* Try again if on_error has been set, otherwise 500. */
 		error_handling(slot, farg, result, e.what());
 	} catch (const std::exception& e) {
@@ -248,14 +248,14 @@ int kvm_backend_stream(struct backend_post *post,
 		auto regs = vm.registers();
 		return (regs.rdi == (uint64_t)data_len) ? 0 : -1;
 
+	} catch (const tinykvm::MemoryException& e) {
+		memory_error_handling(post->ctx, e);
 	} catch (const tinykvm::MachineException& e) {
 		fprintf(stderr, "Backend VM exception: %s (data: 0x%lX)\n",
 			e.what(), e.data());
 		VSLb(post->ctx->vsl, SLT_Error,
 			"Backend VM exception: %s (data: 0x%lX)",
 			e.what(), e.data());
-	} catch (const tinykvm::MemoryException& e) {
-		memory_error_handling(post->ctx, e);
 	} catch (const std::exception& e) {
 		fprintf(stderr, "Backend VM exception: %s\n", e.what());
 		VSLb(post->ctx->vsl, SLT_Error,
