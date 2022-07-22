@@ -10,15 +10,13 @@ static void syscall_register_func(vCPU& cpu, MachineInstance& inst)
 {
 	// Register callback function for tenant
 	auto regs = cpu.registers();
-	//printf("register_func: Function %lld is now 0x%llX\n",
-	//	regs.rdi, regs.rsi);
 	const uint64_t KERNEL_END = cpu.machine().kernel_end_address();
 	if (UNLIKELY(regs.rsi < KERNEL_END)) {
+		fprintf(stderr, "register_func: Function %lld is now 0x%llX\n",
+				regs.rdi, regs.rsi);
 		throw std::runtime_error("Invalid address for register_func provided");
 	}
 	inst.instance().set_entry_at(regs.rdi, regs.rsi);
-	regs.rax = 0;
-	cpu.set_registers(regs);
 }
 static void syscall_wait_for_requests(vCPU& cpu, MachineInstance& inst)
 {

@@ -51,6 +51,8 @@ void MachineInstance::initialize()
 		   TOOD: Make sure we have room for it, using memory limits. */
 		auto stack = machine().mmap_allocate(MAIN_STACK_SIZE);
 		machine().set_stack_address(stack + MAIN_STACK_SIZE);
+		//printf("Heap BRK: 0x%lX -> 0x%lX\n", machine().heap_address(), machine().heap_address() + tinykvm::Machine::BRK_MAX);
+		//printf("Stack: 0x%lX -> 0x%lX\n", stack, stack + MAIN_STACK_SIZE);
 		// Build stack, auxvec, envp and program arguments
 		machine().setup_linux(
 			{"vmod_kvm", name(), TenantConfig::guest_state_file},
@@ -74,7 +76,7 @@ void MachineInstance::initialize()
 		// Set new vmcall stack base lower than current RSP, in
 		// order to avoid trampling stack-allocated things in main.
 		auto rsp = machine().registers().rsp;
-		rsp &= ~0xFLL;
+		rsp = (rsp - 128UL) & ~0xFLL; // Avoid red-zone if main is leaf
 		machine().set_stack_address(rsp);
 
 		printf("Program for tenant %s is loaded\n", name().c_str());
