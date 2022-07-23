@@ -1,3 +1,23 @@
+/**
+ * @file kvm_backend.c
+ * @author Alf-André Walla (fwsgonzo@hotmail.com)
+ * @brief
+ * @version 0.1
+ * @date 2022-07-23
+ *
+ *
+ * This file contains all the glue between Varnish backend functionality
+ * and the VMOD KVM tenant VMs. Here we create a backend that can POST
+ * data into a tenants VM and then extract data from and return that as
+ * a HTTP response.
+ *
+ * The vmod_vm_backend function is the VCL function that selected VMOD KVM
+ * as a backend for a specific URL, usually tied to a Host header field.
+ * Once selected, Varnish will eventually switch over to the backend side,
+ * by activating a backend worker thread, and then invoke the function
+ * registered by the .gethdrs callback. That is, kvmbe_gethdrs.
+ *
+ */
 #include "vmod_kvm.h"
 
 #include "kvm_backend.h"
@@ -32,7 +52,7 @@ kvmbe_finish(const struct director *dir, struct worker *wrk, struct busyobj *bo)
 }
 
 static enum vfp_status v_matchproto_(vfp_pull_f)
-pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
+kvmfp_pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 {
 	CHECK_OBJ_NOTNULL(vc, VFP_CTX_MAGIC);
 	CHECK_OBJ_NOTNULL(vfe, VFP_ENTRY_MAGIC);
@@ -81,7 +101,7 @@ pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 
 static const struct vfp kvm_fetch_processor = {
 	.name = "kvm_backend",
-	.pull = pull,
+	.pull = kvmfp_pull,
 };
 
 static void
@@ -109,8 +129,8 @@ kvmbe_gethdrs(const struct director *dir,
 	CHECK_OBJ_NOTNULL(bo->beresp, HTTP_MAGIC);
 	AZ(bo->htc);
 
-	/* Produce backend response */
-	struct vmod_kvm_response *kvmr;
+	/* Retrieve info from struct filled by VCL vm_backend(...) call. */
+	struct vmod_kvm_backend *kvmr;
 	CAST_OBJ_NOTNULL(kvmr, dir->priv, KVM_BACKEND_MAGIC);
 
 	const struct vrt_ctx ctx = {
@@ -127,6 +147,8 @@ kvmbe_gethdrs(const struct director *dir,
 	kvmr->t_prev = bo->t_prev;
 	kvm_ts(ctx.vsl, "TenantStart", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 
+	/* The backend_result contains many iovec-like buffers needed for
+	   extracting data from the VM without copying to a temporary buffer. */
 	struct backend_result *result =
 		(struct backend_result *)WS_Alloc(bo->ws, VMBE_RESULT_SIZE);
 	if (result == NULL) {
@@ -135,6 +157,9 @@ kvmbe_gethdrs(const struct director *dir,
 	}
 	result->bufcount = VMBE_NUM_BUFFERS;
 
+	/* Reserving a VM means putting ourselves in a concurrent queue
+	   waiting for a free VM, and then getting exclusive access until
+	   the end of the request. */
 	struct vmod_kvm_slot *slot =
 		kvm_reserve_machine(&ctx, kvmr->tenant, false);
 	if (slot == NULL) {
@@ -144,11 +169,12 @@ kvmbe_gethdrs(const struct director *dir,
 	kvm_ts(ctx.vsl, "TenantReserve", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 
 	struct backend_post *post = NULL;
-	/* The HTTP method is stored in the first header field. */
+	/* The HTTP method is stored in the first header field.
+	   We may want to change the API, passing the method as argument. */
 	const bool is_post = strcmp(bo->bereq->hd[0].b, "POST") == 0;
 	if (is_post)
 	{
-		/* Retrieve body by copying directly into backend VM */
+		/* Retrieve body by copying directly into backend VM. */
 		post = (struct backend_post *)WS_Alloc(bo->ws, sizeof(struct backend_post));
 		if (post == NULL) {
 			VSLb(ctx.vsl, SLT_Error, "KVM: Out of workspace for post");
@@ -164,14 +190,14 @@ kvmbe_gethdrs(const struct director *dir,
 		kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 	}
 
-	/* Make a backend VM call (with optional POST) */
+	/* Make a backend VM call (with optional POST). */
 	kvm_backend_call(&ctx, slot, kvmr->funcarg, post, result);
 	kvm_ts(ctx.vsl, "TenantProcess", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 
-	/* Status code is sanitized in the backend call */
+	/* Status code is sanitized in the backend call. */
 	http_PutResponse(bo->beresp, "HTTP/1.1", result->status, NULL);
 
-	/* Allow missing content-type when no content present */
+	/* Explicitly set content-type when content present. */
 	if (result->content_length > 0)
 	{
 		http_PrintfHeader(bo->beresp, "Content-Type: %.*s",
@@ -180,10 +206,12 @@ kvmbe_gethdrs(const struct director *dir,
 			"Content-Length: %zu", result->content_length);
 	}
 
+	/* TODO: Tie Last-Modified to content? */
 	char timestamp[VTIM_FORMAT_SIZE];
 	VTIM_format(VTIM_real(), timestamp);
 	http_PrintfHeader(bo->beresp, "Last-Modified: %s", timestamp);
 
+	/* HTTP connection of BusyObj on workspace. */
 	bo->htc = WS_Alloc(bo->ws, sizeof *bo->htc);
 	if (bo->htc == NULL) {
 		VSLb(ctx.vsl, SLT_Error, "KVM: Out of workspace for HTC");
@@ -191,29 +219,31 @@ kvmbe_gethdrs(const struct director *dir,
 	}
 	INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
 
-	/* store the result in workspace and free result */
+	/* Store the result in workspace and free result. */
 	bo->htc->content_length = result->content_length;
 	bo->htc->priv = (void *)result;
 	bo->htc->body_status = BS_LENGTH;
 
+	/* Initialize fetch processor, which will retrieve the data from
+	   the VM, buffer by buffer, and send it to Varnish storage.
+	   See: kvmfp_pull */
 	vfp_init(bo);
 	kvm_ts(ctx.vsl, "TenantResponse", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 	return (0);
 }
 
-static struct vmod_kvm_response *
+static struct vmod_kvm_backend *
 kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant,
 	VCL_STRING url)
 {
-	struct vmod_kvm_response *kvmr;
-	kvmr = WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_response));
+	struct vmod_kvm_backend *kvmr;
+	kvmr = WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_backend));
 	if (kvmr == NULL) {
 		VRT_fail(ctx, "KVM: Out of workspace");
 		return (NULL);
 	}
 
 	INIT_OBJ(kvmr, KVM_BACKEND_MAGIC);
-	kvmr->priv_key = ctx;
 	kvmr->t_work = VTIM_real();
 
 	kvmr->tenant = kvm_tenant_find(task, tenant);
@@ -243,7 +273,7 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
-	struct vmod_kvm_response *kvmr =
+	struct vmod_kvm_backend *kvmr =
 		kvm_response_director(ctx, task, tenant, url);
 
 	if (kvmr != NULL) {

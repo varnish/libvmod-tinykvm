@@ -1,3 +1,19 @@
+/**
+ * @file vmod_kvm.c
+ * 
+ * @author Alf-André Walla (fwsgonzo@hotmail.com)
+ * @brief 
+ * @version 0.1
+ * @date 2022-07-23
+ * 
+ * This file is the entry point for all VMOD KVM interaction with VCL.
+ * The starting point is often kvm.embed_tenants, which is implemented
+ * as vmod_embed_tenants by the VCC generator script.
+ * 
+ * The second most important function is vm_backend, which is implemented
+ * in kvm_backend.c, with the entry point at the bottom.
+ * 
+ */
 #include "vmod_kvm.h"
 
 # include <vsb.h>

@@ -1,3 +1,19 @@
+/**
+ * @file tenant_instance.cpp
+ * @author Alf-André Walla (fwsgonzo@hotmail.com)
+ * @brief Live tenant configuration and programs.
+ * @version 0.1
+ * @date 2022-07-23
+ * 
+ * Contains the current program and debug-program for a tenant.
+ * Both programs can be hot-swapped during execution at any time,
+ * and atomic ref-counting is used to make sure that every request
+ * keeps it alive until completion.
+ * 
+ * Also contains tenant configuration, which includes things like
+ * timeouts, memory limits and other settings.
+ * 
+**/
 #include "tenant_instance.hpp"
 
 #include "common_defs.hpp"

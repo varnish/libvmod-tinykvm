@@ -1,3 +1,14 @@
+/**
+ * @file kvm_post.c
+ * @author Alf-André Walla (fwsgonzo@hotmail.com)
+ * @brief Callbacks for Varnish POST body aggregation.
+ * @version 0.1
+ * @date 2022-07-23
+ * 
+ * Routines for retrieving POST bodies either all at once, or
+ * in parts (streaming POST).
+ * 
+ */
 #include "vmod_kvm.h"
 
 #include "kvm_backend.h"

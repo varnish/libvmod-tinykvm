@@ -1,3 +1,17 @@
+/**
+ * @file machine_instance.cpp
+ * @author Alf-André Walla (fwsgonzo@hotmail.com)
+ * @brief TinyKVM and API wrapper for tenant programs.
+ * @version 0.1
+ * @date 2022-07-23
+ * 
+ * Responsible for wrapping the TinyKVM VMM and guest program
+ * functions and API. A MachineInstance is always run inside a
+ * specific thread pool with one thread, in order to guarantee
+ * that it is running in the thread it was created in. This is
+ * a requirement by KVM. 
+ * 
+**/
 #include "machine_instance.hpp"
 #include "tenant_instance.hpp"
 #include "settings.hpp"

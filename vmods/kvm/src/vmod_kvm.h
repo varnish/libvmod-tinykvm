@@ -1,8 +1,6 @@
 #pragma once
 #include <stdint.h>
 
-#include "vtree.h"
-
 #include "cache/cache_varnishd.h"
 #include "cache/cache_director.h"
 #include "cache/cache_filter.h"
@@ -15,15 +13,6 @@ typedef struct vmod_priv * VCL_PRIV;
 #define KVM_FORK_DEBUG     1
 
 
-struct vmod_kvm_backend
-{
-	uint64_t magic;
-
-	uint64_t max_time;
-
-	struct director dir;
-};
-
 struct vmod_kvm_updater
 {
 	uint64_t magic;
@@ -35,12 +24,11 @@ struct vmod_kvm_updater
 	uint16_t debug_port;
 };
 
-struct vmod_kvm_response
+struct vmod_kvm_backend
 {
 	uint64_t magic;
 	struct director dir;
 
-	const void *priv_key;
 	struct vmod_kvm_tenant *tenant;
 	const char *funcarg[2];
 	uint64_t max_response_size;

@@ -1,3 +1,15 @@
+/**
+ * @file backend.cpp
+ * @author Alf-André Walla (fwsgonzo@hotmail.com)
+ * @brief Glue between C and C++ for KVM backends.
+ * @version 0.1
+ * @date 2022-07-23
+ * 
+ * The main functions for handling backend GET, POST and streaming
+ * POST methods. All errors thrown inside the library are ultimately
+ * handled here.
+ * 
+**/
 #include "tenant_instance.hpp"
 #include "program_instance.hpp"
 #include "settings.hpp"
@@ -33,7 +45,7 @@ static int16_t sanitize_status_code(int16_t code)
 	if (LIKELY(code >= 200 && code < 600))
 		return code;
 	[[unlikely]]
-	throw tinykvm::MachineException("Invalid status code returned by VM program", code);
+	throw tinykvm::MachineException("Invalid HTTP status code returned by program", code);
 }
 
 static inline void kvm_ts(struct vsl_log *vsl, const char *event,

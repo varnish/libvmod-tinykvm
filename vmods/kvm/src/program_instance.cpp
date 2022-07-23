@@ -1,3 +1,24 @@
+/**
+ * @file program_instance.cpp
+ * @author Alf-André Walla (fwsgonzo@hotmail.com)
+ * @brief Wrapper for a live instance of a KVM program.
+ * @version 0.1
+ * @date 2022-07-23
+ *
+ * A program instance wraps all the features of a single program
+ * into one structure that can be hot-swapped at run-time. The
+ * features include the program, the thread pool used to communicate
+ * with the program. The binary and main VM (used as storage), the
+ * TP for communicating with main VM. A timer system for handling
+ * async tasks (into storage), and stuff needed to live-debug the
+ * program.
+ * 
+ * There is also a separate vCPU (with TP) for fully asynchronous
+ * tasks that can use storage at the same time as requests. It is
+ * recommended to use the asynchronous vCPU only for safe things
+ * like fetching from Varnish in order to produce content.
+ * 
+**/
 #include "program_instance.hpp"
 #include "tenant_instance.hpp"
 #include "settings.hpp"
