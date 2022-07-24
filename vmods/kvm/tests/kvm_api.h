@@ -30,12 +30,12 @@ extern void register_func(int, ...);
  * The system will then pause the VM and freeze everything. The frozen state
  * will be restored on every request.
  *
- * Register callbacks for various modes of operations:
+ * Register callbacks for various modes of operation:
  **/
 static inline void set_on_recv(void(*f)(const char*)) { register_func(0, f); }
 static inline void set_backend_get(void(*f)(const char*)) { register_func(1, f); }
 static inline void set_backend_post(void(*f)(const char*, const uint8_t*, size_t)) { register_func(2, f); }
-static inline void set_backend_stream_post(long(*f)(const uint8_t*, size_t)) { register_func(3, f); }
+static inline void set_backend_stream_post(long(*f)(const char* arg, const uint8_t* data, size_t len, size_t off)) { register_func(3, f); }
 
 /* When uploading a new program, there is an opportunity to pass on
    state to the next program, using the live update and restore callbacks. */

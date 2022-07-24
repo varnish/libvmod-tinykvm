@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 static const uint64_t POST_BUFFER = (1UL << 28); /* 256MB */
 
 struct VMBuffer {
@@ -22,6 +24,5 @@ struct backend_post {
 	uint64_t address;
 	uint64_t capacity;
 	size_t length;
-	uint64_t process_func;
-	uint64_t func;
+	const char *argument;
 };

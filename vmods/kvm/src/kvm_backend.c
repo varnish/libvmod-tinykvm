@@ -30,7 +30,7 @@
 extern uint64_t kvm_allocate_memory(KVM_SLOT, uint64_t bytes);
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
 	const char *farg[2], struct backend_post *, struct backend_result *);
-extern void kvm_get_body(struct backend_post *, struct busyobj *);
+extern int kvm_get_body(struct backend_post *, struct busyobj *);
 
 static void v_matchproto_(vdi_panic_f)
 kvmbe_panic(const struct director *dir, struct vsb *vsb)
@@ -185,8 +185,12 @@ kvmbe_gethdrs(const struct director *dir,
 		post->address = kvm_allocate_memory(slot, POST_BUFFER); /* Buffer bytes */
 		post->capacity = POST_BUFFER;
 		post->length  = 0;
-		post->process_func = 0x0;
-		kvm_get_body(post, bo);
+		post->argument = kvmr->funcarg[0];
+		int ret = kvm_get_body(post, bo);
+		if (ret < 0) {
+			VSLb(ctx.vsl, SLT_Error, "KVM: Unable to aggregate POST data");
+			return (-1);
+		}
 		kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 	}
 

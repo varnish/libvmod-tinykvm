@@ -3,24 +3,36 @@ varnishtest "KVM Backend: Basic POST test"
 shell {
 cat >${tmpdir}/${testname}.c <<-EOF
 #include "kvm_api.h"
+#include <assert.h>
+#include <string.h>
 
 static void on_get(const char *url)
 {
-	set_cacheable(0, 1.0f);
-	backend_response_str(200, "text/plain", url);
+	assert(0);
 }
-static void on_post(const char *url, const char *data, size_t len)
+static void on_post(const char *url, const unsigned char *data, size_t len)
 {
+	assert(strcmp(url, "/arg") == 0);
+
 	if (strcmp("Hello World", data) == 0)
 		backend_response_str(200, "text/plain", "OK");
 	else
 		backend_response_str(401, "text/plain", "Not OK");
+}
+static long on_stream(const char *url, const unsigned char *data, size_t len, size_t offset)
+{
+	assert(strcmp(url, "/arg") == 0);
+	assert(memcmp(data, "Hello World", len) == 0);
+	assert(len == 11);
+	assert(offset == 0);
+	return len;
 }
 
 int main(int argc, char **argv)
 {
 	set_backend_get(on_get);
 	set_backend_post(on_post);
+	set_backend_stream_post(on_stream);
 	wait_for_requests();
 }
 EOF
@@ -54,7 +66,7 @@ vcl 4.1;
 } -start
 
 client c1 {
-	txreq -url "/" -req POST -hdr "Host: xpizza.com" -body "Hello World"
+	txreq -url "/arg" -req POST -hdr "Host: xpizza.com" -body "Hello World"
 	rxresp
 	expect resp.status == 200
 	expect resp.body == "OK"

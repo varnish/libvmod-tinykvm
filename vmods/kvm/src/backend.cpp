@@ -24,7 +24,7 @@ static constexpr bool VERBOSE_BACKEND = false;
 
 static void memory_error_handling(VRT_CTX, const tinykvm::MemoryException& e)
 {
-	if (e.addr() < 0x100) { /* Null-pointer speculation */
+	if (e.addr() < 0x500) { /* Null-pointer speculation */
 	fprintf(stderr,
 		"Backend VM memory exception: %s (addr: 0x%lX, size: 0x%lX)\n",
 		e.what(), e.addr(), e.size());
@@ -236,7 +236,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 
 extern "C"
 int kvm_backend_stream(struct backend_post *post,
-	const void* data_ptr, ssize_t data_len, int last)
+	const void* data_ptr, ssize_t data_len)
 {
 	assert(post && post->slot);
 	auto& slot = *(kvm::VMPoolItem *)post->slot;
@@ -245,20 +245,35 @@ int kvm_backend_stream(struct backend_post *post,
 		auto& vm = mi.machine();
 
 		/* Copy the data segment into VM */
-		const uint64_t g_addr = vm.mmap_allocate(data_len);
-		vm.copy_to_guest(g_addr, data_ptr, data_len);
+		vm.copy_to_guest(post->address, data_ptr, data_len);
 
-		/* Call the backend streaming function.
-		   NOTE: We can use timed_reentry here after first call. */
-		const auto timeout = mi.tenant().config.max_time();
-		vm.timed_vmcall(mi.program().entry_at(ProgramEntryIndex::BACKEND_STREAM),
-			timeout, (uint64_t) g_addr, (uint64_t) data_len,
-			(uint64_t) post->length, !!last);
+		/* Call the backend streaming function, if set. */
+		const auto call_addr =
+			mi.program().entry_at(ProgramEntryIndex::BACKEND_STREAM);
+		if (call_addr != 0x0) {
+			const auto timeout = mi.tenant().config.max_time();
+			if (post->length == 0) {
+				vm.timed_vmcall(call_addr, timeout,
+					post->argument,
+					(uint64_t)post->address, (uint64_t)data_len,
+					(uint64_t)post->length);
+			} else {
+				vm.timed_reentry(call_addr, timeout,
+					post->argument,
+					(uint64_t)post->address, (uint64_t)data_len,
+					(uint64_t)post->length);
+			}
 
-		/* Verify that the VM consumed all the bytes.
-		   RDI gets set by the exit system call, AX is trampled. */
-		auto regs = vm.registers();
-		return (regs.rdi == (uint64_t)data_len) ? 0 : -1;
+			/* Increment POST length *after* VM call. */
+			post->length += data_len;
+
+			/* Verify that the VM consumed all the bytes. */
+			return ((ssize_t)vm.return_value() == data_len) ? 0 : -1;
+		}
+
+		/* Increment POST length, no VM call. */
+		post->length += data_len;
+		return 0;
 
 	} catch (const tinykvm::MemoryException& e) {
 		memory_error_handling(post->ctx, e);
