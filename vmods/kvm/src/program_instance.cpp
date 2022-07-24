@@ -138,7 +138,7 @@ Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 		mi->tail_reset();
 		// Signal waiters that slot is ready again
 		// If there any waiters, they keep the program referenced
-		mi->instance().m_vmqueue.enqueue(slot);
+		mi->program().m_vmqueue.enqueue(slot);
 		// Last action: Unassign program, which can destruct the program
 		slot->prog_ref = nullptr;
 	}};

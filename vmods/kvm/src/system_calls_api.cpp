@@ -16,7 +16,7 @@ static void syscall_register_func(vCPU& cpu, MachineInstance& inst)
 				regs.rdi, regs.rsi);
 		throw std::runtime_error("Invalid address for register_func provided");
 	}
-	inst.instance().set_entry_at(regs.rdi, regs.rsi);
+	inst.program().set_entry_at(regs.rdi, regs.rsi);
 }
 static void syscall_wait_for_requests(vCPU& cpu, MachineInstance& inst)
 {
@@ -89,7 +89,7 @@ static void syscall_storage_callb(vCPU& cpu, MachineInstance& inst)
 			.addr = (uint64_t)regs.rsi,  // src
 			.len  = (uint64_t)regs.rdx   // len
 		};
-		regs.rax = inst.instance().storage_call(cpu.machine(),
+		regs.rax = inst.program().storage_call(cpu.machine(),
 		/*  func      buf vector    dst     dstsize */
 			regs.rdi, 1, buffers, regs.rcx, regs.r8);
 	} else {
@@ -105,7 +105,7 @@ static void syscall_storage_callv(vCPU& cpu, MachineInstance& inst)
 	if (!inst.is_storage() && n <= 64) {
 		VirtBuffer buffers[64];
 		cpu.machine().copy_from_guest(buffers, regs.rdx, n * sizeof(VirtBuffer));
-		regs.rax = inst.instance().storage_call(cpu.machine(),
+		regs.rax = inst.program().storage_call(cpu.machine(),
 		/*  func      buf vector    dst     dstsize */
 			regs.rdi, n, buffers, regs.rcx, regs.r8);
 	} else {
@@ -123,11 +123,11 @@ static void syscall_storage_task(vCPU& cpu, MachineInstance& inst)
 	const uint64_t start    = regs.rcx;
 	const uint64_t period   = regs.r8;
 	if (start == 0 && period == 0) {
-		regs.rax = inst.instance().async_storage_call(
+		regs.rax = inst.program().async_storage_call(
 			async, function, argument);
 	} else {
 		/* XXX: Racy spam avoidance of async tasks. */
-		auto *prog = &inst.instance();
+		auto *prog = &inst.program();
 		if (prog->m_timer_system.racy_count() < STORAGE_TASK_MAX_TIMERS) {
 			regs.rax = prog->m_timer_system.add(
 				std::chrono::milliseconds(start),
@@ -147,7 +147,7 @@ static void syscall_storage_task(vCPU& cpu, MachineInstance& inst)
 static void syscall_stop_storage_task(vCPU& cpu, MachineInstance& inst)
 {
 	auto regs = cpu.registers();
-	regs.rax = inst.instance().m_timer_system.remove(regs.rdi);
+	regs.rax = inst.program().m_timer_system.remove(regs.rdi);
 	cpu.set_registers(regs);
 }
 

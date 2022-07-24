@@ -45,8 +45,8 @@ public:
 	const auto* ctx() const noexcept { return m_ctx; }
 	void set_ctx(const vrt_ctx* ctx) { m_ctx = ctx; }
 	const auto& tenant() const noexcept { return *m_tenant; }
-	auto& instance() { return *m_inst; }
-	const auto& instance() const { return *m_inst; }
+	auto& program() { return *m_inst; }
+	const auto& program() const { return *m_inst; }
 
 	uint64_t max_time() const noexcept;
 	const std::string& name() const noexcept;

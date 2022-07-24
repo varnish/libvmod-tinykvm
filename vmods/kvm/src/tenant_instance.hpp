@@ -6,7 +6,6 @@ struct vrt_ctx;
 namespace tinykvm { struct vCPU; }
 
 namespace kvm {
-class MachineInstance;
 class ProgramInstance;
 struct VMPoolItem;
 

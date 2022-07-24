@@ -170,7 +170,7 @@ int kvm_callv(VRT_CTX, kvm::VMPoolItem* slot,
 {
 	uint64_t addr = 0x0;
 	try {
-		addr = slot->mi->instance().entry_at(index);
+		addr = slot->mi->program().entry_at(index);
 	} catch (const std::exception& e) {
 		fprintf(stderr, "KVM VM exception: %s\n", e.what());
 		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());

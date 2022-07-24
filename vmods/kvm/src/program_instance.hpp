@@ -9,6 +9,7 @@ struct VirtBuffer {
 	uint64_t addr;
 	size_t   len;
 };
+
 /**
  * A pool item is all the bits necessary to execute inside KVM
  * for a particular tenant. The pool item can be requested as

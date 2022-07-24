@@ -88,7 +88,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 	const char *farg[2], struct backend_result *result, const char *exception)
 {
 	auto& machine = *slot->mi;
-	const auto& prog = machine.instance();
+	const auto& prog = machine.program();
 	auto* ctx = machine.ctx();
 	if (prog.entry_at(ProgramEntryIndex::ON_ERROR) == 0x0)
 		goto internal_server_error;
@@ -155,7 +155,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 	VSLb(ctx->vsl, SLT_VCL_Log, "Tenant: %s", machine.name().c_str());
 	kvm_ts(ctx->vsl, "ProgramStart", t_work, t_prev, VTIM_real());
 	try {
-		const auto& prog = machine.instance();
+		const auto& prog = machine.program();
 		const auto timeout = machine.tenant().config.max_time();
 		auto& vm = machine.machine();
 		auto fut = slot->tp.enqueue(
@@ -251,7 +251,7 @@ int kvm_backend_stream(struct backend_post *post,
 		/* Call the backend streaming function.
 		   NOTE: We can use timed_reentry here after first call. */
 		const auto timeout = mi.tenant().config.max_time();
-		vm.timed_vmcall(mi.instance().entry_at(ProgramEntryIndex::BACKEND_STREAM),
+		vm.timed_vmcall(mi.program().entry_at(ProgramEntryIndex::BACKEND_STREAM),
 			timeout, (uint64_t) g_addr, (uint64_t) data_len,
 			(uint64_t) post->length, !!last);
 
