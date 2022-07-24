@@ -117,6 +117,7 @@ MachineInstance::MachineInstance(
 	  m_tenant(ten), m_inst(inst),
 	  m_is_debug(source.is_debug()),
 	  m_is_storage(false),
+	  m_is_ephemeral(source.is_ephemeral()),
 	  m_sighandler{source.m_sighandler},
 	  m_fd        {ten->config.max_fd(), "File descriptors"},
 	  m_regex     {ten->config.max_regex(), "Regex handles"},
@@ -159,12 +160,12 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 	MachineInstance& source)
 {
 	this->m_ctx = ctx;
-	//m_tenant = source->m_tenant;
-	machine().reset_to(source.machine(), {
-		.max_mem = tenant().config.max_memory(),
-		.max_cow_mem = tenant().config.max_work_memory(),
-	});
-	m_inst   = source.m_inst;
+	if (this->m_is_ephemeral) {
+		machine().reset_to(source.machine(), {
+			.max_mem = tenant().config.max_memory(),
+			.max_cow_mem = tenant().config.max_work_memory(),
+		});
+	}
 	m_sighandler = source.m_sighandler;
 
 	/* Load the fds of the source */

@@ -183,6 +183,9 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			if (obj.contains("hugepages")) {
 				group.hugepages = obj["hugepages"];
 			}
+			if (obj.contains("allow_make_ephemeral")) {
+				group.allow_make_ephemeral = obj["allow_make_ephemeral"];
+			}
 			if (obj.contains("allowed_paths")) {
 				group.allowed_paths = obj["allowed_paths"].get<std::vector<std::string>>();
 			}

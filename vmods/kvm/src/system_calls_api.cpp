@@ -71,13 +71,24 @@ static void syscall_storage_mem_shared(vCPU& cpu, MachineInstance& inst)
 	regs.rax = 0;
 	cpu.set_registers(regs);
 }
-
 static void syscall_all_mem_shared(vCPU& cpu, MachineInstance& inst)
 {
 	auto regs = cpu.registers();
 	inst.set_global_memory_shared(true);
 	regs.rax = 0;
 	cpu.set_registers(regs);
+}
+static void syscall_make_ephemeral(vCPU& cpu, MachineInstance& inst)
+{
+	auto regs = cpu.registers();
+	if (inst.is_storage()) {
+		if (inst.tenant().config.allow_make_ephemeral())
+			inst.set_ephemeral(regs.rdi != 0);
+		else
+			throw std::runtime_error("Cannot change ephemeralness. Option 'allow_make_ephemeral' not enabled.");
+	} else {
+		throw std::runtime_error("Cannot change ephemeralness after initialization");
+	}
 }
 
 static void syscall_storage_callb(vCPU& cpu, MachineInstance& inst)

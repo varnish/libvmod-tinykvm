@@ -1,5 +1,7 @@
 vcl 4.1;
+import file;
 import kvm;
+import std;
 backend default none;
 
 sub vcl_init {
@@ -9,13 +11,17 @@ sub vcl_init {
 			"group": "test",
 			"filename": "/tmp/test",
 
+			"concurrency": 32,
 			"max_time": 4.0,
 			"max_boot_time": 16.0,
 			"max_memory": 512,
 			"max_work_memory": 512,
-			"hugepages": false
+			"hugepages": true,
+			"ephemeral_hugepages": false,
+			"allow_make_ephemeral": true
 		}
 	}""");
+	new f = file.init(std.getenv("HOME"));
 }
 
 sub vcl_recv {
@@ -29,6 +35,10 @@ sub vcl_recv {
 }
 
 sub vcl_backend_fetch {
+	if (bereq.url == "/file") {
+		set bereq.backend = f.backend();
+		return (fetch);
+	}
 	if (bereq.method == "POST" && bereq.http.X-LiveUpdate) {
 		/* Live update POST */
 		set bereq.backend = kvm.live_update(
@@ -39,4 +49,7 @@ sub vcl_backend_fetch {
 	set bereq.backend = kvm.vm_backend(
 			bereq.http.Host,
 			bereq.url);
+}
+sub vcl_backend_response {
+	set beresp.uncacheable = true;
 }

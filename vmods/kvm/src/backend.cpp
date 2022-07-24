@@ -172,9 +172,14 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				auto vm_entry_addr = prog.entry_at(ProgramEntryIndex::BACKEND_COMP);
 				if (UNLIKELY(vm_entry_addr == 0x0))
 					throw std::runtime_error("The GET callback has not been registered");
-				vm.timed_vmcall(vm_entry_addr,
-					timeout, farg[0]);
-			} else if (post->process_func == 0x0) {
+				if (machine.is_ephemeral()) {
+					/* Call into VM doing a full pagetable/cache flush. */
+					vm.timed_vmcall(vm_entry_addr, timeout, farg[0]);
+				} else {
+					/* Call into VM without flushing anything. */
+					vm.timed_reentry(vm_entry_addr, timeout, farg[0]);
+				}
+			} else {
 				/* Try to reduce POST mmap allocation */
 				vm.mmap_relax(post->address, post->capacity, post->length);
 				/* Call the backend POST function */
@@ -184,11 +189,6 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				vm.timed_vmcall(vm_entry_addr,
 					timeout, farg[0],
 					(uint64_t) post->address, (uint64_t) post->length);
-			} else {
-				/* Call the backend streaming POST function */
-				vm.timed_vmcall(prog.entry_at(ProgramEntryIndex::BACKEND_STREAM),
-					timeout, farg[0],
-					(uint64_t) post->length);
 			}
 			kvm_ts(ctx->vsl, "ProgramResponse", t_work, t_prev, VTIM_real());
 

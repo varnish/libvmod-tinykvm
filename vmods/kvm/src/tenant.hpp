@@ -30,6 +30,7 @@ struct TenantGroup {
 	size_t   max_regex    = 32;
 	bool     hugepages    = false;
 	bool     ephemeral_hugepages = false;
+	bool     allow_make_ephemeral = false;
 
 	std::vector<std::string> environ {
 		"LC_TYPE=C", "LC_ALL=C", "USER=root"
@@ -68,6 +69,7 @@ struct TenantConfig
 	size_t   max_backends() const noexcept { return group.max_backends; }
 	bool     hugepages() const noexcept { return group.hugepages; }
 	bool     ephemeral_hugepages() const noexcept { return group.ephemeral_hugepages; }
+	bool     allow_make_ephemeral() const noexcept { return group.allow_make_ephemeral; }
 	auto&    environ() const noexcept { return group.environ; }
 
 	static bool begin_dyncall_initialization(VCL_PRIV);

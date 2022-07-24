@@ -240,6 +240,12 @@ extern void make_all_memory_shared();
    one-sidedness, it has to be used with caution. */
 extern void make_storage_memory_shared();
 
+/* Setting this during initialization will determine whether
+   or not request VMs will be reset after each request.
+   When they are ephemeral, they will be reset.
+   This setting is ENABLED by default for security reasons. */
+extern int make_ephemeral(int);
+
 /* Start multi-processing using @n vCPUs on given function,
    forwarding up to 4 integral/pointer arguments.
    Multi-processing starts and ends asynchronously.
@@ -429,6 +435,13 @@ asm(".global make_all_memory_shared\n" \
 ".type make_all_memory_shared, function\n" \
 "make_all_memory_shared:\n" \
 "	mov $0x10702, %eax\n" \
+"	out %eax, $0\n" \
+"   ret\n");
+
+asm(".global make_ephemeral\n" \
+".type make_ephemeral, function\n" \
+"make_ephemeral:\n" \
+"	mov $0x10703, %eax\n" \
 "	out %eax, $0\n" \
 "   ret\n");
 
