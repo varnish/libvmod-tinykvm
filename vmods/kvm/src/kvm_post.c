@@ -27,8 +27,9 @@ kvm_get_aggregate_body(void *priv, int flush, int last, const void *ptr, ssize_t
 	(void)flush;
 
 	/* We will want to call backend stream once per segment, and not
-	   finally with zero length and last=1, instead we can use
-	   on_post callback to trigger any finishing logic. */
+	   finally with len=0 and last=1. Instead we can use the on_post
+	   callback to trigger any finishing logic. The on_post callback
+	   will get called right after returning from here. */
 	if (!last)
 		return (kvm_backend_stream(post, ptr, len));
 	else

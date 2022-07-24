@@ -9,6 +9,31 @@
  * POST methods. All errors thrown inside the library are ultimately
  * handled here.
  * 
+ * In these functions we have already reserved a VM, and so we can now
+ * communicate with it for the purposes of calling into a guests program.
+ * Communication happens by enqueueing work to a single thread where the
+ * VM already sits dormant. While very little work *has* to happen in
+ * that thread, the actual calls into the VM has to be done inside it.
+ * This is a hard requirement by KVM: Any ioctl() accessing the vCPU of
+ * a VM has to be done in the thread it was created in.
+ * Enqueued work can be finalized by calling .get() on the future the
+ * enqueue() operation returns, which is a blocking call. If an
+ * exception happens in the VM thread, it will then propagate down and
+ * you can catch it.
+ * 
+ * We check if the program has a certain callback set, then we set up
+ * the call, perform it, extract the repsonse data back, and we return
+ * back to the Varnish backend code.
+ * If an error happens, there is a callback that allows handling it by
+ * providing a custom response instead of delivering a 503. This
+ * callback has a low timeout and intended for things like error pages
+ * or delivering alternative content.
+ * 
+ * There is a bunch of time measuring code intended to provide tenants
+ * with detailed information about the run-time costs of their programs.
+ * These timestamps are written to VSL and can be viewed in the
+ * Sledgehammer agent program.
+ * 
 **/
 #include "tenant_instance.hpp"
 #include "program_instance.hpp"

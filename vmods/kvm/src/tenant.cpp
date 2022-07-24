@@ -1,3 +1,56 @@
+/**
+ * @file tenant.cpp
+ * @author Alf-André Walla (fwsgonzo@hotmail.com)
+ * @brief Tenant JSON parsing and startup configuration.
+ * @version 0.1
+ * @date 2022-07-24
+ *
+ * The functions kvm_init_tenants_str and kvm_init_tenants_file will
+ * be called during startup, from VCL. The functions will parse a JSON
+ * document configuring each tenant, and then create tenants one by one.
+ *
+ * The JSON document can have tenants and groups. Each group is a named
+ * object with settings, but no filename/key. Each named object with a
+ * filename and key is treated as a tenant. You can customize each tenant
+ * by adding settings directly to the tenant, just like a group.
+ *
+ * Example:
+ * 	kvm.embed_tenants("""{
+ *		"test.com": {
+ *			"key": "123",
+ *			"group": "test",
+ *			"filename": "/tmp/test",
+ *
+ *			"concurrency": 32,
+ *			"max_time": 4.0,
+ *			"max_boot_time": 16.0,
+ *			"max_memory": 512,
+ *			"max_work_memory": 128,
+ *		}
+ *	}""");
+ *
+ * The JSON above will create a test.com tenant with 32 request VMs that
+ * each have up to 128MB memory. It will also have a main storage VM with
+ * up to 512MB memory. Request VMs and storage VM share the same memory,
+ * however request VMs cannot modify main memory, only make local copies
+ * of pages. That is where max_work_memory comes in: It is the amount of
+ * memory that each request VM can create from duplicating main memory
+ * when writes occur.
+ * 
+ * The timeouts are used to determine the length of time we are allowed
+ * to use to initialize the main storage VM as well as handle requests.
+ * max_boot_time is used during initialization.
+ * max_time is used during request handling.
+ * 
+ * Each tenants main VM is initialized at the same time as other tenants,
+ * in parallel. This reduces startup time greatly when there are many
+ * tenants. Should one of the tenants fail in a way that causes a wait
+ * for the full duration of the max_boot_time, then Varnish will appear
+ * to hang for that duration, as it will have to wait until everyone is
+ * either ready, or has failed. It is therefore probably in everyones
+ * best interest to not make the boot initialization timeout too high.
+ * 
+ */
 #include "tenants.hpp"
 
 #include "common_defs.hpp"
