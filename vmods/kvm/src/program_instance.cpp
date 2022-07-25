@@ -118,7 +118,7 @@ void ProgramInstance::set_entry_at(const int idx, gaddr_t addr)
 }
 
 Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
-	TenantInstance*, std::shared_ptr<ProgramInstance>& prog)
+	TenantInstance*, std::shared_ptr<ProgramInstance> prog)
 {
 	VMPoolItem* slot = nullptr;
 	m_vmqueue.wait_dequeue(slot);
@@ -129,16 +129,16 @@ Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 
 	/* This creates a self-reference, which ensures that open
 	   Machine instances will keep the program instance alive. */
-	slot->prog_ref = prog;
+	slot->prog_ref = std::move(prog);
 
 	/* What happens when the transaction is done */
 	return {slot, [] (void* slotv) {
 		auto* slot = (VMPoolItem *)slotv;
-		auto* mi = slot->mi.get();
-		mi->tail_reset();
+		auto& mi = *slot->mi;
+		mi.tail_reset();
 		// Signal waiters that slot is ready again
 		// If there any waiters, they keep the program referenced
-		mi->program().m_vmqueue.enqueue(slot);
+		mi.program().m_vmqueue.enqueue(slot);
 		// Last action: Unassign program, which can destruct the program
 		slot->prog_ref = nullptr;
 	}};

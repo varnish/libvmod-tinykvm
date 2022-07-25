@@ -273,17 +273,17 @@ int kvm_backend_stream(struct backend_post *post,
 	auto& slot = *(kvm::VMPoolItem *)post->slot;
 	auto& mi = *slot.mi;
 	try {
-		auto fut = slot.tp.enqueue(
-		[&] () -> int {
-			auto& vm = mi.machine();
+		auto& vm = mi.machine();
 
-			/* Copy the data segment into VM */
-			vm.copy_to_guest(post->address, data_ptr, data_len);
+		/* Copy the data segment into VM */
+		vm.copy_to_guest(post->address, data_ptr, data_len);
 
-			/* Call the backend streaming function, if set. */
-			const auto call_addr =
-				mi.program().entry_at(ProgramEntryIndex::BACKEND_STREAM);
-			if (call_addr != 0x0) {
+		/* Call the backend streaming function, if set. */
+		const auto call_addr =
+			mi.program().entry_at(ProgramEntryIndex::BACKEND_STREAM);
+		if (call_addr != 0x0) {
+			auto fut = slot.tp.enqueue(
+			[&] {
 				const auto timeout = mi.tenant().config.max_time();
 				if (post->length == 0) {
 					vm.timed_vmcall(call_addr, timeout,
@@ -296,19 +296,19 @@ int kvm_backend_stream(struct backend_post *post,
 						(uint64_t)post->address, (uint64_t)data_len,
 						(uint64_t)post->length);
 				}
+			});
+			fut.get();
 
-				/* Increment POST length *after* VM call. */
-				post->length += data_len;
-
-				/* Verify that the VM consumed all the bytes. */
-				return ((ssize_t)vm.return_value() == data_len) ? 0 : -1;
-			}
-
-			/* Increment POST length, no VM call. */
+			/* Increment POST length *after* VM call. */
 			post->length += data_len;
-			return 0;
-		});
-		return fut.get();
+
+			/* Verify that the VM consumed all the bytes. */
+			return ((ssize_t)vm.return_value() == data_len) ? 0 : -1;
+		}
+
+		/* Increment POST length, no VM call. */
+		post->length += data_len;
+		return 0;
 
 	} catch (const tinykvm::MemoryException& e) {
 		memory_error_handling(post->ctx, e);

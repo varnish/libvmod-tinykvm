@@ -84,7 +84,7 @@ public:
 
 	/* Reserve VM from blocking queue. */
 	Reservation reserve_vm(const vrt_ctx*,
-		TenantInstance*, std::shared_ptr<ProgramInstance>&);
+		TenantInstance*, std::shared_ptr<ProgramInstance>);
 
 	/* Serialized vector-based vmcall into storage VM.
 	   NOTE: buffers are clobbered by the function call. */

@@ -106,7 +106,7 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 		}
 		try {
 			// Reserve a machine through blocking queue.
-			Reservation resv = prog->reserve_vm(ctx, this, prog);
+			Reservation resv = prog->reserve_vm(ctx, this, std::move(prog));
 
 			priv_task->priv = resv.slot;
 			priv_task->len  = KVM_PROGRAM_MAGIC;
