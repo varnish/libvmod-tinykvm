@@ -32,7 +32,6 @@ extern void register_func(int, ...);
  *
  * Register callbacks for various modes of operation:
  **/
-static inline void set_on_recv(void(*f)(const char*)) { register_func(0, f); }
 static inline void set_backend_get(void(*f)(const char*)) { register_func(1, f); }
 static inline void set_backend_post(void(*f)(const char*, const uint8_t*, size_t)) { register_func(2, f); }
 static inline void set_backend_stream_post(long(*f)(const char* arg, const uint8_t* data, size_t len, size_t off)) { register_func(3, f); }
@@ -198,54 +197,6 @@ storage_return(const void* data, size_t len);
 static inline void
 storage_return_nothing(void) { storage_return(NULL, 0); }
 
-/* Shared memory between all VMs. Globally visible to
-   all VMs, and reads/writes are immediately seen
-   by both storage and request VMs. */
-struct shared_memory_info {
-	uint64_t ptr;
-	uint64_t end;
-};
-extern struct shared_memory_info shared_memory_area();
-
-/* Allocate pointers to shared memory with given size and alignment. */
-#define SHM_ALLOC_BYTES(x) internal_shm_alloc(x, 8)
-#define SHM_ALLOC_TYPE(x) internal_shm_alloc(sizeof(x), _Alignof(x))
-static inline void * internal_shm_alloc(size_t size, size_t align) {
-	static struct shared_memory_info info;
-	if (info.ptr == 0x0) {
-		info = shared_memory_area();
-	}
-	char *p = (char *)((info.ptr + (align-1)) & ~(uint64_t)(align-1));
-	info.ptr = (uint64_t)&p[size];
-	if ((uint64_t)p + size <= info.end)
-		return p;
-	else
-		return NULL;
-}
-
-/* If called during main() routine, it will cause
-   global memory to be fully shared among everyone,
-   not including the main stacks, which are separate.
-   Effectively, memory will behave as if you are
-   running a normal Linux program, and all requests
-   were threads sharing the same memory. It is no
-   longer necessary to call into storage, however it
-   may still be useful to invoke async storage calls. */
-extern void make_all_memory_shared();
-
-/* From the point of calling this function, any new
-   pages written to in the mutable storage will
-   be globally visible immediately, shared with
-   all request VMs in a one-sided way. Due to this
-   one-sidedness, it has to be used with caution. */
-extern void make_storage_memory_shared();
-
-/* Setting this during initialization will determine whether
-   or not request VMs will be reset after each request.
-   When they are ephemeral, they will be reset.
-   This setting is ENABLED by default for security reasons. */
-extern int make_ephemeral(int);
-
 /* Start multi-processing using @n vCPUs on given function,
    forwarding up to 4 integral/pointer arguments.
    Multi-processing starts and ends asynchronously.
@@ -300,11 +251,61 @@ extern long multiprocess_wait();
    multi-processing operation. */
 extern int vcpuid() __attribute__((const));
 
+
+/* Shared memory between all VMs. Globally visible to
+   all VMs, and reads/writes are immediately seen
+   by both storage and request VMs. */
+struct shared_memory_info {
+	uint64_t ptr;
+	uint64_t end;
+};
+extern struct shared_memory_info shared_memory_area();
+
+/* Allocate pointers to shared memory with given size and alignment. */
+#define SHM_ALLOC_BYTES(x) internal_shm_alloc(x, 8)
+#define SHM_ALLOC_TYPE(x) internal_shm_alloc(sizeof(x), _Alignof(x))
+static inline void * internal_shm_alloc(size_t size, size_t align) {
+	static struct shared_memory_info info;
+	if (info.ptr == 0x0) {
+		info = shared_memory_area();
+	}
+	char *p = (char *)((info.ptr + (align-1)) & ~(uint64_t)(align-1));
+	info.ptr = (uint64_t)&p[size];
+	if ((uint64_t)p + size <= info.end)
+		return p;
+	else
+		return NULL;
+}
+
+/* If called during main() routine, it will cause
+   global memory to be fully shared among everyone,
+   not including the main stacks, which are separate.
+   Effectively, memory will behave as if you are
+   running a normal Linux program, and all requests
+   were threads sharing the same memory. It is no
+   longer necessary to call into storage, however it
+   may still be useful to invoke async storage calls. */
+extern void make_all_memory_shared();
+
+/* From the point of calling this function, any new
+   pages written to in the mutable storage will
+   be globally visible immediately, shared with
+   all request VMs in a one-sided way. Due to this
+   one-sidedness, it has to be used with caution. */
+extern void make_storage_memory_shared();
+
+/* Setting this during initialization will determine whether
+   or not request VMs will be reset after each request.
+   When they are ephemeral, they will be reset.
+   This setting is ENABLED by default for security reasons. */
+extern int make_ephemeral(int);
+
+/* Retrieve memory layout information. */
 struct meminfo {
 	uint64_t max_memory;
-	uint64_t max_workmem;
-	uint64_t workmem_upper;
-	uint64_t workmem_current;
+	uint64_t max_reqmem;
+	uint64_t reqmem_upper;
+	uint64_t reqmem_current;
 };
 extern void get_meminfo(struct meminfo*);
 

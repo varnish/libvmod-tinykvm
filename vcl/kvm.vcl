@@ -10,10 +10,10 @@ sub vcl_init {
 	kvm.embed_tenants("""
 		{
 			"hugepages": {
-				"max_time": 4.0,
-				"max_boot_time": 16.0,
 				"max_memory": 256,
-				"max_work_memory": 8,
+				"max_boot_time": 16.0,
+				"max_request_memory": 16,
+				"max_request_time": 4.0,
 				"hugepages": true
 			},
 			"vpizza.com": {

@@ -33,10 +33,10 @@ A group consists of one or more tenants and defines how tenants are executed
 within a virtual machine.
 
 - concurrency: The number of available request VMs
-- max_memory: The size of the main storage memory
-- max_work_memory: The size of the memory for each request VM
-- max_time
 - max_boot_time
+- max_request_time
+- max_memory: The size of the main storage memory
+- max_request_memory: The available memory for each request
 - hugepages
 - allowed_paths (default: []): a list of paths that the tenant can open/load.
 
@@ -59,7 +59,10 @@ $Function VOID embed_tenants(PRIV_VCL, STRING json)
 			"xpizza.com": {
 				"filename": "/tmp/xpizza",
 				"key": "key used to verify live updates",
-				"group": "test"
+				"group": "test",
+
+				"max_request_memory": 128,
+				"max_request_time": 4.0
 			}
 		}
 	""");
@@ -97,14 +100,6 @@ $Function BACKEND live_debug(PRIV_VCL, STRING tenant, STRING key, BYTES max_size
 - Receive a binary suitable for debugging.
 - Whenever a request triggers a breakpoint, open a port
   for GDB remote debugging.
-
-$Function INT vm_call(PRIV_VCL, STRING tenant,
-		ENUM {
-			ON_REQUEST
-		} func = "ON_REQUEST",
-		STRING arg = "")
-
-- Call self-registered function in tenant program.
 
 $Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING url)
 

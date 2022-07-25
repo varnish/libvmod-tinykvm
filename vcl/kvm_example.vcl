@@ -12,11 +12,11 @@ sub vcl_init {
 			"filename": "/tmp/test",
 
 			"concurrency": 32,
-			"max_time": 4.0,
-			"max_boot_time": 16.0,
 			"max_memory": 512,
-			"max_work_memory": 512,
-			"hugepages": true,
+			"max_boot_time": 16.0,
+			"max_request_memory": 512,
+			"max_request_time": 4.0,
+			"hugepages": false,
 			"ephemeral_hugepages": false,
 			"allow_make_ephemeral": true
 		}

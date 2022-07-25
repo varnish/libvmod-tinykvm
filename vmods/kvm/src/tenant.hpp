@@ -23,7 +23,7 @@ struct TenantGroup {
 	float    max_boot_time; /* Seconds */
 	uint64_t max_memory; /* Megabytes */
 	uint32_t max_work_mem; /* Megabytes */
-	uint64_t shared_memory = 64; /* Megabytes */
+	uint32_t shared_memory; /* Megabytes */
 	size_t   max_concurrency = 4;
 	size_t   max_fd       = 32;
 	size_t   max_backends = 8;
@@ -42,10 +42,12 @@ struct TenantGroup {
 
 	void set_max_memory(uint64_t newmax_mb) { this->max_memory = newmax_mb * 1048576ul; }
 	void set_max_workmem(uint64_t newmax_mb) { this->max_work_mem = newmax_mb * 1048576ul; }
+	void set_shared_mem(uint64_t newmax_mb) { this->shared_memory = newmax_mb * 1048576ul; }
 
 	TenantGroup(std::string n, float t, uint64_t mm, uint64_t mwm, vmods_t&& vm = vmods_t{})
 		: name{n}, max_time(t), max_boot_time(10.0),
 		  max_memory(mm * 1048576ul), max_work_mem(mwm * 1048576ul),
+		  shared_memory(max_memory / 8),
 		  vmods{std::move(vm)}  {}
 };
 
@@ -64,6 +66,7 @@ struct TenantConfig
 	float    max_time() const noexcept { return group.max_time; }
 	uint64_t max_memory() const noexcept { return group.max_memory; }
 	uint32_t max_work_memory() const noexcept { return group.max_work_mem; }
+	uint32_t shared_memory() const noexcept { return group.shared_memory; }
 	size_t   max_fd() const noexcept { return group.max_fd; }
 	size_t   max_regex() const noexcept { return group.max_regex; }
 	size_t   max_backends() const noexcept { return group.max_backends; }

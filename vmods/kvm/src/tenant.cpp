@@ -22,10 +22,10 @@
  *			"filename": "/tmp/test",
  *
  *			"concurrency": 32,
- *			"max_time": 4.0,
  *			"max_boot_time": 16.0,
  *			"max_memory": 512,
- *			"max_work_memory": 128,
+ *			"max_request_time": 4.0,
+ *			"max_request_memory": 128,
  *		}
  *	}""");
  *
@@ -40,7 +40,7 @@
  * The timeouts are used to determine the length of time we are allowed
  * to use to initialize the main storage VM as well as handle requests.
  * max_boot_time is used during initialization.
- * max_time is used during request handling.
+ * max_request_time is used during GET/POST request handling.
  * 
  * Each tenants main VM is initialized at the same time as other tenants,
  * in parallel. This reduces startup time greatly when there are many
@@ -200,7 +200,7 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 					std::forward_as_tuple(grname),
 					std::forward_as_tuple(
 						grname,
-						1.0f, /* 1 second timeout */
+						4.0f, /* 1 second timeout */
 						256, /* 256 MB max memory */
 						32 /* 32 MB max working memory */
 				));
@@ -209,26 +209,26 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			auto& group = grit->second;
 			// All group parameters are treated as optional and can be defined in a
 			// tenant configuration or in a group configuration.
-			if (obj.contains("max_time")) {
-				group.max_time = obj["max_time"];
+			if (obj.contains("max_boot_time")) {
+				group.max_boot_time = obj["max_boot_time"];
+			}
+			if (obj.contains("max_request_time")) {
+				group.max_time = obj["max_request_time"];
 			}
 			if (obj.contains("max_memory")) {
 				// Limits the memory of the Main VM.
 				group.set_max_memory(obj["max_memory"]);
 			}
-			if (obj.contains("shared_memory")) {
-				// Sets the size of shared memory between VMs.
-				// Cannot be larger than max memory.
-				group.set_max_memory(obj["shared_memory"]);
-			}
-			if (obj.contains("max_work_memory")) {
+			if (obj.contains("max_request_memory")) {
 				// Limits the memory of an ephemeral VM. Ephemeral VMs are used to handle
 				// requests (and faults in pages one by one using CoW). They are based
 				// off of the bigger Main VMs which use "max_memory" (and are identity-mapped).
-				group.set_max_workmem(obj["max_work_memory"]);
+				group.set_max_workmem(obj["max_request_memory"]);
 			}
-			if (obj.contains("max_boot_time")) {
-				group.max_boot_time = obj["max_boot_time"];
+			if (obj.contains("shared_memory")) {
+				// Sets the size of shared memory between VMs.
+				// Cannot be larger than half of max memory.
+				group.set_shared_mem(obj["shared_memory"]);
 			}
 			if (obj.contains("concurrency")) {
 				group.max_concurrency = obj["concurrency"];
