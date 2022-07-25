@@ -50,6 +50,3 @@ sub vcl_backend_fetch {
 			bereq.http.Host,
 			bereq.url);
 }
-sub vcl_backend_response {
-	set beresp.uncacheable = true;
-}
