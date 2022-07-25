@@ -6,7 +6,7 @@ cat >${tmpdir}/${testname}.c <<-EOF
 
 static void my_backend(const char *arg)
 {
-	set_cacheable(0, 1.0f);
+	set_cacheable(0, 1.0f, 0.0f, 0.0f);
 	backend_response_str(200, "text/plain", arg);
 }
 

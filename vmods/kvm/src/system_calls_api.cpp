@@ -1,7 +1,7 @@
 extern "C" {
 	long kvm_SetBackend(VRT_CTX, VCL_BACKEND dir);
 	void kvm_SetCacheable(VRT_CTX, bool c);
-	void kvm_SetTTL(VRT_CTX, float ttl);
+	void kvm_SetTTLs(VRT_CTX, float ttl, float grace, float keep);
 }
 
 namespace kvm {
@@ -48,7 +48,8 @@ static void syscall_set_cacheable(vCPU& cpu, MachineInstance& inst)
 	auto regs = cpu.registers();
 	if (inst.ctx()->bo) {
 		kvm_SetCacheable(inst.ctx(), regs.rdi);
-		kvm_SetTTL(inst.ctx(), regs.rsi / 1000.0);
+		kvm_SetTTLs(inst.ctx(), // TTL, GRACE, KEEP
+			regs.rsi / 1000.0, regs.rdx / 1000.0, regs.rcx / 1000.0);
 		regs.rax = 0;
 	} else {
 		regs.rax = -1;

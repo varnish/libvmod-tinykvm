@@ -106,9 +106,9 @@ http_findf(int where, const char *key, size_t, const char *outb, size_t outl);
  *
 **/
 extern long
-syscall_set_cacheable(int cached, long ttl_milliseconds);
-static inline long set_cacheable(int cached, float ttl) {
-	return syscall_set_cacheable(cached, ttl * 1000);
+syscall_set_cacheable(int cached, long ttl_millis, long grace_ms, long keep_ms);
+static inline long set_cacheable(int cached, float ttl, float grace, float keep) {
+	return syscall_set_cacheable(cached, ttl * 1000, grace * 1000, keep * 1000);
 }
 
 /**

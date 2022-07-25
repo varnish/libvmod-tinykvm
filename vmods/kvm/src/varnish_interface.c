@@ -40,12 +40,15 @@ bool kvm_GetCacheable(VRT_CTX)
 	return !ctx->bo->uncacheable;
 }
 
-void kvm_SetTTL(VRT_CTX, float ttl)
+void kvm_SetTTLs(VRT_CTX, float ttl, float grace, float keep)
 {
 	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
 	struct objcore *oc = ctx->bo->fetch_objcore;
 	CHECK_OBJ_NOTNULL(oc, OBJCORE_MAGIC);
+
 	oc->ttl = ttl;
+	oc->grace = grace;
+	oc->keep = keep;
 }
 float kvm_GetTTL(VRT_CTX)
 {
