@@ -59,12 +59,14 @@ kvmfp_pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 	AN(p);
 	AN(lp);
 
+	/* The resulting response of a backend request. */
 	struct backend_result *result = (struct backend_result *)vfe->priv1;
 	if (result->content_length == 0) {
 		*lp = 0;
 		return (VFP_END);
 	}
 
+	/* Go through each response buffer and write it to storage. */
 	struct VMBuffer *current = &result->buffers[vfe->priv2];
 	ssize_t max = *lp;
 	ssize_t written = 0;
@@ -133,6 +135,8 @@ kvmbe_gethdrs(const struct director *dir,
 	struct vmod_kvm_backend *kvmr;
 	CAST_OBJ_NOTNULL(kvmr, dir->priv, KVM_BACKEND_MAGIC);
 
+	/* Create a fake VRT_CTX in order to have access to VCL,
+	   workspace, VSL, BusyObj and the request later on. */
 	const struct vrt_ctx ctx = {
 		.magic = VRT_CTX_MAGIC,
 		.vcl = bo->vcl,
@@ -236,12 +240,15 @@ kvmbe_gethdrs(const struct director *dir,
 	return (0);
 }
 
-static struct vmod_kvm_backend *
-kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant,
-	VCL_STRING url)
+VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
+	VCL_STRING tenant, VCL_STRING url)
 {
-	struct vmod_kvm_backend *kvmr;
-	kvmr = WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_backend));
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	/* Everything we do has lifetime of the backend request,
+	   so we can use the workspace. */
+	struct vmod_kvm_backend *kvmr =
+		WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_backend));
 	if (kvmr == NULL) {
 		VRT_fail(ctx, "KVM: Out of workspace");
 		return (NULL);
@@ -250,6 +257,7 @@ kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant,
 	INIT_OBJ(kvmr, KVM_BACKEND_MAGIC);
 	kvmr->t_work = VTIM_real();
 
+	/* Lookup internal tenant using VCL task */
 	kvmr->tenant = kvm_tenant_find(task, tenant);
 	if (kvmr->tenant == NULL) {
 		VRT_fail(ctx, "KVM: Tenant not found: %s", tenant);
@@ -269,20 +277,5 @@ kvm_response_director(VRT_CTX, VCL_PRIV task, VCL_STRING tenant,
 	dir->finish  = kvmbe_finish;
 	dir->panic   = kvmbe_panic;
 
-	return (kvmr);
-}
-
-VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
-	VCL_STRING tenant, VCL_STRING url)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-
-	struct vmod_kvm_backend *kvmr =
-		kvm_response_director(ctx, task, tenant, url);
-
-	if (kvmr != NULL) {
-		return (&kvmr->dir);
-	}
-
-	return (NULL);
+	return (&kvmr->dir);
 }

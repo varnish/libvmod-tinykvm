@@ -66,7 +66,7 @@ static void memory_error_handling(VRT_CTX, const tinykvm::MemoryException& e)
 
 static int16_t sanitize_status_code(int16_t code)
 {
-	/* Allow successes, redirects and client and server errors */
+	/* Allow successes, redirects, client and server errors */
 	if (LIKELY(code >= 200 && code < 600))
 		return code;
 	[[unlikely]]
@@ -109,6 +109,9 @@ static void fetch_result(MachineInstance& mi, struct backend_result *result)
 		result->bufcount, (tinykvm::Machine::Buffer *)result->buffers, cvaddr, clen);
 }
 
+/* Error handling is an optional callback into the request VM when an
+   exception just happened during normal GET/POST. It gives tenant a
+   chance to produce a proper error page, or deliver alternate content. */
 static void error_handling(kvm::VMPoolItem* slot,
 	const char *farg[2], struct backend_result *result, const char *exception)
 {
@@ -176,13 +179,11 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 	double t_work = t_prev;
 
 	auto& machine = *slot->mi;
+	/* Setting the VRT_CTX allows access to HTTP and VSL, etc. */
 	machine.set_ctx(ctx);
 	VSLb(ctx->vsl, SLT_VCL_Log, "Tenant: %s", machine.name().c_str());
 	kvm_ts(ctx->vsl, "ProgramStart", t_work, t_prev, VTIM_real());
 	try {
-		const auto& prog = machine.program();
-		const auto timeout = machine.tenant().config.max_time();
-		auto& vm = machine.machine();
 		auto fut = slot->tp.enqueue(
 		[&] {
 			if constexpr (VERBOSE_BACKEND) {
@@ -191,6 +192,10 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			kvm_ts(ctx->vsl, "ProgramCall", t_work, t_prev, VTIM_real());
 			/* Enforce that guest program calls the backend_response system call. */
 			machine.begin_backend_call();
+
+			const auto timeout = machine.tenant().config.max_time();
+			const auto& prog = machine.program();
+			auto& vm = machine.machine();
 
 			if (post == nullptr) {
 				/* Call the backend compute function */
@@ -268,38 +273,42 @@ int kvm_backend_stream(struct backend_post *post,
 	auto& slot = *(kvm::VMPoolItem *)post->slot;
 	auto& mi = *slot.mi;
 	try {
-		auto& vm = mi.machine();
+		auto fut = slot.tp.enqueue(
+		[&] () -> int {
+			auto& vm = mi.machine();
 
-		/* Copy the data segment into VM */
-		vm.copy_to_guest(post->address, data_ptr, data_len);
+			/* Copy the data segment into VM */
+			vm.copy_to_guest(post->address, data_ptr, data_len);
 
-		/* Call the backend streaming function, if set. */
-		const auto call_addr =
-			mi.program().entry_at(ProgramEntryIndex::BACKEND_STREAM);
-		if (call_addr != 0x0) {
-			const auto timeout = mi.tenant().config.max_time();
-			if (post->length == 0) {
-				vm.timed_vmcall(call_addr, timeout,
-					post->argument,
-					(uint64_t)post->address, (uint64_t)data_len,
-					(uint64_t)post->length);
-			} else {
-				vm.timed_reentry(call_addr, timeout,
-					post->argument,
-					(uint64_t)post->address, (uint64_t)data_len,
-					(uint64_t)post->length);
+			/* Call the backend streaming function, if set. */
+			const auto call_addr =
+				mi.program().entry_at(ProgramEntryIndex::BACKEND_STREAM);
+			if (call_addr != 0x0) {
+				const auto timeout = mi.tenant().config.max_time();
+				if (post->length == 0) {
+					vm.timed_vmcall(call_addr, timeout,
+						post->argument,
+						(uint64_t)post->address, (uint64_t)data_len,
+						(uint64_t)post->length);
+				} else {
+					vm.timed_reentry(call_addr, timeout,
+						post->argument,
+						(uint64_t)post->address, (uint64_t)data_len,
+						(uint64_t)post->length);
+				}
+
+				/* Increment POST length *after* VM call. */
+				post->length += data_len;
+
+				/* Verify that the VM consumed all the bytes. */
+				return ((ssize_t)vm.return_value() == data_len) ? 0 : -1;
 			}
 
-			/* Increment POST length *after* VM call. */
+			/* Increment POST length, no VM call. */
 			post->length += data_len;
-
-			/* Verify that the VM consumed all the bytes. */
-			return ((ssize_t)vm.return_value() == data_len) ? 0 : -1;
-		}
-
-		/* Increment POST length, no VM call. */
-		post->length += data_len;
-		return 0;
+			return 0;
+		});
+		return fut.get();
 
 	} catch (const tinykvm::MemoryException& e) {
 		memory_error_handling(post->ctx, e);
