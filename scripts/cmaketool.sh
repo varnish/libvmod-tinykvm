@@ -37,6 +37,7 @@ vmod_api=""
 do_build=false
 do_clean=false
 do_gprof=false
+do_massif=false
 do_sanitize=false
 do_debug=false
 do_singleproc=false
@@ -101,6 +102,11 @@ case $i in
     shift
     ;;
 	--gprof)
+	do_gprof=true
+    shift
+    ;;
+	--massif)
+	do_massif=true
 	do_gprof=true
     shift
     ;;
@@ -233,6 +239,8 @@ if [ "$run" = true ] ; then
 
 	if [ "$do_debug" = true ] ; then
 		gdb --cd="$DEBUG_PATH" --args "$BUILD_PATH/$folder/varnishd" "$@"
+	elif [ "$do_massif" = true ] ; then
+		valgrind --tool=massif --trace-children=yes "$BUILD_PATH/$folder/varnishd" "$@"
 	else
 		[ "$VERBOSE" ] && echo "$preargs ./varnishd $@"
 		$preargs ./varnishd "$@"
