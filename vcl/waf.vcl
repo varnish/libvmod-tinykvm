@@ -1,4 +1,3 @@
-vcl 4.1;
 #waf.vcl
 #
 # To use this vcl, simply include it at the top of your vcl, all
@@ -38,7 +37,6 @@ sub vcl_init {
 
 sub vcl_recv {
 	std.cache_req_body(waf.bytes(waf_opts.get("cache_req_body_bytes"), 1MB));
-	unset req.http.waf-skip;
 	# get first XFF ip if avail otherwise take client ip/port
 	if (req.http.X-Forwarded-For) {
 		set req.http.waf-client-ip = regsub(req.http.X-Forwarded-For, ",.*$", "");
@@ -50,16 +48,15 @@ sub vcl_recv {
 }
 
 sub vcl_backend_fetch {
-	if (bereq.http.waf-skip != "true") {
-		varnish_waf.init_transaction();
-		if (bereq.http.waf-skip != "request") {
-			# check req.body/headers. if there is an
-			# disruptive action, go to v_b_e
-			if (varnish_waf.check_req(bereq.http.waf-client-ip,
-				std.integer(bereq.http.waf-client-port, 0))) {
-				return (error);
-			}
-		}
+	# Initialize transaction data
+	varnish_waf.init_transaction();
+	# Finish setting up transaction data
+	# varnish_waf.setup_transaction();
+	# check req.body/headers. if there is an
+	# disruptive action, go to v_b_e
+	if (varnish_waf.check_req(bereq.http.waf-client-ip,
+		std.integer(bereq.http.waf-client-port, 0))) {
+		return (error);
 	}
 }
 
@@ -83,30 +80,13 @@ sub waf_check_fini {
 }
 
 sub vcl_backend_response {
-	if (bereq.http.waf-skip !~ "^(true|response)$") {
-		# check resp.body/headers
-		varnish_waf.check_resp();
-		call waf_check_fini;
-	}
+	# check resp.body/headers
+	varnish_waf.check_resp();
+	call waf_check_fini;
 }
 
 sub vcl_backend_error {
-	if (bereq.http.waf-skip != "true") {
-		call waf_check_fini;
-	}
+	call waf_check_fini;
 }
 
 #EOF
-
-backend default {
-	.host = "127.0.0.1";
-	.port = "8000";
-}
-
-sub vcl_init {
-	varnish_waf.add_files(std.getenv("HOME") + "/git/varnish_autoperf/vcl/waf.conf");
-}
-
-sub vcl_recv {
-	set req.http.waf-skip = req.http.skip;
-}

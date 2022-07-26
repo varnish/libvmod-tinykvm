@@ -34,7 +34,14 @@ $Method VOID .add_file_remote(STRING url, STRING key = "")
 
 $Method VOID .init_transaction()
 
-        Set up a ModSecurity transaction
+        Set up the transaction for the single HTTP Request.
+        This is needed to allow skipping one of request or response.
+        This should be called before ``check_req`` or ``check_resp``.
+
+$Method VOID .setup_transaction()
+
+        Set up a ModSecurity transaction. This needs to be called
+        after initializing a transaction.
 
 $Method BOOL .check_req(STRING client_ip = "", INT client_port = 0)
 
@@ -67,3 +74,11 @@ $Method INT .disrupt_status()
 $Method STRING .disrupt_url()
 
         Get the status code of a disrupted request to set the Location header to.
+
+$Method VOID .skip_rule_by_id(STRING id)
+
+        Skip a rule by its ID. If called in ``vcl_init``, it is for the entire VCL lifetime.
+
+$Method VOID .skip_rule_by_tag(STRING tag)
+
+        Skip a rule by its tag. If called in ``vcl_init``, it is for the entire VCL lifetime.
