@@ -148,7 +148,7 @@ static void syscall_http_append(vCPU& cpu, MachineInstance& inst)
 	val[len] = 0;
 
 	regs.rax = http_header_append(hp, val, len);
-	cpu.machine().set_registers(regs);
+	cpu.set_registers(regs);
 }
 
 static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
@@ -159,7 +159,7 @@ static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
 	const uint16_t g_wlen = regs.rdx;
 	if (UNLIKELY(g_what == 0x0 || g_wlen == 0)) {
 		regs.rax = 0;
-		cpu.machine().set_registers(regs);
+		cpu.set_registers(regs);
 		return;
 	}
 
@@ -202,7 +202,7 @@ static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
 		}
 	}
 	/* Return value: Index of header field */
-	cpu.machine().set_registers(regs);
+	cpu.set_registers(regs);
 }
 
 static void syscall_http_find(vCPU& cpu, MachineInstance &inst)
@@ -236,7 +236,7 @@ static void syscall_http_find(vCPU& cpu, MachineInstance &inst)
 		regs.rax = 0;
 	}
 
-	cpu.machine().set_registers(regs);
+	cpu.set_registers(regs);
 }
 
 } // kvm

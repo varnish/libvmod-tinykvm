@@ -1,4 +1,5 @@
 #pragma once
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -89,25 +90,70 @@ backend_response_str(int16_t status, const char *ctype, const char *content)
 **/
 static const int BEREQ  = 4;  /* Get values from this. */
 static const int BERESP = 5;  /* Set values on this. */
+static const unsigned HTTP_FMT_SIZE = 4096; /* Most header fields fit. */
 
-extern void
-http_appendf(int where, const char*, size_t);
-
-/* Append a new header field. */
-static inline void
-http_append_str(int where, const char *str) { http_appendf(where, str, __builtin_strlen(str)); }
-
-/* Set or overwrite an existing header field. */
 extern long
-http_setf(int where, const char *what, size_t len);
+sys_http_append(int where, const char *, size_t);
+
+/* Append a new header field from a ZT string. */
+static inline void
+http_append_str(int where, const char *str) { sys_http_append(where, str, __builtin_strlen(str)); }
+
+/* Append a new header field from a formatted string with arguments. */
+static inline void
+http_appendf(int where, const char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+	char buffer[HTTP_FMT_SIZE];
+	const int len = __builtin_vsnprintf(buffer, sizeof(buffer), fmt, ap);
+	va_end(ap);
+	sys_http_append(where, buffer, len);
+}
+
+extern long
+sys_http_set(int where, const char *what, size_t len);
+
+/* Set or overwrite an existing header field using ZT string. */
+static inline void
+http_set_str(int where, const char *field) { sys_http_set(where, field, __builtin_strlen(field)); }
+
+/* Set or overwrite an existing header field using formatted string. */
+static inline void
+http_setf(int where, const char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+	char buffer[HTTP_FMT_SIZE];
+	const int len = __builtin_vsnprintf(buffer, sizeof(buffer), fmt, ap);
+	va_end(ap);
+	sys_http_set(where, buffer, len);
+}
 
 /* Unset an existing header field by key. */
 static inline long
-http_unsetf(int where, const char *key, size_t len) { return http_setf(where, key, len); }
+http_unset_str(int where, const char *key) { return sys_http_set(where, key, __builtin_strlen(key)); }
 
-/* Retrieve a header field by key. */
-extern long
-http_findf(int where, const char *key, size_t, const char *outb, size_t outl);
+static inline long
+http_unset(int where, const char *key, size_t len) { return sys_http_set(where, key, len); }
+
+/* Retrieve a header field by key, writing result to outb and returning actual length. */
+extern unsigned
+sys_http_find(int where, const char *key, size_t, const char *outb, size_t outl);
+
+static inline unsigned
+http_find_str(int where, const char *key, const char *outb, size_t outl) {
+	return sys_http_find(where, key, __builtin_strlen(key), outb, outl);
+}
+
+static inline const char *
+http_alloc_find(int where, const char *key) {
+	char buffer[HTTP_FMT_SIZE];
+	const unsigned len = /* sys_http_find returns 0 when not found. */
+		sys_http_find(where, key, __builtin_strlen(key), buffer, sizeof(buffer));
+	char *result = (char *)__builtin_malloc(len+1);
+	__builtin_memcpy(result, buffer, len);
+	result[len] = 0;
+	return result;
+}
 
 /**
  * Varnish caching configuration
@@ -403,23 +449,23 @@ asm(".global syscall_set_cacheable\n" \
 "	out %eax, $0\n" \
 "	ret");
 
-asm(".global http_appendf\n" \
-".type http_appendf, function\n" \
-"http_appendf:\n" \
+asm(".global sys_http_append\n" \
+".type sys_http_append, function\n" \
+"sys_http_append:\n" \
 "	mov $0x10020, %eax\n" \
 "	out %eax, $0\n" \
 "	ret");
 
-asm(".global http_setf\n" \
-".type http_setf, function\n" \
-"http_setf:\n" \
+asm(".global sys_http_set\n" \
+".type sys_http_set, function\n" \
+"sys_http_set:\n" \
 "	mov $0x10021, %eax\n" \
 "	out %eax, $0\n" \
 "	ret");
 
-asm(".global http_findf\n" \
-".type http_findf, function\n" \
-"http_findf:\n" \
+asm(".global sys_http_find\n" \
+".type sys_http_find, function\n" \
+"sys_http_find:\n" \
 "	mov $0x10022, %eax\n" \
 "	out %eax, $0\n" \
 "	ret");
