@@ -2,6 +2,7 @@ varnishtest "KVM Backend: Basic HTTP test"
 
 shell {
 cat >${tmpdir}/${testname}.c <<-EOF
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include "kvm_api.h"
@@ -10,6 +11,15 @@ static void on_get(const char *url)
 {
 	http_appendf(BERESP, "X-Value: 5");
 	http_setf(BERESP, "X-OtherValue: 6");
+
+	/* Test finding field length. "X-Value: 5" (L=10) */
+	unsigned len = sys_http_find(BERESP, "X-Value", 7, NULL, 0);
+	assert(len == 10);
+
+	/* Retrieve header field using exact length. */
+	char buffer[len];
+	http_find_str(BERESP, "X-Value", buffer, sizeof(buffer));
+	assert(memcmp(buffer, "X-Value: 5", len) == 0);
 
 	/* Test overwriting a header field. */
 	if (strcasecmp(url, "/test2") == 0) {

@@ -135,7 +135,8 @@ http_unset_str(int where, const char *key) { return sys_http_set(where, key, __b
 static inline long
 http_unset(int where, const char *key, size_t len) { return sys_http_set(where, key, len); }
 
-/* Retrieve a header field by key, writing result to outb and returning actual length. */
+/* Retrieve a header field by key, writing result to outb and returning actual length.
+   If outb is zero, instead returns the length of header field, or zero if not found. */
 extern unsigned
 sys_http_find(int where, const char *key, size_t, const char *outb, size_t outl);
 
@@ -143,7 +144,18 @@ static inline unsigned
 http_find_str(int where, const char *key, const char *outb, size_t outl) {
 	return sys_http_find(where, key, __builtin_strlen(key), outb, outl);
 }
+static inline unsigned
+http_find_strlen(int where, const char *key) {
+	return sys_http_find(where, key, __builtin_strlen(key), NULL, 0);
+}
 
+#if __GNUC__ > 7
+#define HAS_BUILTIN_MALLOC
+#elif __has_builtin(__builtin_malloc)
+#define HAS_BUILTIN_MALLOC
+#endif
+
+#ifdef HAS_BUILTIN_MALLOC
 static inline const char *
 http_alloc_find(int where, const char *key) {
 	char buffer[HTTP_FMT_SIZE];
@@ -154,6 +166,7 @@ http_alloc_find(int where, const char *key) {
 	result[len] = 0;
 	return result;
 }
+#endif
 
 /**
  * Varnish caching configuration

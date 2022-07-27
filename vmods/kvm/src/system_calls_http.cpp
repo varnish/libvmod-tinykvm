@@ -1,3 +1,4 @@
+#include <cstdint>
 extern "C" {
 	void http_SetH(struct http *to, unsigned n, const char *fm);
 	void http_UnsetIdx(struct http *hp, unsigned idx);
@@ -51,7 +52,7 @@ inline http*
 get_http(VRT_CTX, int where)
 {
 	if (UNLIKELY(ctx == nullptr)) {
-		throw std::runtime_error("Missing VRT_CTX in get_http");
+		throw std::runtime_error("VRT ctx not available. Not in a request?");
 	}
 	struct http* hp = nullptr;
 	switch (where) {
@@ -136,7 +137,7 @@ http_header_append(struct http* hp, const char* val, uint32_t len)
 
 static void syscall_http_append(vCPU& cpu, MachineInstance& inst)
 {
-	auto regs = cpu.machine().registers();
+	auto regs = cpu.registers();
 	auto *hp = get_http(inst.ctx(), (gethdr_e)regs.rdi);
 	const uint64_t addr = regs.rsi;
 	const uint32_t len = regs.rdx;
@@ -144,7 +145,7 @@ static void syscall_http_append(vCPU& cpu, MachineInstance& inst)
 	auto *val = (char *)WS_Alloc(inst.ctx()->ws, len + 1);
 	if (val == nullptr)
 		throw std::runtime_error("Unable to make room for HTTP header field");
-	inst.machine().copy_from_guest(val, addr, len);
+	cpu.machine().copy_from_guest(val, addr, len);
 	val[len] = 0;
 
 	regs.rax = http_header_append(hp, val, len);
@@ -153,7 +154,7 @@ static void syscall_http_append(vCPU& cpu, MachineInstance& inst)
 
 static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
 {
-	auto regs = cpu.machine().registers();
+	auto regs = cpu.registers();
 	const int where = regs.rdi;
 	const uint64_t g_what = regs.rsi;
 	const uint16_t g_wlen = regs.rdx;
@@ -169,7 +170,7 @@ static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
 	auto *buffer = (char *)WS_Alloc(inst.ctx()->ws, g_wlen + 1);
 	if (buffer == nullptr)
 		throw std::runtime_error("Unable to make room for HTTP header field");
-	inst.machine().copy_from_guest(buffer, g_what, g_wlen);
+	cpu.machine().copy_from_guest(buffer, g_what, g_wlen);
 	buffer[g_wlen] = 0;
 
 	/* Find the ':' in the buffer */
@@ -207,31 +208,37 @@ static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
 
 static void syscall_http_find(vCPU& cpu, MachineInstance &inst)
 {
-	auto regs = cpu.machine().registers();
+	auto regs = cpu.registers();
 	const int where = regs.rdi;
 	const uint64_t g_what = regs.rsi;
 	const uint16_t g_wlen = regs.rdx;
 
 	auto* hp = get_http(inst.ctx(), (gethdr_e)where);
 
-	/* Read out *what* from guest */
+	/* Read out *what* from guest, as zero-terminated string */
 	auto* buffer = (char *)WS_Alloc(inst.ctx()->ws, g_wlen + 1);
 	if (buffer == nullptr)
 		throw std::runtime_error("Unable to make room for HTTP header field");
-	inst.machine().copy_from_guest(buffer, g_what, g_wlen);
+	cpu.machine().copy_from_guest(buffer, g_what, g_wlen);
 	buffer[g_wlen] = 0;
 
 	/* Find the header field by its name */
 	unsigned index = http_findhdr(hp, g_wlen, buffer);
 	if (index > 0)
 	{
-		const uint64_t g_dest    = regs.rcx;
-		const uint64_t g_destlen = regs.r8;
 		const auto& field = hp->field_array[index];
-		const uint64_t flen = field.end - field.begin;
-		const uint64_t size = std::min(flen, g_destlen);
-		inst.machine().copy_to_guest(g_dest, field.begin, size);
-		regs.rax = size;
+		const uint16_t flen = field.end - field.begin;
+
+		const uint64_t g_dest    = regs.rcx;
+		const uint16_t g_destlen = regs.r8;
+		if (g_dest != 0x0)
+		{
+			const uint16_t size = std::min(flen, g_destlen);
+			cpu.machine().copy_to_guest(g_dest, field.begin, size);
+			regs.rax = size;
+		} else {
+			regs.rax = flen;
+		}
 	} else {
 		regs.rax = 0;
 	}
