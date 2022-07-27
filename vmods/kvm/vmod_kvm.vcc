@@ -35,6 +35,7 @@ within a virtual machine.
 - concurrency: The number of available request VMs
 - max_boot_time
 - max_request_time
+- max_storage_time
 - max_memory: The size of the main storage memory
 - max_request_memory: The available memory for each request
 - hugepages

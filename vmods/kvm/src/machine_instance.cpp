@@ -40,8 +40,8 @@ MachineInstance::MachineInstance(
 	bool debug)
 	: m_ctx(ctx),
 	  m_machine(binary, {
-		.max_mem = ten->config.max_memory(),
-		.max_cow_mem = ten->config.max_work_memory(),
+		.max_mem = ten->config.max_main_memory(),
+		.max_cow_mem = ten->config.max_req_memory(),
 		.hugepages = ten->config.hugepages(),
 		.master_direct_memory_writes = false,
 	  }),
@@ -84,8 +84,9 @@ void MachineInstance::initialize()
 
 		// Make forkable (with working memory)
 		// TODO: Tenant config variable for storage memory
+		// Max memory here is the available CoW memory for storage
 		machine().prepare_copy_on_write(
-			tenant().config.max_work_memory(), shm_boundary);
+			tenant().config.max_main_memory(), shm_boundary);
 
 		// Set new vmcall stack base lower than current RSP, in
 		// order to avoid trampling stack-allocated things in main.
@@ -110,8 +111,8 @@ MachineInstance::MachineInstance(
 	const TenantInstance* ten, ProgramInstance* inst)
 	: m_ctx(ctx),
 	  m_machine(source.machine(), {
-		.max_mem = ten->config.max_memory(),
-		.max_cow_mem = ten->config.max_work_memory(),
+		.max_mem = ten->config.max_main_memory(),
+		.max_cow_mem = ten->config.max_req_memory(),
 		.hugepages = ten->config.ephemeral_hugepages(),
 	  }),
 	  m_tenant(ten), m_inst(inst),
@@ -162,8 +163,8 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 	this->m_ctx = ctx;
 	if (this->m_is_ephemeral) {
 		machine().reset_to(source.machine(), {
-			.max_mem = tenant().config.max_memory(),
-			.max_cow_mem = tenant().config.max_work_memory(),
+			.max_mem = tenant().config.max_main_memory(),
+			.max_cow_mem = tenant().config.max_req_memory(),
 		});
 	}
 	m_sighandler = source.m_sighandler;
@@ -187,8 +188,8 @@ void MachineInstance::copy_to(uint64_t addr, const void* src, size_t len, bool z
 	machine().copy_to_guest(addr, src, len, zeroes);
 }
 
-uint64_t MachineInstance::max_time() const noexcept {
-	return tenant().config.max_time();
+float MachineInstance::max_req_time() const noexcept {
+	return tenant().config.max_req_time();
 }
 const std::string& MachineInstance::name() const noexcept {
 	return tenant().config.name;
@@ -200,7 +201,7 @@ const std::string& MachineInstance::group() const noexcept {
 uint64_t MachineInstance::shared_memory_boundary() const noexcept
 {
 	/* For VMs < 4GB this works well enough. */
-	return tenant().config.group.max_memory - shared_memory_size();
+	return tenant().config.group.max_main_memory - shared_memory_size();
 }
 uint64_t MachineInstance::shared_memory_size() const noexcept
 {

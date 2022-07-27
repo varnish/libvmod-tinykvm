@@ -193,7 +193,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			/* Enforce that guest program calls the backend_response system call. */
 			machine.begin_backend_call();
 
-			const auto timeout = machine.tenant().config.max_time();
+			const auto timeout = machine.tenant().config.max_req_time();
 			const auto& prog = machine.program();
 			auto& vm = machine.machine();
 
@@ -284,7 +284,7 @@ int kvm_backend_stream(struct backend_post *post,
 		if (call_addr != 0x0) {
 			auto fut = slot.tp.enqueue(
 			[&] {
-				const auto timeout = mi.tenant().config.max_time();
+				const auto timeout = mi.tenant().config.max_req_time();
 				if (post->length == 0) {
 					vm.timed_vmcall(call_addr, timeout,
 						post->argument,

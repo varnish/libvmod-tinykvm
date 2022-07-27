@@ -274,8 +274,8 @@ static void syscall_memory_info(vCPU& cpu, MachineInstance &inst)
 		uint64_t workmem_upper;
 		uint64_t workmem_current;
 	} meminfo {
-		.max_memory = inst.tenant().config.max_memory(),
-		.max_workmem = inst.tenant().config.max_work_memory(),
+		.max_memory = inst.tenant().config.max_main_memory(),
+		.max_workmem = inst.tenant().config.max_req_memory(),
 		.workmem_upper = cpu.machine().banked_memory_capacity_bytes(),
 		.workmem_current = cpu.machine().banked_memory_bytes(),
 	};

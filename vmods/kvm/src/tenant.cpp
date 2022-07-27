@@ -199,12 +199,7 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 				const auto& ret = groups.emplace(
 					std::piecewise_construct,
 					std::forward_as_tuple(grname),
-					std::forward_as_tuple(
-						grname,
-						4.0f, /* 1 second timeout */
-						256, /* 256 MB max memory */
-						32 /* 32 MB max working memory */
-				));
+					std::forward_as_tuple(grname));
 				grit = ret.first;
 			}
 			auto& group = grit->second;
@@ -214,7 +209,10 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 				group.max_boot_time = obj["max_boot_time"];
 			}
 			if (obj.contains("max_request_time")) {
-				group.max_time = obj["max_request_time"];
+				group.max_req_time = obj["max_request_time"];
+			}
+			if (obj.contains("max_storage_time")) {
+				group.max_req_time = obj["max_storage_time"];
 			}
 			if (obj.contains("max_memory")) {
 				// Limits the memory of the Main VM.

@@ -3,7 +3,12 @@
 namespace kvm
 {
     static constexpr size_t MAIN_STACK_SIZE = 1UL << 22; /* 4MB */
+    static constexpr size_t MAIN_MEMORY_SIZE = 256; /* 256MB */
+    static constexpr float  STARTUP_TIMEOUT = 16.0f;
+
+    static constexpr size_t REQUEST_MEMORY_SIZE = 64; /* 64MB */
     static constexpr int    REQUEST_VM_NICE = 10;
+    static constexpr float  REQUEST_VM_TIMEOUT = 4.0f;
     static constexpr float  ERROR_HANDLING_TIMEOUT = 1.0f;
 
     /* Serialized storage VM access */

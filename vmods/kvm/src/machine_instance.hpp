@@ -48,7 +48,7 @@ public:
 	auto& program() { return *m_inst; }
 	const auto& program() const { return *m_inst; }
 
-	uint64_t max_time() const noexcept;
+	float max_req_time() const noexcept;
 	const std::string& name() const noexcept;
 	const std::string& group() const noexcept;
 

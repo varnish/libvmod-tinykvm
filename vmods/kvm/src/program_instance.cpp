@@ -186,7 +186,8 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 				printf("Storage task calling 0x%lX with stack 0x%lX\n",
 					func, new_stack);
 			}
-			stm.timed_reentry_stack(func, new_stack, STORAGE_TIMEOUT,
+			const float timeout = main_vm->tenant().config.max_storage_time();
+			stm.timed_reentry_stack(func, new_stack, timeout,
 				(uint64_t)n, (uint64_t)stm_bufaddr, (uint64_t)res_size);
 			/* Get the result buffer and length (capped to res_size) */
 			auto regs = stm.registers();
@@ -318,6 +319,7 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 		uint64_t data;
 		uint64_t len;
 	};
+	const float timeout = main_vm->tenant().config.max_storage_time();
 
 	auto future = m_main_queue.enqueue(
 	[&] () -> SerializeResult
@@ -326,7 +328,7 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 			/* Serialize data in the old machine */
 				main_vm->set_ctx(ctx);
 				auto &old_machine = main_vm->machine();
-				old_machine.timed_vmcall(func, STORAGE_TIMEOUT);
+				old_machine.timed_vmcall(func, timeout);
 				/* Get serialized data */
 				auto regs = old_machine.registers();
 				auto data_addr = regs.rdi;
@@ -354,8 +356,7 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 			/* Begin resume procedure */
 			new_prog.main_vm->set_ctx(ctx);
 
-			new_machine.timed_vmcall(newfunc, STORAGE_TIMEOUT,
-				(uint64_t)from.len);
+			new_machine.timed_vmcall(newfunc, timeout, (uint64_t)from.len);
 
 			auto regs = new_machine.registers();
 			/* The machine should be calling STOP with rsi=dst_data */

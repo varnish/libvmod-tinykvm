@@ -144,6 +144,8 @@ static inline unsigned
 http_find_str(int where, const char *key, const char *outb, size_t outl) {
 	return sys_http_find(where, key, __builtin_strlen(key), outb, outl);
 }
+
+/* Retrieve the length of a header field by key. Returns zero when not found. */
 static inline unsigned
 http_find_strlen(int where, const char *key) {
 	return sys_http_find(where, key, __builtin_strlen(key), NULL, 0);
