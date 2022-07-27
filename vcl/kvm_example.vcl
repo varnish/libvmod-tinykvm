@@ -18,7 +18,11 @@ sub vcl_init {
 			"max_request_time": 4.0,
 			"hugepages": false,
 			"ephemeral_hugepages": false,
-			"allow_make_ephemeral": true
+			"allow_make_ephemeral": true,
+
+			"allowed_paths": [
+				"/usr/lib/x86_64-linux-gnu/espeak-ng-data"
+			]
 		}
 	}""");
 	new f = file.init(std.getenv("HOME"));

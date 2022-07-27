@@ -32,22 +32,30 @@ extern void register_func(int, ...);
  *
  * Register callbacks for various modes of operation:
  **/
-static inline void set_backend_get(void(*f)(const char*)) { register_func(1, f); }
-static inline void set_backend_post(void(*f)(const char*, const uint8_t*, size_t)) { register_func(2, f); }
-static inline void set_backend_stream_post(long(*f)(const char* arg, const uint8_t* data, size_t len, size_t off)) { register_func(3, f); }
+static inline void set_backend_get(void(*f)(const char *url)) { register_func(1, f); }
+static inline void set_backend_post(void(*f)(const char *url, const uint8_t*, size_t)) { register_func(2, f); }
+
+/* Streaming POST will receive each data segment as they arrive. A final POST
+   call happens at the end. This call needs some further improvements, because
+   right now Varnish will fill the VM with the whole POST data no matter what,
+   but call the streaming POST callback on each segment. Instead, it should put
+   each segment on stack and the callee may choose to build a complete buffer. */
+static inline void set_backend_stream_post(long(*f)(const char *url, const uint8_t *data, size_t len, size_t off)) { register_func(3, f); }
 
 /* When uploading a new program, there is an opportunity to pass on
    state to the next program, using the live update and restore callbacks. */
 static inline void set_on_live_update(void(*f)()) { register_func(4, f); }
-static inline void set_on_live_restore(void(*f)(size_t)) { register_func(5, f); }
+static inline void set_on_live_restore(void(*f)(size_t datalen)) { register_func(5, f); }
 
 /* When an exception happens that terminates the request it is possible to
    produce a custom response instead of a generic HTTP 500. There is very
    limited time to produce the response, typically 1.0 seconds. */
-static inline void set_on_error(void (*f)(const char *, const char *)) { register_func(6, f); }
+static inline void set_on_error(void (*f)(const char *url, const char *exception)) { register_func(6, f); }
 
 /* Wait for requests without terminating machine. Call this just before
-   the end of int main(). */
+   the end of int main(). It will preserve the state of the whole machine,
+   including startup arguments and stack values. Future requests will use
+   a new stack, and will not trample the old stack, including red-zone. */
 extern void wait_for_requests();
 
 /**
@@ -79,8 +87,8 @@ backend_response_str(int16_t status, const char *ctype, const char *content)
  * HTTP header field manipulation
  *
 **/
-static const int BEREQ  = 4;
-static const int BERESP = 5;
+static const int BEREQ  = 4;  /* Get values from this. */
+static const int BERESP = 5;  /* Set values on this. */
 
 extern void
 http_appendf(int where, const char*, size_t);
@@ -324,32 +332,36 @@ extern void get_meminfo(struct meminfo*);
 #endif
 DYNAMIC_CALL(goto_dns, 0x746238D2)
 
-/* Fetch content from provided URL. Content must be allocated prior to
-   calling the function. The fetcher will fill out the structure if the
+/* Fetch content from provided URL. Content will be allocated by Varnish
+   when fetching. The fetcher will also fill out the input structure if the
    fetch succeeds. If a serious error is encountered, the function returns
-   a non-zero value and the struct contents is undefined. */
-struct curl_options {
-	const char *interface;
-	const char *unused;
-	int         tcp_fast_open;
-	uint32_t    resume_from;
-};
-struct curl_fields {
-	const char *ptr[8];
-	uint16_t    len[8];
-};
-struct curl_opts {
+   a non-zero value and the struct contents are undefined.
+   *curl_fields* and *curl_options* are both optional and can be NULL.
+   NOTE: It is possible to run out of memory in mutable storage if you do a
+   lot of cURL fetching without unmapping the content buffer. */
+struct curl_op {
 	uint32_t    status;
 	uint32_t    post_buflen;
 	const void *post_buffer;
-	struct curl_options *options;
-	struct curl_fields *fields;
 	void  *content;
 	uint32_t content_length;
 	uint32_t ctlen;
 	char   ctype[128];
 };
-DYNAMIC_CALL(curl_fetch, 0xB86011FB, const char*, size_t, struct curl_opts*)
+struct curl_fields {
+	const char *ptr[8];
+	uint16_t    len[8];
+};
+struct curl_options {
+	const char *interface;      /* Select interface to bind to. */
+	const char *unused;
+	int8_t      dummy_fetch;    /* Does not allocate content. */
+	int8_t      tcp_fast_open;  /* Enables TCP Fast Open. */
+	int8_t      unused_opt1;
+	int8_t      unused_opt2;
+	uint32_t    unused_opt3;
+};
+DYNAMIC_CALL(curl_fetch, 0xB86011FB, const char*, size_t, struct curl_op*, struct curl_fields*, struct curl_options*)
 
 /* Embed binary data into executable. This data has no guaranteed alignment. */
 #define EMBED_BINARY(name, filename) \

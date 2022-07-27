@@ -204,7 +204,7 @@ uint64_t MachineInstance::shared_memory_boundary() const noexcept
 }
 uint64_t MachineInstance::shared_memory_size() const noexcept
 {
-	return tenant().config.group.shared_memory << 20u;
+	return tenant().config.group.shared_memory;
 }
 
 void MachineInstance::print(std::string_view text)

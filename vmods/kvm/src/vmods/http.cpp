@@ -37,9 +37,13 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		/**
 		 * rdi = URL
 		 * rsi = URL length
-		 * rdx  = result buffer
+		 * rdx = result buffer
+		 * rcx = fields buffer
+		 * r8  = options buffer
 		**/
-		const uint64_t g_buffer = regs.rdx;
+		const uint64_t op_buffer = regs.rdx;
+		const uint64_t fields_buffer = regs.rcx;
+		const uint64_t options_buffer = regs.r8;
 		const int CONN_TIMEOUT = 5;
 		const int READ_TIMEOUT = 8;
 		constexpr uint64_t CURL_BUFFER_MAX = 1UL << 25; /* 32 MB */
@@ -55,8 +59,11 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		struct curl_options {
 			uint64_t  interface;
 			uint64_t  unused;
-			int       tcp_fast_open;
-			uint32_t  resume_from;
+			int8_t    dummy_fetch;    /* Does not allocate content. */
+			int8_t    tcp_fast_open;  /* Enables TCP Fast Open. */
+			int8_t    unused_opt1;
+			int8_t    unused_opt2;
+			uint32_t  unused_opt3;
 		};
 		struct opfields {
 			uint64_t addr[CURL_FIELDS_NUM];
@@ -66,21 +73,19 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			uint32_t status;
 			uint32_t post_buflen;
 			uint64_t post_addr;
-			uint64_t options;
-			uint64_t fields;
 			uint64_t content_addr;
 			uint32_t content_length;
 			uint32_t ct_length;
 			char     ctype[CONTENT_TYPE_LEN];
 		};
 		opresult opres;
-		vcpu.machine().copy_from_guest(&opres, g_buffer, sizeof(opresult));
+		vcpu.machine().copy_from_guest(&opres, op_buffer, sizeof(opresult));
 
 		// Retrieve request header fields into string vector
 		std::array<std::string, CURL_FIELDS_NUM> fields;
-		if (opres.fields != 0x0) {
-			opfields of;
-			vcpu.machine().copy_from_guest(&of, opres.fields, sizeof(of));
+		if (fields_buffer != 0x0) {
+			struct opfields of;
+			vcpu.machine().copy_from_guest(&of, fields_buffer, sizeof(of));
 			/* Iterate through all the request fields. */
 			for (size_t i = 0; i < CURL_FIELDS_NUM; i++) {
 				if (of.addr[i] != 0x0 && of.len[i] != 0x0) {
@@ -92,6 +97,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		}
 
 		// XXX: Fixme, mmap is basic/unreliable
+
 		opres.content_addr = vcpu.machine().mmap_allocate(CURL_BUFFER_MAX);
 		const bool is_post = (opres.post_addr != 0x0 && opres.post_buflen != 0x0);
 
@@ -123,10 +129,11 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &op);
 
 		/* Extra cURL options. */
-		if (opres.options != 0x0)
+		bool option_dummy_request = false;
+		if (options_buffer != 0x0)
 		{
 			struct curl_options options;
-			inst.machine().copy_from_guest(&options, opres.options, sizeof(options));
+			inst.machine().copy_from_guest(&options, options_buffer, sizeof(options));
 			/* Custom interface/source IP. */
 			if (options.interface != 0x0) {
 				char ifname[64];
@@ -138,14 +145,16 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			if (options.tcp_fast_open) {
 				curl_easy_setopt(curl, CURLOPT_TCP_FASTOPEN, 1);
 			}
+			option_dummy_request = options.dummy_fetch;
 		}
 
 		/* Request header fields. */
 		struct curl_slist *req_list = NULL;
-		if (opres.fields != 0x0) {
+		if (!fields.empty()) {
 			for (const auto& field : fields) {
 				if (!field.empty())
 					req_list = curl_slist_append(req_list, field.c_str());
+				else break;
 			}
 			curl_easy_setopt(curl, CURLOPT_HTTPHEADER, req_list);
 		}
@@ -181,7 +190,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 				/* Copy Content-Type from guest opres into string. */
 				std::string ct = "Content-Type: ";
 				ct.resize(ct.size() + opres.ct_length);
-				inst.machine().copy_from_guest(&ct[14], g_buffer + offsetof(opresult, ctype), opres.ct_length);
+				inst.machine().copy_from_guest(&ct[14], op_buffer + offsetof(opresult, ctype), opres.ct_length);
 
 				post_list = curl_slist_append(post_list, ct.c_str());
 				curl_easy_setopt(curl, CURLOPT_HTTPHEADER, post_list);
@@ -190,10 +199,16 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 
 		CURLcode res = curl_easy_perform(curl);
 		if (res == 0) {
-			/* Calculate content length */
-			opres.content_length = op.dst - opres.content_addr;
-			/* Adjust and set new mmap base. TODO: Log failed relaxations */
-			vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, opres.content_length);
+			if (!option_dummy_request) {
+				/* Calculate content length */
+				opres.content_length = op.dst - opres.content_addr;
+				/* Adjust and set new mmap base. XXX: Log failed relaxations */
+				vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, opres.content_length);
+			} else {
+				opres.content_length = 0;
+				/* Adjust the buffer down to zero again, completely unmapping it. */
+				vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, 0);
+			}
 			/* Get response status and Content-Type */
 			long status;
 			res = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
@@ -211,7 +226,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			{
 				opres.ct_length = 0;
 			}
-			vcpu.machine().copy_to_guest(g_buffer, &opres, sizeof(opres));
+			vcpu.machine().copy_to_guest(op_buffer, &opres, sizeof(opres));
 			if constexpr (VERBOSE_CURL) {
 				printf("cURL transfer complete, %u bytes\n", opres.content_length);
 			}

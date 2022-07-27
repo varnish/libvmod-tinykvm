@@ -25,6 +25,7 @@
 #include "varnish.hpp"
 #include <cstring>
 #include <tinykvm/rsp_client.hpp>
+extern "C" int usleep(uint32_t usec);
 
 namespace kvm {
 static constexpr bool VERBOSE_STORAGE_TASK = false;
@@ -82,11 +83,15 @@ ProgramInstance::ProgramInstance(
 
 		/* We do not have a storage CTX after this point. */
 		main_vm->set_ctx(nullptr);
+		this->initialization_complete = true;
 		return 0;
 	});
 }
 ProgramInstance::~ProgramInstance()
 {
+	if (main_vm_extra_cpu) {
+		main_vm_extra_cpu->deinit();
+	}
 }
 
 long ProgramInstance::wait_for_initialization()
@@ -239,6 +244,10 @@ long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 				if constexpr (VERBOSE_STORAGE_TASK) {
 					printf("Calling 0x%lX\n", func);
 				}
+				/* Avoid async storage while still initializing. 10ms intervals. */
+				if (!this->initialization_complete) {
+					usleep(10'000);
+				}
 				stm.timed_reentry(func, ASYNC_STORAGE_TIMEOUT,
 					(uint64_t)arg);
 				if constexpr (VERBOSE_STORAGE_TASK) {
@@ -264,13 +273,17 @@ long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 			auto& stm = main_vm->machine();
 
 			try {
-				if (!main_vm_extra_cpu) {
-					main_vm_extra_cpu.reset(new tinykvm::vCPU);
-					main_vm_extra_cpu->smp_init(EXTRA_CPU_ID, stm);
-				}
 				if constexpr (VERBOSE_STORAGE_TASK) {
 					printf("Calling 0x%lX with stack 0x%lX\n",
 						func, main_vm_extra_cpu_stack);
+				}
+				/* Avoid async storage while still initializing. 10ms intervals. */
+				if (!this->initialization_complete) {
+					usleep(10'000);
+				}
+				if (!main_vm_extra_cpu) {
+					main_vm_extra_cpu.reset(new tinykvm::vCPU);
+					main_vm_extra_cpu->smp_init(EXTRA_CPU_ID, stm);
 				}
 				/* For the love of GOD don't try to change this to
 				   a timed_reentry_stack call *again*. This function

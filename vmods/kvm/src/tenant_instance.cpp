@@ -105,8 +105,14 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 			return nullptr;
 		}
 		try {
+			/* Avoid reservation while still initializing. 10ms intervals. */
+			if (UNLIKELY(!prog->initialization_complete)) {
+				return nullptr;
+			}
+
 			// Reserve a machine through blocking queue.
 			Reservation resv = prog->reserve_vm(ctx, this, std::move(prog));
+			// prog is nullptr after this ^
 
 			priv_task->priv = resv.slot;
 			priv_task->len  = KVM_PROGRAM_MAGIC;

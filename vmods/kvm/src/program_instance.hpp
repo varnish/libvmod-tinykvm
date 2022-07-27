@@ -139,6 +139,7 @@ public:
 	std::mutex rsp_mtx;
 
 	std::future<long> m_future;
+	bool initialization_complete = false;
 };
 
 } // kvm
