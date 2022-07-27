@@ -154,7 +154,8 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 	const std::vector<uint8_t>& vec, const char* source)
 {
 	try {
-		const json j = json::parse(vec.begin(), vec.end());
+		/* Parse JSON with comments enabled. */
+		const json j = json::parse(vec.begin(), vec.end(), nullptr, true, true);
 
 		std::map<std::string, kvm::TenantGroup> groups {};
 

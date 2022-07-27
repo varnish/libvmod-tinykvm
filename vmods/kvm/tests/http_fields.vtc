@@ -8,14 +8,14 @@ cat >${tmpdir}/${testname}.c <<-EOF
 
 static void on_get(const char *url)
 {
-	http_appendf(BERESP, "X-Value: 5", 10);
-	http_setf(BERESP, "X-OtherValue: 6", 15);
+	http_appendf(BERESP, "X-Value: 5");
+	http_setf(BERESP, "X-OtherValue: 6");
 
 	/* Test overwriting a header field. */
 	if (strcasecmp(url, "/test2") == 0) {
-		http_setf(BERESP, "X-OtherValue: 7", 15);
+		http_setf(BERESP, "X-OtherValue: 7");
 		/* This will unset the field. */
-		http_setf(BERESP, "X-Value", 7);
+		http_setf(BERESP, "X-Value");
 	}
 
 	backend_response_str(200, "text/plain", url);

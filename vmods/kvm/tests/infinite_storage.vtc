@@ -49,7 +49,7 @@ vcl 4.1;
 		kvm.embed_tenants("""
 			{
 				"diefast": {
-					"max_time": 1.0,
+					"max_request_time": 1.0,
 					"max_memory": 256,
 					"max_work_memory": 4
 				},

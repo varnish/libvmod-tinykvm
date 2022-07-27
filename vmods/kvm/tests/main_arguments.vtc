@@ -28,9 +28,11 @@ vcl 4.1;
 	sub vcl_init {
 		kvm.embed_tenants("""
 			{
+				/* Comments are enabled. */
 				"xpizza.com": {
 					"filename": "${tmpdir}/${testname}",
 					"key": "",
+					/* Comments are treated as whitespace. */
 					"group": "test"
 				}
 			}
