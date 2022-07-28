@@ -29,9 +29,14 @@ static void syscall_wait_for_requests(vCPU& cpu, MachineInstance& inst)
 	}
 }
 
-static void syscall_backend_response(vCPU& cpu, MachineInstance &inst)
+static void syscall_backend_response(vCPU& cpu, MachineInstance& inst)
 {
-	inst.finish_backend_call();
+	inst.finish_call(1);
+	cpu.stop();
+}
+static void syscall_storage_return(vCPU& cpu, MachineInstance& inst)
+{
+	inst.finish_call(2);
 	cpu.stop();
 }
 
@@ -282,6 +287,24 @@ static void syscall_memory_info(vCPU& cpu, MachineInstance &inst)
 	auto regs = cpu.registers();
 	cpu.machine().copy_to_guest(regs.rdi, &meminfo, sizeof(meminfo));
 	cpu.set_registers(regs);
+}
+
+static void syscall_breakpoint(vCPU& cpu, MachineInstance& inst)
+{
+	auto regs = cpu.registers();
+	if (inst.is_debug()) {
+		if (inst.ctx()) {
+			VSLb(inst.ctx()->vsl, SLT_Debug,
+				"VM breakpoint at 0x%lX", (long) regs.rip);
+		}
+		inst.open_debugger(DEBUG_PORT);
+	} else {
+		if (inst.ctx()) {
+			VSLb(inst.ctx()->vsl, SLT_Debug,
+				"Skipped VM breakpoint at 0x%lX (debug not enabled)",
+				(long) regs.rip);
+		}
+	}
 }
 
 } // kvm

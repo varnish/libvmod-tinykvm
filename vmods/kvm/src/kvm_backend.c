@@ -165,7 +165,7 @@ kvmbe_gethdrs(const struct director *dir,
 	   waiting for a free VM, and then getting exclusive access until
 	   the end of the request. */
 	struct vmod_kvm_slot *slot =
-		kvm_reserve_machine(&ctx, kvmr->tenant, false);
+		kvm_reserve_machine(&ctx, kvmr->tenant, kvmr->debug);
 	if (slot == NULL) {
 		VSLb(ctx.vsl, SLT_Error, "KVM: Unable to reserve machine");
 		return (-1);
@@ -240,6 +240,17 @@ kvmbe_gethdrs(const struct director *dir,
 	return (0);
 }
 
+static void init_director(struct director *dir, void *kvmr)
+{
+	INIT_OBJ(dir, DIRECTOR_MAGIC);
+	dir->priv = kvmr;
+	dir->name = "KVM backend director";
+	dir->vcl_name = "vmod_kvm";
+	dir->gethdrs = kvmbe_gethdrs;
+	dir->finish  = kvmbe_finish;
+	dir->panic   = kvmbe_panic;
+}
+
 VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING url)
 {
@@ -266,16 +277,42 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 
 	kvmr->funcarg[0] = url;
 	kvmr->funcarg[1] = NULL;
+	kvmr->debug = 0;
 	kvmr->max_response_size = 0;
 
-	struct director *dir = &kvmr->dir;
-	INIT_OBJ(dir, DIRECTOR_MAGIC);
-	dir->priv = kvmr;
-	dir->name = "KVM backend director";
-	dir->vcl_name = "vmod_kvm";
-	dir->gethdrs = kvmbe_gethdrs;
-	dir->finish  = kvmbe_finish;
-	dir->panic   = kvmbe_panic;
+	init_director(&kvmr->dir, kvmr);
+	return (&kvmr->dir);
+}
 
+VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
+	VCL_STRING tenant, VCL_STRING key, VCL_STRING url)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	/* Everything we do has lifetime of the backend request,
+	   so we can use the workspace. */
+	struct vmod_kvm_backend *kvmr =
+		WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_backend));
+	if (kvmr == NULL) {
+		VRT_fail(ctx, "KVM: Out of workspace");
+		return (NULL);
+	}
+
+	INIT_OBJ(kvmr, KVM_BACKEND_MAGIC);
+	kvmr->t_work = VTIM_real();
+
+	/* Lookup internal tenant using VCL task */
+	kvmr->tenant = kvm_tenant_find_key(task, tenant, key);
+	if (kvmr->tenant == NULL) {
+		VRT_fail(ctx, "KVM: Tenant not found: %s", tenant);
+		return (NULL);
+	}
+
+	kvmr->funcarg[0] = url;
+	kvmr->funcarg[1] = NULL;
+	kvmr->debug = 1;
+	kvmr->max_response_size = 0;
+
+	init_director(&kvmr->dir, kvmr);
 	return (&kvmr->dir);
 }

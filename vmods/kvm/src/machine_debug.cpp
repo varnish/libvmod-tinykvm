@@ -41,8 +41,50 @@ void MachineInstance::open_debugger(uint16_t port)
 	// Begin debugging (without locks)
 	auto& client = program().rspclient;
 	client->set_machine(machine());
-	client->interrupt();
-	//this->run_debugger_loop();
+
+	try {
+		// Debugger loop
+		while (client->process_one());
+	} catch (...) {
+		program().rsp_script = nullptr;
+		throw;
+	}
+
+	// Release client
+	program().rsp_script = nullptr;
+}
+
+void MachineInstance::resume_debugger(float timeout)
+{
+	auto& client = program().rspclient;
+	if (client.get() == nullptr) {
+		/* Without debugger, we can just run like normal. */
+		machine().run(timeout);
+		return;
+	}
+	auto& old_machine = client->machine();
+	client->set_machine(machine());
+
+	try {
+		// Tell GDB that machine is "running"
+		machine().stop(false);
+		// Interrupt to tell GDB that we are somewhere else now
+		client->interrupt();
+		// Debugger loop (only while machine is running)
+		while (client->process_one() && !machine().stopped());
+	} catch (const std::exception& e) {
+		printf("Error when debugging storage: %s\n", e.what());
+		client->set_machine(old_machine);
+		throw;
+	}
+
+	/* Debugger could have disconnected, let's finish. */
+	if (!machine().stopped() && !this->response_called(2)) {
+		machine().run(timeout);
+	}
+
+	/* Restore old machine used by debugger. */
+	client->set_machine(old_machine);
 }
 
 }

@@ -81,7 +81,7 @@ static inline void kvm_ts(struct vsl_log *vsl, const char *event,
 
 static void fetch_result(MachineInstance& mi, struct backend_result *result)
 {
-	if (UNLIKELY(!mi.backend_response_called())) {
+	if (UNLIKELY(!mi.response_called(1))) {
 		throw std::runtime_error("HTTP response not set. Program crashed? Check logs!");
 	}
 
@@ -125,7 +125,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 		auto fut = slot->tp.enqueue(
 		[&] {
 			/* Enforce that guest program calls the backend_response system call. */
-			machine.begin_backend_call();
+			machine.begin_call();
 
 			/* Call the on_error callback with exception reason. */
 			auto vm_entry_addr = prog.entry_at(ProgramEntryIndex::ON_ERROR);
@@ -191,9 +191,9 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			}
 			kvm_ts(ctx->vsl, "ProgramCall", t_work, t_prev, VTIM_real());
 			/* Enforce that guest program calls the backend_response system call. */
-			machine.begin_backend_call();
+			machine.begin_call();
 
-			const auto timeout = machine.tenant().config.max_req_time();
+			const auto timeout = machine.max_req_time();
 			const auto& prog = machine.program();
 			auto& vm = machine.machine();
 
@@ -284,7 +284,7 @@ int kvm_backend_stream(struct backend_post *post,
 		if (call_addr != 0x0) {
 			auto fut = slot.tp.enqueue(
 			[&] {
-				const auto timeout = mi.tenant().config.max_req_time();
+				const auto timeout = mi.max_req_time();
 				if (post->length == 0) {
 					vm.timed_vmcall(call_addr, timeout,
 						post->argument,

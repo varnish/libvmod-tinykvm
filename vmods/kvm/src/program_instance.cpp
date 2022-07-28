@@ -187,10 +187,32 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 					func, new_stack);
 			}
 			const float timeout = main_vm->tenant().config.max_storage_time();
-			stm.timed_reentry_stack(func, new_stack, timeout,
+			main_vm->begin_call();
+
+			/* Build call manually. */
+			tinykvm::tinykvm_x86regs regs;
+			stm.setup_call(regs, func, new_stack,
 				(uint64_t)n, (uint64_t)stm_bufaddr, (uint64_t)res_size);
+			regs.rip = stm.reentry_address();
+			stm.set_registers(regs);
+
+			/* Check if this is a debug program. */
+			if (main_vm->is_debug()) {
+				main_vm->resume_debugger(timeout);
+			} else {
+				stm.run(timeout);
+			}
+
+			//stm.timed_reentry_stack(func, new_stack, timeout,
+			//	(uint64_t)n, (uint64_t)stm_bufaddr, (uint64_t)res_size);
+
+			/* The machine must be stopped, and it must have called storage_return. */
+			if (!stm.stopped() || !main_vm->response_called(2)) {
+				throw std::runtime_error("Storage did not respond properly");
+			}
+
 			/* Get the result buffer and length (capped to res_size) */
-			auto regs = stm.registers();
+			regs = stm.registers();
 			const gaddr_t st_res_buffer = regs.rdi;
 			const uint64_t st_res_size  = (regs.rsi < res_size) ? regs.rsi : res_size;
 			if (res_addr != 0x0 && st_res_buffer != 0x0) {

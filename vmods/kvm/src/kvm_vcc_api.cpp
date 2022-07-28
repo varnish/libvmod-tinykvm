@@ -132,7 +132,7 @@ static int kvm_forkcall(VRT_CTX, kvm::VMPoolItem* slot,
 		auto fut = slot->tp.enqueue(
 		[&] () -> long {
 			auto& vm = machine.machine();
-			const auto timeout = machine.tenant().config.max_req_time();
+			const auto timeout = machine.max_req_time();
 			/* Call the guest function at addr */
 			vm.timed_vmcall(addr, timeout, farg);
 			/* Make sure no SMP work is in-flight. */

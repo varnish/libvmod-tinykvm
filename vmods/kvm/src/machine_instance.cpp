@@ -189,7 +189,7 @@ void MachineInstance::copy_to(uint64_t addr, const void* src, size_t len, bool z
 }
 
 float MachineInstance::max_req_time() const noexcept {
-	return tenant().config.max_req_time();
+	return tenant().config.max_req_time(is_debug());
 }
 const std::string& MachineInstance::name() const noexcept {
 	return tenant().config.name;

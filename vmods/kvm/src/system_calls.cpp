@@ -74,6 +74,9 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10010: // BACKEND_RESPONSE
 				syscall_backend_response(cpu, inst);
 				return;
+			case 0x10011: // STORAGE_RETURN
+				syscall_storage_return(cpu, inst);
+				return;
 			case 0x10020: // HTTP_APPEND
 				syscall_http_append(cpu, inst);
 				return;
@@ -124,6 +127,9 @@ void MachineInstance::setup_syscall_interface()
 				return;
 			case 0x10A00: // GET_MEMINFO
 				syscall_memory_info(cpu, inst);
+				return;
+			case 0x7F7F7: // BREAKPOINT
+				syscall_breakpoint(cpu, inst);
 				return;
 			default:
 				syscall_unknown(cpu, inst, scall);

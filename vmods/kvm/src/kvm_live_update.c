@@ -178,68 +178,50 @@ static inline void kvm_update_director(
 	dir->panic   = kvm_updater_be_panic;
 }
 
-VCL_BACKEND vmod_live_update(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING key, VCL_BYTES max_size)
+static VCL_BACKEND do_live_update(VRT_CTX, VCL_PRIV task,
+	VCL_STRING tenant, VCL_STRING key, VCL_BYTES max_size, VCL_BOOL debug)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	if (key == NULL) {
+	if (key == NULL)
+	{
 		VRT_fail(ctx, "Missing key");
 		return (NULL);
 	}
 
 	struct vmod_kvm_tenant *ten = kvm_tenant_find_key(task, tenant, key);
-	if (ten == NULL) {
+	if (ten == NULL)
+	{
 		VRT_fail(ctx, "Could not find tenant: %s, or wrong key: %s",
-			tenant, key);
+				 tenant, key);
 		return (NULL);
 	}
 
 	struct vmod_kvm_updater *kvmu;
 	kvmu = WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_updater));
-	if (kvmu == NULL) {
+	if (kvmu == NULL)
+	{
 		VRT_fail(ctx, "Out of workspace for live update");
 		return (NULL);
 	}
 
 	INIT_OBJ(kvmu, KVM_UPDATER_MAGIC);
 	kvmu->max_binary_size = max_size;
-	kvmu->tenant = ten;
-	kvmu->is_debug = 0;
+	kvmu->tenant   = ten;
+	kvmu->is_debug = debug;
 	kvm_update_director(&kvmu->dir, kvmu);
 
 	return (&kvmu->dir);
 }
 
+VCL_BACKEND vmod_live_update(VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING key, VCL_BYTES max_size)
+{
+	return (do_live_update(ctx, task, tenant, key, max_size, 0));
+}
+
 VCL_BACKEND vmod_live_debug(
 	VRT_CTX, VCL_PRIV task, VCL_STRING tenant, VCL_STRING key, VCL_BYTES max_size)
 {
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	if (key == NULL) {
-		VRT_fail(ctx, "Missing key");
-		return (NULL);
-	}
-
-	struct vmod_kvm_tenant *ten = kvm_tenant_find_key(task, tenant, key);
-	if (ten == NULL) {
-		VRT_fail(ctx, "Could not find tenant: %s, or wrong key: %s",
-			tenant, key);
-		return (NULL);
-	}
-
-	struct vmod_kvm_updater *kvmu;
-	kvmu = WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_updater));
-	if (kvmu == NULL) {
-		VRT_fail(ctx, "Out of workspace for live debugging");
-		return (NULL);
-	}
-
-	INIT_OBJ(kvmu, KVM_UPDATER_MAGIC);
-	kvmu->max_binary_size = max_size;
-	kvmu->tenant = ten;
-	kvmu->is_debug   = 1;
-	kvmu->debug_port = 0;
-	kvm_update_director(&kvmu->dir, kvmu);
-
-	return (&kvmu->dir);
+	return (do_live_update(ctx, task, tenant, key, max_size, 1));
 }
 
 VCL_BOOL vmod_live_update_file(

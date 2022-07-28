@@ -65,9 +65,9 @@ public:
 	/* With this we can enforce that certain syscalls have been invoked before
 	   we even check the validity of responses. This makes sure that crashes does
 	   not accidentally produce valid responses, which can cause confusion. */
-	void begin_backend_call() { m_backend_response_called = false; }
-	void finish_backend_call() { m_backend_response_called = true; }
-	bool backend_response_called() const noexcept { return m_backend_response_called; }
+	void begin_call() { m_response_called = 0; }
+	void finish_call(uint8_t n) { m_response_called = n; }
+	bool response_called(uint8_t n) const noexcept { return m_response_called == n; }
 
 	void init_sha256();
 	void hash_buffer(const char* buffer, int len);
@@ -79,6 +79,7 @@ public:
 	void set_sigaction(int sig, gaddr_t handler);
 	void print_backtrace(const gaddr_t addr);
 	void open_debugger(uint16_t);
+	void resume_debugger(float timeout);
 
 	static void kvm_initialize();
 	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool dbg);
@@ -104,7 +105,7 @@ private:
 	bool        m_is_storage = false;
 	bool        m_is_ephemeral = true;
 	bool        m_waiting_for_requests = false;
-	bool        m_backend_response_called = false;
+	uint8_t     m_response_called = 0;
 	bool        m_global_shared_memory = false;
 	bool        m_last_newline = true;
 	gaddr_t     m_sighandler = 0;

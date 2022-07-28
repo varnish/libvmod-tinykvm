@@ -60,7 +60,10 @@ struct TenantConfig
 	TenantGroup    group;
 
 	float    max_boot_time() const noexcept { return group.max_boot_time; }
-	float    max_req_time() const noexcept { return group.max_req_time; }
+	float    max_req_time(bool debug) const noexcept {
+		if (debug) return DEBUG_TIMEOUT;
+		return group.max_req_time;
+	}
 	float    max_storage_time() const noexcept { return group.max_storage_time; }
 	uint64_t max_main_memory() const noexcept { return group.max_main_memory; }
 	uint32_t max_req_memory() const noexcept { return group.max_req_mem; }

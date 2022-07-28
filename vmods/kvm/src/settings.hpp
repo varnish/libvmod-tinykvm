@@ -2,6 +2,9 @@
 
 namespace kvm
 {
+    static constexpr uint16_t DEBUG_PORT    = 2159;
+    static constexpr float    DEBUG_TIMEOUT = 120.0f;
+
     static constexpr size_t MAIN_STACK_SIZE = 1UL << 22; /* 4MB */
     static constexpr size_t MAIN_MEMORY_SIZE = 256; /* 256MB */
     static constexpr float  STARTUP_TIMEOUT = 16.0f;

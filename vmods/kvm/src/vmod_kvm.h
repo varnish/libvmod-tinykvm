@@ -31,6 +31,7 @@ struct vmod_kvm_backend
 
 	struct vmod_kvm_tenant *tenant;
 	const char *funcarg[2];
+	int debug;
 	uint64_t max_response_size;
 
 	double t_prev;

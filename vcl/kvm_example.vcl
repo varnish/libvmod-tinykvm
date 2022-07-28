@@ -44,11 +44,26 @@ sub vcl_backend_fetch {
 		return (fetch);
 	}
 	if (bereq.method == "POST" && bereq.http.X-LiveUpdate) {
-		/* Live update POST */
-		set bereq.backend = kvm.live_update(
-			bereq.http.Host, bereq.http.X-LiveUpdate, 64MB);
+		if (bereq.http.X-LiveDebug) {
+			/* Live update debug POST */
+			set bereq.backend = kvm.live_debug(
+				bereq.http.Host, bereq.http.X-LiveDebug, 64MB);
+			return (fetch);
+		} else {
+			/* Regular live update POST */
+			set bereq.backend = kvm.live_update(
+				bereq.http.Host, bereq.http.X-LiveUpdate, 64MB);
+			return (fetch);
+		}
+	}
+	if (bereq.http.X-LiveDebug) {
+		/* Requests to debug programs */
+		set bereq.backend = kvm.vm_debug_backend(
+			bereq.http.Host, bereq.http.X-LiveDebug,
+			bereq.url);
 		return (fetch);
 	}
+
 	/* Regular GET/POST request */
 	set bereq.backend = kvm.vm_backend(
 			bereq.http.Host,

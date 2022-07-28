@@ -118,3 +118,10 @@ $Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING url)
 - If a streaming function is registered, the VMOD will call the streaming
   function in the program for each data segment it receives, and then finally
   it will call the POST function at the end with the whole data segment.
+
+$Function BACKEND vm_debug_backend(PRIV_VCL, STRING tenant, STRING key, STRING url)
+
+- Execute request in a tenants debug program.
+- The program must have previously been installed via a live_debug() POST request.
+- Debug programs are allowed to execute the breakpoint system call,
+  which opens up the ability to use GDB to live-debug the request.

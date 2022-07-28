@@ -378,6 +378,9 @@ struct meminfo {
 };
 extern void get_meminfo(struct meminfo*);
 
+/* Live-debugging */
+extern void sys_breakpoint();
+
 /* This cannot be used when KVM is used as a backend */
 #ifndef KVM_API_ALREADY_DEFINED
 #define DYNAMIC_CALL(name, hash, ...) \
@@ -444,156 +447,169 @@ DYNAMIC_CALL(curl_fetch, 0xB86011FB, const char*, size_t, struct curl_op*, struc
 #define TRUST_ME(ptr)    ((void*)(uintptr_t)(ptr))
 
 #ifndef KVM_API_ALREADY_DEFINED
-asm(".global register_func\n" \
-".type register_func, function\n" \
-"register_func:\n" \
-"	mov $0x10000, %eax\n" \
-"	out %eax, $0\n" \
-"	ret");
+asm(".global register_func\n"
+	".type register_func, @function\n"
+	"register_func:\n"
+	".cfi_startproc\n"
+	"	mov $0x10000, %eax\n"
+	"	out %eax, $0\n"
+	"	ret\n"
+	".cfi_endproc\n");
 
-asm(".global wait_for_requests\n" \
-".type wait_for_requests, function\n" \
-"wait_for_requests:\n" \
-"	mov $0x10001, %eax\n" \
-"	out %eax, $0\n");
+asm(".global wait_for_requests\n"
+	".type wait_for_requests, @function\n"
+	"wait_for_requests:\n"
+	"	mov $0x10001, %eax\n"
+	"	out %eax, $0\n");
 
-asm(".global syscall_set_cacheable\n" \
-".type syscall_set_cacheable, function\n" \
-"syscall_set_cacheable:\n" \
-"	mov $0x10005, %eax\n" \
-"	out %eax, $0\n" \
-"	ret");
+asm(".global syscall_set_cacheable\n"
+	".type syscall_set_cacheable, @function\n"
+	"syscall_set_cacheable:\n"
+	"	mov $0x10005, %eax\n"
+	"	out %eax, $0\n"
+	"	ret\n");
 
-asm(".global sys_http_append\n" \
-".type sys_http_append, function\n" \
-"sys_http_append:\n" \
-"	mov $0x10020, %eax\n" \
-"	out %eax, $0\n" \
-"	ret");
+asm(".global backend_response\n"
+	".type backend_response, @function\n"
+	"backend_response:\n"
+	".cfi_startproc\n"
+	"	mov $0x10010, %eax\n"
+	"	out %eax, $0\n"
+	".cfi_endproc\n");
 
-asm(".global sys_http_set\n" \
-".type sys_http_set, function\n" \
-"sys_http_set:\n" \
-"	mov $0x10021, %eax\n" \
-"	out %eax, $0\n" \
-"	ret");
+asm(".global sys_http_append\n"
+	".type sys_http_append, @function\n"
+	"sys_http_append:\n"
+	"	mov $0x10020, %eax\n"
+	"	out %eax, $0\n"
+	"	ret\n");
 
-asm(".global sys_http_find\n" \
-".type sys_http_find, function\n" \
-"sys_http_find:\n" \
-"	mov $0x10022, %eax\n" \
-"	out %eax, $0\n" \
-"	ret");
+asm(".global sys_http_set\n"
+	".type sys_http_set, @function\n"
+	"sys_http_set:\n"
+	"	mov $0x10021, %eax\n"
+	"	out %eax, $0\n"
+	"	ret\n");
 
-asm(".global backend_response\n" \
-".type backend_response, function\n" \
-"backend_response:\n" \
-"	mov $0x10010, %eax\n" \
-"	out %eax, $0\n");
+asm(".global sys_http_find\n"
+	".type sys_http_find, @function\n"
+	"sys_http_find:\n"
+	"	mov $0x10022, %eax\n"
+	"	out %eax, $0\n"
+	"	ret\n");
 
-asm(".global shared_memory_area\n" \
-".type shared_memory_area, function\n" \
-"shared_memory_area:\n" \
-"	mov $0x10700, %eax\n" \
-"	out %eax, $0\n" \
-"   ret\n");
+asm(".global shared_memory_area\n"
+	".type shared_memory_area, @function\n"
+	"shared_memory_area:\n"
+	"	mov $0x10700, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
 
-asm(".global make_storage_memory_shared\n" \
-".type make_storage_memory_shared, function\n" \
-"make_storage_memory_shared:\n" \
-"	mov $0x10701, %eax\n" \
-"	out %eax, $0\n" \
-"   ret\n");
+asm(".global make_storage_memory_shared\n"
+	".type make_storage_memory_shared, @function\n"
+	"make_storage_memory_shared:\n"
+	"	mov $0x10701, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
 
-asm(".global make_all_memory_shared\n" \
-".type make_all_memory_shared, function\n" \
-"make_all_memory_shared:\n" \
-"	mov $0x10702, %eax\n" \
-"	out %eax, $0\n" \
-"   ret\n");
+asm(".global make_all_memory_shared\n"
+	".type make_all_memory_shared, @function\n"
+	"make_all_memory_shared:\n"
+	"	mov $0x10702, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
 
-asm(".global make_ephemeral\n" \
-".type make_ephemeral, function\n" \
-"make_ephemeral:\n" \
-"	mov $0x10703, %eax\n" \
-"	out %eax, $0\n" \
-"   ret\n");
+asm(".global make_ephemeral\n"
+	".type make_ephemeral, @function\n"
+	"make_ephemeral:\n"
+	"	mov $0x10703, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
 
-asm(".global storage_call\n" \
-".type storage_call, function\n" \
-"storage_call:\n" \
-"	mov $0x10707, %eax\n" \
-"	out %eax, $0\n" \
-"   ret\n");
+asm(".global storage_call\n"
+	".type storage_call, @function\n"
+	"storage_call:\n"
+	"	mov $0x10707, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
 
-asm(".global storage_callv\n" \
-".type storage_callv, function\n" \
-"storage_callv:\n" \
-"	mov $0x10708, %eax\n" \
-"	out %eax, $0\n" \
-"   ret\n");
+asm(".global storage_callv\n"
+	".type storage_callv, @function\n"
+	"storage_callv:\n"
+	"	mov $0x10708, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
 
-asm(".global sys_storage_task\n" \
-".type sys_storage_task, function\n" \
-"sys_storage_task:\n" \
-"	mov $0x10709, %eax\n" \
-"	out %eax, $0\n" \
-"   ret\n");
+asm(".global sys_storage_task\n"
+	".type sys_storage_task, @function\n"
+	"sys_storage_task:\n"
+	"	mov $0x10709, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
 
-asm(".global stop_storage_task\n" \
-".type stop_storage_task, function\n" \
-"stop_storage_task:\n" \
-"	mov $0x1070A, %eax\n" \
-"	out %eax, $0\n" \
-"   ret\n");
+asm(".global stop_storage_task\n"
+	".type stop_storage_task, @function\n"
+	"stop_storage_task:\n"
+	"	mov $0x1070A, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
 
-asm(".global storage_return\n" \
-".type storage_return, function\n" \
-"storage_return:\n" \
-"	mov $0xFFFF, %eax\n" \
-"	out %eax, $0\n" \
-"   ret\n");
+asm(".global storage_return\n"
+	".type storage_return, @function\n"
+	"storage_return:\n"
+	".cfi_startproc\n"
+	"	mov $0x10011, %eax\n"
+	"	out %eax, $0\n"
+	"	ret\n"
+	".cfi_endproc\n");
 
-asm(".global multiprocess\n" \
-".type multiprocess, function\n" \
-"multiprocess:\n" \
-"	mov $0x10710, %eax\n" \
-"	out %eax, $0\n" \
-"   ret\n");
+asm(".global multiprocess\n"
+	".type multiprocess, @function\n"
+	"multiprocess:\n"
+	"	mov $0x10710, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
 
-asm(".global multiprocess_array\n" \
-".type multiprocess_array, function\n" \
-"multiprocess_array:\n" \
-"	mov $0x10711, %eax\n" \
-"	out %eax, $0\n" \
-"   ret\n");
+asm(".global multiprocess_array\n"
+	".type multiprocess_array, @function\n"
+	"multiprocess_array:\n"
+	"	mov $0x10711, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
 
-asm(".global multiprocess_clone\n" \
-".type multiprocess_clone, function\n" \
-"multiprocess_clone:\n" \
-"	mov $0x10712, %eax\n" \
-"	out %eax, $0\n" \
-"   ret\n");
+asm(".global multiprocess_clone\n"
+	".type multiprocess_clone, @function\n"
+	"multiprocess_clone:\n"
+	"	mov $0x10712, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
 
-asm(".global multiprocess_wait\n" \
-".type multiprocess_wait, function\n" \
-"multiprocess_wait:\n" \
-"	mov $0x10713, %eax\n" \
-"	out %eax, $0\n" \
-"   ret\n");
+asm(".global multiprocess_wait\n"
+	".type multiprocess_wait, @function\n"
+	"multiprocess_wait:\n"
+	"	mov $0x10713, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
 
-asm(".global vcpuid\n" \
-".type vcpuid, function\n" \
-"vcpuid:\n" \
-"	mov %gs:(0x0), %eax\n" \
-"   ret\n");
+asm(".global vcpuid\n"
+	".type vcpuid, @function\n"
+	"vcpuid:\n"
+	"	mov %gs:(0x0), %eax\n"
+	"   ret\n");
 
-asm(".global get_meminfo\n" \
-".type get_meminfo, function\n" \
-"get_meminfo:\n" \
-"	mov $0x10A00, %eax\n" \
-"	out %eax, $0\n" \
-"   ret\n");
+asm(".global get_meminfo\n"
+	".type get_meminfo, @function\n"
+	"get_meminfo:\n"
+	"	mov $0x10A00, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
+
+asm(".global sys_breakpoint\n"
+	".type sys_breakpoint, @function\n"
+	"sys_breakpoint:\n"
+	"	mov $0x7F7F7, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
 #endif // KVM_API_ALREADY_DEFINED
 
 #ifdef __cplusplus
