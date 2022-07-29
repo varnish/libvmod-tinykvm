@@ -3,7 +3,7 @@
 
 namespace kvm {
 
-void MachineInstance::open_debugger(uint16_t port)
+void MachineInstance::open_debugger(uint16_t port, float timeout)
 {
 	// Make sure we are the first to trigger a breakpoint
 	program().rsp_mtx.lock();
@@ -45,6 +45,11 @@ void MachineInstance::open_debugger(uint16_t port)
 	try {
 		// Debugger loop
 		while (client->process_one());
+		// If the machine is still running, continue unless response set.
+		const int RESP = this->is_storage() ? 2 : 1;
+		if (!machine().stopped() && !this->response_called(RESP)) {
+			machine().run(timeout);
+		}
 	} catch (...) {
 		program().rsp_script = nullptr;
 		throw;
@@ -54,7 +59,7 @@ void MachineInstance::open_debugger(uint16_t port)
 	program().rsp_script = nullptr;
 }
 
-void MachineInstance::resume_debugger(float timeout)
+void MachineInstance::storage_debugger(float timeout)
 {
 	auto& client = program().rspclient;
 	if (client.get() == nullptr) {

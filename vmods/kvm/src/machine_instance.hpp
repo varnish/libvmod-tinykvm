@@ -78,8 +78,8 @@ public:
 
 	void set_sigaction(int sig, gaddr_t handler);
 	void print_backtrace();
-	void open_debugger(uint16_t);
-	void resume_debugger(float timeout);
+	void open_debugger(uint16_t, float timeout);
+	void storage_debugger(float timeout);
 
 	static void kvm_initialize();
 	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool dbg);

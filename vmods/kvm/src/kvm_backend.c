@@ -307,6 +307,10 @@ VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
 		VRT_fail(ctx, "KVM: Tenant not found: %s", tenant);
 		return (NULL);
 	}
+	if (!kvm_tenant_debug_allowed(kvmr->tenant)) {
+		VRT_fail(ctx, "KVM: Tenant not allowed to live-debug: %s", tenant);
+		return (NULL);
+	}
 
 	kvmr->funcarg[0] = url;
 	kvmr->funcarg[1] = NULL;

@@ -198,7 +198,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 
 			/* Check if this is a debug program. */
 			if (main_vm->is_debug()) {
-				main_vm->resume_debugger(timeout);
+				main_vm->storage_debugger(timeout);
 			} else {
 				stm.run(timeout);
 			}

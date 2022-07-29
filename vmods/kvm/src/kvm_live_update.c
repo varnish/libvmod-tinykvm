@@ -171,8 +171,8 @@ static inline void kvm_update_director(
 {
 	INIT_OBJ(dir, DIRECTOR_MAGIC);
 	dir->priv = kvmu;
-	dir->name = "VM updater director";
-	dir->vcl_name = "vmod_machine_update";
+	dir->name = "KVM live-update director";
+	dir->vcl_name = "vmod_kvm";
 	dir->gethdrs = kvm_updater_be_gethdrs;
 	dir->finish  = kvm_updater_be_finish;
 	dir->panic   = kvm_updater_be_panic;
@@ -184,15 +184,22 @@ static VCL_BACKEND do_live_update(VRT_CTX, VCL_PRIV task,
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	if (key == NULL)
 	{
-		VRT_fail(ctx, "Missing key");
+		VRT_fail(ctx, "KVM: Missing key");
 		return (NULL);
 	}
 
 	struct vmod_kvm_tenant *ten = kvm_tenant_find_key(task, tenant, key);
 	if (ten == NULL)
 	{
-		VRT_fail(ctx, "Could not find tenant: %s, or wrong key: %s",
+		VRT_fail(ctx, "KVM: Could not find tenant: %s, or wrong key: %s",
 				 tenant, key);
+		return (NULL);
+	}
+
+	if (debug && !kvm_tenant_debug_allowed(ten))
+	{
+		VRT_fail(ctx, "KVM: Tenant not allowed to live-debug: %s",
+				 tenant);
 		return (NULL);
 	}
 
@@ -200,7 +207,7 @@ static VCL_BACKEND do_live_update(VRT_CTX, VCL_PRIV task,
 	kvmu = WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_updater));
 	if (kvmu == NULL)
 	{
-		VRT_fail(ctx, "Out of workspace for live update");
+		VRT_fail(ctx, "KVM: Out of workspace for live update");
 		return (NULL);
 	}
 

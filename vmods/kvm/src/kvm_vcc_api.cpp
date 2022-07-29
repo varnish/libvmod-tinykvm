@@ -21,6 +21,12 @@ uint64_t kvm_resolve_name(kvm::TenantInstance* tenant, const char* func)
 	return tenant->lookup(func);
 }
 
+extern "C" int
+kvm_tenant_debug_allowed(kvm::TenantInstance* tenant)
+{
+	return tenant->config.allow_debug();
+}
+
 extern "C"
 int kvm_tenant_gucci(kvm::TenantInstance* tenant, int debug)
 {

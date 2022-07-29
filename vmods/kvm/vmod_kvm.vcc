@@ -39,6 +39,8 @@ within a virtual machine.
 - max_memory: The size of the main storage memory
 - max_request_memory: The available memory for each request
 - hugepages
+- allow_debug
+- allow_make_ephemeral
 - allowed_paths (default: []): a list of paths that the tenant can open/load.
 
 API

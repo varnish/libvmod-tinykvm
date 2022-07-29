@@ -297,7 +297,7 @@ static void syscall_breakpoint(vCPU& cpu, MachineInstance& inst)
 			VSLb(inst.ctx()->vsl, SLT_Debug,
 				"VM breakpoint at 0x%lX", (long) regs.rip);
 		}
-		inst.open_debugger(DEBUG_PORT);
+		inst.open_debugger(DEBUG_PORT, inst.max_req_time());
 	} else {
 		if (inst.ctx()) {
 			VSLb(inst.ctx()->vsl, SLT_Debug,

@@ -18,6 +18,7 @@ sub vcl_init {
 			"max_request_time": 4.0,
 			"hugepages": false,
 			"ephemeral_hugepages": false,
+			"allow_debug": true,
 			"allow_make_ephemeral": true,
 
 			"allowed_paths": [
