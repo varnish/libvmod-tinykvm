@@ -208,7 +208,32 @@ uint64_t MachineInstance::shared_memory_size() const noexcept
 	return tenant().config.group.shared_memory;
 }
 
-void MachineInstance::print(std::string_view text)
+void MachineInstance::print_backtrace()
+{
+	const auto regs = machine().registers();
+	machine().print_registers();
+
+	uint64_t rip = regs.rip;
+	if (rip >= 0x2000 && rip < 0x3000) {
+		/* Exception handler */
+		try {
+			machine().unsafe_copy_from_guest(&rip, regs.rsp, 8);
+			// Unwinding the stack is too hard :(
+			// But this is the real RSP:
+			//machine().unsafe_copy_from_guest(&rsp, regs.rsp + 24, 8);
+		} catch (...) {}
+	}
+
+	char buffer[4096];
+	int len = snprintf(buffer, sizeof(buffer),
+		"[0] 0x%8lX   %s\n",
+		rip, machine().resolve(rip).c_str());
+	if (len > 0) {
+		machine().print(buffer, len);
+	}
+}
+
+void MachineInstance::print(std::string_view text) const
 {
 	if (this->m_last_newline) {
 		printf(">>> [%s] %.*s", name().c_str(), (int)text.size(), text.begin());
@@ -217,7 +242,7 @@ void MachineInstance::print(std::string_view text)
 	}
 	this->m_last_newline = (text.back() == '\n');
 }
-tinykvm::Machine::printer_func MachineInstance::get_vsl_printer()
+tinykvm::Machine::printer_func MachineInstance::get_vsl_printer() const
 {
 	/* NOTE: Guests will "always" end with newlines */
 	return [this] (const char* buffer, size_t len) {

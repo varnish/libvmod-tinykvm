@@ -31,7 +31,7 @@ public:
 	static constexpr size_t  DIRECTOR_MAX = 32;
 	static constexpr size_t  RESULTS_MAX  = 3;
 
-	void print(std::string_view text);
+	void print(std::string_view text) const;
 	void dynamic_call(uint32_t hash);
 
 	auto& regex() { return m_regex; }
@@ -77,7 +77,7 @@ public:
 	gaddr_t resolve_address(const char* name) const { return machine().address_of(name); }
 
 	void set_sigaction(int sig, gaddr_t handler);
-	void print_backtrace(const gaddr_t addr);
+	void print_backtrace();
 	void open_debugger(uint16_t);
 	void resume_debugger(float timeout);
 
@@ -95,7 +95,7 @@ private:
 	void handle_timeout(gaddr_t);
 	void sanitize_path(char*, size_t);
 	void sanitize_file(char*, size_t);
-	tinykvm::Machine::printer_func get_vsl_printer();
+	tinykvm::Machine::printer_func get_vsl_printer() const;
 
 	const vrt_ctx* m_ctx;
 	machine_t m_machine;
@@ -107,7 +107,7 @@ private:
 	bool        m_waiting_for_requests = false;
 	uint8_t     m_response_called = 0;
 	bool        m_global_shared_memory = false;
-	bool        m_last_newline = true;
+	mutable bool m_last_newline = true;
 	gaddr_t     m_sighandler = 0;
 	VSHA256Context* m_sha_ctx = nullptr;
 

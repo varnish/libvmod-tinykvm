@@ -116,10 +116,12 @@ static void error_handling(kvm::VMPoolItem* slot,
 	const char *farg[2], struct backend_result *result, const char *exception)
 {
 	auto& machine = *slot->mi;
+	/* Print sane backtrace (faulting RIP) */
+	machine.print_backtrace();
+
 	const auto& prog = machine.program();
 	auto* ctx = machine.ctx();
-	if (prog.entry_at(ProgramEntryIndex::ON_ERROR) == 0x0)
-		goto internal_server_error;
+	if (prog.entry_at(ProgramEntryIndex::ON_ERROR) != 0x0) {
 	try {
 		auto& vm = machine.machine();
 		auto fut = slot->tp.enqueue(
@@ -160,9 +162,13 @@ static void error_handling(kvm::VMPoolItem* slot,
 		fprintf(stderr, "Backend VM exception: %s\n", e.what());
 		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
 	}
-internal_server_error:
-	/* Make sure no SMP work is in-flight. */
-	machine.machine().smp_wait();
+	}
+	try {
+		/* Make sure no SMP work is in-flight. */
+		machine.machine().smp_wait();
+		/* Print sane backtrace */
+		machine.print_backtrace();
+	} catch (...) {}
 	/* An error result */
 	new (result) backend_result {nullptr, 0,
 		500, /* Internal server error */
