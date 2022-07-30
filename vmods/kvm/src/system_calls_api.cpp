@@ -1,5 +1,5 @@
 extern "C" {
-	long kvm_SetBackend(VRT_CTX, VCL_BACKEND dir);
+	//long kvm_SetBackend(VRT_CTX, VCL_BACKEND dir);
 	void kvm_SetCacheable(VRT_CTX, bool c);
 	void kvm_SetTTLs(VRT_CTX, float ttl, float grace, float keep);
 }
@@ -9,7 +9,7 @@ namespace kvm {
 static void syscall_register_func(vCPU& cpu, MachineInstance& inst)
 {
 	// Register callback function for tenant
-	auto regs = cpu.registers();
+	const auto& regs = cpu.registers();
 	const uint64_t KERNEL_END = cpu.machine().kernel_end_address();
 	if (UNLIKELY(regs.rsi < KERNEL_END)) {
 		fprintf(stderr, "register_func: Function %lld is now 0x%llX\n",
@@ -40,17 +40,9 @@ static void syscall_storage_return(vCPU& cpu, MachineInstance& inst)
 	cpu.stop();
 }
 
-static void syscall_set_backend(vCPU& cpu, MachineInstance& inst)
-{
-	auto regs = cpu.registers();
-	auto* dir = inst.directors().item(regs.rdi);
-	kvm_SetBackend(inst.ctx(), dir);
-	regs.rax = 0;
-	cpu.set_registers(regs);
-}
 static void syscall_set_cacheable(vCPU& cpu, MachineInstance& inst)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	if (inst.ctx()->bo) {
 		kvm_SetCacheable(inst.ctx(), regs.rdi);
 		kvm_SetTTLs(inst.ctx(), // TTL, GRACE, KEEP
@@ -64,7 +56,7 @@ static void syscall_set_cacheable(vCPU& cpu, MachineInstance& inst)
 
 static void syscall_shared_memory(vCPU& cpu, MachineInstance& inst)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	regs.rax = inst.shared_memory_boundary();
 	regs.rdx = inst.shared_memory_boundary() + inst.shared_memory_size();
 	cpu.set_registers(regs);
@@ -72,21 +64,21 @@ static void syscall_shared_memory(vCPU& cpu, MachineInstance& inst)
 
 static void syscall_storage_mem_shared(vCPU& cpu, MachineInstance& inst)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	inst.machine().set_main_memory_writable(true);
 	regs.rax = 0;
 	cpu.set_registers(regs);
 }
 static void syscall_all_mem_shared(vCPU& cpu, MachineInstance& inst)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	inst.set_global_memory_shared(true);
 	regs.rax = 0;
 	cpu.set_registers(regs);
 }
 static void syscall_make_ephemeral(vCPU& cpu, MachineInstance& inst)
 {
-	auto regs = cpu.registers();
+	const auto& regs = cpu.registers();
 	if (inst.is_storage()) {
 		if (inst.tenant().config.allow_make_ephemeral())
 			inst.set_ephemeral(regs.rdi != 0);
@@ -99,7 +91,7 @@ static void syscall_make_ephemeral(vCPU& cpu, MachineInstance& inst)
 
 static void syscall_storage_callb(vCPU& cpu, MachineInstance& inst)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	if (!inst.is_storage()) {
 		VirtBuffer buffers[1];
 		buffers[0] = {
@@ -117,7 +109,7 @@ static void syscall_storage_callb(vCPU& cpu, MachineInstance& inst)
 }
 static void syscall_storage_callv(vCPU& cpu, MachineInstance& inst)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	const size_t n = regs.rsi;
 	if (!inst.is_storage() && n <= 64) {
 		VirtBuffer buffers[64];
@@ -133,7 +125,7 @@ static void syscall_storage_callv(vCPU& cpu, MachineInstance& inst)
 }
 static void syscall_storage_task(vCPU& cpu, MachineInstance& inst)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	const uint64_t function = regs.rdi;
 	const uint64_t argument = regs.rsi;
 	const int      async = regs.rdx;
@@ -163,14 +155,14 @@ static void syscall_storage_task(vCPU& cpu, MachineInstance& inst)
 }
 static void syscall_stop_storage_task(vCPU& cpu, MachineInstance& inst)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	regs.rax = inst.program().m_timer_system.remove(regs.rdi);
 	cpu.set_registers(regs);
 }
 
 static void syscall_multiprocess(vCPU& cpu, MachineInstance&)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	try {
 		/* It's too expensive to schedule multiple workloads. */
 		if (UNLIKELY(cpu.machine().smp_active())) {
@@ -202,7 +194,7 @@ static void syscall_multiprocess(vCPU& cpu, MachineInstance&)
 }
 static void syscall_multiprocess_array(vCPU& cpu, MachineInstance&)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	try {
 		/* It's too expensive to schedule multiple workloads. */
 		if (UNLIKELY(cpu.machine().smp_active())) {
@@ -232,7 +224,7 @@ static void syscall_multiprocess_array(vCPU& cpu, MachineInstance&)
 }
 static void syscall_multiprocess_clone(vCPU& cpu, MachineInstance&)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	try {
 		/* It's too expensive to schedule multiple workloads. */
 		if (UNLIKELY(cpu.machine().smp_active())) {
@@ -259,7 +251,7 @@ static void syscall_multiprocess_clone(vCPU& cpu, MachineInstance&)
 }
 static void syscall_multiprocess_wait(vCPU& cpu, MachineInstance&)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	try {
 		/* XXX: Propagate SMP exceptions */
 		cpu.machine().smp_wait();
@@ -284,14 +276,13 @@ static void syscall_memory_info(vCPU& cpu, MachineInstance &inst)
 		.workmem_upper = cpu.machine().banked_memory_capacity_bytes(),
 		.workmem_current = cpu.machine().banked_memory_bytes(),
 	};
-	auto regs = cpu.registers();
+	const auto& regs = cpu.registers();
 	cpu.machine().copy_to_guest(regs.rdi, &meminfo, sizeof(meminfo));
-	cpu.set_registers(regs);
 }
 
 static void syscall_breakpoint(vCPU& cpu, MachineInstance& inst)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	if (inst.is_debug()) {
 		if (inst.ctx()) {
 			VSLb(inst.ctx()->vsl, SLT_Debug,

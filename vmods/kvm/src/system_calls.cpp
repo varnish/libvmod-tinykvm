@@ -87,7 +87,7 @@ void MachineInstance::setup_syscall_interface()
 				syscall_http_find(cpu, inst);
 				return;
 			case 0x10100:
-				syscall_set_backend(cpu, inst);
+				//syscall_set_backend(cpu, inst);
 				return;
 			case 0x10700: // SHARED_MEMORY_AREA
 				syscall_shared_memory(cpu, inst);

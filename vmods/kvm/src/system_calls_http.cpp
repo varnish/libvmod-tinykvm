@@ -137,7 +137,7 @@ http_header_append(struct http* hp, const char* val, uint32_t len)
 
 static void syscall_http_append(vCPU& cpu, MachineInstance& inst)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	auto *hp = get_http(inst.ctx(), (gethdr_e)regs.rdi);
 	const uint64_t addr = regs.rsi;
 	const uint32_t len = regs.rdx;
@@ -154,7 +154,7 @@ static void syscall_http_append(vCPU& cpu, MachineInstance& inst)
 
 static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	const int where = regs.rdi;
 	const uint64_t g_what = regs.rsi;
 	const uint16_t g_wlen = regs.rdx;
@@ -208,7 +208,7 @@ static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
 
 static void syscall_http_find(vCPU& cpu, MachineInstance &inst)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	const int where = regs.rdi;
 	const uint64_t g_what = regs.rsi;
 	const uint16_t g_wlen = regs.rdx;
