@@ -1,4 +1,4 @@
-$Module kvm 3 "High-Performance KVM Sandbox For VCL"
+$Module kvm 3 "High-Performance KVM Sandbox For Varnish"
 
 DESCRIPTION
 ===========
@@ -50,12 +50,18 @@ $Event vmod_event
 
 $Function VOID load_tenants(PRIV_VCL, STRING filename)
 
-- Load tenants from file
+- Load tenant JSON configuration from file
+- See below for example JSON
+
+$Function BOOL fetch_tenants(PRIV_VCL, STRING url)
+
+- Fetch tenant JSON configuration from given URL
+- Connection and transmission delays will affect startup time of Varnish
 - See below for example JSON
 
 $Function VOID embed_tenants(PRIV_VCL, STRING json)
 
-- Load tenants directly from embedded JSON.
+- Parse tenant configuration directly from embedded JSON.
 - Example:
 	kvm.embed_tenants("""
 		{

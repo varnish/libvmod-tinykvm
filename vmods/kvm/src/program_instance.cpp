@@ -96,6 +96,10 @@ ProgramInstance::~ProgramInstance()
 
 long ProgramInstance::wait_for_initialization()
 {
+	if (!this->m_future.valid()) {
+		//fprintf(stderr, "Skipped over %s\n", main_vm->tenant().config.name.c_str());
+		return 0;
+	}
 	auto code = this->m_future.get();
 
 	if (main_vm == nullptr) {

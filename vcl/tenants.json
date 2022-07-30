@@ -1,19 +1,7 @@
 {
-	"default": {
-		"max_instructions": 2000000,
-		"max_memory": 42000000,
-		"max_heap":  4194304
-	},
-	"xpizza.com": {
-		"filename": "/tmp/xpizza",
-		"group": "default"
-	},
 	"ypizza.com": {
-		"filename": "/tmp/ypizza",
-		"group": "default"
-	},
-	"zpizza.com": {
-		"filename": "/tmp/zpizza",
-		"group": "default"
+		"group": "default",
+		"key": "123",
+		"filename": "/tmp/ypizza"
 	}
 }

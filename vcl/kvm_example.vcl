@@ -26,6 +26,8 @@ sub vcl_init {
 			]
 		}
 	}""");
+	//kvm.fetch_tenants("127.0.0.1:8000/tenants.json");
+
 	new f = file.init(std.getenv("HOME"));
 }
 

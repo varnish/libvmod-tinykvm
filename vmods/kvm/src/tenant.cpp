@@ -320,10 +320,11 @@ kvm::TenantInstance* kvm_tenant_find_key(VCL_PRIV task, const char* name, const 
 }
 
 extern "C"
-void kvm_init_tenants_str(VRT_CTX, VCL_PRIV task, const char* str)
+void kvm_init_tenants_str(VRT_CTX, VCL_PRIV task, const char* filename,
+	const char* str, size_t len)
 {
-	const std::vector<uint8_t> json { str, str + strlen(str) };
-	kvm::init_tenants(ctx, task, json, "string");
+	const std::vector<uint8_t> json { str, str + len };
+	kvm::init_tenants(ctx, task, json, filename);
 }
 
 extern "C"
