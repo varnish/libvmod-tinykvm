@@ -86,7 +86,7 @@ static void fetch_result(MachineInstance& mi, struct backend_result *result)
 	}
 
 	/* Get content-type and data */
-	auto regs = mi.machine().registers();
+	const auto& regs = mi.machine().registers();
 	const uint16_t status = regs.rdi;
 	const uint64_t tvaddr = regs.rsi;
 	const uint16_t tlen   = regs.rdx;
