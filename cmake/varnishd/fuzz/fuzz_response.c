@@ -98,7 +98,7 @@ void response_fuzzer(void* data, size_t len, int version)
         }
     }
 
-    if (0) {
+    if (1) {
         // signalling end of request, increases exec/s by 4x
         shutdown(fuzzd, SHUT_WR);
 

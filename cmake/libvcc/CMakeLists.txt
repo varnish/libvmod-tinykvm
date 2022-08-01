@@ -43,7 +43,10 @@ set(VCC_SOURCES ${VCC_PATH}/vcc_acl.c
             )
 if (NOT VARNISH_PLUS)
 	list (APPEND VCC_SOURCES
+		${VCC_PATH}/vcc_action.c
 		${VCC_PATH}/vcc_source.c
+		${VCC_PATH}/vcc_vmod.c
+		${VCC_PATH}/vcc_vmod_sym.c
 	)
 endif()
 add_library(vcc STATIC ${VCC_SOURCES})

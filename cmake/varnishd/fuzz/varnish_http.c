@@ -80,9 +80,10 @@ void varnishd_initialize(const char* vcl_path)
 		"-p", vmod_folder,
 		"-p", feature_http2,
 		"-p", feature_siproc,
-		"-p", feature_vslflush,
 		"-p", ti_buffer,
 #ifdef VARNISH_PLUS
+// XXX: vsl_flush not merged yet.
+//		"-p", feature_vslflush,
 		"-p", lbt_buffer,
 #endif
 		"-p", cs_buffer, // needed?

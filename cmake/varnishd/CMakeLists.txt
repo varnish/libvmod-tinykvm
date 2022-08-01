@@ -162,6 +162,10 @@ else()
 		${VD_PATH}/mgt/mgt_symtab.c
 		${VD_PATH}/storage/storage_debug.c
 	)
+	list (REMOVE_ITEM VARNISHD_SOURCES
+		${VD_PATH}/mgt/mgt_param_bits.c
+		${VD_PATH}/mgt/mgt_param_tbl.c
+	)
 endif()
 if (WORKSPACE_EMULATOR)
 	list (REMOVE_ITEM VARNISHD_SOURCES
