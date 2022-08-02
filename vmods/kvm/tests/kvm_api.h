@@ -175,8 +175,13 @@ http_alloc_find(int where, const char *key) {
  *
  **/
 extern int sys_regex_compile(const char *, size_t);
-extern int sys_regex_match(int rgx, const char *, size_t);
 extern void sys_regex_free(int rgx);
+/* Returns where the regex matches the buffer, or negative. */
+extern int sys_regex_match(int rgx, const char *, size_t);
+/* Regex substitution on buffer with another into dst. Flags: ALL=0x1 */
+extern long sys_regex_subst(int rgx, const char *buf, const char *subst, char *dst, size_t dstlen, int flags);
+/* Copy header fields from one HTTP header to another. */
+extern int sys_regex_copyto(int rgx, int srchp, int dsthp);
 
 /**
  * Varnish caching configuration
@@ -524,6 +529,20 @@ asm(".global sys_regex_match\n"
 	".type sys_regex_match, @function\n"
 	"sys_regex_match:\n"
 	"	mov $0x10032, %eax\n"
+	"	out %eax, $0\n"
+	"	ret\n");
+
+asm(".global sys_regex_subst\n"
+	".type sys_regex_subst, @function\n"
+	"sys_regex_subst:\n"
+	"	mov $0x10033, %eax\n"
+	"	out %eax, $0\n"
+	"	ret\n");
+
+asm(".global sys_regex_copyto\n"
+	".type sys_regex_copyto, @function\n"
+	"sys_regex_copyto:\n"
+	"	mov $0x10035, %eax\n"
 	"	out %eax, $0\n"
 	"	ret\n");
 

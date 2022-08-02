@@ -96,6 +96,12 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10032: // REGEX_MATCH
 				syscall_regex_match(cpu, inst);
 				return;
+			case 0x10033: // REGEX_SUBST
+				syscall_regex_subst(cpu, inst);
+				return;
+			case 0x10035: // REGEX_COPYTO
+				syscall_regex_copyto(cpu, inst);
+				return;
 			case 0x10100:
 				//syscall_set_backend(cpu, inst);
 				return;

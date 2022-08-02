@@ -246,4 +246,36 @@ static void syscall_http_find(vCPU& cpu, MachineInstance &inst)
 	cpu.set_registers(regs);
 }
 
+static void syscall_regex_copyto(vCPU& cpu, MachineInstance& inst)
+{
+    auto& regs = cpu.registers();
+    const uint32_t idx = regs.rdi;
+	const uint32_t srchp_idx = regs.rsi;
+	const uint32_t dsthp_idx = regs.rdx;
+
+	auto& entry = inst.regex().get(idx);
+	auto* srchp = get_http(inst.ctx(), srchp_idx);
+	auto* dsthp = get_http(inst.ctx(), dsthp_idx);
+	unsigned matches = 0;
+
+	/* Prevent recursive loop if we are duplicating src == dst. */
+	const size_t cnt = srchp->field_count;
+	for (unsigned u = HDR_FIRST; u < cnt; u++)
+	{
+		auto* begin = srchp->field_array[u].begin;
+		auto* end   = srchp->field_array[u].end;
+
+		bool success =
+        	(VRE_exec(entry.item, begin, end - begin, 0,
+            	0, nullptr, 0, nullptr) >= 0);
+		if (success) {
+			http_header_append(dsthp, begin, end - begin);
+			matches++;
+		}
+	}
+
+	regs.rax = matches;
+    cpu.set_registers(regs);
+}
+
 } // kvm

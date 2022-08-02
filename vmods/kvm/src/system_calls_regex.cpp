@@ -75,7 +75,34 @@ static void syscall_regex_match(vCPU& cpu, MachineInstance& inst)
             const volatile struct vre_limits *lim) */
         regs.rax =
             VRE_exec(entry.item, subject.c_str(), subject.size(), 0,
-                0, nullptr, 0, nullptr) >= 0;
+                0, nullptr, 0, nullptr);
+    }
+    cpu.set_registers(regs);
+}
+
+static void syscall_regex_subst(vCPU& cpu, MachineInstance& inst)
+{
+    auto& regs = cpu.registers();
+    const uint32_t idx   = regs.rdi;
+    const uint64_t vbuffer = regs.rsi;
+    const uint32_t vsubst = regs.rdx;
+    const uint64_t dstaddr = regs.rcx;
+    const uint32_t dstsize = regs.r8;
+    const uint32_t flags   = regs.r9;
+
+    auto& entry = inst.regex().get(idx);
+    const auto buffer = cpu.machine().copy_from_cstring(vbuffer);
+    const auto subst  = cpu.machine().copy_from_cstring(vsubst);
+    const bool all = (flags & 1) == 1;
+
+    const char* result =
+        VRT_regsub(inst.ctx(), all, buffer.c_str(), entry.item, subst.c_str());
+    if (result != nullptr) {
+        const uint32_t max = std::min(dstsize, (uint32_t)__builtin_strlen(result)+1);
+        cpu.machine().copy_to_guest(dstaddr, result, max);
+        regs.rax = max;
+    } else {
+        regs.rax = -1;
     }
     cpu.set_registers(regs);
 }

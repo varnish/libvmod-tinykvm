@@ -34,6 +34,7 @@ add_vmod_tests(vmod_kvm kvm
 	tests/not_found.vtc
 	tests/post_backend.vtc
 	tests/program_not_ready.vtc
+	tests/regex.vtc
 	tests/rotate_vcl.vtc
 	tests/stateful_storage.vtc
 	tests/stateful_buffered_storage.vtc
