@@ -16,6 +16,7 @@ using namespace tinykvm;
 #endif
 
 #include "system_calls_http.cpp"
+#include "system_calls_regex.cpp"
 #include "system_calls_api.cpp"
 
 namespace kvm {
@@ -85,6 +86,15 @@ void MachineInstance::setup_syscall_interface()
 				return;
 			case 0x10022: // HTTP_FIND
 				syscall_http_find(cpu, inst);
+				return;
+			case 0x10030: // REGEX_COMPILE
+				syscall_regex_compile(cpu, inst);
+				return;
+			case 0x10031: // REGEX_FREE
+				syscall_regex_free(cpu, inst);
+				return;
+			case 0x10032: // REGEX_MATCH
+				syscall_regex_match(cpu, inst);
 				return;
 			case 0x10100:
 				//syscall_set_backend(cpu, inst);

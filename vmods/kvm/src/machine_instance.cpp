@@ -49,8 +49,7 @@ MachineInstance::MachineInstance(
 	  m_is_debug(debug),
 	  m_is_storage(true),
 	  m_fd        {ten->config.max_fd(), "File descriptors"},
-	  m_regex     {ten->config.max_regex(), "Regex handles"},
-	  m_directors {ten->config.max_backends(), "Directors"}
+	  m_regex     {ten->config.max_regex(), "Regex handles"}
 {
 	machine().set_userdata<MachineInstance> (this);
 	machine().set_printer(get_vsl_printer());
@@ -121,8 +120,7 @@ MachineInstance::MachineInstance(
 	  m_is_ephemeral(source.is_ephemeral()),
 	  m_sighandler{source.m_sighandler},
 	  m_fd        {ten->config.max_fd(), "File descriptors"},
-	  m_regex     {ten->config.max_regex(), "Regex handles"},
-	  m_directors {ten->config.max_backends(), "Directors"}
+	  m_regex     {ten->config.max_regex(), "Regex handles"}
 {
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t0);
@@ -133,8 +131,6 @@ MachineInstance::MachineInstance(
 	m_fd.reset_and_loan(source.m_fd);
 	/* Load the compiled regexes of the source */
 	m_regex.reset_and_loan(source.m_regex);
-	/* Load the directors of the source */
-	m_directors.reset_and_loan(source.m_directors);
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t1);
 	printf("Total time in MachineInstance constr body: %ldns\n", nanodiff(t0, t1));
@@ -173,8 +169,6 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 	m_fd.reset_and_loan(source.m_fd);
 	/* Load the compiled regexes of the source */
 	m_regex.reset_and_loan(source.m_regex);
-	/* Load the directors of the source */
-	m_directors.reset_and_loan(source.m_directors);
 	/* XXX: Todo: reset more stuff */
 }
 

@@ -171,9 +171,17 @@ http_alloc_find(int where, const char *key) {
 #endif
 
 /**
+ * Regular Expressions
+ *
+ **/
+extern int sys_regex_compile(const char *, size_t);
+extern int sys_regex_match(int rgx, const char *, size_t);
+extern void sys_regex_free(int rgx);
+
+/**
  * Varnish caching configuration
  *
-**/
+ **/
 extern long
 syscall_set_cacheable(int cached, long ttl_millis, long grace_ms, long keep_ms);
 static inline long set_cacheable(int cached, float ttl, float grace, float keep) {
@@ -495,6 +503,27 @@ asm(".global sys_http_find\n"
 	".type sys_http_find, @function\n"
 	"sys_http_find:\n"
 	"	mov $0x10022, %eax\n"
+	"	out %eax, $0\n"
+	"	ret\n");
+
+asm(".global sys_regex_compile\n"
+	".type sys_regex_compile, @function\n"
+	"sys_regex_compile:\n"
+	"	mov $0x10030, %eax\n"
+	"	out %eax, $0\n"
+	"	ret\n");
+
+asm(".global sys_regex_free\n"
+	".type sys_regex_free, @function\n"
+	"sys_regex_free:\n"
+	"	mov $0x10031, %eax\n"
+	"	out %eax, $0\n"
+	"	ret\n");
+
+asm(".global sys_regex_match\n"
+	".type sys_regex_match, @function\n"
+	"sys_regex_match:\n"
+	"	mov $0x10032, %eax\n"
 	"	out %eax, $0\n"
 	"	ret\n");
 

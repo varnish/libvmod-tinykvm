@@ -60,7 +60,8 @@ inline auto crc32c(const std::string& value)
 	return crc32<0x1EDC6F41>(value.c_str(), value.size());
 }
 
-extern uint32_t crc32c_hw(const char* vdata, size_t len);
+extern uint32_t crc32c_hw(uint32_t partial, const char* data, size_t len);
+extern uint32_t crc32c_hw(const char* data, size_t len);
 
 inline uint32_t crc32c_hw(const std::string& value)
 {

@@ -4,9 +4,7 @@
 #include "instance_cache.hpp"
 
 struct vrt_ctx;
-struct VSHA256Context;
 struct vre;
-struct director;
 
 namespace kvm {
 class TenantInstance;
@@ -28,14 +26,11 @@ public:
 	using gaddr_t = uint64_t;
 	using machine_t = tinykvm::Machine;
 	static constexpr size_t  REGEX_MAX    = 64;
-	static constexpr size_t  DIRECTOR_MAX = 32;
-	static constexpr size_t  RESULTS_MAX  = 3;
 
 	void print(std::string_view text) const;
 	void dynamic_call(uint32_t hash);
 
 	auto& regex() { return m_regex; }
-	auto& directors() { return m_directors; }
 
 	auto& machine() { return m_machine; }
 	const auto& machine() const { return m_machine; }
@@ -109,11 +104,9 @@ private:
 	bool        m_global_shared_memory = false;
 	mutable bool m_last_newline = true;
 	gaddr_t     m_sighandler = 0;
-	VSHA256Context* m_sha_ctx = nullptr;
 
 	Cache<int> m_fd;
 	Cache<vre*> m_regex;
-	Cache<const director*> m_directors;
 };
 
 } // kvm
