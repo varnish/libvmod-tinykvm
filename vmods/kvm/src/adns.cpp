@@ -10,5 +10,5 @@ extern "C" {
 extern "C"
 void handle_vmod_event(struct vcl *vcl, enum vcl_event_e e)
 {
-    //ADNS_event(vcl, e);
+    ADNS_event(vcl, e);
 }
