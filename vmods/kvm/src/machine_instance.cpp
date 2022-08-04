@@ -39,7 +39,7 @@ MachineInstance::MachineInstance(
 	const TenantInstance* ten, ProgramInstance* inst,
 	bool debug)
 	: m_ctx(ctx),
-	  m_machine(binary, {
+	  m_machine(binary, tinykvm::MachineOptions{
 		.max_mem = ten->config.max_main_memory(),
 		.max_cow_mem = ten->config.max_req_memory(),
 		.hugepages = ten->config.hugepages(),
@@ -109,7 +109,7 @@ MachineInstance::MachineInstance(
 	const MachineInstance& source, const vrt_ctx* ctx,
 	const TenantInstance* ten, ProgramInstance* inst)
 	: m_ctx(ctx),
-	  m_machine(source.machine(), {
+	  m_machine(source.machine(), tinykvm::MachineOptions{
 		.max_mem = ten->config.max_main_memory(),
 		.max_cow_mem = ten->config.max_req_memory(),
 		.hugepages = ten->config.ephemeral_hugepages(),

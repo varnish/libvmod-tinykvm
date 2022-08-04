@@ -69,7 +69,6 @@ static int16_t sanitize_status_code(int16_t code)
 	/* Allow successes, redirects, client and server errors */
 	if (LIKELY(code >= 200 && code < 600))
 		return code;
-	[[unlikely]]
 	throw tinykvm::MachineException("Invalid HTTP status code returned by program", code);
 }
 

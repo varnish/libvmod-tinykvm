@@ -6,7 +6,7 @@ option(KVM_FACEDETECTION "" OFF)
 option(KVM_ADNS "" OFF)
 
 # WARNING: everything!
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++20 -O2 -g3")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++17 -O2 -g3")
 
 set(KVM_SOURCES
 	src/backend.cpp
