@@ -1,4 +1,3 @@
-#include "utils/crc32.hpp"
 
 namespace kvm {
 
@@ -16,6 +15,7 @@ static void syscall_regex_compile(vCPU& cpu, MachineInstance& inst)
             hash = crc32c_hw(hash, data.begin(), data.size());
             pattern.append(data);
         });
+    hash ^= 0xFFFFFFFF;
 
 	const int idx = inst.regex().find(hash);
 	if (idx >= 0) {

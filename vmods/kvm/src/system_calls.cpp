@@ -1,5 +1,6 @@
 #include "tenant_instance.hpp"
 #include "program_instance.hpp"
+#include "utils/crc32.hpp"
 #include "varnish.hpp"
 #include <cstring>
 #include <fcntl.h>
@@ -17,9 +18,19 @@ using namespace tinykvm;
 
 #include "system_calls_http.cpp"
 #include "system_calls_regex.cpp"
+#include "system_calls_dns.cpp"
 #include "system_calls_api.cpp"
 
 namespace kvm {
+uint32_t crc32_kvm(vCPU& cpu, uint64_t vaddr, size_t rsize)
+{
+    uint32_t hash = 0xFFFFFFFF;
+    cpu.machine().foreach_memory(vaddr, rsize,
+        [&] (const std::string_view data) {
+            hash = crc32c_hw(hash, data.begin(), data.size());
+        });
+	return hash ^ 0xFFFFFFFF;
+}
 
 void MachineInstance::sanitize_path(char* buffer, size_t buflen)
 {
@@ -104,6 +115,18 @@ void MachineInstance::setup_syscall_interface()
 				return;
 			case 0x10100:
 				//syscall_set_backend(cpu, inst);
+				return;
+			case 0x10200: // ADNS_NEW
+				syscall_adns_new(cpu, inst);
+				return;
+			case 0x10201: // ADNS_FREE
+				syscall_adns_free(cpu, inst);
+				return;
+			case 0x10202: // ADNS_CONFIG
+				syscall_adns_config(cpu, inst);
+				return;
+			case 0x10203: // ADNS_GET
+				syscall_adns_get(cpu, inst);
 				return;
 			case 0x10700: // SHARED_MEMORY_AREA
 				syscall_shared_memory(cpu, inst);

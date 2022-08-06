@@ -28,6 +28,7 @@
 extern "C" int usleep(uint32_t usec);
 
 namespace kvm {
+extern void libadns_untag(const std::string&, struct vcl*);
 static constexpr bool VERBOSE_STORAGE_TASK = false;
 
 VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
@@ -54,6 +55,7 @@ ProgramInstance::ProgramInstance(
 	  m_main_queue {1, STORAGE_VM_NICE, false},
 	  m_main_async_queue {1, ASYNC_STORAGE_NICE, ASYNC_STORAGE_LOWPRIO},
 	  entry_address {},
+	  m_vcl {ctx->vcl},
 	  rspclient{nullptr}
 {
 	this->m_future = m_main_queue.enqueue(
@@ -91,6 +93,10 @@ ProgramInstance::~ProgramInstance()
 {
 	if (main_vm_extra_cpu) {
 		main_vm_extra_cpu->deinit();
+	}
+	for (const auto& adns : m_adns_tags) {
+		if (!adns.tag.empty())
+			libadns_untag(adns.tag, this->m_vcl);
 	}
 }
 

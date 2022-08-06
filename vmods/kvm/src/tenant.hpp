@@ -76,6 +76,7 @@ struct TenantConfig
 	bool     ephemeral_hugepages() const noexcept { return group.ephemeral_hugepages; }
 	bool     allow_debug() const noexcept { return group.allow_debug; }
 	bool     allow_make_ephemeral() const noexcept { return group.allow_make_ephemeral; }
+	bool     allow_verbose_curl() const noexcept { return true; }
 	auto&    environ() const noexcept { return group.environ; }
 
 	static bool begin_dyncall_initialization(VCL_PRIV);

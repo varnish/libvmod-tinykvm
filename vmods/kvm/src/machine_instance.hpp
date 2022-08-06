@@ -1,5 +1,6 @@
 #pragma once
 #include <cassert>
+#include <cstdarg>
 #include <tinykvm/machine.hpp>
 #include "instance_cache.hpp"
 
@@ -25,9 +26,10 @@ class MachineInstance {
 public:
 	using gaddr_t = uint64_t;
 	using machine_t = tinykvm::Machine;
-	static constexpr size_t  REGEX_MAX    = 64;
+	static constexpr size_t REGEX_MAX = 64;
 
 	void print(std::string_view text) const;
+	void logf(const char*, ...) const;
 	void dynamic_call(uint32_t hash);
 
 	auto& regex() { return m_regex; }
@@ -108,5 +110,20 @@ private:
 	Cache<int> m_fd;
 	Cache<vre*> m_regex;
 };
+
+inline void MachineInstance::logf(const char *fmt, ...) const
+{
+	char buffer[2048];
+	va_list va;
+	va_start(va, fmt);
+	/* NOTE: vsnprintf has an insane return value. */
+	const int len = vsnprintf(buffer, sizeof(buffer), fmt, va);
+	va_end(va);
+	if (len >= 0 && (size_t)len < sizeof(buffer)) {
+		this->print(std::string_view{buffer, (size_t)len});
+	} else {
+		throw std::runtime_error("Printf buffer exceeded");
+	}
+}
 
 } // kvm

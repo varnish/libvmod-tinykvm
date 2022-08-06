@@ -1,5 +1,5 @@
-#include "../tenant.hpp"
 #include "../machine_instance.hpp"
+#include "../tenant_instance.hpp"
 #include "../varnish.hpp"
 #include <cassert>
 #include <cstring>
@@ -33,7 +33,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 	TenantConfig::set_dynamic_call(task, "curl.fetch",
 	[=] (MachineInstance& inst, tinykvm::vCPU& vcpu)
 	{
-		auto regs = vcpu.registers();
+		auto& regs = vcpu.registers();
 		/**
 		 * rdi = URL
 		 * rsi = URL length
@@ -47,12 +47,9 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		const int CONN_TIMEOUT = 5;
 		const int READ_TIMEOUT = 8;
 		constexpr uint64_t CURL_BUFFER_MAX = 1UL << 25; /* 32 MB */
-		constexpr bool VERBOSE_CURL = false;
 
 		/* URL */
-		std::string url;
-		url.resize(regs.rsi);
-		vcpu.machine().copy_from_guest(url.data(), regs.rdi, regs.rsi);
+		const auto url = vcpu.machine().buffer_to_string(regs.rdi, regs.rsi, 512);
 
 		constexpr size_t CONTENT_TYPE_LEN = 128;
 		constexpr size_t CURL_FIELDS_NUM = 8;
@@ -61,7 +58,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			uint64_t  unused;
 			int8_t    dummy_fetch;    /* Does not allocate content. */
 			int8_t    tcp_fast_open;  /* Enables TCP Fast Open. */
-			int8_t    unused_opt1;
+			int8_t    dont_verify_host;
 			int8_t    unused_opt2;
 			uint32_t  unused_opt3;
 		};
@@ -80,6 +77,10 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		};
 		opresult opres;
 		vcpu.machine().copy_from_guest(&opres, op_buffer, sizeof(opresult));
+
+		// The top bit of the HTTP status enables VERBOSE mode (for now)
+		const bool VERBOSE_CURL = (opres.status & 0x80000000) && inst.tenant().config.allow_verbose_curl();
+		opres.status &= ~0x80000000;
 
 		// Retrieve request header fields into string vector
 		std::array<std::string, CURL_FIELDS_NUM> fields;
@@ -101,7 +102,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		opres.content_addr = vcpu.machine().mmap_allocate(CURL_BUFFER_MAX);
 		const bool is_post = (opres.post_addr != 0x0 && opres.post_buflen != 0x0);
 
-		if constexpr (VERBOSE_CURL) {
+		if (VERBOSE_CURL) {
 		printf("Curl: %s (%s)\n", url.c_str(), is_post ? "POST" : "GET");
 		}
 
@@ -111,7 +112,14 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		};
 
 		CURL *curl = curl_easy_init();
-		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+		if (int err = curl_easy_setopt(curl, CURLOPT_URL, url.c_str()) != CURLE_OK) {
+			if (VERBOSE_CURL) {
+				printf("cURL URL errpr %d for URL: %s\n", err, url.c_str());
+			}
+			regs.rax = -err;
+			vcpu.set_registers(regs);
+			return;
+		}
 		curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, CONN_TIMEOUT);
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, READ_TIMEOUT); /* Seconds */
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, (write_callback)
@@ -144,6 +152,9 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			/* Enable TCP Fast Open. */
 			if (options.tcp_fast_open) {
 				curl_easy_setopt(curl, CURLOPT_TCP_FASTOPEN, 1);
+			}
+			if (options.dont_verify_host) {
+				curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0);
 			}
 			option_dummy_request = options.dummy_fetch;
 		}
@@ -222,17 +233,16 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 				opres.ct_length = ctlen;
 				std::memcpy(opres.ctype, ctype, ctlen);
 			}
-			else
-			{
+			else {
 				opres.ct_length = 0;
 			}
 			vcpu.machine().copy_to_guest(op_buffer, &opres, sizeof(opres));
-			if constexpr (VERBOSE_CURL) {
+			if (VERBOSE_CURL) {
 				printf("cURL transfer complete, %u bytes\n", opres.content_length);
 			}
 			regs.rax = 0;
 		} else {
-			if constexpr (VERBOSE_CURL) {
+			if (VERBOSE_CURL) {
 				printf("cURL error: %d\n", res);
 			}
 			regs.rax = -res;

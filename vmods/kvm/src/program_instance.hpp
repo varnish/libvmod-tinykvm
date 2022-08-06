@@ -1,8 +1,11 @@
 #pragma once
 #include "machine_instance.hpp"
+#include "instance_cache.hpp"
 #include "settings.hpp"
+#include "adns.hpp"
 #include "utils/cpptime.hpp"
 #include <blockingconcurrentqueue.h>
+struct vcl;
 
 namespace kvm {
 struct VirtBuffer {
@@ -59,6 +62,7 @@ enum class ProgramEntryIndex : uint8_t {
 class ProgramInstance {
 public:
 	using gaddr_t = MachineInstance::gaddr_t;
+	static constexpr size_t ADNS_MAX = 8;
 
 	ProgramInstance(std::vector<uint8_t>,
 		const vrt_ctx*, TenantInstance*, bool debug = false);
@@ -127,6 +131,15 @@ public:
 	   things, like the storage and request VMs. Timers carry capture
 	   storage referring to the other program members. */
 	cpptime::TimerSystem m_timer_system;
+
+	/* libadns keyes on VCL structs. */
+	vcl* get_adns_key() const { return this->m_vcl; }
+	vcl* m_vcl;
+
+	/* ADNS tags are used to receive DNS changes over time (storage only).
+	   Initialized during storage initialization, read-only during request handling. */
+	std::array<AsyncDNS, ADNS_MAX> m_adns_tags;
+	int free_adns_tag() const { for (size_t i = 0; i < m_adns_tags.size(); i++)if (m_adns_tags[i].tag.empty()) return i; return -1; }
 
 	/* Live debugging feature using the GDB RSP protocol.
 	   Debugging allows stepping through the tenants program line by line

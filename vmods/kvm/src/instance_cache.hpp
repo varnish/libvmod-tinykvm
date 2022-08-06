@@ -3,6 +3,13 @@
 #include <stdexcept>
 
 namespace kvm {
+/**
+ * @brief Manage cached values for tenant programs
+ * 
+ * 
+ * It is not necessary to use hash, but it should be non-zero when managing new objects.
+ * When hash is not used, it is a stand-in for a used/free value indicator.
+**/
 
 template <typename T>
 struct Cache {
@@ -11,6 +18,7 @@ struct Cache {
 		uint32_t hash = 0;
 		bool     non_owned = false;
 
+		bool empty() const noexcept { return hash == 0; }
 		void free() { item = T(); hash = 0; }
 	};
 
@@ -32,17 +40,24 @@ struct Cache {
 		}
 		return -1;
 	}
-	size_t manage(T& ptr, uint32_t hash)
+
+	size_t max_entries() const noexcept {
+		return cache.capacity();
+	}
+	bool is_full() const noexcept {
+		return cache.size() >= max_entries();
+	}
+	size_t manage(const T& ptr, uint32_t hash)
 	{
 		// Add new slot
-		if (cache.size() < max_entries)
+		if (cache.size() < max_entries())
 		{
 			cache.push_back({ptr, hash});
 			return cache.size() - 1;
 		}
 		// Re-use existing slot
 		for (unsigned idx = 0; idx < cache.size(); idx++) {
-			if (cache[idx].item == T()) {
+			if (cache[idx].empty()) {
 				cache[idx] = {ptr, hash};
 				return idx;
 			}
@@ -53,11 +68,32 @@ struct Cache {
 	{
 		cache.at(idx).free();
 	}
+	bool free_byhash(uint32_t hash)
+	{
+		for (auto& entry : cache) {
+			if (entry.hash == hash) {
+				entry.free();
+				return true;
+			}
+		}
+		return false;
+	}
+	bool free_byval(const T& val)
+	{
+		for (auto& entry : cache) {
+			if (!entry.empty() && entry.item == val) {
+				entry.free();
+				return true;
+			}
+		}
+		return false;
+	}
 
 	void reset_and_loan(const Cache& other) {
 		/* Clear out the cache and reset to other */
-		this->max_entries = other.max_entries;
-		cache.clear();
+		cache = {};
+		cache.reserve(other.max_entries());
+
 		/* Load the items of the other and make them non-owned */
 		for (const auto& item : other.cache) {
 			cache.push_back(item);
@@ -66,17 +102,16 @@ struct Cache {
 	}
 	void foreach_owned(std::function<void(Entry&)> callback) {
 		for (auto& entry : cache) {
-			if (entry.item && !entry.non_owned)
+			if (entry.hash != 0 && !entry.non_owned)
 				callback(entry);
 		}
 	}
 
 	Cache(size_t max, const char* desc)
-		: max_entries(max), description(desc) {}
+		: description(desc) { cache.reserve(max); }
 
 	std::vector<Entry> cache;
-	size_t max_entries;
-	const char*  description;
+	const char* description;
 };
 
 } // kvm
