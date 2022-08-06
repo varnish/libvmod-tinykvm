@@ -305,7 +305,9 @@ int adns_get_count(int idx, int entry) {
  * It is also possible to access storage only to make persistent changes, while
  * accessing global variables in the request VMs as needed afterwards. To
  * enable this mode call make_storage_memory_shared() from main. Be cautious
- * of race conditions, as always.
+ * of race conditions, as always. Alternatively, store things in the dedicated
+ * shared memory area. This area is always present and can be queried using the
+ * calls related to shared memory below here.
  *
  * When calling into the storage program the data you provide will be copied into
  * the VM, and the response you give back will be copied back into the request-

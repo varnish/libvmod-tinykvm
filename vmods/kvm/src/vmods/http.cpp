@@ -46,7 +46,9 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		const uint64_t options_buffer = regs.r8;
 		const int CONN_TIMEOUT = 5;
 		const int READ_TIMEOUT = 8;
-		constexpr uint64_t CURL_BUFFER_MAX = 1UL << 25; /* 32 MB */
+		/* We can over-allocate the buffer because we are immediately
+		   relaxing it after finishing the fetch operation. */
+		constexpr uint64_t CURL_BUFFER_MAX = 256UL * 1024UL * 1024UL;
 
 		/* URL */
 		const auto url = vcpu.machine().buffer_to_string(regs.rdi, regs.rsi, 512);
@@ -98,7 +100,6 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		}
 
 		// XXX: Fixme, mmap is basic/unreliable
-
 		opres.content_addr = vcpu.machine().mmap_allocate(CURL_BUFFER_MAX);
 		const bool is_post = (opres.post_addr != 0x0 && opres.post_buflen != 0x0);
 
@@ -112,148 +113,158 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		};
 
 		CURL *curl = curl_easy_init();
-		if (int err = curl_easy_setopt(curl, CURLOPT_URL, url.c_str()) != CURLE_OK) {
-			if (VERBOSE_CURL) {
-				printf("cURL URL errpr %d for URL: %s\n", err, url.c_str());
-			}
-			regs.rax = -err;
-			vcpu.set_registers(regs);
-			return;
-		}
-		curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, CONN_TIMEOUT);
-		curl_easy_setopt(curl, CURLOPT_TIMEOUT, READ_TIMEOUT); /* Seconds */
-		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, (write_callback)
-		[] (char *ptr, size_t size, size_t nmemb, void *poop) -> size_t {
-			auto& woop = *(writeop *)poop;
-			const size_t total = size * nmemb;
-			try {
-				woop.machine.copy_to_guest(woop.dst, ptr, total);
-				woop.dst += total;
-				return total;
-			} catch (...) {
-				return 0;
-			}
-		});
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &op);
-
-		/* Extra cURL options. */
-		bool option_dummy_request = false;
-		if (options_buffer != 0x0)
-		{
-			struct curl_options options;
-			inst.machine().copy_from_guest(&options, options_buffer, sizeof(options));
-			/* Custom interface/source IP. */
-			if (options.interface != 0x0) {
-				char ifname[64];
-				inst.machine().copy_from_guest(ifname, options.interface, sizeof(ifname));
-				ifname[sizeof(ifname)-1] = 0;
-				curl_easy_setopt(curl, CURLOPT_INTERFACE, ifname);
-			}
-			/* Enable following 301 Location. */
-			if (options.follow_location) {
-				curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
-			}
-			/* Enable TCP Fast Open. */
-			if (options.tcp_fast_open) {
-				curl_easy_setopt(curl, CURLOPT_TCP_FASTOPEN, 1);
-			}
-			if (options.dont_verify_host) {
-				curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0);
-			}
-			option_dummy_request = options.dummy_fetch;
-		}
-
-		/* Request header fields. */
 		struct curl_slist *req_list = NULL;
-		if (!fields.empty()) {
-			for (const auto& field : fields) {
-				if (!field.empty())
-					req_list = curl_slist_append(req_list, field.c_str());
-				else break;
-			}
-			curl_easy_setopt(curl, CURLOPT_HTTPHEADER, req_list);
-		}
-
-		/* Optional POST: We need a valid buffer and size. */
 		struct curl_slist *post_list = NULL;
-		readop rop;
-		if (is_post)
+		try
 		{
-			curl_easy_setopt(curl, CURLOPT_POST, 1);
-			curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, opres.post_buflen);
-			rop = readop {
-				.machine = &inst.machine(),
-				.src = opres.post_addr,
-				.bytes = opres.post_buflen,
-			};
-			curl_easy_setopt(curl, CURLOPT_READFUNCTION, (read_callback)
+			if (int err = curl_easy_setopt(curl, CURLOPT_URL, url.c_str()) != CURLE_OK) {
+				if (VERBOSE_CURL) {
+					printf("cURL URL errpr %d for URL: %s\n", err, url.c_str());
+				}
+				regs.rax = -err;
+				vcpu.set_registers(regs);
+				return;
+			}
+			curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, CONN_TIMEOUT);
+			curl_easy_setopt(curl, CURLOPT_TIMEOUT, READ_TIMEOUT); /* Seconds */
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, (write_callback)
 			[] (char *ptr, size_t size, size_t nmemb, void *poop) -> size_t {
-				auto& rop = *(readop *)poop;
-				const size_t total = std::min(rop.bytes, size * nmemb);
+				auto& woop = *(writeop *)poop;
+				const size_t total = size * nmemb;
 				try {
-					rop.machine->copy_from_guest(ptr, rop.src, total);
-					rop.src += total;
+					woop.machine.copy_to_guest(woop.dst, ptr, total);
+					woop.dst += total;
 					return total;
 				} catch (...) {
 					return 0;
 				}
 			});
-			curl_easy_setopt(curl, CURLOPT_READDATA, &rop);
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &op);
 
-			/* Optional Content-Type for POST. */
-			if (opres.ct_length != 0 && opres.ct_length < CONTENT_TYPE_LEN) {
-				/* Copy Content-Type from guest opres into string. */
-				std::string ct = "Content-Type: ";
-				ct.resize(ct.size() + opres.ct_length);
-				inst.machine().copy_from_guest(&ct[14], op_buffer + offsetof(opresult, ctype), opres.ct_length);
-
-				post_list = curl_slist_append(post_list, ct.c_str());
-				curl_easy_setopt(curl, CURLOPT_HTTPHEADER, post_list);
+			/* Extra cURL options. */
+			bool option_dummy_request = false;
+			if (options_buffer != 0x0)
+			{
+				struct curl_options options;
+				inst.machine().copy_from_guest(&options, options_buffer, sizeof(options));
+				/* Custom interface/source IP. */
+				if (options.interface != 0x0) {
+					const auto ifname = vcpu.machine().copy_from_cstring(options.interface);
+					curl_easy_setopt(curl, CURLOPT_INTERFACE, ifname.c_str());
+				}
+				/* Enable following 301 Location. */
+				if (options.follow_location) {
+					curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
+				}
+				/* Enable TCP Fast Open. */
+				if (options.tcp_fast_open) {
+					curl_easy_setopt(curl, CURLOPT_TCP_FASTOPEN, 1);
+				}
+				if (options.dont_verify_host) {
+					curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0);
+				}
+				option_dummy_request = options.dummy_fetch;
 			}
-		}
 
-		CURLcode res = curl_easy_perform(curl);
-		if (res == 0) {
-			if (!option_dummy_request) {
-				/* Calculate content length */
-				opres.content_length = op.dst - opres.content_addr;
-				/* Adjust and set new mmap base. XXX: Log failed relaxations */
-				vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, opres.content_length);
+			/* Request header fields. */
+			if (!fields.empty()) {
+				for (const auto& field : fields) {
+					if (!field.empty())
+						req_list = curl_slist_append(req_list, field.c_str());
+					else break;
+				}
+				curl_easy_setopt(curl, CURLOPT_HTTPHEADER, req_list);
+			}
+
+			/* Optional POST: We need a valid buffer and size. */
+			readop rop;
+			if (is_post)
+			{
+				curl_easy_setopt(curl, CURLOPT_POST, 1);
+				curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, opres.post_buflen);
+				rop = readop {
+					.machine = &inst.machine(),
+					.src = opres.post_addr,
+					.bytes = opres.post_buflen,
+				};
+				curl_easy_setopt(curl, CURLOPT_READFUNCTION, (read_callback)
+				[] (char *ptr, size_t size, size_t nmemb, void *poop) -> size_t {
+					auto& rop = *(readop *)poop;
+					const size_t total = std::min(rop.bytes, size * nmemb);
+					try {
+						rop.machine->copy_from_guest(ptr, rop.src, total);
+						rop.src += total;
+						return total;
+					} catch (...) {
+						return 0;
+					}
+				});
+				curl_easy_setopt(curl, CURLOPT_READDATA, &rop);
+
+				/* Optional Content-Type for POST. */
+				if (opres.ct_length != 0 && opres.ct_length < CONTENT_TYPE_LEN) {
+					/* Copy Content-Type from guest opres into string.
+					   TODO: Improve this to avoid a heap allocation. cURL copies the string. */
+					std::string ct = "Content-Type: ";
+					ct.resize(ct.size() + opres.ct_length);
+					inst.machine().copy_from_guest(&ct[14], op_buffer + offsetof(opresult, ctype), opres.ct_length);
+
+					post_list = curl_slist_append(post_list, ct.c_str());
+					curl_easy_setopt(curl, CURLOPT_HTTPHEADER, post_list);
+				}
+			}
+
+			CURLcode res = curl_easy_perform(curl);
+			if (res == 0) {
+				if (!option_dummy_request) {
+					/* Calculate content length */
+					opres.content_length = op.dst - opres.content_addr;
+					/* Adjust and set new mmap base. XXX: Log failed relaxations */
+					vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, opres.content_length);
+				} else {
+					opres.content_length = 0;
+					/* Adjust the buffer down to zero again, completely unmapping it. */
+					vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, 0);
+				}
+				/* Get response status and Content-Type */
+				long status;
+				res = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
+				opres.status = status;
+				const char* ctype = nullptr;
+				res = curl_easy_getinfo(curl, CURLINFO_CONTENT_TYPE, &ctype);
+				/* We have an expectation of at least CONTENT_TYPE_LEN bytes available for
+				writing back Content-Type, directly into opres structure. */
+				if (res == 0 && ctype != nullptr) {
+					const size_t ctlen = std::min(strlen(ctype)+1, CONTENT_TYPE_LEN);
+					opres.ct_length = ctlen;
+					std::memcpy(opres.ctype, ctype, ctlen);
+				}
+				else {
+					opres.ct_length = 0;
+				}
+				vcpu.machine().copy_to_guest(op_buffer, &opres, sizeof(opres));
+				if (VERBOSE_CURL) {
+					printf("cURL transfer complete, %u bytes\n", opres.content_length);
+				}
+				regs.rax = 0;
 			} else {
-				opres.content_length = 0;
-				/* Adjust the buffer down to zero again, completely unmapping it. */
-				vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, 0);
+				if (VERBOSE_CURL) {
+					printf("cURL error: %d\n", res);
+				}
+				/* Free the over-allocated fetch buffer. */
+				vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, 0u);
+				regs.rax = -res;
 			}
-			/* Get response status and Content-Type */
-			long status;
-			res = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
-			opres.status = status;
-			const char* ctype = nullptr;
-			res = curl_easy_getinfo(curl, CURLINFO_CONTENT_TYPE, &ctype);
-			/* We have an expectation of at least CONTENT_TYPE_LEN bytes available for
-			   writing back Content-Type, directly into opres structure. */
-			if (res == 0 && ctype != nullptr) {
-				const size_t ctlen = std::min(strlen(ctype)+1, CONTENT_TYPE_LEN);
-				opres.ct_length = ctlen;
-				std::memcpy(opres.ctype, ctype, ctlen);
-			}
-			else {
-				opres.ct_length = 0;
-			}
-			vcpu.machine().copy_to_guest(op_buffer, &opres, sizeof(opres));
-			if (VERBOSE_CURL) {
-				printf("cURL transfer complete, %u bytes\n", opres.content_length);
-			}
-			regs.rax = 0;
-		} else {
-			if (VERBOSE_CURL) {
-				printf("cURL error: %d\n", res);
-			}
-			regs.rax = -res;
 		}
-		curl_easy_cleanup(curl);
+		catch (...)
+		{
+			/* Free the over-allocated fetch buffer. */
+			vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, 0u);
+			regs.rax = -1;
+		}
 		curl_slist_free_all(req_list);
 		curl_slist_free_all(post_list);
+		curl_easy_cleanup(curl);
 		vcpu.set_registers(regs);
 	});
 }
