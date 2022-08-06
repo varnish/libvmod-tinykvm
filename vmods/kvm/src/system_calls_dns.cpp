@@ -96,7 +96,7 @@ static void syscall_adns_new(vCPU& cpu, MachineInstance& inst)
 	 * RDI: tag key, added to the program instance address to build program-unique tag
 	 * XXX: Tag is not fully unique due to program address not being random enough.
 	 **/
-	std::string tag = std::to_string((uintptr_t)regs.rdi) + std::to_string((uintptr_t)&inst.program());
+	std::string tag = std::to_string((uint32_t)regs.rdi) + std::to_string((uintptr_t)&inst.program());
 
 	auto ret = ADNS_tag(tag.c_str(), inst.program().get_adns_key());
 	if (ret < 0) {

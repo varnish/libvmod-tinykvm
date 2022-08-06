@@ -251,14 +251,14 @@ union adns_rules {
 	} b;
 	uint64_t reg;
 };
-extern int sys_adns_new(long key);
+extern int sys_adns_new(uint32_t key);
 extern int sys_adns_free(int idx);
 extern int sys_adns_config(int idx, const char *host, const char *service, long ttl, uint64_t rules);
 struct adns {
 	uint8_t  ipv;
-	/* IPv4 or IPv6 Address. */
+	/* IPv4, IPv6 or Hostname. */
 	uint8_t  addrlen;
-	uint8_t  address[47];
+	uint8_t  address[126];
 	int8_t   touched;
 	uint16_t priority;
 	uint16_t weight;
@@ -269,7 +269,7 @@ extern int sys_adns_get(int idx, int entry, const struct adns *, size_t);
 
 /* Create new configurable ADNS entry based on integral key. Returns tag index. */
 static inline
-int adns_new(long key) { return sys_adns_new(key); }
+int adns_new(uint32_t key) { return sys_adns_new(key); }
 
 /* Configure the ADNS index with hostname, service, TTL and rules. */
 static inline
