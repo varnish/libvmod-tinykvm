@@ -8,6 +8,7 @@ namespace kvm {
 
 struct AsyncDNSEntry {
 	static constexpr size_t HASH_LEN = 32;
+	static constexpr size_t ADDR_LEN = 47;
 
 	std::string name;
     uint8_t ipv;

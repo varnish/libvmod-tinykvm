@@ -56,11 +56,11 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		struct curl_options {
 			uint64_t  interface;
 			uint64_t  unused;
+			int8_t    follow_location; /* Follow Location in 301. */
 			int8_t    dummy_fetch;    /* Does not allocate content. */
 			int8_t    tcp_fast_open;  /* Enables TCP Fast Open. */
 			int8_t    dont_verify_host;
-			int8_t    unused_opt2;
-			uint32_t  unused_opt3;
+			uint32_t  unused_opt5;
 		};
 		struct opfields {
 			uint64_t addr[CURL_FIELDS_NUM];
@@ -148,6 +148,10 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 				inst.machine().copy_from_guest(ifname, options.interface, sizeof(ifname));
 				ifname[sizeof(ifname)-1] = 0;
 				curl_easy_setopt(curl, CURLOPT_INTERFACE, ifname);
+			}
+			/* Enable following 301 Location. */
+			if (options.follow_location) {
+				curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
 			}
 			/* Enable TCP Fast Open. */
 			if (options.tcp_fast_open) {

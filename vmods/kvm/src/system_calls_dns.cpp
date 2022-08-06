@@ -94,6 +94,7 @@ static void syscall_adns_new(vCPU& cpu, MachineInstance& inst)
 	}
 	/**
 	 * RDI: tag key, added to the program instance address to build program-unique tag
+	 * XXX: Tag is not fully unique due to program address not being random enough.
 	 **/
 	std::string tag = std::to_string((uintptr_t)regs.rdi) + std::to_string((uintptr_t)&inst.program());
 
@@ -174,6 +175,8 @@ static void syscall_adns_config(vCPU& cpu, MachineInstance& inst)
 
 struct g_adns_entry {
 	uint8_t  ipv;
+	uint8_t  addrlen;
+	std::array<uint8_t, AsyncDNSEntry::ADDR_LEN> addr;
 	int8_t   touched;
 	uint16_t priority;
 	uint16_t weight;
@@ -195,29 +198,30 @@ static void syscall_adns_get(vCPU& cpu, MachineInstance& inst)
 	const uint32_t idx = regs.rsi;
 	const uint64_t vbuffer = regs.rdx;
 	const size_t   vbuflen = regs.rcx;
-	const uint64_t vhost    = regs.r8;
-	const size_t   vhostlen = regs.r9;
 	auto& adns = inst.program().m_adns_tags.at(tag);
 
 	std::unique_lock lck(adns.mtx);
 	if (UNLIKELY(adns.tag.empty())) {
 		throw std::runtime_error("ADNS tag not initialized");
 	}
-	if (idx < adns.entries.size() && vbuflen >= sizeof(g_adns_entry)) {
+	if (vbuffer == 0x0) {
+		regs.rax = adns.entries.size();
+	}
+	else if (idx < adns.entries.size() && vbuflen >= sizeof(g_adns_entry)) {
 		const auto& entry = adns.entries.at(idx);
-		const g_adns_entry gentry {
+		g_adns_entry gentry {
 			.ipv     = entry.ipv,
+			.addrlen = (uint8_t)entry.name.size(),
 			.touched = entry.touched,
 			.priority = entry.priority,
 			.weight  = entry.weight,
-			.hash    = entry.hash
+			.hash    = entry.hash,
 		};
-		cpu.machine().copy_to_guest(vbuffer, &gentry, sizeof(gentry));
-		/* Name buffer (zero-terminated) */
-		printf("ADNS returning %s\n", entry.name.c_str());
-		if (vhostlen >= entry.name.size()+1) {
-			cpu.machine().copy_to_guest(vhost, entry.name.c_str(), entry.name.size()+1);
-			regs.rax = entry.name.size();
+		const uint8_t addrlen = uint8_t(entry.name.size() + 1);
+		if (addrlen <= AsyncDNSEntry::ADDR_LEN) {
+			std::memcpy(gentry.addr.data(), entry.name.c_str(), addrlen);
+			cpu.machine().copy_to_guest(vbuffer, &gentry, sizeof(gentry));
+			regs.rax = 0;
 		} else {
 			regs.rax = -1;
 		}
