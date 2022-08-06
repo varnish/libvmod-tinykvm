@@ -1,0 +1,87 @@
+varnishtest "KVM Backend: cURL fetch test"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include "kvm_api.h"
+#include <string.h>
+
+static void on_get(const char *url)
+{
+	set_cacheable(0, 1.0f, 0.0f, 0.0f);
+
+	if (strcmp(url, "/example") == 0) {
+		backend_response_str(200, "text/plain", "Hello Example World");
+	}
+	if (strcmp(url, "/fetch") == 0) {
+		const char *strport = http_alloc_find(BEREQ, "X-Port");
+		const int port = atoi(&strport[8]);
+
+		/* Create URL to reach Varnish at /example. */
+		char curl_url[64];
+		const int curl_len =
+			snprintf(curl_url, sizeof(curl_url), "http://127.0.0.1:%d/example", port);
+
+		/* Add Host: xpizza.com to reach this tenant program. */
+		struct curl_fields fields = {};
+		fields.ptr[0] = "Host: xpizza.com";
+		fields.len[0] = strlen(fields.ptr[0]);
+
+		struct curl_op op = {};
+		curl_fetch(curl_url, curl_len, &op, &fields, NULL);
+
+		backend_response(op.status, op.ctype, op.ctlen, op.content, op.content_length);
+	}
+	backend_response_str(200, "text/plain", "Hello World");
+}
+
+int main(int argc, char **argv)
+{
+	set_backend_get(on_get);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+	vcl 4.1;
+	import kvm;
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""{
+			"xpizza.com": {
+				"filename": "${tmpdir}/${testname}",
+				"key": "",
+				"group": "test"
+			}
+		}""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+			bereq.http.Host,
+			bereq.url);
+	}
+} -start
+
+define m1 make_requests {
+	txreq -url "/fetch" -hdr "Host: xpizza.com" -hdr "X-Port: ${v1_port}"
+	rxresp
+	expect resp.body == "Hello Example World"
+	expect resp.status == 200
+}
+
+client c1 -repeat 25 {
+	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+
+	${m1_make_requests}
+	${m1_make_requests}
+} -run
