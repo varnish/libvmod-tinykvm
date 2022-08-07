@@ -186,6 +186,9 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 					curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0);
 				}
 				option_dummy_request = options.dummy_fetch;
+				if (option_dummy_request) {
+					curl_easy_setopt(curl, CURLOPT_NOBODY, 1);
+				}
 			}
 
 			/* Request header fields. */
