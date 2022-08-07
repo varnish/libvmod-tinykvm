@@ -510,6 +510,9 @@ DYNAMIC_CALL(goto_dns, 0x746238D2)
    when fetching. The fetcher will also fill out the input structure if the
    fetch succeeds. If a serious error is encountered, the function returns
    a non-zero value and the struct contents are undefined.
+   If any of the headers or headers_length fields are non-zero, cURL will
+   ***NOT*** read response headers into them and set the values. It is a
+   way to disable the feature, as it takes up extra memory if unwanted.
    *curl_fields* and *curl_options* are both optional and can be NULL.
    NOTE: It is possible to run out of memory in mutable storage if you do a
    lot of cURL fetching without unmapping the content buffer. */
@@ -517,7 +520,10 @@ struct curl_op {
 	uint32_t    status;
 	uint32_t    post_buflen;
 	const void *post_buffer;
-	void  *content;
+	char    *headers;
+	uint32_t headers_length;
+	uint32_t unused1;
+	void    *content;
 	uint32_t content_length;
 	uint32_t ctlen;
 	char   ctype[128];

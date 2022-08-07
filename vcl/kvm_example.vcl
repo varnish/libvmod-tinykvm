@@ -12,7 +12,7 @@ sub vcl_init {
 			"filename": "/tmp/test",
 
 			"concurrency": 32,
-			"max_memory": 512,
+			"max_memory": 1200,
 			"max_boot_time": 16.0,
 			"max_request_memory": 512,
 			"max_request_time": 4.0,

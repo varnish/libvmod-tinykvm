@@ -24,7 +24,6 @@ set(KVM_SOURCES
 	src/varnish_interface.c
 	### VMODS ###
 	src/vmods/vmods.cpp
-	src/vmods/goto.cpp
 	src/vmods/http.cpp
 )
 if (KVM_FACEDETECTION)

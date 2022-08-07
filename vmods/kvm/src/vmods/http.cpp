@@ -16,6 +16,7 @@ extern "C" {
 namespace kvm {
 typedef size_t (*read_callback)(char *buffer, size_t size, size_t nitems, void *);
 typedef size_t (*write_callback)(char *, size_t, size_t, void *);
+typedef size_t (*header_callback)(char *buffer, size_t size, size_t nitems, void *);
 struct writeop {
 	tinykvm::Machine& machine;
 	uint64_t dst;
@@ -40,7 +41,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		 * rdx = result buffer
 		 * rcx = fields buffer
 		 * r8  = options buffer
-		**/
+		 **/
 		const uint64_t op_buffer = regs.rdx;
 		const uint64_t fields_buffer = regs.rcx;
 		const uint64_t options_buffer = regs.r8;
@@ -72,6 +73,9 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			uint32_t status;
 			uint32_t post_buflen;
 			uint64_t post_addr;
+			uint64_t headers;
+			uint32_t headers_length;
+			uint32_t unused1;
 			uint64_t content_addr;
 			uint32_t content_length;
 			uint32_t ct_length;
@@ -115,6 +119,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		CURL *curl = curl_easy_init();
 		struct curl_slist *req_list = NULL;
 		struct curl_slist *post_list = NULL;
+		std::string headers;
 		try
 		{
 			if (int err = curl_easy_setopt(curl, CURLOPT_URL, url.c_str()) != CURLE_OK) {
@@ -140,6 +145,23 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 				}
 			});
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &op);
+
+			/* Response header fields. */
+			if (opres.headers == 0x0 && opres.headers_length == 0)
+			{
+				curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, (header_callback)
+				[] (char *buffer, size_t size, size_t nitems, void *usr) -> size_t
+				{
+					auto *headers = (std::string *)usr;
+					try {
+						headers->append(buffer, nitems * size);
+						return nitems * size;
+					} catch (...) {
+						return 0;
+					}
+				});
+				curl_easy_setopt(curl, CURLOPT_HEADERDATA, &headers);
+			}
 
 			/* Extra cURL options. */
 			bool option_dummy_request = false;
@@ -242,7 +264,18 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 				else {
 					opres.ct_length = 0;
 				}
+				/* Allocate and copy the response headers, if any. */
+				opres.headers = 0x0;
+				opres.headers_length = 0;
+				if (!headers.empty())
+				{
+					opres.headers = vcpu.machine().mmap_allocate(headers.size()+1);
+					opres.headers_length = headers.size();
+					vcpu.machine().copy_to_guest(opres.headers, headers.data(), headers.size()+1);
+				}
+				// OP result back to guest
 				vcpu.machine().copy_to_guest(op_buffer, &opres, sizeof(opres));
+
 				if (VERBOSE_CURL) {
 					printf("cURL transfer complete, %u bytes\n", opres.content_length);
 				}
