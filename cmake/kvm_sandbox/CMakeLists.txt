@@ -3,7 +3,7 @@ project (kvm_sandbox CXX)
 
 option(SHARED_KVM "Build the KVM sandbox PIC" ON)
 option(KVM_FACEDETECTION "" OFF)
-option(KVM_ADNS "" OFF)
+option(KVM_ADNS "" ON)
 
 # WARNING: everything!
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++17 -O2 -g3")
