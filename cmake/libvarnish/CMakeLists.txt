@@ -117,7 +117,7 @@ else()
 	# Brilliant idea to require this random global define
 	target_compile_definitions(varnish PUBLIC _lint=1)
 endif()
-#set_property(TARGET varnish PROPERTY POSITION_INDEPENDENT_CODE 1)
+set_property(TARGET varnish PROPERTY POSITION_INDEPENDENT_CODE 1)
 
 if (LIBFUZZER)
 	if (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
