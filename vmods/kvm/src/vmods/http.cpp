@@ -55,7 +55,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		const auto url = vcpu.machine().buffer_to_string(regs.rdi, regs.rsi, 512);
 
 		constexpr size_t CONTENT_TYPE_LEN = 128;
-		constexpr size_t CURL_FIELDS_NUM = 8;
+		constexpr size_t CURL_FIELDS_NUM = 12;
 		struct curl_options {
 			uint64_t  interface;
 			uint64_t  unused;
@@ -198,6 +198,17 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 						req_list = curl_slist_append(req_list, field.c_str());
 					else break;
 				}
+				/* Optional Content-Type override for POSTs. */
+				if (opres.ct_length > 0 && opres.ct_length < CONTENT_TYPE_LEN)
+				{
+					/* Copy Content-Type from guest opres into string.
+					   TODO: Improve this to avoid a heap allocation. cURL copies the string. */
+					std::string ct = "Content-Type: ";
+					ct.resize(ct.size() + opres.ct_length);
+					std::memcpy(&ct[14], opres.ctype, opres.ct_length);
+
+					req_list = curl_slist_append(req_list, ct.c_str());
+				}
 				curl_easy_setopt(curl, CURLOPT_HTTPHEADER, req_list);
 			}
 
@@ -225,18 +236,6 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 					}
 				});
 				curl_easy_setopt(curl, CURLOPT_READDATA, &rop);
-
-				/* Optional Content-Type for POST. */
-				if (opres.ct_length != 0 && opres.ct_length < CONTENT_TYPE_LEN) {
-					/* Copy Content-Type from guest opres into string.
-					   TODO: Improve this to avoid a heap allocation. cURL copies the string. */
-					std::string ct = "Content-Type: ";
-					ct.resize(ct.size() + opres.ct_length);
-					inst.machine().copy_from_guest(&ct[14], op_buffer + offsetof(opresult, ctype), opres.ct_length);
-
-					post_list = curl_slist_append(post_list, ct.c_str());
-					curl_easy_setopt(curl, CURLOPT_HTTPHEADER, post_list);
-				}
 			}
 
 			CURLcode res = curl_easy_perform(curl);
