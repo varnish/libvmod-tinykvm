@@ -1,3 +1,15 @@
+/**
+ * @file kvm_api.h
+ * @author Alf-André Walla (fwsgonzo@hotmail.com)
+ * @brief 
+ * @version 0.1
+ * @date 2022-08-09
+ * 
+ * Single-source-of-truth API header for the KVM VMOD. Languages can
+ * use the C API directly, or indirectly through API-generation based on
+ * this header.
+ * 
+**/
 #pragma once
 #include <stdarg.h>
 #include <stddef.h>
@@ -76,13 +88,31 @@ extern void wait_for_requests();
  *  }
  **/
 extern void __attribute__((noreturn, used))
-backend_response(int16_t status, const void *t, uintptr_t, const void *c, uintptr_t);
+backend_response(int16_t status, const void *t, size_t, const void *c, size_t);
 
 static inline void
 backend_response_str(int16_t status, const char *ctype, const char *content)
 {
 	backend_response(status, ctype, __builtin_strlen(ctype), content, __builtin_strlen(content));
 }
+
+/**
+ * Stream a response back to Varnish using streaming callback function.
+ * All response headers must be provided before calling this function,
+ * as only data streaming is allowed afterwards. The same request VM is
+ * used to deliver the response, and so all state (and stack) is available.
+ * 
+ * The streaming callback will ask for a limited amount of bytes, and any
+ * number between 1 and max bytes can be provided. If 0 is provided, the
+ * delivery is considered stalled (and fails).
+ */
+struct streaming_content {
+	const void *data;
+	size_t len;
+};
+typedef struct streaming_content (*content_stream_func)(void *arg, size_t max, size_t written, size_t total);
+extern void __attribute__((noreturn, used))
+begin_streaming_response(int16_t status, const void *t, size_t, size_t content_length, content_stream_func content_cb, const void *arg);
 
 /**
  * HTTP header field manipulation
@@ -476,10 +506,12 @@ extern void make_storage_memory_shared();
 /* Setting this during initialization will determine whether
    or not request VMs will be reset after each request.
    When they are ephemeral, they will be reset.
-   This setting is ENABLED by default for security reasons. */
+   This setting is ENABLED by default for security reasons and
+   cannot be disabled, except by allowing it through a tenant
+   configuration setting. */
 extern int make_ephemeral(int);
 
-/* Retrieve memory layout information. */
+/* Retrieve information about memory limits. */
 struct meminfo {
 	uint64_t max_memory;
 	uint64_t max_reqmem;
@@ -488,7 +520,15 @@ struct meminfo {
 };
 extern void get_meminfo(struct meminfo*);
 
-/* Live-debugging */
+/* Returns true (1) if this program is uploaded through the live-debug
+   VCL function, and is a debug program. Otherwise, false (0). */
+extern int sys_is_debug();
+
+/* Live-debugging breakpoint. Live-debugging can only be used
+   by debug programs. This breakpoint is a no-op for regular
+   programs. Debug programs cannot be debugged without a
+   breakpoint, as the brekapoint is the single-source of opening
+   up for remote GDB debugging. */
 extern void sys_breakpoint();
 
 /* This cannot be used when KVM is used as a backend */
@@ -529,8 +569,9 @@ struct curl_op {
 	char   ctype[128];
 };
 struct curl_fields {
-	const char *ptr[8];
-	uint16_t    len[8];
+#define CURL_FIELDS_COUNT  12u
+	const char *ptr[CURL_FIELDS_COUNT];
+	uint16_t    len[CURL_FIELDS_COUNT];
 };
 struct curl_options {
 	const char *interface;       /* Select interface to bind to. */
@@ -590,6 +631,14 @@ asm(".global backend_response\n"
 	"backend_response:\n"
 	".cfi_startproc\n"
 	"	mov $0x10010, %eax\n"
+	"	out %eax, $0\n"
+	".cfi_endproc\n");
+
+asm(".global begin_streaming_response\n"
+	".type begin_streaming_response, @function\n"
+	"begin_streaming_response:\n"
+	".cfi_startproc\n"
+	"	mov $0x10012, %eax\n"
 	"	out %eax, $0\n"
 	".cfi_endproc\n");
 
@@ -783,12 +832,20 @@ asm(".global get_meminfo\n"
 	"	out %eax, $0\n"
 	"   ret\n");
 
+asm(".global sys_is_debug\n"
+	".type sys_is_debug, @function\n"
+	"sys_is_debug:\n"
+	"	mov $0x7FDEB, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
+
 asm(".global sys_breakpoint\n"
 	".type sys_breakpoint, @function\n"
 	"sys_breakpoint:\n"
 	"	mov $0x7F7F7, %eax\n"
 	"	out %eax, $0\n"
 	"   ret\n");
+
 #endif // KVM_API_ALREADY_DEFINED
 
 #ifdef __cplusplus

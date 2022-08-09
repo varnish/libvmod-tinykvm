@@ -34,5 +34,5 @@ cp build_debian11/libvmod_kvm.so ~/vcp6-kvm/vmod/debian-11
 cp build_fedora/libvmod_kvm.so ~/vcp6-kvm/vmod/fedora-36
 cp build_rlinux8/libvmod_kvm.so ~/vcp6-kvm/vmod/rocky-8
 cp build_rlinux9/libvmod_kvm.so ~/vcp6-kvm/vmod/rocky-9
-cp build/libvmod_kvm.so ~/vcp6-kvm/vmod/ubuntu-20.04
-cp build_ubuntu22/libvmod_kvm.so ~/vcp6-kvm/vmod/ubuntu-22.04
+cp build/libvmod_kvm.so ~/vcp6-kvm/vmod/ubuntu-20
+cp build_ubuntu22/libvmod_kvm.so ~/vcp6-kvm/vmod/ubuntu-22
