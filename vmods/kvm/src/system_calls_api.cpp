@@ -280,6 +280,14 @@ static void syscall_memory_info(vCPU& cpu, MachineInstance &inst)
 	cpu.machine().copy_to_guest(regs.rdi, &meminfo, sizeof(meminfo));
 }
 
+static void syscall_is_debug(vCPU& cpu, MachineInstance& inst)
+{
+	auto& regs = cpu.registers();
+	regs.rax = inst.is_debug();
+	cpu.set_registers(regs);
+
+}
+
 static void syscall_breakpoint(vCPU& cpu, MachineInstance& inst)
 {
 	auto& regs = cpu.registers();

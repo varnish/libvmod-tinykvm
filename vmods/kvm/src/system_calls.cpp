@@ -167,6 +167,9 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10A00: // GET_MEMINFO
 				syscall_memory_info(cpu, inst);
 				return;
+			case 0x7FDEB: // IS_DEBUG
+				syscall_is_debug(cpu, inst);
+				return;
 			case 0x7F7F7: // BREAKPOINT
 				syscall_breakpoint(cpu, inst);
 				return;
