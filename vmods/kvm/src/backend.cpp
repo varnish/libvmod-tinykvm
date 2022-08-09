@@ -47,19 +47,19 @@ extern "C" {
 }
 static constexpr bool VERBOSE_BACKEND = false;
 
-static void memory_error_handling(VRT_CTX, const tinykvm::MemoryException& e)
+static void memory_error_handling(struct vsl_log *vsl, const tinykvm::MemoryException& e)
 {
 	if (e.addr() < 0x500) { /* Null-pointer speculation */
 	fprintf(stderr,
 		"Backend VM memory exception: %s (addr: 0x%lX, size: 0x%lX)\n",
 		e.what(), e.addr(), e.size());
-	VSLb(ctx->vsl, SLT_Error,
+	VSLb(vsl, SLT_Error,
 		"Backend VM memory exception: %s (addr: 0x%lX, size: 0x%lX)",
 		e.what(), e.addr(), e.size());
 	} else {
 		fprintf(stderr,
 			"Backend VM memory exception: Null-pointer access\n");
-		VSLb(ctx->vsl, SLT_Error,
+		VSLb(vsl, SLT_Error,
 			"Backend VM memory exception: Null-pointer access");
 	}
 }
@@ -78,9 +78,12 @@ static inline void kvm_ts(struct vsl_log *vsl, const char *event,
 	VSLb_ts(vsl, event, work, &prev, now);
 }
 
-static void fetch_result(MachineInstance& mi, struct backend_result *result)
+static void fetch_result(kvm::VMPoolItem* slot,
+	MachineInstance& mi, struct backend_result *result)
 {
-	if (UNLIKELY(!mi.response_called(1))) {
+	const bool regular_response = mi.response_called(1);
+	const bool streaming_response = mi.response_called(10);
+	if (UNLIKELY(!regular_response && !streaming_response)) {
 		throw std::runtime_error("HTTP response not set. Program crashed? Check logs!");
 	}
 
@@ -89,8 +92,6 @@ static void fetch_result(MachineInstance& mi, struct backend_result *result)
 	const uint16_t status = regs.rdi;
 	const uint64_t tvaddr = regs.rsi;
 	const uint16_t tlen   = regs.rdx;
-	const uint64_t cvaddr = regs.rcx;
-	const uint64_t clen   = regs.r8;
 
 	/* Immediately copy out content-type because small. */
 	char *tbuf = (char *)WS_Alloc(mi.ctx()->ws, tlen);
@@ -99,13 +100,42 @@ static void fetch_result(MachineInstance& mi, struct backend_result *result)
 	}
 	mi.machine().copy_from_guest(tbuf, tvaddr, tlen);
 
-	/* Return content-type, content-length and buffers */
-	result->type = tbuf;
-	result->tsize = tlen;
-	result->status = sanitize_status_code(status);
-	result->content_length = clen;
-	result->bufcount = mi.machine().gather_buffers_from_range(
-		result->bufcount, (tinykvm::Machine::Buffer *)result->buffers, cvaddr, clen);
+	if (regular_response)
+	{
+		const uint64_t cvaddr = regs.rcx;
+		const uint64_t clen   = regs.r8;
+
+		/* Return content-type, content-length and buffers */
+		result->type = tbuf;
+		result->tsize = tlen;
+		result->status = sanitize_status_code(status);
+		result->content_length = clen;
+		result->bufcount = mi.machine().gather_buffers_from_range(
+			result->bufcount, (tinykvm::Machine::Buffer *)result->buffers, cvaddr, clen);
+	}
+	else { /* Streaming response */
+		const uint64_t clen      = regs.rcx;
+		const uint64_t callb_va  = regs.r8;
+		const uint64_t callb_arg = regs.r9;
+
+		if (UNLIKELY(clen == 0)) {
+			throw std::runtime_error("Cannot stream zero-length response");
+		}
+		if (UNLIKELY(callb_va == 0x0)) {
+			throw std::runtime_error("Cannot stream using invalid callback (address is 0x0)");
+		}
+
+		/* Return content-type, content-length and streaming info */
+		result->type = tbuf;
+		result->tsize = tlen;
+		result->status = sanitize_status_code(status);
+		result->content_length = clen;
+		result->bufcount = 0;
+		result->stream_slot = (vmod_kvm_slot *)slot;
+		result->stream_vsl  = nullptr;
+		result->stream_callback = callb_va;
+		result->stream_argument = callb_arg;
+	}
 }
 
 /* Error handling is an optional callback into the request VM when an
@@ -138,7 +168,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 			/* Make sure no SMP work is in-flight. */
 			vm.smp_wait();
 
-			fetch_result(machine, result);
+			fetch_result(slot, machine, result);
 		});
 		fut.get();
 		return;
@@ -150,7 +180,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 			"%s: Backend VM timed out (%f seconds)",
 			machine.name().c_str(), mte.seconds());
 	} catch (const tinykvm::MemoryException& e) {
-		memory_error_handling(ctx, e);
+		memory_error_handling(ctx->vsl, e);
 	} catch (const tinykvm::MachineException& e) {
 		fprintf(stderr, "%s: Backend VM exception: %s (data: 0x%lX)\n",
 			machine.name().c_str(), e.what(), e.data());
@@ -233,7 +263,8 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			if constexpr (VERBOSE_BACKEND) {
 				printf("Finish backend GET %s\n", farg[0]);
 			}
-			fetch_result(machine, result);
+			/* Verify response and fill out result struct. */
+			fetch_result(slot, machine, result);
 
 			kvm_ts(ctx->vsl, "ProgramProcess", t_work, t_prev, VTIM_real());
 		});
@@ -251,7 +282,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 		/* Try again if on_error has been set, otherwise 500. */
 		error_handling(slot, farg, result, mte.what());
 	} catch (const tinykvm::MemoryException& e) {
-		memory_error_handling(ctx, e);
+		memory_error_handling(ctx->vsl, e);
 		/* Try again if on_error has been set, otherwise 500. */
 		error_handling(slot, farg, result, e.what());
 	} catch (const tinykvm::MachineException& e) {
@@ -271,7 +302,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 }
 
 extern "C"
-int kvm_backend_stream(struct backend_post *post,
+int kvm_backend_streaming_post(struct backend_post *post,
 	const void* data_ptr, ssize_t data_len)
 {
 	assert(post && post->slot);
@@ -316,7 +347,7 @@ int kvm_backend_stream(struct backend_post *post,
 		return 0;
 
 	} catch (const tinykvm::MemoryException& e) {
-		memory_error_handling(post->ctx, e);
+		memory_error_handling(post->ctx->vsl, e);
 	} catch (const tinykvm::MachineException& e) {
 		fprintf(stderr, "Backend VM exception: %s (data: 0x%lX)\n",
 			e.what(), e.data());
@@ -326,6 +357,54 @@ int kvm_backend_stream(struct backend_post *post,
 	} catch (const std::exception& e) {
 		fprintf(stderr, "Backend VM exception: %s\n", e.what());
 		VSLb(post->ctx->vsl, SLT_Error,
+			"VM call exception: %s", e.what());
+	}
+	/* An error result */
+	return -1;
+}
+
+extern "C"
+ssize_t kvm_backend_streaming_delivery(
+	struct backend_result *result, void* dst,
+	ssize_t max_len, ssize_t written)
+{
+	assert(result && result->stream_callback);
+	auto& slot = *(kvm::VMPoolItem *)result->stream_slot;
+	auto& mi = *slot.mi;
+	mi.set_ctx(nullptr);
+	try {
+		auto& vm = mi.machine();
+
+		/* Call the backend streaming function, if set. */
+		auto fut = slot.tp.enqueue(
+		[&] {
+			const auto timeout = STREAM_HANDLING_TIMEOUT;
+			vm.timed_reentry(result->stream_callback, timeout,
+				(uint64_t)result->stream_argument,
+				(uint64_t)max_len, (uint64_t)written,
+				(uint64_t)result->content_length);
+		});
+		fut.get();
+
+		const auto& regs = vm.registers();
+		/* NOTE: RAX gets moved to RDI. RDX is length.
+		   NOTE: We use unsigned min to avoid negative values! */
+		size_t len = std::min((size_t)max_len, (size_t)regs.rdx);
+		vm.copy_from_guest(dst, regs.rdi, len);
+
+		return len;
+
+	} catch (const tinykvm::MemoryException& e) {
+		memory_error_handling(result->stream_vsl, e);
+	} catch (const tinykvm::MachineException& e) {
+		fprintf(stderr, "Backend VM exception: %s (data: 0x%lX)\n",
+			e.what(), e.data());
+		VSLb(result->stream_vsl, SLT_Error,
+			"Backend VM exception: %s (data: 0x%lX)",
+			e.what(), e.data());
+	} catch (const std::exception& e) {
+		fprintf(stderr, "Backend VM exception: %s\n", e.what());
+		VSLb(result->stream_vsl, SLT_Error,
 			"VM call exception: %s", e.what());
 	}
 	/* An error result */

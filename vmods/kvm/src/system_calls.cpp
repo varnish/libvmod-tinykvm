@@ -86,6 +86,9 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10010: // BACKEND_RESPONSE
 				syscall_backend_response(cpu, inst);
 				return;
+			case 0x10012: // BACKEND_STREAMING_RESPONSE
+				syscall_backend_streaming_response(cpu, inst);
+				return;
 			case 0x10011: // STORAGE_RETURN
 				syscall_storage_return(cpu, inst);
 				return;

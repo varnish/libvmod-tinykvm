@@ -54,10 +54,7 @@ kvmbe_finish(const struct director *dir, struct worker *wrk, struct busyobj *bo)
 static enum vfp_status v_matchproto_(vfp_pull_f)
 kvmfp_pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 {
-	CHECK_OBJ_NOTNULL(vc, VFP_CTX_MAGIC);
-	CHECK_OBJ_NOTNULL(vfe, VFP_ENTRY_MAGIC);
-	AN(p);
-	AN(lp);
+	(void)vc;
 
 	/* The resulting response of a backend request. */
 	struct backend_result *result = (struct backend_result *)vfe->priv1;
@@ -100,22 +97,28 @@ kvmfp_pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 		}
 	}
 }
-
 static const struct vfp kvm_fetch_processor = {
 	.name = "kvm_backend",
 	.pull = kvmfp_pull,
 };
 
+#include "kvm_streaming_backend.c"
+
+
 static void
-vfp_init(struct busyobj *bo)
+vfp_init(struct busyobj *bo, bool streaming)
 {
 	CHECK_OBJ_NOTNULL(bo->vfc, VFP_CTX_MAGIC);
 	CHECK_OBJ_NOTNULL(bo->htc, HTTP_CONN_MAGIC);
+	struct vfp_entry *vfe;
 
-	struct vfp_entry *vfe =
-		VFP_Push(bo->vfc, &kvm_fetch_processor);
+	if (!streaming) {
+		vfe = VFP_Push(bo->vfc, &kvm_fetch_processor);
+	} else {
+		vfe = VFP_Push(bo->vfc, &kvm_streaming_fetch_processor);
+	}
+
 	CHECK_OBJ_NOTNULL(vfe, VFP_ENTRY_MAGIC);
-
 	vfe->priv1 = bo->htc->priv;
 	vfe->priv2 = 0;
 }
@@ -234,8 +237,11 @@ kvmbe_gethdrs(const struct director *dir,
 
 	/* Initialize fetch processor, which will retrieve the data from
 	   the VM, buffer by buffer, and send it to Varnish storage.
-	   See: kvmfp_pull */
-	vfp_init(bo);
+	   It is a streamed response if the buffer-count is zero, but the
+	   content-length is non-zero. We also must have a callback function.
+	   See: kvmfp_pull, kvmfp_streaming_pull */
+	const bool streaming = result->content_length > 0 && result->bufcount == 0;
+	vfp_init(bo, streaming);
 	kvm_ts(ctx.vsl, "TenantResponse", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 	return (0);
 }

@@ -34,6 +34,11 @@ static void syscall_backend_response(vCPU& cpu, MachineInstance& inst)
 	inst.finish_call(1);
 	cpu.stop();
 }
+static void syscall_backend_streaming_response(vCPU& cpu, MachineInstance& inst)
+{
+	inst.finish_call(10);
+	cpu.stop();
+}
 static void syscall_storage_return(vCPU& cpu, MachineInstance& inst)
 {
 	inst.finish_call(2);

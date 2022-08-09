@@ -18,7 +18,7 @@
 #include "vcl.h"
 #include "vcc_if.h"
 
-extern int kvm_backend_stream(struct backend_post *, const void*, ssize_t);
+extern int kvm_backend_streaming_post(struct backend_post *, const void*, ssize_t);
 
 static int
 kvm_get_aggregate_body(void *priv, int flush, int last, const void *ptr, ssize_t len)
@@ -31,7 +31,7 @@ kvm_get_aggregate_body(void *priv, int flush, int last, const void *ptr, ssize_t
 	   callback to trigger any finishing logic. The on_post callback
 	   will get called right after returning from here. */
 	if (!last)
-		return (kvm_backend_stream(post, ptr, len));
+		return (kvm_backend_streaming_post(post, ptr, len));
 	else
 		return (0);
 }
