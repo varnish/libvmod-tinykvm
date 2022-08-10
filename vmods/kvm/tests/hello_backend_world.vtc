@@ -4,15 +4,30 @@ shell {
 cat >${tmpdir}/${testname}.c <<-EOF
 #include "kvm_api.h"
 
-static void my_backend(const char *arg)
+static void on_get(const char *url)
 {
 	set_cacheable(0, 1.0f, 0.0f, 0.0f);
-	backend_response_str(200, "text/plain", arg);
+
+	/* 1: Hello World */
+	if (strcmp(url, "/1") == 0)
+		backend_response_str(200, "text/plain", "Hello World");
+	/* 2: (empty) */
+	if (strcmp(url, "/2") == 0)
+		backend_response(200, "text/plain", 10, NULL, 0);
+	/* 3: Invalid memory */
+	if (strcmp(url, "/3") == 0)
+		backend_response(200, "text/plain", 10, NULL, 16);
+	/* 4: Overflowing content length */
+	if (strcmp(url, "/4") == 0)
+		backend_response(200, "text/plain", 10, "Hello World", ~0ULL);
+	/* 5: Overflowing content-length length */
+	if (strcmp(url, "/5") == 0)
+		backend_response(200, "text/plain", ~0ULL, "Hello World", 11);
 }
 
 int main(int argc, char **argv)
 {
-	set_backend_get(my_backend);
+	set_backend_get(on_get);
 	wait_for_requests();
 }
 EOF
@@ -40,18 +55,35 @@ vcl 4.1;
 
 	sub vcl_backend_fetch {
 		set bereq.backend = kvm.vm_backend(
-				bereq.http.Host,
-				"Hello World");
+			bereq.http.Host,
+			bereq.url);
 	}
 } -start
 
 client c1 {
-	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+	txreq -url "/1" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.body == "Hello World"
 	expect resp.status == 200
-	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+	txreq -url "/1" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.body == "Hello World"
 	expect resp.status == 200
+
+	txreq -url "/2" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == ""
+	expect resp.status == 200
+
+	txreq -url "/3" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 500
+
+	txreq -url "/4" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 500
+
+	txreq -url "/5" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 500
 } -run

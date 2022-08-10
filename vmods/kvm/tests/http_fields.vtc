@@ -12,6 +12,31 @@ static void on_get(const char *url)
 	http_appendf(BERESP, "X-Value: 5");
 	http_setf(BERESP, "X-OtherValue: 6");
 
+	/* Invalid append/set/find */
+	if (strcmp(url, "/test3_0") == 0) {
+		sys_http_append(BERESP, "X-Value: 5", ~0ULL);
+	}
+	else if (strcmp(url, "/test3_1") == 0) {
+		sys_http_set(BERESP, "X-Value: 5", ~0ULL);
+	}
+	else if (strcmp(url, "/test3_2") == 0) {
+		unsigned len = sys_http_find(BERESP, "X-NotFound", 10, NULL, 0);
+		assert(len == 0);
+	}
+	else if (strcmp(url, "/test3_3") == 0) {
+		sys_http_find(BERESP, "X-Value", ~0ULL, NULL, 0);
+	}
+	else if (strcmp(url, "/test3_4") == 0) {
+		/* Should return length. */
+		unsigned len = sys_http_find(BERESP, "X-Value", 7, NULL, 0);
+		assert(len == 10);
+	}
+	else if (strcmp(url, "/test3_5") == 0) {
+		/* Should write to invalid result buffer. */
+		unsigned len = sys_http_find(BERESP, "X-Value", 7, on_get, 0xFFFF);
+		assert(len == 10);
+	}
+
 	/* Test finding field length. "X-Value: 5" (L=10) */
 	unsigned len = sys_http_find(BERESP, "X-Value", 7, NULL, 0);
 	assert(len == 10);
@@ -74,10 +99,35 @@ client c1 {
 	expect resp.http.X-OtherValue == "6"
 	expect resp.body == "/test1"
 	expect resp.status == 200
+
 	txreq -url "/test2" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.http.X-Value == <undef>
 	expect resp.http.X-OtherValue == "7"
 	expect resp.body == "/test2"
 	expect resp.status == 200
+
+	txreq -url "/test3_0" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 500
+	txreq -url "/test3_1" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 500
+
+	# http_find: Not found
+	txreq -url "/test3_2" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 200
+
+	# http_find: Invalid length
+	txreq -url "/test3_3" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 500
+
+	txreq -url "/test3_4" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 200
+	txreq -url "/test3_5" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 500
 } -run
