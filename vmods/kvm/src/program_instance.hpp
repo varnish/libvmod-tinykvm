@@ -153,6 +153,9 @@ public:
 
 	std::future<long> m_future;
 	bool initialization_complete = false;
+private:
+	/* Wait for Varnish to listen and this program to complete initialization. */
+	void try_wait_for_startup_and_initialization();
 };
 
 } // kvm
