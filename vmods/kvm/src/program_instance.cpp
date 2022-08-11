@@ -27,11 +27,6 @@
 #include <tinykvm/rsp_client.hpp>
 extern "C" int usleep(uint32_t usec);
 
-extern "C" __attribute__((noinline, weak))
-int VCA_AcceptingConnections() {
-	return 1;
-}
-
 namespace kvm {
 extern void libadns_untag(const std::string&, struct vcl*);
 static constexpr bool VERBOSE_STORAGE_TASK = false;
@@ -417,6 +412,16 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 	return new_future.get();
 }
 
+static int varnish_is_accepting_connections() {
+	static bool waited = false;
+	if (UNLIKELY(!waited)) {
+		waited = true;
+		usleep(250'000); /* Sleep 250ms */
+	}
+	// TODO: Use VCA_AcceptingConnections()
+	return 1;
+}
+
 void ProgramInstance::try_wait_for_startup_and_initialization()
 {
 	/* Avoid async storage while still initializing. 100ms intervals. */
@@ -425,7 +430,7 @@ void ProgramInstance::try_wait_for_startup_and_initialization()
 
 	int retries = MAX_RETRIES; /* 5000ms maximum wait */
 	while (
-		(!this->initialization_complete || !VCA_AcceptingConnections())
+		(!this->initialization_complete || !varnish_is_accepting_connections())
 		&& retries > 0)
 	{
 		usleep(WAIT_TIME);
