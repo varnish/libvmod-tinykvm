@@ -1,7 +1,7 @@
 vcl 4.1;
 
 include "/home/gonzo/github/varnish_autoperf/vcl/waf.vcl";
-import synthbackend from "/home/gonzo/github/varnish_autoperf/ext/varnish-cache-plus/lib/libvmod_synthbackend/.libs/libvmod_synthbackend.so";
+import synthbackend;
 
 backend default {
     .host = "127.0.0.1";

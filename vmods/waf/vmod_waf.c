@@ -11,7 +11,6 @@
 #include <arpa/inet.h>
 
 #include <modsecurity/intervention.h>
-#include <modsecurity/transaction.h>
 #include <modsecurity/rules_set.h>
 
 #include <cache/cache_varnishd.h>
@@ -46,7 +45,8 @@ struct task_ctx {
 	Transaction			*txn;
 	ModSecurityIntervention		ivn;
 	vfp_init_waf_cb_f		*vfp_init_waf_cb;
-	int				txn_processed;
+	RulesSet			*rules;
+	int				conn_processed;
 	int				body_checked;
 	ssize_t				req_bodybytes;
 };
@@ -54,14 +54,14 @@ struct task_ctx {
 #define NOT_IN_VCL_MOD_R(SUBMOD, SUBMOD_STRING, RET)			\
 	if (ctx->method != SUBMOD) {					\
 		VRT_fail(ctx, "WAF: cannot call %s outside of %s",	\
-			__FUNCTION__, SUBMOD_STRING);			\
+		    __FUNCTION__, SUBMOD_STRING);			\
 		return (RET);						\
 	}
 
 #define NOT_IN_VCL_MOD(SUBMOD, SUBMOD_STRING)				\
 	if (ctx->method != SUBMOD) {					\
 		VRT_fail(ctx, "WAF: cannot call %s outside of %s",	\
-			__FUNCTION__, SUBMOD_STRING);			\
+		    __FUNCTION__, SUBMOD_STRING);			\
 		return;							\
 	}
 
@@ -121,14 +121,14 @@ pull_waf(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
 		if (!ret || vp == VFP_END) {
 			if (!msc_process_response_body(tctx->txn)) {
 				return (VFP_Error(vc, "WAF: Failed to process"
-					" body"));
+				    " body"));
 			}
 			tctx->body_checked = 1;
 			if (intercepted(tctx)) {
 				VSLb(vc->bo->vsl, SLT_WAF, "LOG: %s",
-					tctx->ivn.log);
+				    tctx->ivn.log);
 				return (VFP_Error(vc, "WAF: Intercepted on "
-					"MS phase 4"));
+				    "MS phase 4"));
 			}
 		}
 	}
@@ -144,7 +144,7 @@ fini_waf(struct vfp_ctx *vc, struct vfp_entry *vfe)
 	CAST_OBJ_NOTNULL(tctx, vfe->priv1, TSK_MAGIC);
 
 	VSLb(vc->bo->vsl, SLT_WAF, "RespBody: %lu",
-		vc->bo->acct.beresp_bodybytes);
+	    vc->bo->acct.beresp_bodybytes);
 }
 
 const struct vfp vfp_waf = {
@@ -188,11 +188,14 @@ free_tctx(void *priv)
 	free(tctx->ivn.url);
 	free(tctx->ivn.log);
 	msc_transaction_cleanup(tctx->txn);
+	if (tctx->rules) {
+		msc_rules_cleanup(tctx->rules);
+	}
 	FREE_OBJ(tctx);
 }
 
 typedef int (*add_hdr)(Transaction *, const u_char *, size_t, const u_char *,
-	size_t);
+    size_t);
 
 static int
 loadhdrs(VRT_CTX, const struct http *hp, Transaction *t, add_hdr func)
@@ -223,7 +226,7 @@ loadhdrs(VRT_CTX, const struct http *hp, Transaction *t, add_hdr func)
 			q++;
 
 		if (!func(t, (const u_char *)hp->hd[u].b, p - hp->hd[u].b,
-			(const u_char *)q, hp->hd[u].e - q)) {
+		    (const u_char *)q, hp->hd[u].e - q)) {
 			VRT_fail(ctx, "WAF: Can't load headers");
 			return(-1);
 		}
@@ -335,7 +338,7 @@ vmod_init__init(VRT_CTX, struct vmod_waf_init **objp, const char *vcl_name)
 	msc_set_log_cb(waf_conf->modsec, msc_callback);
 
 	msc_set_connector_info(waf_conf->modsec, "Varnish WAF "
-		COMBINED_VERSION);
+	    COMBINED_VERSION);
 
 	*objp = waf_conf;
 }
@@ -370,14 +373,14 @@ vmod_init_add_files(VRT_CTX, struct vmod_waf_init *waf, VCL_STRING path)
 
 	if (glob(path, GLOB_ERR, NULL, &pglob)) {
 		VRT_fail(ctx, "WAF: Error setting up glob: %s %d %s", path,
-			errno, strerror(errno));
+		    errno, strerror(errno));
 		return;
 	}
 
 	for (i = 0; i < pglob.gl_pathc; i++) {
 		VSL(SLT_WAF, 0, "FILE: %s", pglob.gl_pathv[i]);
 		if (msc_rules_add_file(waf->rules, pglob.gl_pathv[i], &err)
-			<= 0) {
+		    <= 0) {
 			VRT_fail(ctx, "WAF: %s", err);
 			break;
 		}
@@ -393,7 +396,7 @@ vmod_init_add_files(VRT_CTX, struct vmod_waf_init *waf, VCL_STRING path)
 
 VCL_VOID
 vmod_init_add_file_remote(VRT_CTX, struct vmod_waf_init *waf,
-	VCL_STRING url, VCL_STRING key)
+    VCL_STRING url, VCL_STRING key)
 {
 	const char *err = NULL;
 
@@ -427,10 +430,10 @@ vmod_init_init_transaction(VRT_CTX, struct vmod_waf_init *waf)
 	tpriv = VRT_priv_task(ctx, waf);
 	AN(tpriv);
 
-	/* Free previous instance. XXX: This is not OK. */
+	/* Free previous instance */
 	if (tpriv->priv) {
 		AN(tpriv->free);
-		tpriv->free(tpriv->priv);
+		tpriv->free(tpriv->priv); /* This calls free_tctx. */
 		tpriv->priv = NULL;
 		tpriv->free = NULL;
 	}
@@ -442,22 +445,44 @@ vmod_init_init_transaction(VRT_CTX, struct vmod_waf_init *waf)
 
 	AN(waf->modsec);
 	AN(waf->rules);
+}
+
+VCL_VOID
+vmod_init_setup_transaction(VRT_CTX, struct vmod_waf_init *waf)
+{
+	struct task_ctx *tctx;
+	struct vmod_priv *tpriv;
+	RulesSet *rules;
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(waf, WAF_MAGIC);
+
+	tpriv = VRT_priv_task(ctx, waf);
+	CAST_OBJ(tctx, tpriv->priv, TSK_MAGIC);
+
+	/* Check if being called in right order */
+	if (!tctx) {
+		VRT_fail(ctx, "WAF: .setup_transaction() wasn't called after "
+		    ".init_transaction()");
+		return;
+	}
+
+	rules = (tctx->rules) ? tctx->rules : waf->rules;
+
+	AN(waf->modsec);
+	AN(rules);
 
 	/*
 	 * TODO: do something with the last arg to log?
 	 * note: this pointer is to pass data to the callback function
 	 * This would be ctx to get vsl in this case to be able to print pretty
 	 */
-	tctx->txn = msc_new_transaction(waf->modsec, waf->rules, NULL);
-
-	/* Poor mans false. We need to make sure that the transaction has been
-	   initialized properly before we can do response checking. */
-	tctx->txn_processed = 0;
+	tctx->txn = msc_new_transaction(waf->modsec, rules, NULL);
 }
 
 VCL_BOOL
 vmod_init_check_req(VRT_CTX, struct vmod_waf_init *waf,
-	VCL_STRING client_ip, VCL_INT client_port)
+    VCL_STRING client_ip, VCL_INT client_port)
 {
 	long int server_port = 0;
 	char server_ip[INET6_ADDRSTRLEN];
@@ -479,7 +504,13 @@ vmod_init_check_req(VRT_CTX, struct vmod_waf_init *waf,
 	/* Check if being called in right order */
 	if (!tctx) {
 		VRT_fail(ctx, "WAF: .req_intercept() wasn't called after "
-			".init_transaction()");
+		    ".init_transaction()");
+		return (0);
+	}
+
+	if (!tctx->txn) {
+		VRT_fail(ctx, "WAF: .setup_transaction() wasn't called after "
+		    ".init_transaction()");
 		return (0);
 	}
 
@@ -491,12 +522,11 @@ vmod_init_check_req(VRT_CTX, struct vmod_waf_init *waf,
 	get_ip_addr(ip, server_ip, &server_port);
 
 	if (!msc_process_connection(tctx->txn, client_ip, client_port,
-		server_ip, server_port)) {
+	    server_ip, server_port)) {
 		VSLb(ctx->vsl, SLT_WAF, "ERROR: processing server connection");
 		return (0);
 	}
-	/* The transaction has been processed. */
-	tctx->txn_processed = 1;
+	tctx->conn_processed = 1;
 
 	if (intercepted(tctx)) {
 		VSLb(ctx->vsl, SLT_WAF, "LOG: %s", tctx->ivn.log);
@@ -511,12 +541,12 @@ vmod_init_check_req(VRT_CTX, struct vmod_waf_init *waf,
 		proto_num++;
 
 	if (!msc_process_uri(tctx->txn, hp->hd[HTTP_HDR_URL].b,
-		hp->hd[HTTP_HDR_METHOD].b, proto_num)) {
+	    hp->hd[HTTP_HDR_METHOD].b, proto_num)) {
 		VSLb(ctx->vsl, SLT_WAF, "ERROR: Failed to process URI");
 		return (0);
 	}
 	VSLb(ctx->vsl, SLT_WAF, "proto: %s %s %s", hp->hd[HTTP_HDR_URL].b,
-		hp->hd[HTTP_HDR_METHOD].b, hp->hd[HTTP_HDR_PROTO].b);
+	    hp->hd[HTTP_HDR_METHOD].b, hp->hd[HTTP_HDR_PROTO].b);
 
 	if (intercepted(tctx)) {
 		VSLb(ctx->vsl, SLT_WAF, "LOG: %s", tctx->ivn.log);
@@ -547,21 +577,21 @@ vmod_init_check_req(VRT_CTX, struct vmod_waf_init *waf,
 
 		if (VRB_Iterate(ctx->req, aggregate_body, tctx) < 0) {
 			VSLb(ctx->vsl, SLT_WAF, "ERROR: Iteration on req.body "
-				"didn't succeed");
+			    "didn't succeed");
 			return (0);
 		}
 	} else if (ctx->bo) {
 		CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
 
 		if (ctx->bo->initial_req_body_status == REQ_BODY_CACHED &&
-			ctx->bo->bereq_body) {
+		    ctx->bo->bereq_body) {
 			CHECK_OBJ_NOTNULL(ctx->bo->bereq_body, OBJCORE_MAGIC);
 			CHECK_OBJ_NOTNULL(ctx->bo->wrk, WORKER_MAGIC);
 
 			if (ObjIterate(ctx->bo->wrk, ctx->bo->bereq_body,
-				tctx, aggregate_body, 0, 0, -1) < 0) {
+			    tctx, aggregate_body, 0, 0, -1) < 0) {
 				VSLb(ctx->vsl, SLT_WAF, "ERROR: "
-					"Iteration on req.body didn't succeed");
+				    "Iteration on req.body didn't succeed");
 				return (0);
 			}
 		}
@@ -605,19 +635,40 @@ vmod_init_check_resp(VRT_CTX, struct vmod_waf_init *waf)
 	/* Check if being called in right order */
 	if (!tctx) {
 		VRT_fail(ctx, "WAF: .resp_intercept() wasn't called after "
-			".req_intercept()");
+		    ".req_intercept()");
 		return (0);
 	}
 
-	if (!tctx->txn_processed) {
-		VRT_fail(ctx, "WAF: Transaction not initialized. "
-			"Did you forget .check_req()?");
+	if (!tctx->txn) {
+		VRT_fail(ctx, "WAF: .setup_transaction() wasn't called after "
+		    ".init_transaction()");
 		return (0);
+	}
+
+	if (!tctx->conn_processed) {
+		/* We have not intercepted the request in
+		 * vmod_init_check_req(). Populate the transaction with an
+		 * empty request. */
+
+		VCL_IP ip;
+		char server_ip[INET6_ADDRSTRLEN];
+		long int server_port;
+
+		ip = VRT_r_local_ip(ctx);
+		get_ip_addr(ip, server_ip, &server_port);
+
+		if (!msc_process_connection(tctx->txn, "", 0,
+		    server_ip, server_port) ||
+		    !msc_process_uri(tctx->txn, "", "", "")) {
+			VSLb(ctx->vsl, SLT_WAF, "ERROR: processing connection");
+			return (0);
+		}
+		tctx->conn_processed = 1;
 	}
 
 	if (intercepted(tctx)) {
 		 VSLb(ctx->vsl, SLT_WAF, "ERROR: Transaction already "
-			"intercepted");
+		    "intercepted");
 		return (1);
 	}
 
@@ -647,7 +698,7 @@ vmod_init_check_resp(VRT_CTX, struct vmod_waf_init *waf)
 
 		if (!msc_process_response_body(tctx->txn)) {
 			VSLb(ctx->vsl, SLT_WAF, "ERROR: Failed to process "
-				"RespBody");
+			    "RespBody");
 			return (0);
 		}
 
@@ -682,7 +733,7 @@ vmod_init_audit_log(VRT_CTX, struct vmod_waf_init *waf)
 	/* Check if being called in right order */
 	if (!tctx) {
 		VRT_fail(ctx, "WAF: .audit_log() wasn't called after "
-			".req_intercept()");
+		    ".req_intercept()");
 	} else if (!msc_process_logging(tctx->txn))
 		VSLb(ctx->vsl, SLT_WAF, "ERROR: failed to process audit log");
 }
@@ -723,4 +774,106 @@ vmod_bytes(VRT_CTX, VCL_STRING b, VCL_BYTES d)
 	}
 
 	return (ret);
+}
+
+static void
+skip_rule_by_type(VRT_CTX, struct vmod_waf_init *waf, const char *type,
+    const char *id)
+{
+	const char *err = NULL, *remove;
+	char *temp_id;
+	unsigned avail;
+	struct task_ctx *tctx = NULL;
+	struct vmod_priv *tpriv = NULL;
+	struct vsb vsb;
+	RulesSet *rules;
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(waf, WAF_MAGIC);
+
+	if (ctx->method != VCL_MET_INIT) {
+		tpriv = VRT_priv_task(ctx, waf);
+		CAST_OBJ(tctx, tpriv->priv, TSK_MAGIC);
+
+		/* Check if being called in right order */
+		if (!tctx) {
+			VRT_fail(ctx, "WAF: .skip_rule_by_id() wasn't "
+			"called after .init_transaction()");
+			return;
+		}
+	}
+
+	if (!id || !*id) {
+		return;
+	}
+
+	temp_id = WS_Copy(ctx->ws, id, -1);
+
+	if (!temp_id) {
+		VRT_fail(ctx, "out of workspace");
+		return;
+	}
+
+	avail = WS_ReserveAll(ctx->ws);
+
+	if (!avail) {
+		VRT_fail(ctx, "out of workspace");
+		return;
+	}
+
+	AN(VSB_new(&vsb, WS_Front(ctx->ws), avail, VSB_FIXEDLEN));
+
+	if (ctx->method != VCL_MET_INIT) {
+		if (!tctx->rules) {
+			tctx->rules = msc_create_rules_set();
+			AN(tctx->rules);
+			AN(waf->rules);
+			if (msc_rules_merge(tctx->rules, waf->rules, &err) <
+			    0) {
+				VRT_fail(ctx, "WAF: %s", err);
+				return;
+			}
+		}
+		rules = tctx->rules;
+	} else {
+		rules = waf->rules;
+	}
+
+	AN(rules);
+	AN(temp_id);
+
+	remove = strtok_r(temp_id, ",", &temp_id);
+
+	while(remove) {
+		VSB_printf(&vsb, "%s %s", type, remove);
+
+		if (VSB_finish(&vsb)) {
+			VRT_fail(ctx, "out of workspace");
+			break;
+		}
+
+		if (msc_rules_add(rules, VSB_data(&vsb), &err) < 0) {
+			VRT_fail(ctx, "WAF: %s", err);
+			break;
+		}
+
+		remove = strtok_r(temp_id, ",", &temp_id);
+		VSB_clear(&vsb);
+	}
+
+	VSB_delete(&vsb);
+	/* We don't need to keep any data around */
+	WS_Release(ctx->ws, 0);
+}
+
+VCL_VOID
+vmod_init_skip_rule_by_id(VRT_CTX, struct vmod_waf_init *waf, VCL_STRING id)
+{
+	skip_rule_by_type(ctx, waf, "SecRuleRemoveById", id);
+}
+
+VCL_VOID
+vmod_init_skip_rule_by_tag(VRT_CTX, struct vmod_waf_init *waf, VCL_STRING tag)
+{
+	skip_rule_by_type(ctx, waf, "SecRuleRemoveByTag", tag);
 }
