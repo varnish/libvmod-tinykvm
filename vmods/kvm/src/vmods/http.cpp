@@ -34,6 +34,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 	TenantConfig::set_dynamic_call(task, "curl.fetch",
 	[=] (MachineInstance& inst, tinykvm::vCPU& vcpu)
 	{
+		static constexpr bool GLOBAL_VERBOSE_CURL = true;
 		auto& regs = vcpu.registers();
 		/**
 		 * rdi = URL
@@ -85,7 +86,8 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		vcpu.machine().copy_from_guest(&opres, op_buffer, sizeof(opresult));
 
 		// The top bit of the HTTP status enables VERBOSE mode (for now)
-		const bool VERBOSE_CURL = (opres.status & 0x80000000) && inst.tenant().config.allow_verbose_curl();
+		const bool VERBOSE_CURL = GLOBAL_VERBOSE_CURL ||
+			((opres.status & 0x80000000) && inst.tenant().config.allow_verbose_curl());
 		opres.status &= ~0x80000000;
 
 		// Retrieve request header fields into string vector

@@ -154,16 +154,6 @@ kvmbe_gethdrs(const struct director *dir,
 	kvmr->t_prev = bo->t_prev;
 	kvm_ts(ctx.vsl, "TenantStart", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 
-	/* The backend_result contains many iovec-like buffers needed for
-	   extracting data from the VM without copying to a temporary buffer. */
-	struct backend_result *result =
-		(struct backend_result *)WS_Alloc(bo->ws, VMBE_RESULT_SIZE);
-	if (result == NULL) {
-		VSLb(ctx.vsl, SLT_Error, "KVM: Out of workspace for result");
-		return (-1);
-	}
-	result->bufcount = VMBE_NUM_BUFFERS;
-
 	/* Reserving a VM means putting ourselves in a concurrent queue
 	   waiting for a free VM, and then getting exclusive access until
 	   the end of the request. */
@@ -200,6 +190,16 @@ kvmbe_gethdrs(const struct director *dir,
 		}
 		kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 	}
+
+	/* The backend_result contains many iovec-like buffers needed for
+	   extracting data from the VM without copying to a temporary buffer. */
+	struct backend_result *result =
+		(struct backend_result *)WS_Alloc(bo->ws, VMBE_RESULT_SIZE);
+	if (result == NULL) {
+		VSLb(ctx.vsl, SLT_Error, "KVM: Out of workspace for result");
+		return (-1);
+	}
+	result->bufcount = VMBE_NUM_BUFFERS;
 
 	/* Make a backend VM call (with optional POST). */
 	kvm_backend_call(&ctx, slot, kvmr->funcarg, post, result);
@@ -261,6 +261,11 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING url)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	if (ctx->method != VCL_MET_BACKEND_FETCH) {
+		VRT_fail(ctx, "vmod_kvm: vm_backend() should only"
+		    "be called from vcl_backend_fetch");
+		return (NULL);
+	}
 
 	/* Everything we do has lifetime of the backend request,
 	   so we can use the workspace. */
@@ -294,6 +299,11 @@ VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING key, VCL_STRING url)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	if (ctx->method != VCL_MET_BACKEND_FETCH) {
+		VRT_fail(ctx, "vmod_kvm: vm_debug_backend() should only"
+		    "be called from vcl_backend_fetch");
+		return (NULL);
+	}
 
 	/* Everything we do has lifetime of the backend request,
 	   so we can use the workspace. */
