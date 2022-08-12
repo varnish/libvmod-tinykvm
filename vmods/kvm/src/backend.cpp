@@ -239,10 +239,10 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					throw std::runtime_error("The GET callback has not been registered");
 				if (machine.is_ephemeral()) {
 					/* Call into VM doing a full pagetable/cache flush. */
-					vm.timed_vmcall(vm_entry_addr, timeout, farg[0]);
+					vm.timed_vmcall(vm_entry_addr, timeout, farg[0], farg[1]);
 				} else {
 					/* Call into VM without flushing anything. */
-					vm.timed_reentry(vm_entry_addr, timeout, farg[0]);
+					vm.timed_reentry(vm_entry_addr, timeout, farg[0], farg[1]);
 				}
 			} else {
 				/* Try to reduce POST mmap allocation */

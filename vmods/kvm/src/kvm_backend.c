@@ -258,7 +258,7 @@ static void init_director(struct director *dir, void *kvmr)
 }
 
 VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
-	VCL_STRING tenant, VCL_STRING url)
+	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	if (ctx->method != VCL_MET_BACKEND_FETCH) {
@@ -287,7 +287,7 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	}
 
 	kvmr->funcarg[0] = url;
-	kvmr->funcarg[1] = NULL;
+	kvmr->funcarg[1] = arg;
 	kvmr->debug = 0;
 	kvmr->max_response_size = 0;
 
@@ -296,7 +296,7 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 }
 
 VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
-	VCL_STRING tenant, VCL_STRING key, VCL_STRING url)
+	VCL_STRING tenant, VCL_STRING key, VCL_STRING url, VCL_STRING arg)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	if (ctx->method != VCL_MET_BACKEND_FETCH) {
@@ -329,7 +329,7 @@ VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
 	}
 
 	kvmr->funcarg[0] = url;
-	kvmr->funcarg[1] = NULL;
+	kvmr->funcarg[1] = arg;
 	kvmr->debug = 1;
 	kvmr->max_response_size = 0;
 

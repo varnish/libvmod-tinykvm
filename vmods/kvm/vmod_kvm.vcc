@@ -110,7 +110,7 @@ $Function BACKEND live_debug(PRIV_VCL, STRING tenant, STRING key, BYTES max_size
 - Whenever a request triggers a breakpoint, open a port
   for GDB remote debugging.
 
-$Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING url)
+$Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING url, STRING arg = "")
 
 - Returns a backend that will call into the current machine to produce a response.
 - Produces 500 server error if there is not enough memory,
@@ -127,7 +127,7 @@ $Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING url)
   function in the program for each data segment it receives, and then finally
   it will call the POST function at the end with the whole data segment.
 
-$Function BACKEND vm_debug_backend(PRIV_VCL, STRING tenant, STRING key, STRING url)
+$Function BACKEND vm_debug_backend(PRIV_VCL, STRING tenant, STRING key, STRING url, STRING arg)
 
 - Execute request in a tenants debug program.
 - The program must have previously been installed via a live_debug() POST request.
