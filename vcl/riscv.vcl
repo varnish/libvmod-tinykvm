@@ -1,99 +1,39 @@
 vcl 4.1;
-import file;
-import goto;
 import riscv;
 import kvm;
 import std;
-import utils;
 
 backend default none;
 
 sub vcl_init {
-	new f = file.init(std.getenv("HOME"));
-	riscv.embed_tenants("""
-		{
-			"vpizza.com": {
-				"filename": "/tmp/riscv_vpizza",
-				"group": "test"
-			},
-			"xpizza.com": {
-				"filename": "/tmp/riscv_xpizza",
-				"group": "test"
-			},
-			"ypizza.com": {
-				"filename": "/tmp/riscv_ypizza",
-				"group": "test"
-			},
-			"zpizza.com": {
-				"filename": "/tmp/riscv_zpizza",
-				"group": "test"
-			}
+	riscv.embed_tenants("""{
+		"test.com": {
+			"filename": "/tmp/riscv_test",
+			"group": "test"
 		}
-	""");
-	kvm.embed_tenants("""
-		{
-			"vpizza.com": {
-				"filename": "/tmp/vpizza",
-				"key": "12daf155b8508edc4a4b8002264d7494",
-				"group": "test"
-			},
-			"ypizza.com": {
-				"filename": "/tmp/ypizza",
-				"key": "12daf155b8508edc4a4b8002264d7494",
-				"group": "test",
-				"allowed_paths": [
-					"/usr/lib/x86_64-linux-gnu/espeak-ng-data/espeak-ng-data",
-					"/usr/lib/x86_64-linux-gnu/espeak-ng-data",
-					"/usr/lib/locale/locale-archive",
-					"/usr/share/locale/locale.alias",
-					"/usr/lib/locale/C.utf8/LC_CTYPE",
-					"/usr/lib/locale/C.UTF-8/LC_CTYPE"
-				]
-			}
+	}""");
+	kvm.embed_tenants("""{
+		"test.com": {
+			"filename": "/tmp/test",
+			"key": "123",
+			"group": "test"
 		}
-	""");
+	}""");
 }
 
 sub vcl_recv {
-
-	if (req.url == "/file") {
-		set req.backend_hint = f.backend();
-		set req.url = req.url + "?foo=" + utils.cpu_id();
-		//set req.url = req.url + "?foo=" + utils.fast_random_int(100);
-		return (hash);
-	}
-	/* Easier to work with wrk */
-	if (req.url ~ "/x") {
-		set req.http.Host = "xpizza.com";
-		//set req.url = req.url + "?foo=" + utils.cpu_id();
-		//set req.url = req.url + "?foo=" + utils.thread_id();
-		//set req.url = req.url + "?foo=" + utils.fast_random_int(100);
-	}
-	else if (req.url ~ "/y") {
-		set req.http.Host = "ypizza.com";
-	}
-	else if (req.url == "/z") {
-		set req.http.Host = "zpizza.com";
-		set req.url = req.url + "?foo=" + utils.cpu_id();
-		//set req.url = req.url + "?foo=" + utils.fast_random_int(100);
+	if (req.http.Host == "127.0.0.1:8080") {
+		set req.http.Host = "test.com";
 	}
 
-	/* Determine tenant */
-	if (req.http.Host) {
-
-		/* Live update mechanism */
-		if (req.method == "POST") {
-			std.cache_req_body(15MB);
-			return (pass);
-		}
-		/* If fork fails, it's probably not a tenant */
-		if (!riscv.fork(req.http.Host, req.http.X-Debug)) {
-			return (synth(403, "No such tenant"));
-		}
-
-	} else {
-		/* No 'Host: tenant' specified */
-		return (synth(403, "Missing Host header field"));
+	/* Live update mechanism */
+	if (req.method == "POST") {
+		std.cache_req_body(15MB);
+		return (pass);
+	}
+	/* If fork fails, it's probably not a tenant */
+	if (!riscv.fork(req.http.Host, req.http.X-Debug)) {
+		return (synth(403, "Unknown tenant"));
 	}
 
 	/* Call into VM */
@@ -125,9 +65,7 @@ sub vcl_recv {
 }
 
 sub vcl_hash {
-	if (riscv.active()) {
-		riscv.apply_hash();
-	}
+	riscv.apply_hash();
 }
 
 sub vcl_synth {
@@ -179,20 +117,16 @@ sub vcl_backend_fetch {
 }
 
 sub vcl_backend_response {
-	if (riscv.active()) {
-		if (riscv.want_resume()) {
-			riscv.resume();
-		} else {
-			riscv.vcall(ON_BACKEND_RESPONSE);
-		}
+	if (riscv.want_resume()) {
+		riscv.resume();
+	} else {
+		riscv.vcall(ON_BACKEND_RESPONSE);
 	}
 }
 
 sub vcl_deliver {
-	if (riscv.active()) {
-		if (riscv.want_resume()) {
-			riscv.resume();
-		}
-		riscv.vcall(ON_DELIVER);
+	if (riscv.want_resume()) {
+		riscv.resume();
 	}
+	riscv.vcall(ON_DELIVER);
 }

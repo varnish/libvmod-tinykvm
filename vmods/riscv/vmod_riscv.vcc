@@ -140,6 +140,7 @@ $Function BOOL    apply_hash()
 - Tries to apply any previously computed hash.
 - Must be called from vcl_hash.
 - Returns true if there was a previously computed hash.
+- Always returns false if no active tenant program.
 
 $Function STRING  want_result()
 
