@@ -34,7 +34,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 	TenantConfig::set_dynamic_call(task, "curl.fetch",
 	[=] (MachineInstance& inst, tinykvm::vCPU& vcpu)
 	{
-		static constexpr bool GLOBAL_VERBOSE_CURL = true;
+		static constexpr bool GLOBAL_VERBOSE_CURL = false;
 		auto& regs = vcpu.registers();
 		/**
 		 * rdi = URL

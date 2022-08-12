@@ -55,28 +55,13 @@ static void syscall_regex_match(vCPU& cpu, MachineInstance& inst)
 
     auto& entry = inst.regex().get(idx);
 
-    const auto subject = cpu.machine().sequential_view(vaddr, size);
-    if (!subject.empty())
-    {
-        regs.rax =
-            VRE_exec(entry.item, subject.begin(), subject.size(), 0,
-                0, nullptr, 0, nullptr) >= 0;
-    } else {
-        /* TODO: Streaming-like approach for big buffers. */
-        std::string subject;
-        subject.reserve(size);
-        cpu.machine().foreach_memory(vaddr, size,
-            [&] (const std::string_view data) {
-                subject.append(data);
-            });
-
-        /* VRE_exec(const vre_t *code, const char *subject, int length,
-            int startoffset, int options, int *ovector, int ovecsize,
-            const volatile struct vre_limits *lim) */
-        regs.rax =
-            VRE_exec(entry.item, subject.c_str(), subject.size(), 0,
-                0, nullptr, 0, nullptr);
-    }
+    auto subject = cpu.machine().string_or_view(vaddr, size);
+    /* VRE_exec(const vre_t *code, const char *subject, int length,
+        int startoffset, int options, int *ovector, int ovecsize,
+        const volatile struct vre_limits *lim) */
+    regs.rax =
+        VRE_exec(entry.item, subject.c_str(), subject.size(), 0,
+            0, nullptr, 0, nullptr);
     cpu.set_registers(regs);
 }
 

@@ -166,7 +166,8 @@ static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
 
 	auto *hp = get_http(inst.ctx(), (gethdr_e)where);
 
-	/* Read out *what* from guest */
+	/* Read out *what* from guest and allocate in on the workspace,
+	   because in most cases we put the buffer in struct http. */
 	auto *buffer = (char *)WS_Alloc(inst.ctx()->ws, g_wlen + 1);
 	if (buffer == nullptr)
 		throw std::runtime_error("Unable to make room for HTTP header field");
@@ -174,7 +175,7 @@ static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
 	buffer[g_wlen] = 0;
 
 	/* Find the ':' in the buffer */
-	const char* colon = strchr(buffer, ':');
+	const char* colon = (const char *)std::memchr(buffer, ':', g_wlen);
 	if (colon != nullptr) {
 		const size_t namelen = colon - buffer;
 
@@ -216,10 +217,10 @@ static void syscall_http_find(vCPU& cpu, MachineInstance &inst)
 	auto* hp = get_http(inst.ctx(), (gethdr_e)where);
 
 	/* Read out *what* from guest, as zero-terminated string */
-	auto buffer = cpu.machine().buffer_to_string(g_what, g_wlen);
+	auto buffer = cpu.machine().string_or_view(g_what, g_wlen);
 
 	/* Find the header field by its name */
-	unsigned index = http_findhdr(hp, buffer.size(), buffer.c_str());
+	unsigned index = http_findhdr(hp, buffer.size(), buffer.begin());
 	if (index > 0)
 	{
 		const auto& field = hp->field_array[index];
