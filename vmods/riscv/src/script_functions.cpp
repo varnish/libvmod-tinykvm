@@ -77,6 +77,35 @@ get_field(VRT_CTX, int where, uint32_t index)
 	}
 	throw std::out_of_range("Header field index not in bounds");
 }
+static unsigned
+http_findhdr(const struct http *hp, unsigned l, const char *hdr)
+{
+	for (unsigned u = HDR_FIRST; u < hp->field_count; u++)
+	{
+		if (hp->field_array[u].end < hp->field_array[u].begin + l + 1)
+			continue;
+		if (hp->field_array[u].begin[l] != ':')
+			continue;
+		if (strncasecmp(hdr, hp->field_array[u].begin, l))
+			continue;
+		return u;
+	}
+	return 0;
+}
+static void
+http_unsetat(struct http *hp, unsigned idx)
+{
+	unsigned count;
+
+	assert(idx >= HDR_FIRST); /* Avoid proto fields */
+	assert(idx < hp->field_count); /* Out of bounds */
+
+	/* Inefficient, but preserves order (assuming sorted?) */
+	count = hp->field_count - idx - 1;
+	memmove(&hp->field_array[idx], &hp->field_array[idx + 1], count * sizeof *hp->field_array);
+	memmove(&hp->field_flags[idx], &hp->field_flags[idx + 1], count * sizeof *hp->field_flags);
+	hp->field_count--;
+}
 
 inline uint32_t field_length(const txt& field)
 {
@@ -508,7 +537,7 @@ APICALL(foreach_header_field)
 			const int idx = machine.memory.read<uint32_t>
 				(addr + offsetof(guest_header_field, index));
 			if (is_valid_index(hp, idx)) {
-				http_UnsetIdx(hp, idx - dcount++);
+				http_unsetat(hp, idx - dcount++);
 			}
 		}
 	}
@@ -527,7 +556,7 @@ APICALL(http_find_name)
 	{
 		/* Find the header field by its name */
 		unsigned index
-			= HTTP_FindHdr(hp, fieldname.size(), fieldname.c_str());
+			= http_findhdr(hp, fieldname.size(), fieldname.c_str());
 		if (index > 0) {
 			machine.set_result(index);
 			return;
@@ -535,7 +564,7 @@ APICALL(http_find_name)
 	} else {
 		/* Find the header field by its name */
 		unsigned index
-			= HTTP_FindHdr(hp, fieldname.size(), fieldname.to_string().c_str());
+			= http_findhdr(hp, fieldname.size(), fieldname.to_string().c_str());
 		if (index > 0) {
 			machine.set_result(index);
 			return;
@@ -609,7 +638,7 @@ APICALL(http_unset_re)
 		auto& field = hp->field_array[i];
 		if ( VRE_exec(vre, field.begin, field.end - field.begin,
 			0, 0, nullptr, 0, nullptr) >= 0 ) {
-			http_UnsetIdx(hp, i);
+			http_unsetat(hp, i);
 			mcount ++;
 		}
 	}
@@ -733,7 +762,7 @@ APICALL(header_field_copy)
 		else /* In VCL you can unset a header field by assigning it
 			to a non-existing other header field. */
 		{
-			http_UnsetIdx(hp, index);
+			http_unsetat(hp, index);
 			machine.set_result(HDR_INVALID);
 			return;
 		}
@@ -756,7 +785,7 @@ APICALL(header_field_unset)
 	/* You are not allowed to unset proto fields */
 	if (is_valid_index(hp, index) && index >= HDR_FIRST)
 	{
-		http_UnsetIdx(hp, index);
+		http_unsetat(hp, index);
 		machine.set_result(index);
 		return;
 	} else if (index == HDR_INVALID) {
