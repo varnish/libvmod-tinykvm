@@ -193,7 +193,7 @@ APICALL(remote_call)
 {
 	auto [func] = machine.sysargs <gaddr_t> ();
 	auto& script = get_script(machine);
-	auto& instance = script.instance();
+	auto& instance = script.program();
 	auto& remote = instance.storage;
 	// Get machine registers
 	auto& myregs = machine.cpu.registers();
@@ -252,7 +252,7 @@ APICALL(remote_strcall)
 	//printf("Remote stringcall: tramp=0x%X func=0x%X data=0x%X len=%d\n",
 	//	tramp, func, data, len);
 	auto& script = get_script(machine);
-	auto& instance = script.instance();
+	auto& instance = script.program();
 	auto& remote = instance.storage;
 
 	// All arguments have to be valid, and we
@@ -339,7 +339,7 @@ APICALL(set_decision)
 		script.pause();
 		// Overwrite the on_recv function, if set
 		if (on_recv != 0x0) {
-			auto& inst = script.instance();
+			auto& inst = script.program();
 			inst.sym_vector.at(1).addr = on_recv;
 			inst.sym_vector.at(1).size = 16;
 		}

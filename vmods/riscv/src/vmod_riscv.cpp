@@ -215,7 +215,7 @@ long riscv_current_call(VRT_CTX, const char* func)
 				"VM call '%s' failed: The function is missing", func);
 			return -1;
 		}
-		int ret = script->call(addr);
+		long ret = script->call(addr);
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t2);
 		printf("Time spent in forkcall(): %ld ns\n", nanodiff(t1, t2));
@@ -231,9 +231,9 @@ long riscv_current_call_idx(VRT_CTX, vcall_info info)
 
 	auto* script = get_machine(ctx);
 	if (script) {
-		if (info.idx >= 0 && info.idx < script->instance().sym_vector.size())
+		if (info.idx >= 0 && info.idx < script->program().sym_vector.size())
 		{
-			auto& entry = script->instance().sym_vector[info.idx];
+			auto& entry = script->program().sym_vector[info.idx];
 			if (UNLIKELY(entry.addr == 0)) {
 				VSLb(ctx->vsl, SLT_Error,
 					"VM call '%s' skipped: The function at index %d is not available",

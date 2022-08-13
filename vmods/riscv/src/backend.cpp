@@ -48,7 +48,7 @@ void riscv_backend_call(VRT_CTX, const void* key, long func, long farg,
 			script->set_ctx(ctx);
 			/* Call the backend response function */
 			auto& machine = script->machine();
-			machine.vmcall(func, (Script::gaddr_t) farg, (int) HDR_BEREQ, (int) HDR_BERESP);
+			machine.vmcall(func, (Script::gaddr_t) farg);
 			/* Restore old ctx for backend_response */
 			script->set_ctx(old_ctx);
 

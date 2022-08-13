@@ -45,8 +45,8 @@ public:
 	const auto* ctx() const noexcept { return m_ctx; }
 	const auto* vrm() const noexcept { return m_tenant; }
 	const auto& tenant() const noexcept { return *m_tenant; }
-	auto& instance() { return m_inst; }
-	const auto& instance() const { return m_inst; }
+	auto& program() { return m_inst; }
+	const auto& program() const { return m_inst; }
 	void set_ctx(const vrt_ctx* ctx) { m_ctx = ctx; }
 	void assign_instance(std::shared_ptr<MachineInstance>& ref) { m_inst_ref = std::move(ref); }
 

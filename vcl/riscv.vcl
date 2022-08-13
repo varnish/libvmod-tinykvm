@@ -1,7 +1,6 @@
 vcl 4.1;
 import riscv;
 import kvm;
-import std;
 
 backend default none;
 
@@ -28,7 +27,6 @@ sub vcl_recv {
 
 	/* Live update mechanism */
 	if (req.method == "POST") {
-		std.cache_req_body(15MB);
 		return (pass);
 	}
 	/* If fork fails, it's probably not a tenant */
