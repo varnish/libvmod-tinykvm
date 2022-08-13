@@ -35,6 +35,7 @@ struct TenantConfig
 	uint64_t max_heap() const noexcept { return group.max_heap; }
 	size_t   max_regex() const noexcept { return group.max_regex; }
 	size_t   max_backends() const noexcept { return group.max_backends; }
+	bool     elf_execute_only() const noexcept { return false; }
 
 	TenantConfig(std::string n, std::string f, TenantGroup g)
 		: name(n), filename(f), group{std::move(g)} {}
