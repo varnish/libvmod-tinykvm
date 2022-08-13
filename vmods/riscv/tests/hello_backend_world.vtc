@@ -4,29 +4,26 @@ shell {
 cat >${tmpdir}/${testname}.cpp <<-EOF
 #include "riscv_api.hpp"
 
-static void on_recv(int req, int resp)
-{
-	char url[4096];
-	get_url(req, url, sizeof(url));
-
+static void
+on_recv(const char* url, int req, int resp) {
 	if (strcmp(url, "/1") == 0)
 	{
 		forge(CACHED, [] {
 			static const char mime[] = "text/plain";
 			static const char text[] = "Hello World";
-			forge_response(200, mime, sizeof(mime)-1, text, sizeof(text)-1);
+			sys_response(200, mime, sizeof(mime)-1, text, sizeof(text)-1);
 		});
 	} else if (strcmp(url, "/2") == 0) {
 		forge(CACHED, [] {
 			static const char mime[] = "text/plain";
 			static const char text[] = "Not found";
-			forge_response(404, mime, sizeof(mime)-1, text, sizeof(text)-1);
+			sys_response(404, mime, sizeof(mime)-1, text, sizeof(text)-1);
 		});
 	} else {
 		forge(CACHED, [] {
 			static const char mime[] = "text/plain";
 			static const char text[] = "Server error";
-			forge_response(500, mime, sizeof(mime)-1, text, sizeof(text)-1);
+			sys_response(500, mime, sizeof(mime)-1, text, sizeof(text)-1);
 		});
 	}
 }
@@ -39,21 +36,18 @@ bash ${testdir}/build.sh ${tmpdir}/${testname}.cpp ${testdir} ${tmpdir}/${testna
 }
 
 varnish v1 -vcl+backend {
-vcl 4.1;
+	vcl 4.1;
 	import riscv;
-	import std;
 
 	backend default none;
 
 	sub vcl_init {
-		riscv.embed_tenants("""
-			{
-				"xpizza.com": {
-					"filename": "${tmpdir}/${testname}",
-					"group": "test"
-				}
+		riscv.embed_tenants("""{
+			"xpizza.com": {
+				"filename": "${tmpdir}/${testname}",
+				"group": "test"
 			}
-		""");
+		}""");
 	}
 
 	sub vcl_recv {
@@ -62,7 +56,7 @@ vcl 4.1;
 		}
 
 		/* Call into VM */
-		riscv.vcall(ON_REQUEST);
+		riscv.vcall(ON_REQUEST, req.url);
 
 		if (riscv.want_result() == "backend") {
 			set req.http.X-Backend-Func = riscv.result_value(1);

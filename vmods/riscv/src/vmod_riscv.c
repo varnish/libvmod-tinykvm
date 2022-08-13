@@ -14,8 +14,7 @@ extern void init_tenants_file(VRT_CTX, const char*);
 extern void* riscv_fork(VRT_CTX, const char* ten, int dbg);
 // Functions operating on a machine already forked, which
 // is accessible through a priv_task.
-extern long riscv_current_call(VRT_CTX, const char*);
-extern long riscv_current_call_idx(VRT_CTX, vcall_info);
+extern long riscv_current_call_idx(VRT_CTX, vcall_info, const char*);
 extern long riscv_current_resume(VRT_CTX);
 extern const char* riscv_current_name(VRT_CTX);
 extern const char* riscv_current_group(VRT_CTX);
@@ -72,11 +71,11 @@ VCL_BOOL vmod_active(VRT_CTX)
 
 	return riscv_current_name(ctx) != NULL;
 }
-VCL_INT vmod_vcall(VRT_CTX, VCL_ENUM e)
+VCL_INT vmod_vcall(VRT_CTX, VCL_ENUM e, VCL_STRING arg)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
-	return riscv_current_call_idx(ctx, enum_to_idx(e));
+	return riscv_current_call_idx(ctx, enum_to_idx(e), arg);
 }
 VCL_INT vmod_resume(VRT_CTX)
 {

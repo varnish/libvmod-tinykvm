@@ -111,8 +111,8 @@ $Function INT     vcall(ENUM {
 		ON_BACKEND_ERROR,
 		ON_DELIVER,
 		ON_LIVE_UPDATE,
-		ON_RESUME_UPDATE
-		} index = "ON_REQUEST")
+		ON_RESUME_UPDATE} index = "ON_REQUEST",
+		STRING argument = 0)
 
 - Calls the given function at index in order added by add_known_function
   (starting at zero), in the currently active machine.

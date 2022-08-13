@@ -11,7 +11,7 @@ static inline std::array<const char*, 12> callback_names = {
 	"Invalid callback",
 	"on_recv",
 	"on_hash",
-	"on_synth",
+	"on_synth",         // 3
 	"on_backend_fetch",
 	"on_backend_response",
 	"on_backend_error",

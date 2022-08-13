@@ -4,17 +4,13 @@ shell {
 cat >${tmpdir}/${testname}.cpp <<-EOF
 #include "riscv_api.hpp"
 
-static void on_recv(int req, int resp)
+static void on_recv(const char* url, int req, int resp)
 {
-	static const char reason[] = "synth";
-	decision(reason, sizeof(reason)-1, 404);
+	decision("synth", 5, 404);
 }
 
-void on_synth()
+void on_synth(const char* url)
 {
-	char url[4096];
-	get_url(HDR_REQ, url, sizeof(url));
-
 	if (strcmp(url, "/") == 0) {
 		static const char mime[] = "text/plain";
 		static const char text[] = "Hello World";
@@ -27,6 +23,7 @@ void on_synth()
 }
 
 void start(int argc, char** argv) {
+	register_callback(3, (void(*)())on_synth);
 	wait_for_requests(on_recv);
 }
 EOF
@@ -40,14 +37,12 @@ vcl 4.1;
 	backend default none;
 
 	sub vcl_init {
-		riscv.embed_tenants("""
-			{
-				"xpizza.com": {
-					"filename": "${tmpdir}/${testname}",
-					"group": "test"
-				}
+		riscv.embed_tenants("""{
+			"xpizza.com": {
+				"filename": "${tmpdir}/${testname}",
+				"group": "test"
 			}
-		""");
+		}""");
 	}
 
 	sub vcl_recv {
@@ -56,7 +51,7 @@ vcl 4.1;
 		}
 
 		/* Call into VM */
-		riscv.vcall(ON_REQUEST);
+		riscv.vcall(ON_REQUEST, req.url);
 
 		if (riscv.want_result() == "synth") {
 			return (synth(riscv.want_status()));
@@ -66,7 +61,7 @@ vcl 4.1;
 	}
 	sub vcl_synth {
 		if (riscv.active()) {
-			riscv.vcall(ON_SYNTH);
+			riscv.vcall(ON_SYNTH, req.url);
 			return (deliver);
 		}
 	}

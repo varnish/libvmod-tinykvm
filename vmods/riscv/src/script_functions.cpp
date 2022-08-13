@@ -310,17 +310,13 @@ APICALL(remote_strcall)
 	machine.increment_counter(REMOTE_CALL_COST + remote.machine().instruction_counter());
 }
 
-APICALL(my_name)
+APICALL(register_callback)
 {
-	const auto [buffer, len] =
-		machine.sysargs<gaddr_t, uint32_t> ();
-	const auto& name = get_script(machine).name();
-	if (len >= name.size()+1) {
-		machine.copy_to_guest(buffer, name.c_str(), name.size()+1);
-		machine.set_result(name.size());
-		return;
-	}
-	machine.set_result(-1);
+	const auto [idx, addr] =
+		machine.sysargs<uint32_t, gaddr_t>();
+	auto& script = get_script(machine);
+	script.program().callback_entries.at(idx) = addr;
+	machine.set_result(0);
 }
 APICALL(set_decision)
 {
@@ -920,13 +916,7 @@ void Script::setup_syscall_interface()
 		FPTR(remote_call),
 		FPTR(remote_strcall),
 
-		FPTR(regex_compile),
-		FPTR(regex_match),
-		FPTR(regex_subst),
-		FPTR(regex_subst_hdr),
-		FPTR(regex_delete),
-
-		FPTR(my_name),
+		FPTR(register_callback),
 		FPTR(set_decision),
 		FPTR(set_backend),
 		FPTR(backend_decision),
@@ -950,6 +940,12 @@ void Script::setup_syscall_interface()
 		FPTR(http_set_status),
 		FPTR(http_unset_re),
 		FPTR(http_find_name),
+
+		FPTR(regex_compile),
+		FPTR(regex_match),
+		FPTR(regex_subst),
+		FPTR(regex_subst_hdr),
+		FPTR(regex_delete),
 
 		FPTR(sha256)
 	};

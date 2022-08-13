@@ -5,7 +5,6 @@ extern "C" {
 }
 
 namespace rvs {
-	static const size_t TOO_SMALL = 3; // vmcalls that can be skipped
 	extern SandboxTenant* create_temporary_tenant(const SandboxTenant*, const std::string&);
 	extern void delete_temporary_tenant(const SandboxTenant*);
 
@@ -50,7 +49,7 @@ const rvs::SandboxTenant* riscv_current_machine(VRT_CTX)
 }
 
 extern "C"
-long riscv_current_call_idx(VRT_CTX, vcall_info info)
+long riscv_current_call_idx(VRT_CTX, vcall_info info, const char* argument)
 {
 	using namespace rvs;
 
@@ -71,7 +70,11 @@ long riscv_current_call_idx(VRT_CTX, vcall_info info)
 		#endif
 			// VRT ctx can easily change even on the same request due to waitlist
 			script->set_ctx(ctx);
-			int ret = script->call(addr, (int) info.arg1, (int) info.arg2);
+			int ret = 0;
+			if (argument != nullptr)
+				ret = script->call(addr, argument, (int) info.arg1, (int) info.arg2);
+			else
+				ret = script->call(addr, (int) info.arg1, (int) info.arg2);
 		#ifdef ENABLE_TIMING
 			TIMING_LOCATION(t2);
 			printf("Time spent in forkcall(): %ld ns\n", nanodiff(t1, t2));

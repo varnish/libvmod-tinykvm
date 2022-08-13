@@ -24,7 +24,7 @@ inline void halt()
 }
 
 __attribute__((noreturn))
-inline void forge_response(int status, const char* arg0, long arg1, const char* arg2, long arg3)
+inline void sys_response(int status, const char* arg0, long arg1, const void* arg2, long arg3)
 {
 	register long a0 asm("a0") = status;
 	register long a1 asm("a1") = (long) arg0;
@@ -82,18 +82,23 @@ inline long get_url(int where, char* buffer, size_t maxlen)
 	return header_field(where, 1, buffer, maxlen);
 }
 
-inline void wait_for_requests(void(*on_recv)(int, int))
+inline void register_callback(unsigned idx, void(*cb)())
 {
-	register void(*a0)(int, int) asm("a0") = on_recv;
+	register unsigned a0     asm("a0") = idx;
+	register void(*a1)()     asm("a1") = cb;
+	register long syscall_id asm("a7") = ECALL_REGISTER_CB;
+
+	asm volatile ("ecall" : : "r"(a0), "r"(a1), "m"(*a1), "r"(syscall_id) : "memory");
+}
+
+typedef void (*on_recv_f) (const char*, int, int);
+inline void wait_for_requests(on_recv_f on_recv)
+{
+	register on_recv_f a0    asm("a0") = on_recv;
 	register long syscall_id asm("a7") = ECALL_SET_DECISION;
 
 	asm volatile ("ecall" : : "r"(a0), "m"(*a0), "r"(syscall_id) : "memory");
 }
-
-extern "C" __attribute__((used, retain))
-void on_synth();
-extern "C" __attribute__((used, retain))
-void on_backend_fetch();
 
 // 1. wrangle with argc and argc
 // 2. initialize the global pointer to __global_pointer
