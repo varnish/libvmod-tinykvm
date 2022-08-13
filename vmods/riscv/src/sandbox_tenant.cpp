@@ -51,9 +51,9 @@ Script* SandboxTenant::vmfork(VRT_CTX, bool debug)
 	#endif
 		std::shared_ptr<MachineInstance> prog;
 		if (LIKELY(!debug))
-			prog = this->program;
+			prog = std::atomic_load(&this->program);
 		else
-			prog = this->debug_program;
+			prog = std::atomic_load(&this->debug_program);
 		/* First-time tenants could have no program loaded */
 		if (UNLIKELY(prog == nullptr))
 			return nullptr;
@@ -78,7 +78,7 @@ Script* SandboxTenant::vmfork(VRT_CTX, bool debug)
 				"VM '%s' exception: %s", script->name().c_str(), e.what());
 			return nullptr;
 		}
-	#ifdef ENABLE_TIMING
+#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);
 		timing_constr.add(t0, t1);
 	#endif
