@@ -14,7 +14,7 @@ struct update_result {
 };
 
 typedef struct {
-	int idx;
+	unsigned idx;
 	int arg1;
 	int arg2;
 } vcall_info;

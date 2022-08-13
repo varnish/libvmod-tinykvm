@@ -340,8 +340,7 @@ APICALL(set_decision)
 		// Overwrite the on_recv function, if set
 		if (on_recv != 0x0) {
 			auto& inst = script.program();
-			inst.sym_vector.at(1).addr = on_recv;
-			inst.sym_vector.at(1).size = 16;
+			inst.callback_entries.at(1) = on_recv;
 		}
 	}
 	machine.stop();

@@ -102,17 +102,16 @@ $Function BOOL    active()
 
 - Returns true if there is a currently active tenant.
 
-$Function INT     call(STRING function)
-
-- Calls the given function in the currently active machine.
-
 $Function INT     vcall(ENUM {
 		ON_REQUEST,
 		ON_HASH,
 		ON_SYNTH,
 		ON_BACKEND_FETCH,
 		ON_BACKEND_RESPONSE,
-		ON_DELIVER
+		ON_BACKEND_ERROR,
+		ON_DELIVER,
+		ON_LIVE_UPDATE,
+		ON_RESUME_UPDATE
 		} index = "ON_REQUEST")
 
 - Calls the given function at index in order added by add_known_function

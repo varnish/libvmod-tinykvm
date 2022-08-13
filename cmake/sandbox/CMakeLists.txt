@@ -8,6 +8,7 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++20 -O2 -g")
 
 list(APPEND RISCV_SOURCES
 	src/backend.cpp
+	src/live_update.cpp
 	src/machine_instance.cpp
 	src/sandbox_tenant.cpp
 	src/script.cpp

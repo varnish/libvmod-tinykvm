@@ -10,7 +10,6 @@
 extern long riscv_current_result_status(VRT_CTX);
 extern struct vmod_riscv_machine* riscv_current_machine(VRT_CTX);
 extern void riscv_backend_call(VRT_CTX, const void*, long, long, struct backend_result *);
-extern uint64_t riscv_resolve_name(struct vmod_riscv_machine*, const char*);
 
 static void v_matchproto_(vdi_panic_f)
 riscvbe_panic(const struct director *dir, struct vsb *vsb)
@@ -196,9 +195,9 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_STRING func, VCL_STRING farg)
 	if (func) {
 		rvr->funcaddr = atoi(func);
 		rvr->funcarg  = atoi(farg);
-		/* If it's not an address, lookup as a public function */
+		/* TODO: If it's null, should we abandon? */
 		if (rvr->funcaddr == 0x0) {
-			rvr->funcaddr = riscv_resolve_name(rvr->machine, func);
+			return (NULL);
 		}
 	}
 	rvr->max_response_size = 0;

@@ -33,7 +33,11 @@ static inline vcall_info enum_to_idx(VCL_ENUM e)
 	if (e == vmod_enum_ON_SYNTH)   return (vcall_info){3, HDR_REQ, HDR_RESP};
 	if (e == vmod_enum_ON_BACKEND_FETCH) return (vcall_info){4, HDR_BEREQ, HDR_BERESP};
 	if (e == vmod_enum_ON_BACKEND_RESPONSE) return (vcall_info){5, HDR_BEREQ, HDR_BERESP};
-	if (e == vmod_enum_ON_DELIVER) return (vcall_info){6, HDR_RESP, HDR_INVALID};
+	if (e == vmod_enum_ON_BACKEND_ERROR) return (vcall_info){6, HDR_BEREQ, HDR_BERESP};
+	if (e == vmod_enum_ON_DELIVER) return (vcall_info){7, HDR_RESP, HDR_INVALID};
+
+	if (e == vmod_enum_ON_LIVE_UPDATE) return (vcall_info){10, HDR_INVALID, HDR_INVALID};
+	if (e == vmod_enum_ON_RESUME_UPDATE) return (vcall_info){11, HDR_INVALID, HDR_INVALID};
 	return (vcall_info){-1, HDR_INVALID, HDR_INVALID};
 }
 
@@ -67,16 +71,6 @@ VCL_BOOL vmod_active(VRT_CTX)
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
 	return riscv_current_name(ctx) != NULL;
-}
-/* Call into any currently running VM. */
-VCL_INT vmod_call(VRT_CTX, VCL_STRING function)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	if (function != NULL)
-		return riscv_current_call(ctx, function);
-
-	VRT_fail(ctx, "Null was passed to vmod_call");
-	return (-1); /* ??? */
 }
 VCL_INT vmod_vcall(VRT_CTX, VCL_ENUM e)
 {

@@ -20,22 +20,6 @@ struct SandboxTenant
 	void reset_dynamic_call(const std::string& name, ghandler_t = nullptr);
 	void dynamic_call(uint32_t hash, Script&) const;
 
-	inline Script::gaddr_t lookup(const char* name) const {
-		auto ref = program;
-		if (LIKELY(ref != nullptr))
-			return ref->lookup(name);
-		return 0x0;
-	}
-
-	inline auto callsite(const char* name) {
-		auto ref = program;
-		if (LIKELY(ref != nullptr)) {
-			auto addr = ref->lookup(name);
-			return ref->script.callsite(addr);
-		}
-		return decltype(ref->script.callsite(0)) {};
-	}
-
 	SandboxTenant(const vrt_ctx*, const TenantConfig&);
 	static void init();
 	void init_vmods(const vrt_ctx*);
