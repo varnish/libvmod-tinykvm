@@ -58,13 +58,13 @@ Script* SandboxTenant::vmfork(VRT_CTX, bool debug)
 		if (UNLIKELY(prog == nullptr))
 			return nullptr;
 		/* Allocate Script on workspace, and construct it in-place */
-		uintptr_t saddr = (uintptr_t)WS_Alloc(ctx->ws, sizeof(Script) + 0x10);
+		uintptr_t saddr = (uintptr_t)WS_Alloc(ctx->ws, sizeof(Script) + 0x20);
 		if (UNLIKELY(saddr == 0x0)) {
 			VRT_fail(ctx, "Out of workspace");
 			return nullptr;
 		}
-		// Make sure Script* is 16-byte aligned
-		saddr = (saddr + 0xF) & ~(uintptr_t)0xF;
+		// IMPORTANT: Make sure Script* is 32-byte aligned
+		saddr = (saddr + 0x1F) & ~(uintptr_t)0x1F;
 		auto* script = (Script*) saddr;
 
 		try {

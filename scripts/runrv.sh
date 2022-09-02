@@ -3,8 +3,9 @@ dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 file=$dir/cmaketool.sh
 
 BWS="workspace_backend=3M"
-mkdir -p /tmp/varnishd
+NTMP="/tmp/varnishd"
+mkdir -p $NTMP
 
-#source $file --vcp=build --single-process --debug=/tmp/varnishd --static-riscv --build $@ --run -a :8080 -f vcl/riscv.vcl -F -p $BWS
-source $file --vcp=build --optimize --static-riscv --disable-mold --build $@ --run -a :8080 -f vcl/riscv.vcl -F -p $BWS
-#source $file --vcp=build --no-optimize --static-riscv --mold --build $@ --run -a :8080 -f vcl/riscv.vcl -F -p $BWS
+#source $file --vcp=build --single-process --debug=/tmp/varnishd --static-riscv --build $@ --run -a :8080 -f vcl/riscv.vcl -F -p $BWS -n $NTMP
+source $file --vcp=build --optimize --static-riscv --disable-mold --build $@ --run -a :8080 -f vcl/riscv.vcl -F -p $BWS -n $NTMP
+#source $file --vcp=build --no-optimize --static-riscv --mold --build $@ --run -a :8080 -f vcl/riscv.vcl -F -p $BWS -n $NTMP
