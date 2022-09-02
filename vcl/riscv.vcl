@@ -35,7 +35,7 @@ sub vcl_recv {
 	}
 
 	/* Call into VM */
-	riscv.vcall(ON_REQUEST);
+	riscv.vcall(ON_REQUEST, req.url);
 
 	/* Make decision */
 	if (riscv.want_result() == "synth") {
@@ -115,16 +115,20 @@ sub vcl_backend_fetch {
 }
 
 sub vcl_backend_response {
-	if (riscv.want_resume()) {
-		riscv.resume();
-	} else {
-		riscv.vcall(ON_BACKEND_RESPONSE);
+	if (riscv.active()) {
+		if (riscv.want_resume()) {
+			riscv.resume();
+		} else {
+			riscv.vcall(ON_BACKEND_RESPONSE);
+		}
 	}
 }
 
 sub vcl_deliver {
-	if (riscv.want_resume()) {
-		riscv.resume();
+	if (riscv.active()) {
+		if (riscv.want_resume()) {
+			riscv.resume();
+		}
+		riscv.vcall(ON_DELIVER);
 	}
-	riscv.vcall(ON_DELIVER);
 }
