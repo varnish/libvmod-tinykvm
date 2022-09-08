@@ -72,9 +72,9 @@ TenantConfig::TenantConfig(
 {
 	this->allowed_file = filename + ".state";
 }
-
 TenantConfig::~TenantConfig() {}
 
+/* Find the active VCL tenants structure. Lazy instantiation. */
 Tenants& tenancy(VCL_PRIV task)
 {
 	if (LIKELY(task->priv != nullptr)) {
@@ -88,6 +88,7 @@ Tenants& tenancy(VCL_PRIV task)
 	return *(Tenants *)task->priv;
 }
 
+/* Initialize dynamic calls only once. Returns true if we should initialize them now. */
 bool TenantConfig::begin_dyncall_initialization(VCL_PRIV task)
 {
 	auto& tcy = tenancy(task);
@@ -270,11 +271,13 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			}
 			catch (const std::exception &e) {
 				VSL(SLT_Error, 0,
-					"Exception when creating machine '%s': %s",
-					tenant.config.name.c_str(), e.what());
+					"Exception when creating machine '%s' from source '%s': %s",
+					tenant.config.name.c_str(), tenant.config.filename.c_str(), e.what());
 				fprintf(stderr,
-						"Exception when creating machine '%s': %s\n",
-						tenant.config.name.c_str(), e.what());
+					"Exception when creating machine '%s' from source '%s': %s\n",
+					tenant.config.name.c_str(), tenant.config.filename.c_str(), e.what());
+				/* XXX: This can be racy if the same tenant is specified
+				   more than once, and is still initializing... */
 				tenant.program = nullptr;
 			}
 		}
@@ -323,13 +326,24 @@ extern "C"
 void kvm_init_tenants_str(VRT_CTX, VCL_PRIV task, const char* filename,
 	const char* str, size_t len)
 {
-	const std::vector<uint8_t> json { str, str + len };
-	kvm::init_tenants(ctx, task, json, filename);
+	/* Load tenants from a JSON string, with the filename used for logging purposes. */
+	try {
+		const std::vector<uint8_t> json { str, str + len };
+		kvm::init_tenants(ctx, task, json, filename);
+	} catch (const std::exception& e) {
+		VSL(SLT_Error, 0,
+			"vmod_kvm: Exception when loading tenants from string '%s': %s",
+			filename, e.what());
+		VRT_fail(ctx,
+			"vmod_kvm: Exception when loading tenants from string '%s': %s",
+			filename, e.what());
+	}
 }
 
 extern "C"
 void kvm_init_tenants_file(VRT_CTX, VCL_PRIV task, const char* filename)
 {
+	/* Load tenants from a local JSON file. */
 	try {
 		const auto json = kvm::file_loader(filename);
 		kvm::init_tenants(ctx, task, json, filename);

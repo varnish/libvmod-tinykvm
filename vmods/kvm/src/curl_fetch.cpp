@@ -14,8 +14,10 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
 
 	char *ptr = (char *)realloc(mem->memory, mem->size + realsize + 1);
 	if (!ptr) {
-		/* out of memory! */
-		printf("not enough memory (realloc returned NULL)\n");
+		/* Out of memory! Let's not try to print or log anything. */
+		free(mem->memory);
+		mem->memory = NULL;
+		mem->size = 0;
 		return 0;
 	}
 
@@ -41,8 +43,8 @@ int kvm_curl_fetch(const struct vrt_ctx *ctx,
 		.size = 0
 	};
 	if (chunk.memory == NULL) {
-		if (ctx != NULL)
-			VRT_fail(ctx, "kvm.fetch_tenants(): Out of memory");
+		if (ctx != NULL && ctx->vsl != NULL)
+			VSLb(ctx->vsl, SLT_Error, "kvm.curl_fetch(): Out of memory");
 		return (-1);
 	}
 
@@ -53,8 +55,8 @@ int kvm_curl_fetch(const struct vrt_ctx *ctx,
 
 	res = curl_easy_perform(curl_handle);
 	if (res != CURLE_OK) {
-		if (ctx != NULL)
-			VRT_fail(ctx, "kvm.fetch_tenants(): cURL failed: %s",
+		if (ctx != NULL && ctx->vsl != NULL)
+			VSLb(ctx->vsl, SLT_Error, "kvm.curl_fetch(): cURL failed: %s",
 				curl_easy_strerror(res));
 		retvalue = -1;
 	}

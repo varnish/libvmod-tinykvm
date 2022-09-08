@@ -86,14 +86,18 @@ ProgramInstance::ProgramInstance(
 			/* XXX: Reset binary when it fails. */
 			if (res != 0) {
 				this->binary = {};
+				this->main_vm = nullptr;
+				return -1;
 			}
-		} catch (...) {
+
+			return begin_initialization(ctx, ten, debug);
+		}
+		catch (...) {
 			/* XXX: Reset binary when it fails. */
 			this->binary = {};
+			this->main_vm = nullptr;
+			return -1;
 		}
-		/* For now, let's always call begin_initialization, in order to make sure
-		that initialization completes and that the error handling gets called. */
-		return begin_initialization(ctx, ten, debug);
 	});
 }
 long ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *ten, bool debug)
