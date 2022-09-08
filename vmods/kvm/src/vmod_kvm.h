@@ -67,3 +67,12 @@ static inline void kvm_ts(struct vsl_log *vsl, const char *event,
 {
 	VSLb_ts(vsl, event, *work, prev, now);
 }
+
+/* Fetch something with cURL. Returns 0: success, <0: failure */
+struct MemoryStruct
+{
+	char *memory;
+	size_t size;
+};
+extern int
+kvm_curl_fetch(VRT_CTX, const char *url, void(*callback)(void*, struct MemoryStruct *), void *usr);

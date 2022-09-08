@@ -64,7 +64,9 @@ public:
 	using gaddr_t = MachineInstance::gaddr_t;
 	static constexpr size_t ADNS_MAX = 8;
 
-	ProgramInstance(std::vector<uint8_t>,
+	ProgramInstance(std::vector<uint8_t> binary,
+		const vrt_ctx*, TenantInstance*, bool debug = false);
+	ProgramInstance(const std::string& uri,
 		const vrt_ctx*, TenantInstance*, bool debug = false);
 	~ProgramInstance();
 	long wait_for_initialization();
@@ -102,7 +104,7 @@ public:
 	long live_update_call(const vrt_ctx*,
 		gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc);
 
-	const std::vector<uint8_t> binary;
+	std::vector<uint8_t> binary;
 	/* Ready-made _main_ VM that can be forked into many small VMs */
 	std::unique_ptr<MachineInstance> main_vm;
 	/* Extra vCPU used for async storage tasks */
@@ -125,7 +127,7 @@ public:
 
 	/* Entry points in the tenants program. Handlers for all types of
 	   requests, serialization mechanisms and related functionality. */
-	std::array<gaddr_t, (size_t)ProgramEntryIndex::TOTAL_ENTRIES> entry_address;
+	std::array<gaddr_t, (size_t)ProgramEntryIndex::TOTAL_ENTRIES> entry_address {};
 
 	/* The timer system needs to be destroyed before any of the other
 	   things, like the storage and request VMs. Timers carry capture
@@ -154,6 +156,7 @@ public:
 	std::future<long> m_future;
 	bool initialization_complete = false;
 private:
+	long begin_initialization(const vrt_ctx *, TenantInstance *, bool debug);
 	/* Wait for Varnish to listen and this program to complete initialization. */
 	void try_wait_for_startup_and_initialization();
 };

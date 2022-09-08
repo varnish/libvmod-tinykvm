@@ -20,6 +20,8 @@
  * 
 **/
 #include "program_instance.hpp"
+
+#include "curl_fetch.hpp"
 #include "tenant_instance.hpp"
 #include "settings.hpp"
 #include "varnish.hpp"
@@ -54,40 +56,75 @@ ProgramInstance::ProgramInstance(
 	: binary{std::move(elf)},
 	  m_main_queue {1, STORAGE_VM_NICE, false},
 	  m_main_async_queue {1, ASYNC_STORAGE_NICE, ASYNC_STORAGE_LOWPRIO},
-	  entry_address {},
+	  m_vcl {ctx->vcl},
+	  rspclient{nullptr}
+{
+	this->m_future = m_main_queue.enqueue(
+	[=] () -> long {
+		return begin_initialization(ctx, ten, debug);
+	});
+}
+ProgramInstance::ProgramInstance(
+	const std::string& uri,
+	const vrt_ctx* ctx, TenantInstance* ten,
+	bool debug)
+	: binary{},
+	  m_main_queue {1, STORAGE_VM_NICE, false},
+	  m_main_async_queue {1, ASYNC_STORAGE_NICE, ASYNC_STORAGE_LOWPRIO},
 	  m_vcl {ctx->vcl},
 	  rspclient{nullptr}
 {
 	this->m_future = m_main_queue.enqueue(
 	[=] () -> long {
 		try {
-			main_vm = std::make_unique<MachineInstance>
-				(binary, ctx, ten, this, debug);
+			int res = kvm_curl_fetch(ctx, uri.c_str(),
+			[] (void* usr, MemoryStruct* chunk) {
+				auto* elf = (std::vector<uint8_t> *)usr;
+				*elf = std::vector<uint8_t> (chunk->memory, chunk->memory + chunk->size);
+			}, &this->binary);
 
-			main_vm_extra_cpu_stack = EXTRA_CPU_STACK_SIZE +
-				main_vm->machine().mmap_allocate(EXTRA_CPU_STACK_SIZE);
-
-			main_vm->initialize();
-
-			const size_t max_vms = ten->config.group.max_concurrency;
-			for (size_t i = 0; i < max_vms; i++) {
-				// Instantiate forked VMs on dedicated threads,
-				// in order to prevent KVM migrations.
-				m_vms.emplace_back(*main_vm, ctx, ten, this);
-				m_vmqueue.enqueue(&m_vms.back());
+			/* XXX: Reset binary when it fails. */
+			if (res != 0) {
+				this->binary = {};
 			}
 		} catch (...) {
-			/* Make sure we signal that there is no program, if the
-			   program fails to intialize. */
-			main_vm = nullptr;
-			return -1;
+			/* XXX: Reset binary when it fails. */
+			this->binary = {};
 		}
-
-		/* We do not have a storage CTX after this point. */
-		main_vm->set_ctx(nullptr);
-		this->initialization_complete = true;
-		return 0;
+		/* For now, let's always call begin_initialization, in order to make sure
+		that initialization completes and that the error handling gets called. */
+		return begin_initialization(ctx, ten, debug);
 	});
+}
+long ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *ten, bool debug)
+{
+	try {
+		main_vm = std::make_unique<MachineInstance>
+			(this->binary, ctx, ten, this, debug);
+
+		main_vm_extra_cpu_stack = EXTRA_CPU_STACK_SIZE +
+			main_vm->machine().mmap_allocate(EXTRA_CPU_STACK_SIZE);
+
+		main_vm->initialize();
+
+		const size_t max_vms = ten->config.group.max_concurrency;
+		for (size_t i = 0; i < max_vms; i++) {
+			// Instantiate forked VMs on dedicated threads,
+			// in order to prevent KVM migrations.
+			m_vms.emplace_back(*main_vm, ctx, ten, this);
+			m_vmqueue.enqueue(&m_vms.back());
+		}
+	} catch (...) {
+		/* Make sure we signal that there is no program, if the
+			program fails to intialize. */
+		main_vm = nullptr;
+		return -1;
+	}
+
+	/* We do not have a storage CTX after this point. */
+	main_vm->set_ctx(nullptr);
+	this->initialization_complete = true;
+	return 0;
 }
 ProgramInstance::~ProgramInstance()
 {

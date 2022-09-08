@@ -51,6 +51,12 @@ kvm_live_update(VRT_CTX, kvm::TenantInstance* ten, struct update_params *params)
 		const auto& filename = ten->config.filename;
 		if (!params->is_debug && !filename.empty())
 		{
+			/* Filename is not empty, so we can now check to see if it's a URI. */
+			if (filename.at(0) != '/' || filename.find("://") != std::string::npos) {
+				/* It is not an absolute path, or it is a URI.
+				   Still a success, but we choose not to store locally. */
+				return static_result("Update successful (not stored)\n", true);
+			}
 			/* If we arrive here, the initialization was successful,
 			   and we can proceed to store the program to disk. */
 			bool ok = file_writer(filename, live_binary);
@@ -63,7 +69,7 @@ kvm_live_update(VRT_CTX, kvm::TenantInstance* ten, struct update_params *params)
 				return dynamic_result(buffer);
 			}
 		}
-		return static_result("Update successful\n", true);
+		return static_result("Update successful (stored)\n", true);
 	} catch (const tinykvm::MachineException& e) {
 		/* Pass machine error back to the client */
 		char buffer[2048];

@@ -72,34 +72,16 @@ VCL_VOID vmod_load_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING filename)
 	kvm_init_tenants_file(ctx, task, filename);
 }
 
-#include <curl/curl.h>
-
-struct MemoryStruct
-{
-	char *memory;
-	size_t size;
+struct FetchTenantsStuff {
+	VRT_CTX;
+	VCL_PRIV task;
+	VCL_STRING url;
 };
 
-static size_t
-WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
+static void fetch_result(void* usr, struct MemoryStruct *chunk)
 {
-	size_t realsize = size * nmemb;
-	struct MemoryStruct *mem = (struct MemoryStruct *)userp;
-
-	char *ptr = realloc(mem->memory, mem->size + realsize + 1);
-	if (!ptr)
-	{
-		/* out of memory! */
-		printf("not enough memory (realloc returned NULL)\n");
-		return 0;
-	}
-
-	mem->memory = ptr;
-	memcpy(&(mem->memory[mem->size]), contents, realsize);
-	mem->size += realsize;
-	mem->memory[mem->size] = 0;
-
-	return realsize;
+	struct FetchTenantsStuff *ftd = (struct FetchTenantsStuff *)usr;
+	kvm_init_tenants_str(ftd->ctx, ftd->task, ftd->url, chunk->memory, chunk->size);
 }
 
 VCL_BOOL vmod_fetch_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING url)
@@ -114,35 +96,12 @@ VCL_BOOL vmod_fetch_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING url)
 	/* Initialize, re-initialize and remove VMODs */
 	initialize_vmods(ctx, task);
 
-	CURL *curl_handle;
-	CURLcode res;
-
-	struct MemoryStruct chunk = {
-		.memory = malloc(1),
-		.size = 0
+	struct FetchTenantsStuff ftd = {
+		.ctx = ctx,
+		.task = task,
+		.url = url
 	};
-	if (chunk.memory == NULL) {
-		VRT_fail(ctx, "kvm.fetch_tenants(): Out of memory");
-		return (0);
-	}
+	long res = kvm_curl_fetch(ctx, url, fetch_result, &ftd);
 
-	curl_handle = curl_easy_init();
-	curl_easy_setopt(curl_handle, CURLOPT_URL, url);
-	curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-	curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, &chunk);
-
-	res = curl_easy_perform(curl_handle);
-	if (res != CURLE_OK)
-	{
-		VRT_fail(ctx, "kvm.fetch_tenants(): cURL failed: %s",
-				 curl_easy_strerror(res));
-		return (0);
-	}
-
-	kvm_init_tenants_str(ctx, task, url, chunk.memory, chunk.size);
-
-	curl_easy_cleanup(curl_handle);
-	free(chunk.memory);
-
-	return (1);
+	return (res);
 }

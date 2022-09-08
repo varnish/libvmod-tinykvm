@@ -34,7 +34,7 @@ TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 		MachineInstance::kvm_initialize();
 	}
 
-	/* Check if the tenant has a program. */
+	/* 1. If filename is empty, do nothing (with warning in the logs). */
 	if (conf.filename.empty()) {
 		VSL(SLT_Error, 0,
 			"No filename specified for '%s'. Send new program.",
@@ -44,8 +44,21 @@ TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 			conf.name.c_str());
 		return;
 	}
-	/* Check if we can read the program filename. */
+	/* 2. If program is URI-like, use cURL. */
+	else if (conf.filename.find("://") != std::string::npos)
+	{
+		/* Load the program from cURL fetch. */
+		try {
+			this->program =
+				std::make_shared<ProgramInstance> (conf.filename, ctx, this);
+		} catch (const std::exception& e) {
+			this->handle_exception(conf, e);
+		}
+		return;
+	}
+	/* 3. Check program is (in-)accessible on local filesystem. */
 	else if (access(conf.filename.c_str(), R_OK)) {
+		/* It is *NOT* accessible. */
 		VSL(SLT_Error, 0,
 			"Missing program or invalid path for '%s'. Send new program.",
 			conf.name.c_str());
@@ -55,25 +68,31 @@ TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 		return;
 	}
 
-	/* Load the program now. */
+	/* Load the program from filesystem now. */
 	try {
 		auto elf = file_loader(conf.filename);
 		this->program =
 			std::make_shared<ProgramInstance> (std::move(elf), ctx, this);
 	} catch (const std::exception& e) {
-		VSL(SLT_Error, 0,
-			"Exception when creating machine '%s': %s",
-			conf.name.c_str(), e.what());
-		fprintf(stderr,
-			"Exception when creating machine '%s': %s\n",
-			conf.name.c_str(), e.what());
-		this->program = nullptr;
+		this->handle_exception(conf, e);
 	}
 }
+void TenantInstance::handle_exception(const TenantConfig& conf, const std::exception& e)
+{
+	VSL(SLT_Error, 0,
+		"Exception when creating machine '%s': %s",
+		conf.name.c_str(), e.what());
+	fprintf(stderr,
+		"Exception when creating machine '%s': %s\n",
+		conf.name.c_str(), e.what());
+	this->program = nullptr;
+}
+
 long TenantInstance::wait_for_initialization()
 {
-	if (program != nullptr)
-		return program->wait_for_initialization();
+	auto prog = this->program;
+	if (prog != nullptr)
+		return prog->wait_for_initialization();
 	return 0;
 }
 

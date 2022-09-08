@@ -41,6 +41,9 @@ public:
 	mutable std::shared_ptr<ProgramInstance> program = nullptr;
 	/* Hot-swappable machine for debugging */
 	mutable std::shared_ptr<ProgramInstance> debug_program = nullptr;
+
+private:
+	void handle_exception(const TenantConfig&, const std::exception&);
 };
 
 } // kvm

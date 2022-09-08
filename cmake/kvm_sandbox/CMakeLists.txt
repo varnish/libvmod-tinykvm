@@ -22,6 +22,8 @@ set(KVM_SOURCES
 	tinykvm/src/functions.cpp  # setup_kvm_system_calls
 	src/utils/crc32.cpp
 	src/varnish_interface.c
+	### cURL ###
+	src/curl_fetch.cpp
 	### VMODS ###
 	src/vmods/vmods.cpp
 	src/vmods/http.cpp
