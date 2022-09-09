@@ -57,31 +57,19 @@ VCL_VOID vmod_embed_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING json)
 	kvm_init_tenants_str(ctx, task, "Embedded JSON", json, strlen(json));
 }
 
-VCL_VOID vmod_load_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING filename)
+VCL_BOOL vmod_load_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING filename)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
 	if (filename == NULL || filename[0] == 0) {
 		VRT_fail(ctx, "kvm.load_tenants() requires a filename");
-		return;
+		return (0);
 	}
 
 	/* Initialize, re-initialize and remove VMODs */
 	initialize_vmods(ctx, task);
 
-	kvm_init_tenants_file(ctx, task, filename);
-}
-
-struct FetchTenantsStuff {
-	VRT_CTX;
-	VCL_PRIV task;
-	VCL_STRING url;
-};
-
-static void fetch_result(void* usr, struct MemoryStruct *chunk)
-{
-	struct FetchTenantsStuff *ftd = (struct FetchTenantsStuff *)usr;
-	kvm_init_tenants_str(ftd->ctx, ftd->task, ftd->url, chunk->memory, chunk->size);
+	return (kvm_init_tenants_file(ctx, task, filename));
 }
 
 VCL_BOOL vmod_fetch_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING url)
@@ -96,12 +84,5 @@ VCL_BOOL vmod_fetch_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING url)
 	/* Initialize, re-initialize and remove VMODs */
 	initialize_vmods(ctx, task);
 
-	struct FetchTenantsStuff ftd = {
-		.ctx = ctx,
-		.task = task,
-		.url = url
-	};
-	long res = kvm_curl_fetch(ctx, url, fetch_result, &ftd);
-
-	return (res);
+	return (kvm_init_tenants_uri(ctx, task, url));
 }

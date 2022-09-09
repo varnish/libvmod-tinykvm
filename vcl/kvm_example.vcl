@@ -1,5 +1,6 @@
 vcl 4.1;
 import file;
+import compute;
 import kvm;
 import std;
 backend default none;
@@ -9,7 +10,7 @@ sub vcl_init {
 		"test.com": {
 			"key": "123",
 			"group": "test",
-			"filename": "/tmp/test",
+			"filename": "http://127.0.0.1:8000/avifencode",
 
 			"concurrency": 32,
 			"max_memory": 1200,
@@ -27,6 +28,8 @@ sub vcl_init {
 		}
 	}""");
 	//kvm.fetch_tenants("127.0.0.1:8000/tenants.json");
+
+	compute.init("https://filebin.varnish-software.com/fh2qb14blnch6r3e/compute.json");
 
 	new f = file.init(std.getenv("HOME"));
 }

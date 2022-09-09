@@ -48,7 +48,7 @@ API
 
 $Event vmod_event
 
-$Function VOID load_tenants(PRIV_VCL, STRING filename)
+$Function BOOL load_tenants(PRIV_VCL, STRING filename)
 
 - Load tenant JSON configuration from file
 - See below for example JSON

@@ -4,12 +4,12 @@
 #include <cstring>
 #include <malloc.h>
 #include "varnish.hpp"
+typedef size_t (*write_callback)(char *, size_t, size_t, void *);
 
-namespace kvm {
-static size_t
-WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
+extern "C" size_t
+kvm_WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
 {
-	size_t realsize = size * nmemb;
+	const size_t realsize = size * nmemb;
 	MemoryStruct *mem = (MemoryStruct *)userp;
 
 	char *ptr = (char *)realloc(mem->memory, mem->size + realsize + 1);
@@ -28,7 +28,6 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
 
 	return realsize;
 }
-} // kvm
 
 extern "C"
 int kvm_curl_fetch(const struct vrt_ctx *ctx,
@@ -50,14 +49,17 @@ int kvm_curl_fetch(const struct vrt_ctx *ctx,
 
 	curl_handle = curl_easy_init();
 	curl_easy_setopt(curl_handle, CURLOPT_URL, url);
-	curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, kvm::WriteMemoryCallback);
+	curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, (write_callback)kvm_WriteMemoryCallback);
 	curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, &chunk);
+	/* Many URLs go straight to redirects, and it is disabled by default. */
+	curl_easy_setopt(curl_handle, CURLOPT_FOLLOWLOCATION, 1);
 
 	res = curl_easy_perform(curl_handle);
 	if (res != CURLE_OK) {
-		if (ctx != NULL && ctx->vsl != NULL)
-			VSLb(ctx->vsl, SLT_Error, "kvm.curl_fetch(): cURL failed: %s",
-				curl_easy_strerror(res));
+		VSL(SLT_Error, 0,
+			"kvm.curl_fetch(): cURL failed: %s", curl_easy_strerror(res));
+		fprintf(stderr,
+			"kvm.curl_fetch(): cURL failed: %s", curl_easy_strerror(res));
 		retvalue = -1;
 	}
 	else {

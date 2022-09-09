@@ -54,9 +54,11 @@
 #include "tenants.hpp"
 
 #include "common_defs.hpp"
+#include "curl_fetch.hpp"
 #include "tenant_instance.hpp"
 #include "utils/crc32.hpp"
 #include "varnish.hpp"
+#include <string_view>
 #include <nlohmann/json.hpp>
 #define KVM_TENANTS_MAGIC  0xc465573f
 using json = nlohmann::json;
@@ -152,145 +154,152 @@ void delete_temporary_tenant(VCL_PRIV task,
 }
 
 static void init_tenants(VRT_CTX, VCL_PRIV task,
-	const std::vector<uint8_t>& vec, const char* source)
+	const std::string_view json_strview, const char* source)
 {
-	try {
-		/* Parse JSON with comments enabled. */
-		const json j = json::parse(vec.begin(), vec.end(), nullptr, true, true);
+	(void) source;
+	/* Parse JSON with comments enabled. */
+	const json j = json::parse(json_strview.begin(), json_strview.end(), nullptr, true, true);
 
-		std::map<std::string, kvm::TenantGroup> groups {};
+	std::map<std::string, kvm::TenantGroup> groups {};
 
-		// Iterate through the user-defined tenant configuration.
-		// The configuration can either be a tenant of a group,
-		// or the configuration for group.
+	// Iterate through the user-defined tenant configuration.
+	// The configuration can either be a tenant of a group,
+	// or the configuration for group.
+	//
+	// The type of configuration is determined by the presence of specific
+	// keys. If "group" is present, then we have the
+	// configuration for a tenant in a group. Otherwise, we assume it is
+	// the configuration for a group.
+	//
+	// The configuration for a group will affect all the tenants that are
+	// associated with that group.
+	//
+	// Tenants are identified through CRC32-C checksums, which means that there
+	// is a miniscule possibility of collisions when adding a million tenants.
+	// But, in practice it should not happen. And the algorithm is entirely
+	// internal and can be changed without breaking anyones setup. Importantly,
+	// CRC32-C is hardware accelerated and faster than string matching.
+	for (const auto& it : j.items())
+	{
+		const auto& obj = it.value();
+		// We either have a group configuration or tenant configuration.
+		// Check for the existence of the group and create it if it does not exist.
+		// The ordering of the tenants can be such that the group configuration
+		// comes after the tenants, or there is no group configuration.
 		//
-		// The type of configuration is determined by the presence of specific
-		// keys. If "filename", "key", and "group" are present, then we have the
-		// configuration for a tenant in a group. Otherwise, we assume it is
-		// the configuration for a group.
+		// If the object key is a valid group, we assume this is configuration
+		// that is specific to the group.
 		//
-		// The configuration for a group will affect all the tenants that are
-		// associated with that group.
-		//
-		// Tenants are identified through CRC32-C checksums, which means that there
-		// is a miniscule possibility of collisions when adding a million tenants.
-		// But, in practice it should not happen. And the algorithm is entirely
-		// internal and can be changed without breaking anyones setup. Importantly,
-		// CRC32-C is hardware accelerated and faster than string matching.
-		for (const auto& it : j.items())
+		// Otherwise, it must be the tenant configuration.
+		std::string grname;
+		if (obj.contains("group")) {
+			grname = obj["group"];
+		} else {
+			grname = it.key();
+		}
+		auto grit = groups.find(grname);
+		if (grit == groups.end()) {
+			const auto& ret = groups.emplace(
+				std::piecewise_construct,
+				std::forward_as_tuple(grname),
+				std::forward_as_tuple(grname));
+			grit = ret.first;
+		}
+		auto& group = grit->second;
+		// All group parameters are treated as optional and can be defined in a
+		// tenant configuration or in a group configuration.
+		if (obj.contains("max_boot_time")) {
+			group.max_boot_time = obj["max_boot_time"];
+		}
+		if (obj.contains("max_request_time")) {
+			group.max_req_time = obj["max_request_time"];
+		}
+		if (obj.contains("max_storage_time")) {
+			group.max_req_time = obj["max_storage_time"];
+		}
+		if (obj.contains("max_memory")) {
+			// Limits the memory of the Main VM.
+			group.set_max_memory(obj["max_memory"]);
+		}
+		if (obj.contains("max_request_memory")) {
+			// Limits the memory of an ephemeral VM. Ephemeral VMs are used to handle
+			// requests (and faults in pages one by one using CoW). They are based
+			// off of the bigger Main VMs which use "max_memory" (and are identity-mapped).
+			group.set_max_workmem(obj["max_request_memory"]);
+		}
+		if (obj.contains("shared_memory")) {
+			// Sets the size of shared memory between VMs.
+			// Cannot be larger than half of max memory.
+			group.set_shared_mem(obj["shared_memory"]);
+		}
+		if (obj.contains("concurrency")) {
+			group.max_concurrency = obj["concurrency"];
+		}
+		if (obj.contains("hugepages")) {
+			group.hugepages = obj["hugepages"];
+		}
+		if (obj.contains("allow_debug")) {
+			group.allow_debug = obj["allow_debug"];
+		}
+		if (obj.contains("allow_make_ephemeral")) {
+			group.allow_make_ephemeral = obj["allow_make_ephemeral"];
+		}
+		if (obj.contains("allowed_paths")) {
+			group.allowed_paths = obj["allowed_paths"].get<std::vector<std::string>>();
+		}
+			printf("has group: %d\n", obj.contains("group"));
+		// Tenant configuration
+		if (obj.contains("group"))
 		{
-			const auto& obj = it.value();
-			std::string grname;
-			// We either have a group configuration or tenant configuration.
-			// Check for the existence of the group and create it if it does not exist.
-			// The ordering of the tenants can be such that the group configuration
-			// comes after the tenants, or there is no group configuration.
-			//
-			// If the object key is a valid group, we assume this is configuration
-			// that is specific to the group.
-			//
-			// Otherwise, it must be the tenant configuration.
-			if (obj.contains("group")) {
-				grname = obj["group"];
-			} else {
-				grname = it.key();
-			}
-			auto grit = groups.find(grname);
-			if (grit == groups.end()) {
-				const auto& ret = groups.emplace(
-					std::piecewise_construct,
-					std::forward_as_tuple(grname),
-					std::forward_as_tuple(grname));
-				grit = ret.first;
-			}
-			auto& group = grit->second;
-			// All group parameters are treated as optional and can be defined in a
-			// tenant configuration or in a group configuration.
-			if (obj.contains("max_boot_time")) {
-				group.max_boot_time = obj["max_boot_time"];
-			}
-			if (obj.contains("max_request_time")) {
-				group.max_req_time = obj["max_request_time"];
-			}
-			if (obj.contains("max_storage_time")) {
-				group.max_req_time = obj["max_storage_time"];
-			}
-			if (obj.contains("max_memory")) {
-				// Limits the memory of the Main VM.
-				group.set_max_memory(obj["max_memory"]);
-			}
-			if (obj.contains("max_request_memory")) {
-				// Limits the memory of an ephemeral VM. Ephemeral VMs are used to handle
-				// requests (and faults in pages one by one using CoW). They are based
-				// off of the bigger Main VMs which use "max_memory" (and are identity-mapped).
-				group.set_max_workmem(obj["max_request_memory"]);
-			}
-			if (obj.contains("shared_memory")) {
-				// Sets the size of shared memory between VMs.
-				// Cannot be larger than half of max memory.
-				group.set_shared_mem(obj["shared_memory"]);
-			}
-			if (obj.contains("concurrency")) {
-				group.max_concurrency = obj["concurrency"];
-			}
-			if (obj.contains("hugepages")) {
-				group.hugepages = obj["hugepages"];
-			}
-			if (obj.contains("allow_debug")) {
-				group.allow_debug = obj["allow_debug"];
-			}
-			if (obj.contains("allow_make_ephemeral")) {
-				group.allow_make_ephemeral = obj["allow_make_ephemeral"];
-			}
-			if (obj.contains("allowed_paths")) {
-				group.allowed_paths = obj["allowed_paths"].get<std::vector<std::string>>();
-			}
-			// Tenant configuration
-			if (obj.contains("key") && obj.contains("group"))
-			{
-				/* Filenames are optional. */
-				std::string filename = "";
-				if (obj.contains("filename")) filename = obj["filename"];
-				/* Use the group data except filename */
-				kvm::load_tenant(ctx, task, kvm::TenantConfig{
-					it.key(),
-					filename,
-					obj["key"],
-					group,
-					kvm::tenancy(task).dynamic_functions
-				});
-			}
-		}
+			/* Filenames are optional. */
+			std::string filename = "";
+			if (obj.contains("filename")) filename = obj["filename"];
+			/* Keys are optional. No/empty key = no live update. */
+			std::string lvu_key = "";
+			if (obj.contains("key")) lvu_key = obj["key"];
+			/* Verify: No filename and no key is an unreachable program. */
+			if (filename.empty() && lvu_key.empty())
+				throw std::runtime_error("vmod_kvm: Unreachable program " + it.key() + " has no filename and no way to update");
 
-		/* Finish initialization, but do not VRT_fail if program
-		   initialization failed. It is a recoverable error. */
-		for (auto& it : tenancy(task).tenants) {
-			auto& tenant = it.second;
-			try {
-				tenant.wait_for_initialization();
-			}
-			catch (const std::exception &e) {
-				VSL(SLT_Error, 0,
-					"Exception when creating machine '%s' from source '%s': %s",
-					tenant.config.name.c_str(), tenant.config.filename.c_str(), e.what());
-				fprintf(stderr,
-					"Exception when creating machine '%s' from source '%s': %s\n",
-					tenant.config.name.c_str(), tenant.config.filename.c_str(), e.what());
-				/* XXX: This can be racy if the same tenant is specified
-				   more than once, and is still initializing... */
-				tenant.program = nullptr;
-			}
-		}
+			printf("filename: %s\n", filename.c_str());
 
-	} catch (const std::exception& e) {
-		VSL(SLT_Error, 0,
-			"vmod_kvm: Exception when loading tenants from %s: %s",
-			source, e.what());
-		VRT_fail(ctx,
-			"vmod_kvm: Exception when loading tenants from %s: %s",
-			source, e.what());
+			/* Use the group data except filename */
+			kvm::load_tenant(ctx, task, kvm::TenantConfig{
+				it.key(),
+				filename,
+				lvu_key,
+				group,
+				kvm::tenancy(task).dynamic_functions
+			});
+		}
+	}
+
+	/* Finish initialization, but do not VRT_fail if program
+		initialization failed. It is a recoverable error. */
+	for (auto& it : tenancy(task).tenants) {
+		auto& tenant = it.second;
+		try {
+			tenant.wait_for_initialization();
+		}
+		catch (const std::exception &e) {
+			VSL(SLT_Error, 0,
+				"Exception when creating machine '%s' from source '%s': %s",
+				tenant.config.name.c_str(), tenant.config.filename.c_str(), e.what());
+			fprintf(stderr,
+				"Exception when creating machine '%s' from source '%s': %s\n",
+				tenant.config.name.c_str(), tenant.config.filename.c_str(), e.what());
+			/* XXX: This can be racy if the same tenant is specified
+				more than once, and is still initializing... */
+			tenant.program = nullptr;
+		}
 	}
 }
+
+struct FetchTenantsStuff {
+	VRT_CTX;
+	VCL_PRIV task;
+	VCL_STRING url;
+};
 
 } // kvm
 
@@ -328,31 +337,62 @@ void kvm_init_tenants_str(VRT_CTX, VCL_PRIV task, const char* filename,
 {
 	/* Load tenants from a JSON string, with the filename used for logging purposes. */
 	try {
-		const std::vector<uint8_t> json { str, str + len };
+		const std::string_view json { str, len };
 		kvm::init_tenants(ctx, task, json, filename);
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
 			"vmod_kvm: Exception when loading tenants from string '%s': %s",
 			filename, e.what());
-		VRT_fail(ctx,
+		fprintf(stderr,
 			"vmod_kvm: Exception when loading tenants from string '%s': %s",
 			filename, e.what());
 	}
 }
 
 extern "C"
-void kvm_init_tenants_file(VRT_CTX, VCL_PRIV task, const char* filename)
+int kvm_init_tenants_file(VRT_CTX, VCL_PRIV task, const char* filename)
 {
 	/* Load tenants from a local JSON file. */
 	try {
 		const auto json = kvm::file_loader(filename);
-		kvm::init_tenants(ctx, task, json, filename);
+		const std::string_view json_strview {(const char *)json.data(), json.size()};
+		kvm::init_tenants(ctx, task, json_strview, filename);
+		return 1;
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
 			"vmod_kvm: Exception when loading tenants from file '%s': %s",
 			filename, e.what());
-		VRT_fail(ctx,
+		fprintf(stderr,
 			"vmod_kvm: Exception when loading tenants from file '%s': %s",
 			filename, e.what());
+		return 0;
+	}
+}
+
+extern "C"
+int kvm_init_tenants_uri(VRT_CTX, VCL_PRIV task, const char* uri)
+{
+	/* Load tenants from a remote JSON file. */
+	try {
+		kvm::FetchTenantsStuff ftd = {
+			.ctx = ctx,
+			.task = task,
+			.url = uri
+		};
+		long res = kvm_curl_fetch(ctx, uri,
+		[] (void* usr, struct MemoryStruct *chunk) {
+			auto* ftd = (kvm::FetchTenantsStuff *)usr;
+			const std::string_view json { chunk->memory, chunk->size };
+			kvm::init_tenants(ftd->ctx, ftd->task, json, ftd->url);
+		}, &ftd);
+		return (res == 0);
+	} catch (const std::exception& e) {
+		VSL(SLT_Error, 0,
+			"vmod_kvm: Exception when loading tenants from URI '%s': %s",
+			uri, e.what());
+		fprintf(stderr,
+			"vmod_kvm: Exception when loading tenants from URI '%s': %s",
+			uri, e.what());
+		return 0;
 	}
 }
