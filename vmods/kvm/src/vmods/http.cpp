@@ -191,6 +191,9 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 				if (option_dummy_request) {
 					curl_easy_setopt(curl, CURLOPT_NOBODY, 1);
 				}
+			} else {
+				/* When no options provided, we default to following 301 redirects. */
+				curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
 			}
 
 			/* Request header fields. */

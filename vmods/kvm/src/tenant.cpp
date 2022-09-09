@@ -247,7 +247,6 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 		if (obj.contains("allowed_paths")) {
 			group.allowed_paths = obj["allowed_paths"].get<std::vector<std::string>>();
 		}
-			printf("has group: %d\n", obj.contains("group"));
 		// Tenant configuration
 		if (obj.contains("group"))
 		{
@@ -260,8 +259,6 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			/* Verify: No filename and no key is an unreachable program. */
 			if (filename.empty() && lvu_key.empty())
 				throw std::runtime_error("vmod_kvm: Unreachable program " + it.key() + " has no filename and no way to update");
-
-			printf("filename: %s\n", filename.c_str());
 
 			/* Use the group data except filename */
 			kvm::load_tenant(ctx, task, kvm::TenantConfig{
