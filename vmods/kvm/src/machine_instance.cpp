@@ -93,7 +93,7 @@ void MachineInstance::initialize()
 		rsp = (rsp - 128UL) & ~0xFLL; // Avoid red-zone if main is leaf
 		machine().set_stack_address(rsp);
 
-		printf("Program for tenant %s is loaded\n", name().c_str());
+		printf("Program '%s' is loaded\n", name().c_str());
 	}
 	catch (const std::exception& e)
 	{

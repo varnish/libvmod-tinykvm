@@ -46,21 +46,24 @@ extern "C" {
 #include "kvm_backend.h"
 }
 static constexpr bool VERBOSE_BACKEND = false;
+static constexpr bool BACKEND_TIMINGS = false;
 
 static void memory_error_handling(struct vsl_log *vsl, const tinykvm::MemoryException& e)
 {
-	if (e.addr() < 0x500) { /* Null-pointer speculation */
-	fprintf(stderr,
-		"Backend VM memory exception: %s (addr: 0x%lX, size: 0x%lX)\n",
-		e.what(), e.addr(), e.size());
-	VSLb(vsl, SLT_Error,
-		"Backend VM memory exception: %s (addr: 0x%lX, size: 0x%lX)",
-		e.what(), e.addr(), e.size());
+	if (e.addr() > 0x500) { /* Null-pointer speculation */
+		fprintf(stderr,
+			"Backend VM memory exception: %s (addr: 0x%lX, size: 0x%lX)\n",
+			e.what(), e.addr(), e.size());
+		VSLb(vsl, SLT_Error,
+			"Backend VM memory exception: %s (addr: 0x%lX, size: 0x%lX)",
+			e.what(), e.addr(), e.size());
 	} else {
 		fprintf(stderr,
-			"Backend VM memory exception: Null-pointer access\n");
+			"Backend VM memory exception: Null-pointer access (%s, addr: 0x%lX, size: 0x%lX)\n",
+			e.what(), e.addr(), e.size());
 		VSLb(vsl, SLT_Error,
-			"Backend VM memory exception: Null-pointer access");
+			"Backend VM memory exception: Null-pointer access (%s, addr: 0x%lX, size: 0x%lX)",
+			e.what(), e.addr(), e.size());
 	}
 }
 
@@ -75,7 +78,9 @@ static int16_t sanitize_status_code(int16_t code)
 static inline void kvm_ts(struct vsl_log *vsl, const char *event,
 		double work, double& prev, double now)
 {
-	VSLb_ts(vsl, event, work, &prev, now);
+	if constexpr (BACKEND_TIMINGS) {
+		VSLb_ts(vsl, event, work, &prev, now);
+	}
 }
 
 static void fetch_result(kvm::VMPoolItem* slot,
@@ -222,7 +227,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 		auto fut = slot->tp.enqueue(
 		[&] {
 			if constexpr (VERBOSE_BACKEND) {
-				printf("Begin backend GET %s\n", farg[0]);
+				printf("Begin backend %s %s (arg=%s)\n", (post == nullptr) ? "GET" : "POST", farg[0], farg[1]);
 			}
 			kvm_ts(ctx->vsl, "ProgramCall", t_work, t_prev, VTIM_real());
 			/* Enforce that guest program calls the backend_response system call. */
@@ -253,7 +258,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					throw std::runtime_error("The POST callback has not been registered");
 				vm.timed_vmcall(vm_entry_addr,
 					timeout, farg[0],
-					(uint64_t) post->address, (uint64_t) post->length);
+					(uint64_t) post->address, (uint64_t) post->length, farg[1]);
 			}
 			kvm_ts(ctx->vsl, "ProgramResponse", t_work, t_prev, VTIM_real());
 
