@@ -1,15 +1,29 @@
 {
     "avif": {
-        "key": "123",
         "group": "test",
         "filename": "https://filebin.varnish-software.com/fh2qb14blnch6r3e/avifencode",
         "concurrency": 8,
         "max_memory": 400,
         "max_boot_time": 8.0,
         "max_request_memory": 400,
-        "max_request_time": 6.0,
-        "allowed_paths": [
-            "/usr/lib/x86_64-linux-gnu/espeak-ng-data"
-        ]
+        "max_request_time": 6.0
+    },
+    "inflate": {
+        "group": "test",
+        "filename": "https://filebin.varnish-software.com/fh2qb14blnch6r3e/inflate",
+        "concurrency": 8,
+        "max_memory": 512,
+        "max_boot_time": 8.0,
+        "max_request_memory": 512,
+        "max_request_time": 6.0
+    },
+    "zstd": {
+        "group": "test",
+        "filename": "https://filebin.varnish-software.com/fh2qb14blnch6r3e/zstddecompr",
+        "concurrency": 8,
+        "max_memory": 512,
+        "max_boot_time": 8.0,
+        "max_request_memory": 512,
+        "max_request_time": 6.0
     }
 }
