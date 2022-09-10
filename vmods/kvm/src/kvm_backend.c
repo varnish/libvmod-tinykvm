@@ -208,8 +208,8 @@ kvmbe_gethdrs(const struct director *dir,
 	/* Status code is sanitized in the backend call. */
 	http_PutResponse(bo->beresp, "HTTP/1.1", result->status, NULL);
 
-	/* Explicitly set content-type when content present. */
-	if (result->content_length > 0)
+	/* Explicitly set content-type when known. */
+	if (result->tsize > 0)
 	{
 		http_PrintfHeader(bo->beresp, "Content-Type: %.*s",
 			(int) result->tsize, result->type);
@@ -286,8 +286,8 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 		return (NULL);
 	}
 
-	kvmr->funcarg[0] = url;
-	kvmr->funcarg[1] = arg;
+	kvmr->funcarg[0] = url ? url : "";
+	kvmr->funcarg[1] = arg ? arg : "";
 	kvmr->debug = 0;
 	kvmr->max_response_size = 0;
 
@@ -328,8 +328,8 @@ VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
 		return (NULL);
 	}
 
-	kvmr->funcarg[0] = url;
-	kvmr->funcarg[1] = arg;
+	kvmr->funcarg[0] = url ? url : "";
+	kvmr->funcarg[1] = arg ? arg : "";
 	kvmr->debug = 1;
 	kvmr->max_response_size = 0;
 
