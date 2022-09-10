@@ -46,6 +46,7 @@ extern void register_func(int, ...);
  * Register callbacks for various modes of operation:
  **/
 static inline void set_backend_get(void(*f)(const char *url)) { register_func(1, f); }
+static inline void set_backend_get2(void(*f)(const char *url, const char *arg)) { register_func(1, f); }
 static inline void set_backend_post(void(*f)(const char *url, const uint8_t*, size_t)) { register_func(2, f); }
 
 /* Streaming POST will receive each data segment as they arrive. A final POST
@@ -573,6 +574,7 @@ struct curl_fields {
 	const char *ptr[CURL_FIELDS_COUNT];
 	uint16_t    len[CURL_FIELDS_COUNT];
 };
+#define CURL_SETFIELD(f, idx, value) { f.ptr[idx] = value; f.len[idx] = __builtin_strlen(value); }
 struct curl_options {
 	const char *interface;       /* Select interface to bind to. */
 	const char *unused;
@@ -586,7 +588,7 @@ DYNAMIC_CALL(curl_fetch, 0xB86011FB, const char*, size_t, struct curl_op*, struc
 
 /* Embed binary data into executable. This data has no guaranteed alignment. */
 #define EMBED_BINARY(name, filename) \
-	asm(".section .rodata\n" \
+	asm(".pushsection .rodata\n" \
 	"	.global " #name "\n" \
 	#name ":\n" \
 	"	.incbin " #filename "\n" \
@@ -597,7 +599,7 @@ DYNAMIC_CALL(curl_fetch, 0xB86011FB, const char*, size_t, struct curl_op*, struc
 	"	.align 4\n" \
 	#name "_size:\n" \
 	"	.int  " #name "_end - " #name "\n" \
-	".section .text"); \
+	".popsection"); \
 	extern char name[]; \
 	extern unsigned name ##_size;
 
