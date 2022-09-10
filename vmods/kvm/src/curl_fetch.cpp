@@ -30,7 +30,7 @@ kvm_WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
 }
 
 extern "C"
-int kvm_curl_fetch(const struct vrt_ctx *ctx,
+int kvm_curl_fetch(
 	const char *url, void(*callback)(void*, MemoryStruct *), void *usr)
 {
 	CURL *curl_handle;
@@ -42,8 +42,6 @@ int kvm_curl_fetch(const struct vrt_ctx *ctx,
 		.size = 0
 	};
 	if (chunk.memory == NULL) {
-		if (ctx != NULL && ctx->vsl != NULL)
-			VSLb(ctx->vsl, SLT_Error, "kvm.curl_fetch(): Out of memory");
 		return (-1);
 	}
 

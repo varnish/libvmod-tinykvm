@@ -81,7 +81,7 @@ ProgramInstance::ProgramInstance(
 	this->m_future = m_main_queue.enqueue(
 	[=] () -> long {
 		try {
-			int res = kvm_curl_fetch(ctx, uri.c_str(),
+			int res = kvm_curl_fetch(uri.c_str(),
 			[] (void* usr, MemoryStruct* chunk) {
 				auto* elf = (std::vector<uint8_t> *)usr;
 				*elf = std::vector<uint8_t> (chunk->memory, chunk->memory + chunk->size);

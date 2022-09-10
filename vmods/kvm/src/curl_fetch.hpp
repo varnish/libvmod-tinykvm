@@ -8,6 +8,6 @@ struct MemoryStruct
 };
 
 extern "C" {
-int kvm_curl_fetch(const struct vrt_ctx *ctx,
+int kvm_curl_fetch(
 	const char *url, void(*callback)(void*, MemoryStruct *), void *usr);
 }
