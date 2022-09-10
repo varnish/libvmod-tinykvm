@@ -99,17 +99,23 @@ bool TenantConfig::begin_dyncall_initialization(VCL_PRIV task)
 	return true;
 }
 
-static inline bool load_tenant(
-	VRT_CTX, VCL_PRIV task, const kvm::TenantConfig& config)
+static inline bool load_tenant(VRT_CTX, VCL_PRIV task,
+	const kvm::TenantConfig& config, bool initialize)
 {
 	try {
 		auto& tcy = tenancy(task);
+		/* Create hash from tenant/program name. */
 		const uint32_t hash = crc32c_hw(config.name);
 
+		/* Insert tenant/program as VCL tenant instance. */
 		const auto [it, inserted] =
-			tcy.tenants.try_emplace(hash, ctx, std::move(config));
+			tcy.tenants.try_emplace(hash, std::move(config));
 		if (UNLIKELY(!inserted)) {
 			throw std::runtime_error("Tenant already existed: " + config.name);
+		}
+		/* If initialization needed, create program immediately. */
+		if (initialize) {
+			it->second.begin_initialize(ctx);
 		}
 		return true;
 
@@ -154,7 +160,7 @@ void delete_temporary_tenant(VCL_PRIV task,
 }
 
 static void init_tenants(VRT_CTX, VCL_PRIV task,
-	const std::string_view json_strview, const char* source)
+	const std::string_view json_strview, const char* source, bool initialize)
 {
 	(void) source;
 	/* Parse JSON with comments enabled. */
@@ -267,9 +273,14 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 				lvu_key,
 				group,
 				kvm::tenancy(task).dynamic_functions
-			});
+			}, initialize);
 		}
 	}
+
+	/* Skip initialization here if we are not @initialize.
+	   NOTE: Early return.  */
+	if (initialize == false)
+		return;
 
 	/* Finish initialization, but do not VRT_fail if program
 		initialization failed. It is a recoverable error. */
@@ -296,6 +307,7 @@ struct FetchTenantsStuff {
 	VRT_CTX;
 	VCL_PRIV task;
 	VCL_STRING url;
+	bool init;
 };
 
 } // kvm
@@ -330,12 +342,12 @@ kvm::TenantInstance* kvm_tenant_find_key(VCL_PRIV task, const char* name, const 
 
 extern "C"
 void kvm_init_tenants_str(VRT_CTX, VCL_PRIV task, const char* filename,
-	const char* str, size_t len)
+	const char* str, size_t len, int init)
 {
 	/* Load tenants from a JSON string, with the filename used for logging purposes. */
 	try {
 		const std::string_view json { str, len };
-		kvm::init_tenants(ctx, task, json, filename);
+		kvm::init_tenants(ctx, task, json, filename, init);
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
 			"vmod_kvm: Exception when loading tenants from string '%s': %s",
@@ -347,13 +359,13 @@ void kvm_init_tenants_str(VRT_CTX, VCL_PRIV task, const char* filename,
 }
 
 extern "C"
-int kvm_init_tenants_file(VRT_CTX, VCL_PRIV task, const char* filename)
+int kvm_init_tenants_file(VRT_CTX, VCL_PRIV task, const char* filename, int init)
 {
 	/* Load tenants from a local JSON file. */
 	try {
 		const auto json = kvm::file_loader(filename);
 		const std::string_view json_strview {(const char *)json.data(), json.size()};
-		kvm::init_tenants(ctx, task, json_strview, filename);
+		kvm::init_tenants(ctx, task, json_strview, filename, init);
 		return 1;
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
@@ -367,20 +379,21 @@ int kvm_init_tenants_file(VRT_CTX, VCL_PRIV task, const char* filename)
 }
 
 extern "C"
-int kvm_init_tenants_uri(VRT_CTX, VCL_PRIV task, const char* uri)
+int kvm_init_tenants_uri(VRT_CTX, VCL_PRIV task, const char* uri, int init)
 {
 	/* Load tenants from a remote JSON file. */
 	try {
 		kvm::FetchTenantsStuff ftd = {
 			.ctx = ctx,
 			.task = task,
-			.url = uri
+			.url = uri,
+			.init = (bool)init,
 		};
 		long res = kvm_curl_fetch(ctx, uri,
 		[] (void* usr, struct MemoryStruct *chunk) {
 			auto* ftd = (kvm::FetchTenantsStuff *)usr;
 			const std::string_view json { chunk->memory, chunk->size };
-			kvm::init_tenants(ftd->ctx, ftd->task, json, ftd->url);
+			kvm::init_tenants(ftd->ctx, ftd->task, json, ftd->url, ftd->init);
 		}, &ftd);
 		return (res == 0);
 	} catch (const std::exception& e) {

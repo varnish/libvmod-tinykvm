@@ -21,6 +21,8 @@
 #include "vcc_if.h"
 #include <malloc.h>
 
+static const int INIT_TENANTS = 1;
+
 VCL_BOOL vmod_tenant_is_ready(VRT_CTX, VCL_PRIV task, VCL_STRING tenant)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
@@ -54,7 +56,7 @@ VCL_VOID vmod_embed_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING json)
 	/* Initialize, re-initialize and remove VMODs */
 	initialize_vmods(ctx, task);
 
-	kvm_init_tenants_str(ctx, task, "Embedded JSON", json, strlen(json));
+	kvm_init_tenants_str(ctx, task, "Embedded JSON", json, strlen(json), INIT_TENANTS);
 }
 
 VCL_BOOL vmod_load_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING filename)
@@ -69,7 +71,7 @@ VCL_BOOL vmod_load_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING filename)
 	/* Initialize, re-initialize and remove VMODs */
 	initialize_vmods(ctx, task);
 
-	return (kvm_init_tenants_file(ctx, task, filename));
+	return (kvm_init_tenants_file(ctx, task, filename, INIT_TENANTS));
 }
 
 VCL_BOOL vmod_fetch_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING url)
@@ -84,5 +86,5 @@ VCL_BOOL vmod_fetch_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING url)
 	/* Initialize, re-initialize and remove VMODs */
 	initialize_vmods(ctx, task);
 
-	return (kvm_init_tenants_uri(ctx, task, url));
+	return (kvm_init_tenants_uri(ctx, task, url, INIT_TENANTS));
 }

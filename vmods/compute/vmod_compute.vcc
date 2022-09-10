@@ -43,7 +43,7 @@ API
 
 $Event vmod_event
 
-$Function BOOL init(PRIV_VCL, STRING uri)
+$Function BOOL library(PRIV_VCL, STRING uri)
 
 - Load library of programs that is pre-installed with Varnish Enterprise.
 

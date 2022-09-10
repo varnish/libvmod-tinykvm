@@ -23,8 +23,16 @@
 
 namespace kvm {
 	extern std::vector<uint8_t> file_loader(const std::string&);
-	extern void initialize_vmods(VRT_CTX);
 
+TenantInstance::TenantInstance(const TenantConfig& conf)
+	: config{conf}
+{
+	static bool init = false;
+	if (!init) {
+		init = true;
+		MachineInstance::kvm_initialize();
+	}
+}
 TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 	: config{conf}
 {
@@ -34,49 +42,82 @@ TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 		MachineInstance::kvm_initialize();
 	}
 
+	this->begin_initialize(ctx);
+}
+
+void TenantInstance::begin_initialize(VRT_CTX)
+{
+	/* Prevent initializing many times, with a warning. */
+	if (this->m_started_init) {
+		VSL(SLT_VCL_Error, 0,
+			"Program '%s' has already been initialized.",
+			config.name.c_str());
+		fprintf(stderr,
+			"Program '%s' has already been initialized.",
+			config.name.c_str());
+		return;
+	}
+	this->m_started_init = true;
+
 	/* 1. If filename is empty, do nothing (with warning in the logs). */
-	if (conf.filename.empty()) {
-		VSL(SLT_Error, 0,
+	if (config.filename.empty()) {
+		VSL(SLT_VCL_Error, 0,
 			"No filename specified for '%s'. Send new program.",
-			conf.name.c_str());
+			config.name.c_str());
 		fprintf(stderr,
 			"No filename specified for '%s'. Send new program.\n",
-			conf.name.c_str());
+			config.name.c_str());
 		return;
 	}
 	/* 2. If program is URI-like, use cURL. */
-	else if (conf.filename.find("://") != std::string::npos)
+	else if (config.filename.find("://") != std::string::npos)
 	{
 		/* Load the program from cURL fetch. */
 		try {
 			this->program =
-				std::make_shared<ProgramInstance> (conf.filename, ctx, this);
+				std::make_shared<ProgramInstance> (config.filename, ctx, this);
 		} catch (const std::exception& e) {
-			this->handle_exception(conf, e);
+			this->handle_exception(config, e);
 		}
 		return;
 	}
 	/* 3. Check program is (in-)accessible on local filesystem. */
-	else if (access(conf.filename.c_str(), R_OK)) {
+	else if (access(config.filename.c_str(), R_OK)) {
 		/* It is *NOT* accessible. */
-		VSL(SLT_Error, 0,
+		VSL(SLT_VCL_Error, 0,
 			"Missing program or invalid path for '%s'. Send new program.",
-			conf.name.c_str());
+			config.name.c_str());
 		fprintf(stderr,
 			"Missing program or invalid path for '%s'. Send new program.\n",
-			conf.name.c_str());
+			config.name.c_str());
 		return;
 	}
 
-	/* Load the program from filesystem now. */
+	/* 4. Load the program from filesystem now. */
 	try {
-		auto elf = file_loader(conf.filename);
+		auto elf = file_loader(config.filename);
 		this->program =
 			std::make_shared<ProgramInstance> (std::move(elf), ctx, this);
 	} catch (const std::exception& e) {
-		this->handle_exception(conf, e);
+		this->handle_exception(config, e);
 	}
 }
+bool TenantInstance::begin_guarded_initialize(const vrt_ctx *ctx, std::shared_ptr<ProgramInstance>& prog)
+{
+	std::scoped_lock lock(this->mtx_running_init);
+
+	if (!this->m_started_init) {
+		this->begin_initialize(ctx);
+		/* This may take some time, as it is blocking, but this will allow the
+		   request to proceed.
+		   XXX: Verify that there are no forever-waiting events here. */
+		this->wait_for_initialization();
+	}
+
+	prog = std::atomic_load(&this->program);
+	return prog != nullptr;
+}
+
 void TenantInstance::handle_exception(const TenantConfig& conf, const std::exception& e)
 {
 	VSL(SLT_Error, 0,
@@ -119,9 +160,15 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 			prog = std::atomic_load(&this->debug_program);
 		// First-time tenants could have no program loaded
 		if (UNLIKELY(prog == nullptr)) {
-			VRT_fail(ctx, "vmreserve: Missing program for %s. Not uploaded?",
-				config.name.c_str());
-			return nullptr;
+			// Attempt to load the program (if it was never attempted)
+			// XXX: But not for debug programs (NOT IMPLEMENTED YET).
+			if (debug || this->begin_guarded_initialize(ctx, prog) == false) {
+				VRT_fail(ctx, "vmreserve: Missing program for %s. Not uploaded?",
+					config.name.c_str());
+				return nullptr;
+			}
+			// On success, prog is now loaded with the new program.
+			// XXX: Assert on prog
 		}
 		try {
 			/* Avoid reservation while still initializing. 10ms intervals. */
