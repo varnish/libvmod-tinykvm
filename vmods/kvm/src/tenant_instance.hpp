@@ -38,6 +38,7 @@ public:
 	TenantInstance(const vrt_ctx*, const TenantConfig&);
 
 	void begin_initialize(const vrt_ctx *);
+	void begin_async_initialize(const vrt_ctx *);
 	long wait_for_initialization();
 
 	/* Initialized during vcl_init */
@@ -49,7 +50,7 @@ public:
 	mutable std::shared_ptr<ProgramInstance> debug_program = nullptr;
 
 private:
-	bool begin_guarded_initialize(const vrt_ctx *, std::shared_ptr<ProgramInstance>&);
+	bool wait_guarded_initialize(const vrt_ctx *, std::shared_ptr<ProgramInstance>&);
 	void handle_exception(const TenantConfig&, const std::exception&);
 	bool m_started_init = false;
 	std::mutex mtx_running_init;

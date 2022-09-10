@@ -277,7 +277,7 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 		}
 	}
 
-	/* Skip initialization here if we are not @initialize.
+	/* Skip initialization here if not @initialize.
 	   NOTE: Early return.  */
 	if (initialize == false)
 		return;

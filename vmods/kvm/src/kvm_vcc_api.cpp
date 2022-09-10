@@ -15,6 +15,13 @@
 using namespace kvm;
 
 extern "C"
+int kvm_tenant_async_start(const vrt_ctx *ctx, kvm::TenantInstance* tenant)
+{
+	tenant->begin_async_initialize(ctx);
+	return 1;
+}
+
+extern "C"
 uint64_t kvm_resolve_name(kvm::TenantInstance* tenant, const char* func)
 {
 	/* The tenant structure has lookup caching */

@@ -102,17 +102,23 @@ void TenantInstance::begin_initialize(VRT_CTX)
 		this->handle_exception(config, e);
 	}
 }
-bool TenantInstance::begin_guarded_initialize(const vrt_ctx *ctx, std::shared_ptr<ProgramInstance>& prog)
+void TenantInstance::begin_async_initialize(const vrt_ctx *ctx)
 {
+	/* Block other requests from trying to initialize. */
 	std::scoped_lock lock(this->mtx_running_init);
 
 	if (!this->m_started_init) {
 		this->begin_initialize(ctx);
-		/* This may take some time, as it is blocking, but this will allow the
-		   request to proceed.
-		   XXX: Verify that there are no forever-waiting events here. */
-		this->wait_for_initialization();
 	}
+}
+bool TenantInstance::wait_guarded_initialize(const vrt_ctx *ctx, std::shared_ptr<ProgramInstance>& prog)
+{
+	begin_async_initialize(ctx);
+
+	/* This may take some time, as it is blocking, but this will allow the
+		request to proceed.
+		XXX: Verify that there are no forever-waiting events here. */
+	this->wait_for_initialization();
 
 	prog = std::atomic_load(&this->program);
 	return prog != nullptr;
@@ -162,7 +168,7 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 		if (UNLIKELY(prog == nullptr)) {
 			// Attempt to load the program (if it was never attempted)
 			// XXX: But not for debug programs (NOT IMPLEMENTED YET).
-			if (debug || this->begin_guarded_initialize(ctx, prog) == false) {
+			if (debug || this->wait_guarded_initialize(ctx, prog) == false) {
 				VRT_fail(ctx, "vmreserve: Missing program for %s. Not uploaded?",
 					config.name.c_str());
 				return nullptr;
@@ -171,8 +177,9 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 			// XXX: Assert on prog
 		}
 		try {
-			/* Avoid reservation while still initializing. 10ms intervals. */
+			// Avoid reservation while still initializing. Instant fail.
 			if (UNLIKELY(!prog->initialization_complete)) {
+				// TODO: It is possible to wait on the mutex here, but whatevs.
 				return nullptr;
 			}
 

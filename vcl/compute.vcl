@@ -6,6 +6,8 @@ sub vcl_init {
 	# Download and activate a Varnish-provided library of compute programs.
 	# A full list of programs and how they can be used would be on the docs site.
 	compute.library("https://filebin.varnish-software.com/fh2qb14blnch6r3e/compute.json");
+	# Start the AVIF transcoder, but don't delay Varnish startup.
+	compute.start("avif");
 }
 
 sub vcl_backend_fetch {

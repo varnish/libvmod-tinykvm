@@ -59,6 +59,8 @@ ProgramInstance::ProgramInstance(
 	  m_vcl {ctx->vcl},
 	  rspclient{nullptr}
 {
+	mtx_future_init.lock();
+
 	this->m_future = m_main_queue.enqueue(
 	[=] () -> long {
 		return begin_initialization(ctx, ten, debug);
@@ -74,6 +76,8 @@ ProgramInstance::ProgramInstance(
 	  m_vcl {ctx->vcl},
 	  rspclient{nullptr}
 {
+	mtx_future_init.lock();
+
 	this->m_future = m_main_queue.enqueue(
 	[=] () -> long {
 		try {
@@ -85,6 +89,7 @@ ProgramInstance::ProgramInstance(
 
 			/* XXX: Reset binary when it fails. */
 			if (res != 0) {
+				mtx_future_init.unlock();
 				this->binary = {};
 				this->main_vm = nullptr;
 				return -1;
@@ -93,6 +98,7 @@ ProgramInstance::ProgramInstance(
 			return begin_initialization(ctx, ten, debug);
 		}
 		catch (...) {
+			mtx_future_init.unlock();
 			/* XXX: Reset binary when it fails. */
 			this->binary = {};
 			this->main_vm = nullptr;
@@ -119,12 +125,14 @@ long ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 			m_vmqueue.enqueue(&m_vms.back());
 		}
 	} catch (...) {
+		mtx_future_init.unlock();
 		/* Make sure we signal that there is no program, if the
 			program fails to intialize. */
 		main_vm = nullptr;
 		return -1;
 	}
 
+	mtx_future_init.unlock();
 	/* We do not have a storage CTX after this point. */
 	main_vm->set_ctx(nullptr);
 	this->initialization_complete = true;
@@ -143,6 +151,8 @@ ProgramInstance::~ProgramInstance()
 
 long ProgramInstance::wait_for_initialization()
 {
+	std::scoped_lock lock(this->mtx_future_init);
+
 	if (!this->m_future.valid()) {
 		//fprintf(stderr, "Skipped over %s\n", main_vm->tenant().config.name.c_str());
 		return 0;

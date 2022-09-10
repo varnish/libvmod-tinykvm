@@ -47,6 +47,11 @@ $Function BOOL library(PRIV_VCL, STRING uri)
 
 - Load library of programs that is pre-installed with Varnish Enterprise.
 
+$Function BOOL start(PRIV_VCL, STRING program, BOOL async = 1)
+
+- Fetch and start program during early Varnish startup.
+- When async, program intialization will not delay Varnish from starting up.
+
 $Function BACKEND backend(PRIV_VCL, STRING program, STRING arg, STRING json_config = "{}")
 
 - Returns a backend that will call the given program to produce a response.

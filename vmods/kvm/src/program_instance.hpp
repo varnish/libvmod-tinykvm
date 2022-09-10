@@ -153,12 +153,14 @@ public:
 	MachineInstance* rsp_script = nullptr;
 	std::mutex rsp_mtx;
 
-	std::future<long> m_future;
 	bool initialization_complete = false;
 private:
 	long begin_initialization(const vrt_ctx *, TenantInstance *, bool debug);
 	/* Wait for Varnish to listen and this program to complete initialization. */
 	void try_wait_for_startup_and_initialization();
+
+	std::future<long> m_future;
+	std::mutex mtx_future_init;
 };
 
 } // kvm
