@@ -89,19 +89,19 @@ ProgramInstance::ProgramInstance(
 
 			/* XXX: Reset binary when it fails. */
 			if (res != 0) {
-				mtx_future_init.unlock();
 				this->binary = {};
 				this->main_vm = nullptr;
+				this->unlock_and_initialized();
 				return -1;
 			}
 
 			return begin_initialization(ctx, ten, debug);
 		}
 		catch (...) {
-			mtx_future_init.unlock();
 			/* XXX: Reset binary when it fails. */
 			this->binary = {};
 			this->main_vm = nullptr;
+			this->unlock_and_initialized();
 			return -1;
 		}
 	});
@@ -125,17 +125,16 @@ long ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 			m_vmqueue.enqueue(&m_vms.back());
 		}
 	} catch (...) {
-		mtx_future_init.unlock();
 		/* Make sure we signal that there is no program, if the
 			program fails to intialize. */
 		main_vm = nullptr;
+		this->unlock_and_initialized();
 		return -1;
 	}
 
-	mtx_future_init.unlock();
 	/* We do not have a storage CTX after this point. */
 	main_vm->set_ctx(nullptr);
-	this->initialization_complete = true;
+	this->unlock_and_initialized();
 	return 0;
 }
 ProgramInstance::~ProgramInstance()

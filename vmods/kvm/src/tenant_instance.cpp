@@ -177,9 +177,9 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 			// XXX: Assert on prog
 		}
 		try {
-			// Avoid reservation while still initializing. Instant fail.
-			if (UNLIKELY(!prog->initialization_complete)) {
-				// TODO: It is possible to wait on the mutex here, but whatevs.
+			// Avoid reservation while still initializing. Wait for lock.
+			// Returns false if the main_vm failed to initialize.
+			if (UNLIKELY(!prog->wait_for_main_vm())) {
 				return nullptr;
 			}
 

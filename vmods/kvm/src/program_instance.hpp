@@ -88,6 +88,11 @@ public:
 	void set_entry_at(int, gaddr_t);
 	void set_entry_at(ProgramEntryIndex i, gaddr_t a) { return set_entry_at((int) i, a); }
 
+	/* Returns true immediately if the main VM initialized successfully.
+	   If initialization has not completed, wait. Returns the result of
+	   the initialization. */
+	bool wait_for_main_vm();
+
 	/* Reserve VM from blocking queue. */
 	Reservation reserve_vm(const vrt_ctx*,
 		TenantInstance*, std::shared_ptr<ProgramInstance>);
@@ -153,14 +158,27 @@ public:
 	MachineInstance* rsp_script = nullptr;
 	std::mutex rsp_mtx;
 
-	bool initialization_complete = false;
 private:
 	long begin_initialization(const vrt_ctx *, TenantInstance *, bool debug);
 	/* Wait for Varnish to listen and this program to complete initialization. */
 	void try_wait_for_startup_and_initialization();
+	void unlock_and_initialized() {
+		this->initialization_complete = true;
+		this->mtx_future_init.unlock();
+	}
 
 	std::future<long> m_future;
 	std::mutex mtx_future_init;
+	bool initialization_complete = false;
 };
+
+inline bool ProgramInstance::wait_for_main_vm()
+{
+	if (this->initialization_complete) return true;
+
+	std::scoped_lock lock(this->mtx_future_init);
+
+	return this->initialization_complete;
+}
 
 } // kvm
