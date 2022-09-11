@@ -50,7 +50,7 @@ FetchContent_MakeAvailable(concurrentqueue)
 
 add_subdirectory(tinykvm/lib tinykvm)
 if (NATIVE)
-	target_compile_options(tinykvm PUBLIC -march=native -Ofast -fno-fast-math)
+	target_compile_options(tinykvm PUBLIC -march=native)
 endif()
 if (LTO_ENABLE)
 	target_compile_options(tinykvm PUBLIC -flto)
