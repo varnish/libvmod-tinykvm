@@ -5,9 +5,9 @@ backend default none;
 sub vcl_init {
 	# Download and activate a Varnish-provided library of compute programs.
 	# A full list of programs and how they can be used would be on the docs site.
-	compute.library("https://filebin.varnish-software.com/fh2qb14blnch6r3e/compute.json");
+	compute.library("https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/compute.json");
 	# Start the AVIF transcoder, but don't delay Varnish startup.
-	compute.start("avif");
+	#compute.start("avif");
 }
 
 sub vcl_backend_fetch {
@@ -17,11 +17,15 @@ sub vcl_backend_fetch {
 	}
 	if (bereq.url == "/gzip") {
 		# Decompress a zlib-compressed asset
-		set bereq.backend = compute.backend("inflate", "https://filebin.varnish-software.com/fh2qb14blnch6r3e/waterfall.png");
+		set bereq.backend = compute.backend("inflate", "http://httpbin.org/gzip");
 	}
 	if (bereq.url == "/zstd") {
 		# Decompress a zstd-compressed asset into a PNG (without content-type)
 		set bereq.backend = compute.backend("zstd", "https://filebin.varnish-software.com/fh2qb14blnch6r3e/waterfall_zstd.png",
 			"inline; filename=waterfall.png");
+	}
+	if (bereq.url == "/ftp") {
+		# Fetch something with cURL
+		set bereq.backend = compute.backend("fetch", "ftp://ftp.funet.fi/pub/standards/RFC/rfc959.txt");
 	}
 }
