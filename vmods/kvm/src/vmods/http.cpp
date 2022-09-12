@@ -35,6 +35,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 	[=] (MachineInstance& inst, tinykvm::vCPU& vcpu)
 	{
 		static constexpr bool GLOBAL_VERBOSE_CURL = false;
+		static constexpr bool GLOBAL_CURL_ALTSVC_CACHE = true;
 		auto& regs = vcpu.registers();
 		/**
 		 * rdi = URL
@@ -124,9 +125,16 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		std::string headers;
 		try
 		{
+			if constexpr (GLOBAL_CURL_ALTSVC_CACHE) {
+				/* The cache file ends up in the Varnish state folder, which is fine. */
+				curl_easy_setopt(curl, CURLOPT_ALTSVC, "altsvc-cache.txt");
+				curl_easy_setopt(curl, CURLOPT_ALTSVC_CTRL,
+					(long) CURLALTSVC_H1|CURLALTSVC_H2|CURLALTSVC_H3);
+			}
+
 			if (int err = curl_easy_setopt(curl, CURLOPT_URL, url.c_str()) != CURLE_OK) {
 				if (VERBOSE_CURL) {
-					printf("cURL URL errpr %d for URL: %s\n", err, url.c_str());
+					printf("cURL URL error %d for URL: %s\n", err, url.c_str());
 				}
 				regs.rax = -err;
 				vcpu.set_registers(regs);
