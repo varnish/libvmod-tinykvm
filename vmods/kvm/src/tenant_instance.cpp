@@ -59,26 +59,26 @@ void TenantInstance::begin_initialize(VRT_CTX)
 	}
 	this->m_started_init = true;
 
-	/* 1. If filename is empty, do nothing (with warning in the logs). */
-	if (config.filename.empty()) {
+	/* 1. If program has an URI, use cURL. */
+	if (!config.uri.empty())
+	{
+		/* Load the program from cURL fetch. */
+		try {
+			this->program =
+				std::make_shared<ProgramInstance> (config.uri, ctx, this);
+		} catch (const std::exception& e) {
+			this->handle_exception(config, e);
+		}
+		return;
+	}
+	/* 2. If filename is empty, do nothing (with warning in the logs). */
+	else if (config.filename.empty()) {
 		VSL(SLT_VCL_Error, 0,
 			"No filename specified for '%s'. Send new program.",
 			config.name.c_str());
 		fprintf(stderr,
 			"No filename specified for '%s'. Send new program.\n",
 			config.name.c_str());
-		return;
-	}
-	/* 2. If program is URI-like, use cURL. */
-	else if (config.filename.find("://") != std::string::npos)
-	{
-		/* Load the program from cURL fetch. */
-		try {
-			this->program =
-				std::make_shared<ProgramInstance> (config.filename, ctx, this);
-		} catch (const std::exception& e) {
-			this->handle_exception(config, e);
-		}
 		return;
 	}
 	/* 3. Check program is (in-)accessible on local filesystem. */

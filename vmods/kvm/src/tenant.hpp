@@ -55,10 +55,11 @@ struct TenantConfig
 	using dynfun_map = std::map<uint32_t, ghandler_t>;
 
 	std::string    name;
-	std::string    filename;
+	std::string    filename;  /* Stored locally here. */
 	std::string    key;
 	uint32_t       hash;
 	TenantGroup    group;
+	std::string    uri;       /* Can be fetched here. */
 
 	float    max_boot_time() const noexcept { return group.max_boot_time; }
 	float    max_req_time(bool debug) const noexcept {
@@ -86,8 +87,8 @@ struct TenantConfig
 	static void set_dynamic_calls(VCL_PRIV, std::vector<std::pair<std::string, ghandler_t>>);
 	static void reset_dynamic_call(VCL_PRIV, const std::string& name, ghandler_t = nullptr);
 
-	TenantConfig(std::string n, std::string f, std::string k,
-		TenantGroup g, dynfun_map& dfm);
+	TenantConfig(std::string nm, std::string fname, std::string key,
+		TenantGroup grp, std::string uri, dynfun_map& dfm);
 	~TenantConfig();
 
 	/* One allowed file for persistence / state-keeping */

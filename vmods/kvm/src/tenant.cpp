@@ -69,8 +69,9 @@ const std::string TenantConfig::guest_state_file = "state";
 
 TenantConfig::TenantConfig(
 	std::string n, std::string f, std::string k,
-	TenantGroup g, dynfun_map& dfm)
-	: name(n), filename(f), key(k), hash{crc32c_hw(n)}, group{std::move(g)}, dynamic_functions_ref{dfm}
+	TenantGroup grp, std::string uri, dynfun_map& dfm)
+	: name(std::move(n)), filename(std::move(f)), key(std::move(k)), hash{crc32c_hw(n)},
+	  group{std::move(grp)}, uri(std::move(uri)), dynamic_functions_ref{dfm}
 {
 	this->allowed_file = filename + ".state";
 }
@@ -262,16 +263,20 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			/* Keys are optional. No/empty key = no live update. */
 			std::string lvu_key = "";
 			if (obj.contains("key")) lvu_key = obj["key"];
+			/* URI is used to fetch a program remotely. */
+			std::string uri = "";
+			if (obj.contains("uri")) uri = obj["uri"];
 			/* Verify: No filename and no key is an unreachable program. */
-			if (filename.empty() && lvu_key.empty())
+			if (filename.empty() && uri.empty() && lvu_key.empty())
 				throw std::runtime_error("vmod_kvm: Unreachable program " + it.key() + " has no filename and no way to update");
 
 			/* Use the group data except filename */
 			kvm::load_tenant(ctx, task, kvm::TenantConfig{
 				it.key(),
-				filename,
-				lvu_key,
+				std::move(filename),
+				std::move(lvu_key),
 				group,
+				std::move(uri),
 				kvm::tenancy(task).dynamic_functions
 			}, initialize);
 		}
@@ -382,27 +387,26 @@ extern "C"
 int kvm_init_tenants_uri(VRT_CTX, VCL_PRIV task, const char* uri, int init)
 {
 	/* Load tenants from a remote JSON file. */
-	try {
-		kvm::FetchTenantsStuff ftd = {
-			.ctx = ctx,
-			.task = task,
-			.url = uri,
-			.init = (bool)init,
-		};
-		long res = kvm_curl_fetch(uri,
-		[] (void* usr, struct MemoryStruct *chunk) {
-			auto* ftd = (kvm::FetchTenantsStuff *)usr;
-			const std::string_view json { chunk->memory, chunk->size };
+	kvm::FetchTenantsStuff ftd = {
+		.ctx = ctx,
+		.task = task,
+		.url = uri,
+		.init = (bool)init,
+	};
+	long res = kvm_curl_fetch(uri,
+	[] (void* usr, struct MemoryStruct *chunk) {
+		auto* ftd = (kvm::FetchTenantsStuff *)usr;
+		const std::string_view json { chunk->memory, chunk->size };
+		try {
 			kvm::init_tenants(ftd->ctx, ftd->task, json, ftd->url, ftd->init);
-		}, &ftd);
-		return (res == 0);
-	} catch (const std::exception& e) {
-		VSL(SLT_Error, 0,
-			"vmod_kvm: Exception when loading tenants from URI '%s': %s",
-			uri, e.what());
-		fprintf(stderr,
-			"vmod_kvm: Exception when loading tenants from URI '%s': %s",
-			uri, e.what());
-		return 0;
-	}
+		} catch (const std::exception& e) {
+			VSL(SLT_Error, 0,
+				"vmod_kvm: Exception when loading tenants from URI '%s': %s",
+				ftd->url, e.what());
+			fprintf(stderr,
+				"vmod_kvm: Exception when loading tenants from URI '%s': %s",
+				ftd->url, e.what());
+		}
+	}, &ftd);
+	return (res == 0);
 }
