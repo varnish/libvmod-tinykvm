@@ -19,7 +19,9 @@
 #include "common_defs.hpp"
 #include "program_instance.hpp"
 #include "varnish.hpp"
+#include <sys/stat.h>
 #include <unistd.h>
+extern "C" void VTIM_format(double, char[20]);
 
 namespace kvm {
 	extern std::vector<uint8_t> file_loader(const std::string&);
@@ -59,13 +61,29 @@ void TenantInstance::begin_initialize(VRT_CTX)
 	}
 	this->m_started_init = true;
 
+	bool filename_accessible = false;
+	std::string filename_mtime = "";
+
+	if (!config.filename.empty()) {
+		if (access(config.filename.c_str(), R_OK) == 0)
+		{
+			filename_accessible = true;
+			struct stat st;
+			if (stat(config.filename.c_str(), &st) == 0) {
+				char buf[20];
+				VTIM_format(st.st_mtim.tv_sec, buf);
+				filename_mtime = "If-Modified-Since: " + std::string(buf);
+			}
+		}
+	}
+
 	/* 1. If program has an URI, use cURL. */
 	if (!config.uri.empty())
 	{
 		/* Load the program from cURL fetch. */
 		try {
-			this->program =
-				std::make_shared<ProgramInstance> (config.uri, ctx, this);
+			this->program = std::make_shared<ProgramInstance> (
+				config.uri, std::move(filename_mtime), ctx, this);
 		} catch (const std::exception& e) {
 			this->handle_exception(config, e);
 		}
@@ -82,7 +100,7 @@ void TenantInstance::begin_initialize(VRT_CTX)
 		return;
 	}
 	/* 3. Check program is (in-)accessible on local filesystem. */
-	else if (access(config.filename.c_str(), R_OK)) {
+	else if (filename_accessible) {
 		/* It is *NOT* accessible. */
 		VSL(SLT_VCL_Error, 0,
 			"Missing program or invalid path for '%s'. Send new program.",

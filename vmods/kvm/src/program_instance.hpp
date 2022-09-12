@@ -66,7 +66,7 @@ public:
 
 	ProgramInstance(std::vector<uint8_t> binary,
 		const vrt_ctx*, TenantInstance*, bool debug = false);
-	ProgramInstance(const std::string& uri,
+	ProgramInstance(const std::string& uri, std::string ifmodsince,
 		const vrt_ctx*, TenantInstance*, bool debug = false);
 	~ProgramInstance();
 	long wait_for_initialization();

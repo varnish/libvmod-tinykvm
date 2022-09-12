@@ -394,7 +394,7 @@ int kvm_init_tenants_uri(VRT_CTX, VCL_PRIV task, const char* uri, int init)
 		.init = (bool)init,
 	};
 	long res = kvm_curl_fetch(uri,
-	[] (void* usr, struct MemoryStruct *chunk) {
+	[] (void* usr, long, struct MemoryStruct *chunk) {
 		auto* ftd = (kvm::FetchTenantsStuff *)usr;
 		const std::string_view json { chunk->memory, chunk->size };
 		try {

@@ -1,13 +1,14 @@
 #pragma once
 #include <cstddef>
 
-struct MemoryStruct
-{
+struct MemoryStruct {
     char*  memory;
     size_t size;
 };
 
+typedef void (*kvm_curl_callback)(void *usr, long status, MemoryStruct *chunk);
+
 extern "C" {
 int kvm_curl_fetch(
-	const char *url, void(*callback)(void*, MemoryStruct *), void *usr);
+	const char *url, kvm_curl_callback callback, void *usr, const char* condhdr = nullptr);
 }

@@ -30,8 +30,11 @@
 extern "C" int usleep(uint32_t usec);
 
 namespace kvm {
+extern std::vector<uint8_t> file_loader(const std::string&);
+extern bool file_writer(const std::string& file, const std::vector<uint8_t>&);
 extern void libadns_untag(const std::string&, struct vcl*);
 static constexpr bool VERBOSE_STORAGE_TASK = false;
+static constexpr bool VERBOSE_PROGRAM_STARTUP = false;
 
 VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
 	const vrt_ctx* ctx, TenantInstance* ten, ProgramInstance* prog)
@@ -67,7 +70,7 @@ ProgramInstance::ProgramInstance(
 	});
 }
 ProgramInstance::ProgramInstance(
-	const std::string& uri,
+	const std::string& uri, std::string ifmodsince,
 	const vrt_ctx* ctx, TenantInstance* ten,
 	bool debug)
 	: binary{},
@@ -81,11 +84,40 @@ ProgramInstance::ProgramInstance(
 	this->m_future = m_main_queue.enqueue(
 	[=] () -> long {
 		try {
+			/* Helper structure for cURL fetch. */
+			struct CurlData {
+				TenantInstance*  ten;
+				ProgramInstance* prog;
+				int status;
+			} data {
+				.ten  = ten,
+				.prog = this,
+				.status = 0
+			};
+
+			/* Blocking cURL fetch, retrieving the program. May
+			   return 304 if the program is newer locally.
+			   TODO: Figure out how trust-worthy stat mtime is. */
 			int res = kvm_curl_fetch(uri.c_str(),
-			[] (void* usr, MemoryStruct* chunk) {
-				auto* elf = (std::vector<uint8_t> *)usr;
-				*elf = std::vector<uint8_t> (chunk->memory, chunk->memory + chunk->size);
-			}, &this->binary);
+			[] (void* usr, long status, MemoryStruct* chunk) {
+				auto* data = (CurlData *)usr;
+				data->status = status;
+				if (status == 304) {
+					if constexpr (VERBOSE_PROGRAM_STARTUP) {
+						printf("Loading '%s' from local disk\n", data->ten->config.name.c_str());
+					}
+					data->prog->binary = file_loader(data->ten->config.filename);
+				} else if (status == 200) {
+					if constexpr (VERBOSE_PROGRAM_STARTUP) {
+						printf("Loading '%s' from HTTP response\n", data->ten->config.name.c_str());
+					}
+					data->prog->binary = 
+						std::vector<uint8_t> (chunk->memory, chunk->memory + chunk->size);
+				} else {
+					// Unhandled HTTP status?
+					throw std::runtime_error("");
+				}
+			}, &data, ifmodsince.c_str());
 
 			/* XXX: Reset binary when it fails. */
 			if (res != 0) {
@@ -95,7 +127,20 @@ ProgramInstance::ProgramInstance(
 				return -1;
 			}
 
-			return begin_initialization(ctx, ten, debug);
+			/* Initialization phase and request VM forking. */
+			long result = begin_initialization(ctx, ten, debug);
+
+			/* Check that the program booted OK. */
+			if (result == 0) {
+				/* Store binary to disk when cURL reports 200 OK. */
+				if (data.status == 200 && !ten->config.filename.empty()) {
+					/* Cannot throw, but reports true/false on write success.
+					   We *DO NOT* care if the write failed. Only a cached binary. */
+					file_writer(ten->config.filename, this->binary);
+				}
+			}
+
+			return result;
 		}
 		catch (...) {
 			/* XXX: Reset binary when it fails. */

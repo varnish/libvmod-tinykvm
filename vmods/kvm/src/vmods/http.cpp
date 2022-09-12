@@ -119,6 +119,9 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			.dst     = opres.content_addr,
 		};
 
+		// NOTE: Up to this point we have not created anything that could leak,
+		// so it is ok to not handle exceptions. After this we will need to start
+		// destroying cURL resources after throw exceptions.
 		CURL *curl = curl_easy_init();
 		struct curl_slist *req_list = NULL;
 		struct curl_slist *post_list = NULL;

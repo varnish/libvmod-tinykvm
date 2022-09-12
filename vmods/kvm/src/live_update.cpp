@@ -6,7 +6,9 @@
 extern "C" {
 #  include "kvm_live_update.h"
 }
-static bool file_writer(const std::string& file, const std::vector<uint8_t>&);
+namespace kvm {
+	bool file_writer(const std::string& file, const std::vector<uint8_t>&);
+}
 
 constexpr update_result
 static_result(const char* text, bool success) {
@@ -59,7 +61,7 @@ kvm_live_update(VRT_CTX, kvm::TenantInstance* ten, struct update_params *params)
 			}
 			/* If we arrive here, the initialization was successful,
 			   and we can proceed to store the program to disk. */
-			bool ok = file_writer(filename, live_binary);
+			bool ok = kvm::file_writer(filename, live_binary);
 			if (!ok) {
 				/* Writing the tenant program to file failed */
 				char buffer[800];
@@ -82,13 +84,16 @@ kvm_live_update(VRT_CTX, kvm::TenantInstance* ten, struct update_params *params)
 	}
 }
 
-bool file_writer(const std::string& filename, const std::vector<uint8_t>& binary)
+namespace kvm
 {
-    FILE* f = fopen(filename.c_str(), "wb");
-    if (f == NULL)
-		return false;
+	bool file_writer(const std::string &filename, const std::vector<uint8_t> &binary)
+	{
+		FILE *f = fopen(filename.c_str(), "wb");
+		if (f == NULL)
+			return false;
 
-	const size_t n = fwrite(binary.data(), 1, binary.size(), f);
-    fclose(f);
-	return n == binary.size();
-}
+		const size_t n = fwrite(binary.data(), 1, binary.size(), f);
+		fclose(f);
+		return n == binary.size();
+	}
+} // kvm
