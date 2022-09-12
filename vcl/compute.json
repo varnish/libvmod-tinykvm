@@ -8,21 +8,21 @@
     },
     "avif": {
         "group": "compute",
-        "filename": "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/avifencode",
+        "uri": "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/avifencode",
         "max_memory": 400,
         "max_request_memory": 400
     },
     "fetch": {
         "group": "compute",
-        "filename": "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/fetch",
+        "uri": "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/fetch",
         "max_request_time": 16.0
     },
     "inflate": {
         "group": "compute",
-        "filename": "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/inflate"
+        "uri": "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/inflate"
     },
     "zstd": {
         "group": "compute",
-        "filename": "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/zstddecompr"
+        "uri": "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/zstddecompr"
     }
 }
