@@ -234,6 +234,12 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			// off of the bigger Main VMs which use "max_memory" (and are identity-mapped).
 			group.set_max_workmem(obj["max_request_memory"]);
 		}
+		if (obj.contains("req_mem_limit_after_reset")) {
+			// Limits the memory of an ephemeral VM after request completion.
+			// Without a limit, the request memory is kept in order to make future
+			// requests faster due to not having to create memory banks.
+			group.set_limit_workmem_after_req(obj["req_mem_limit_after_reset"]);
+		}
 		if (obj.contains("shared_memory")) {
 			// Sets the size of shared memory between VMs.
 			// Cannot be larger than half of max memory.

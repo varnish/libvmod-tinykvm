@@ -18,6 +18,7 @@ struct TenantGroup {
 	float    max_storage_time; /* Seconds */
 	uint64_t max_main_memory; /* Megabytes */
 	uint32_t max_req_mem; /* Megabytes */
+	uint32_t limit_req_mem; /* Megabytes of memory banks to keep after request completion */
 	uint32_t shared_memory; /* Megabytes */
 	size_t   max_concurrency = 4;
 	size_t   max_fd       = 32;
@@ -36,6 +37,7 @@ struct TenantGroup {
 
 	void set_max_memory(uint64_t newmax_mb) { this->max_main_memory = newmax_mb * 1048576ul; }
 	void set_max_workmem(uint64_t newmax_mb) { this->max_req_mem = newmax_mb * 1048576ul; }
+	void set_limit_workmem_after_req(uint64_t newmax_mb) { this->limit_req_mem = newmax_mb * 1048576ul; }
 	void set_shared_mem(uint64_t newmax_mb) { this->shared_memory = newmax_mb * 1048576ul; }
 
 	TenantGroup(std::string n)
@@ -69,6 +71,7 @@ struct TenantConfig
 	float    max_storage_time() const noexcept { return group.max_storage_time; }
 	uint64_t max_main_memory() const noexcept { return group.max_main_memory; }
 	uint32_t max_req_memory() const noexcept { return group.max_req_mem; }
+	uint32_t limit_req_memory() const noexcept { return group.limit_req_mem; }
 	uint32_t shared_memory() const noexcept { return group.shared_memory; }
 	size_t   max_fd() const noexcept { return group.max_fd; }
 	size_t   max_regex() const noexcept { return group.max_regex; }

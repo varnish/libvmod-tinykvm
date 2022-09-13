@@ -159,6 +159,7 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 		machine().reset_to(source.machine(), {
 			.max_mem = tenant().config.max_main_memory(),
 			.max_cow_mem = tenant().config.max_req_memory(),
+			.reset_free_work_mem = tenant().config.limit_req_memory(),
 		});
 	}
 	m_sighandler = source.m_sighandler;

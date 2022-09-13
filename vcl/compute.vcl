@@ -9,6 +9,9 @@ sub vcl_init {
 	# Start the AVIF transcoder, but don't delay Varnish startup.
 	compute.start("avif");
 }
+sub vcl_recv {
+	return (pass);
+}
 
 sub vcl_backend_fetch {
 	if (bereq.url == "/") {
