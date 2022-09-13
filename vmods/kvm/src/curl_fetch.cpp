@@ -52,7 +52,7 @@ int kvm_curl_fetch(
 
 	struct curl_slist *req_list = NULL;
 	if (condhdr != nullptr && condhdr[0] != 0) {
-		printf("Adding header: %s\n", condhdr);
+		//printf("Adding header: %s\n", condhdr);
 		req_list = curl_slist_append(req_list, condhdr);
 		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, req_list);
 	}

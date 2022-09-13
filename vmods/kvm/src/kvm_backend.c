@@ -213,9 +213,10 @@ kvmbe_gethdrs(const struct director *dir,
 	{
 		http_PrintfHeader(bo->beresp, "Content-Type: %.*s",
 			(int) result->tsize, result->type);
-		http_PrintfHeader(bo->beresp,
-			"Content-Length: %zu", result->content_length);
 	}
+	/* Always set content-length, always known. */
+	http_PrintfHeader(bo->beresp,
+		"Content-Length: %zu", result->content_length);
 
 	/* TODO: Tie Last-Modified to content? */
 	char timestamp[VTIM_FORMAT_SIZE];
