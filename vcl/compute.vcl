@@ -22,7 +22,20 @@ sub vcl_backend_fetch {
 	if (bereq.url == "/zstd") {
 		# Decompress a zstd-compressed asset into a PNG (without content-type)
 		set bereq.backend = compute.backend("zstd", "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/waterfall_zstd.png",
-			"inline; filename=waterfall.png");
+			"""{
+				"action": "decompress",
+				"headers": [
+					"Content-Disposition: inline; filename=waterfall.png"
+				]
+			}""");
+	}
+	if (bereq.url == "/zstd/compress") {
+		# Compress data using zstandard
+		set bereq.backend = compute.backend("zstd", "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/waterfall.png",
+			"""{
+				"action": "compress",
+				"level": 6
+			}""");
 	}
 	if (bereq.url == "/ftp") {
 		# Fetch something with cURL

@@ -26,7 +26,7 @@
     },
     "zstd": {
         "group": "compute",
-        "uri": "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/zstddecompr",
+        "uri": "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/zstdpp",
         "filename": "/tmp/compute_zstd"
     }
 }
