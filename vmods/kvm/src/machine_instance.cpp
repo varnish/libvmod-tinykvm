@@ -92,8 +92,6 @@ void MachineInstance::initialize()
 		auto rsp = machine().registers().rsp;
 		rsp = (rsp - 128UL) & ~0xFLL; // Avoid red-zone if main is leaf
 		machine().set_stack_address(rsp);
-
-		printf("Program '%s' is loaded\n", name().c_str());
 	}
 	catch (const std::exception& e)
 	{

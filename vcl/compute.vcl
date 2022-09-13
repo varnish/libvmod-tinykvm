@@ -32,10 +32,6 @@ sub vcl_backend_fetch {
 		# Fetch HTTP/3 page with cURL. AltSvc cache enables future fetches to use HTTP/3.
 		set bereq.backend = compute.backend("fetch", "https://quic.rocks:4433/");
 	}
-	if (bereq.url == "/wss") {
-		# Fetch HTTPS WebSockets page with cURL.
-		set bereq.backend = compute.backend("fetch", "https://quic.rocks:4433/");
-	}
 }
 sub vcl_backend_response {
 	if (bereq.url == "/http3") {

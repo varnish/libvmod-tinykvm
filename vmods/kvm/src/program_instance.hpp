@@ -71,6 +71,9 @@ public:
 	~ProgramInstance();
 	long wait_for_initialization();
 
+	bool binary_was_local() const noexcept { return m_binary_was_local; }
+	bool binary_was_cached() const noexcept { return m_binary_was_cached; }
+
 	/* Look up the address of the given name (function or object)
 	   in the currently running program. The operation is very
 	   expensive as it iterates through the ELF symbol table. */
@@ -170,6 +173,8 @@ private:
 	std::future<long> m_future;
 	std::mutex mtx_future_init;
 	bool initialization_complete = false;
+	bool m_binary_was_local = false;
+	bool m_binary_was_cached = false;
 };
 
 inline bool ProgramInstance::wait_for_main_vm()

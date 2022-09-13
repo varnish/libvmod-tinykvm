@@ -99,8 +99,8 @@ void TenantInstance::begin_initialize(VRT_CTX)
 			config.name.c_str());
 		return;
 	}
-	/* 3. Check program is (in-)accessible on local filesystem. */
-	else if (filename_accessible) {
+	/* 3. Check program was in-accessible on local filesystem. */
+	else if (!filename_accessible) {
 		/* It is *NOT* accessible. */
 		VSL(SLT_VCL_Error, 0,
 			"Missing program or invalid path for '%s'. Send new program.",

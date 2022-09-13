@@ -64,6 +64,8 @@ ProgramInstance::ProgramInstance(
 {
 	mtx_future_init.lock();
 
+	this->m_binary_was_local = true;
+	this->m_binary_was_cached = false;
 	this->m_future = m_main_queue.enqueue(
 	[=] () -> long {
 		return begin_initialization(ctx, ten, debug);
@@ -81,6 +83,7 @@ ProgramInstance::ProgramInstance(
 {
 	mtx_future_init.lock();
 
+	this->m_binary_was_local = false;
 	this->m_future = m_main_queue.enqueue(
 	[=] () -> long {
 		try {
@@ -127,6 +130,9 @@ ProgramInstance::ProgramInstance(
 				return -1;
 			}
 
+			this->m_binary_was_cached = (data.status == 304);
+			this->m_binary_was_local = this->m_binary_was_cached;
+
 			/* Initialization phase and request VM forking. */
 			long result = begin_initialization(ctx, ten, debug);
 
@@ -169,6 +175,12 @@ long ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 			m_vms.emplace_back(*main_vm, ctx, ten, this);
 			m_vmqueue.enqueue(&m_vms.back());
 		}
+
+		printf("Program '%s' is loaded (%s, %s)\n",
+			main_vm->name().c_str(),
+			this->binary_was_local() ? "local" : "remote",
+			this->binary_was_cached() ? "cached" : "not cached");
+
 	} catch (...) {
 		/* Make sure we signal that there is no program, if the
 			program fails to intialize. */
