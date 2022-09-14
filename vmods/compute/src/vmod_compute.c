@@ -42,10 +42,25 @@ VCL_BOOL vmod_start(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_BOOL async)
 	}
 }
 
-extern VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
+extern struct director *vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg);
 
+extern void vmod_kvm_set_kvmr_backend(
+	struct director *dir, VCL_BACKEND backend);
+
+/* Create a response from a KVM backend with another backend as argument. */
 VCL_BACKEND vmod_backend(VRT_CTX, VCL_PRIV task,
+	VCL_STRING program, VCL_BACKEND backend, VCL_STRING arg, VCL_STRING json_config)
+{
+	struct director *dir =
+		vmod_vm_backend(ctx, task, program, arg, json_config);
+
+	vmod_kvm_set_kvmr_backend(dir, backend);
+	return (dir);
+}
+
+/* Create a response from a KVM backend. */
+VCL_BACKEND vmod_program(VRT_CTX, VCL_PRIV task,
 	VCL_STRING program, VCL_STRING arg, VCL_STRING json_config)
 {
 	return (vmod_vm_backend(ctx, task, program, arg, json_config));

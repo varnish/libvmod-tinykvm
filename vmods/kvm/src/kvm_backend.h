@@ -8,6 +8,21 @@ struct VMBuffer {
 };
 struct vsl_log;
 
+struct vmod_kvm_backend
+{
+	uint64_t magic;
+	struct director *dir;
+
+	struct vmod_kvm_tenant *tenant;
+	const char *funcarg[2];
+	int debug;
+	uint64_t max_response_size;
+	const struct director* backend;
+
+	double t_prev;
+	double t_work;
+};
+
 struct backend_result {
 	const char *type;
 	uint16_t tsize; /* Max 64KB Content-Type */

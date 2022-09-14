@@ -24,20 +24,6 @@ struct vmod_kvm_updater
 	uint16_t debug_port;
 };
 
-struct vmod_kvm_backend
-{
-	uint64_t magic;
-	struct director dir;
-
-	struct vmod_kvm_tenant *tenant;
-	const char *funcarg[2];
-	int debug;
-	uint64_t max_response_size;
-
-	double t_prev;
-	double t_work;
-};
-
 struct vmod_kvm_synth
 {
 	struct vsb *vsb;

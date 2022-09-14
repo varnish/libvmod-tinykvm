@@ -52,7 +52,13 @@ $Function BOOL start(PRIV_VCL, STRING program, BOOL async = 1)
 - Fetch and start program during early Varnish startup.
 - When async, program intialization will not delay Varnish from starting up.
 
-$Function BACKEND backend(PRIV_VCL, STRING program, STRING arg, STRING json_config = "{}")
+$Function BACKEND backend(PRIV_VCL, STRING program, BACKEND remote, STRING url, STRING json_config = "{}")
+
+- Returns a backend that will call the given program to produce a response.
+- It will attempt to use the given backend address when fetching an asset is necessary.
+- Supports GET and POST requests.
+
+$Function BACKEND program(PRIV_VCL, STRING program, STRING arg, STRING json_config = "{}")
 
 - Returns a backend that will call the given program to produce a response.
 - Supports GET and POST requests.

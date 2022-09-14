@@ -29,7 +29,7 @@
 #include "vcc_if.h"
 extern uint64_t kvm_allocate_memory(KVM_SLOT, uint64_t bytes);
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
-	const char *farg[2], struct backend_post *, struct backend_result *);
+	struct vmod_kvm_backend *, struct backend_post *, struct backend_result *);
 extern int kvm_get_body(struct backend_post *, struct busyobj *);
 
 static void v_matchproto_(vdi_panic_f)
@@ -202,7 +202,7 @@ kvmbe_gethdrs(const struct director *dir,
 	result->bufcount = VMBE_NUM_BUFFERS;
 
 	/* Make a backend VM call (with optional POST). */
-	kvm_backend_call(&ctx, slot, kvmr->funcarg, post, result);
+	kvm_backend_call(&ctx, slot, kvmr, post, result);
 	kvm_ts(ctx.vsl, "TenantProcess", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 
 	/* Status code is sanitized in the backend call. */
@@ -247,8 +247,15 @@ kvmbe_gethdrs(const struct director *dir,
 	return (0);
 }
 
-static void init_director(struct director *dir, void *kvmr)
+static void init_director(VRT_CTX, struct vmod_kvm_backend *kvmr)
 {
+	kvmr->dir = WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_backend));
+	if (kvmr->dir == NULL) {
+		VRT_fail(ctx, "KVM: Out of workspace");
+		return;
+	}
+
+	struct director *dir = kvmr->dir;
 	INIT_OBJ(dir, DIRECTOR_MAGIC);
 	dir->priv = kvmr;
 	dir->name = "KVM backend director";
@@ -256,6 +263,12 @@ static void init_director(struct director *dir, void *kvmr)
 	dir->gethdrs = kvmbe_gethdrs;
 	dir->finish  = kvmbe_finish;
 	dir->panic   = kvmbe_panic;
+}
+
+void vmod_kvm_set_kvmr_backend(struct director *dir, VCL_BACKEND backend)
+{
+	struct vmod_kvm_backend *kvmr = (struct vmod_kvm_backend *)dir->priv;
+	kvmr->backend = backend;
 }
 
 VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
@@ -292,8 +305,8 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	kvmr->debug = 0;
 	kvmr->max_response_size = 0;
 
-	init_director(&kvmr->dir, kvmr);
-	return (&kvmr->dir);
+	init_director(ctx, kvmr);
+	return (kvmr->dir);
 }
 
 VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
@@ -334,6 +347,6 @@ VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
 	kvmr->debug = 1;
 	kvmr->max_response_size = 0;
 
-	init_director(&kvmr->dir, kvmr);
-	return (&kvmr->dir);
+	init_director(ctx, kvmr);
+	return (kvmr->dir);
 }
