@@ -21,7 +21,7 @@
 #include "varnish.hpp"
 #include <sys/stat.h>
 #include <unistd.h>
-extern "C" void VTIM_format(double, char[20]);
+extern "C" void VTIM_format(double, char[32]);
 
 namespace kvm {
 	extern std::vector<uint8_t> file_loader(const std::string&);
@@ -70,7 +70,7 @@ void TenantInstance::begin_initialize(VRT_CTX)
 			filename_accessible = true;
 			struct stat st;
 			if (stat(config.filename.c_str(), &st) == 0) {
-				char buf[20];
+				char buf[32];
 				VTIM_format(st.st_mtim.tv_sec, buf);
 				filename_mtime = "If-Modified-Since: " + std::string(buf);
 			}
