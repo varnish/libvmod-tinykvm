@@ -18,7 +18,7 @@ sub vcl_recv {
 }
 
 sub vcl_backend_fetch {
-	if (bereq.url == "/") {
+	if (bereq.url == "/avif" || bereq.url == "/") {
 		# Transform a JPEG asset to AVIF, cache and deliver it. cURL can fetch using TLS and HTTP/2.
 		set bereq.backend = compute.program("avif", "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/rose.jpg");
 	}
@@ -32,7 +32,7 @@ sub vcl_backend_fetch {
 	}
 	if (bereq.url == "/zstd") {
 		# Decompress a zstd-compressed asset into a PNG (without content-type)
-		set bereq.backend = compute.program("zstd", "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/waterfall_zstd.png",
+		set bereq.backend = compute.program("zstd", "http://127.0.0.1:8080/zstd/compress",
 			"""{
 				"action": "decompress",
 				"headers": [
