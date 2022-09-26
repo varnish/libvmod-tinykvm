@@ -22,10 +22,6 @@ sub vcl_backend_fetch {
 		# Transform a JPEG asset to AVIF, cache and deliver it. cURL can fetch using TLS and HTTP/2.
 		set bereq.backend = compute.program("avif", "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/rose.jpg");
 	}
-	if (bereq.url == "/b") {
-		# Transform a JPEG asset to AVIF, cache and deliver it. cURL can fetch using TLS and HTTP/2.
-		set bereq.backend = compute.backend("avif", default, "https://${backend}/nsyb0c1pvwa7ecf9/rose.jpg");
-	}
 	if (bereq.url == "/gzip") {
 		# Decompress a zlib-compressed asset
 		set bereq.backend = compute.program("inflate", "http://httpbin.org/gzip");

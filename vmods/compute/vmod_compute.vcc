@@ -3,11 +3,12 @@ $Module compute 3 "High-Performance Compute For Varnish Enterprise"
 DESCRIPTION
 ===========
 
-vmod_compute allows using a library of sandboxed programs to
+vmod_compute allows using libraries of sandboxed programs to
 safely transform data without having to worry about security
-issues.
+issues. Programs are loaded as-needed and can be swapped out
+at any time.
 
-Each program provided by the library are ready-to-use. Each
+Each program provided by the library is ready-to-use. Each
 program has a specific purpose and comes with a simple explanation
 of what it does, and what JSON configuration should be provided
 to make the program perform a given function.
@@ -19,23 +20,25 @@ LIBRARY
 A library defines a group of ready-to-use programs. Varnish Enterprise has
 a list of officially supported programs, each of which solve a specific task.
 
-Further, each programs comes with a specific JSON configuration that allows
+Further, each program comes with a specific JSON configuration that allows
 the VCL writer to tailor the program to his needs.
 
-See http://programs.varnish-software.com for a list of official programs.
+See http://compute.varnish-software.com for a list of official programs.
 
 Example:
-	set bereq.backend = compute.backend("jpeg_to_avif",
+	set bereq.backend = compute.backend("avif",
 		"https://backend2.myorg.co.uk/assets/" + bereq.url);
 
-	The jpeg_to_avif program will transcode a valid JPEG to AVIF, or if it fails,
+	The avif program will transcode a valid JPEG to AVIF, or if it fails,
 	deliver the original JPEG instead. The program will fetch the image from the
-	argument URL, and then transcode it.
+	argument URL, and then transcode it. You can use any valid URL that can be
+	fetched with cURL, such as FTP, HTTPS and local files with
+	file:///home/user/file.
 
 	The JSON configuration for each officially supported program uses a common
 	scheme between all programs in order to make advanced DNS configuration easy.
 	Each parameter in the DNS configuration is named and works exactly like in
-	vmod_goto, and uses the same source for DNS.
+	the Goto VMOD, and uses the same source for DNS.
 
 
 API
@@ -46,17 +49,12 @@ $Event vmod_event
 $Function BOOL library(PRIV_VCL, STRING uri)
 
 - Load library of programs that is pre-installed with Varnish Enterprise.
+- All programs are retrieved, but are started only on-demand.
 
 $Function BOOL start(PRIV_VCL, STRING program, BOOL async = 1)
 
-- Fetch and start program during early Varnish startup.
+- Start program during early Varnish startup.
 - When async, program intialization will not delay Varnish from starting up.
-
-$Function BACKEND backend(PRIV_VCL, STRING program, BACKEND remote, STRING url, STRING json_config = "{}")
-
-- Returns a backend that will call the given program to produce a response.
-- It will attempt to use the given backend address when fetching an asset is necessary.
-- Supports GET and POST requests.
 
 $Function BACKEND program(PRIV_VCL, STRING program, STRING arg, STRING json_config = "{}")
 
