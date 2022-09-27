@@ -1,4 +1,5 @@
 vcl 4.1;
+import activedns;
 import compute;
 
 backend default {
@@ -7,6 +8,9 @@ backend default {
 }
 
 sub vcl_init {
+	new vafb = activedns.dns_group();
+	vafb.set_host("filebin.varnish-software.com");
+
 	# Download and activate a Varnish-provided library of compute programs.
 	# A full list of programs and how they can be used would be on the docs site.
 	compute.library("https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/compute.json");
@@ -20,7 +24,10 @@ sub vcl_recv {
 sub vcl_backend_fetch {
 	if (bereq.url == "/avif" || bereq.url == "/") {
 		# Transform a JPEG asset to AVIF, cache and deliver it. cURL can fetch using TLS and HTTP/2.
-		set bereq.backend = compute.program("avif", "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/rose.jpg");
+		set bereq.backend = compute.program("avif", "https://${vafb}/nsyb0c1pvwa7ecf9/rose.jpg",
+			"""{
+				"headers": ["Host: filebin.varnish-software.com"]
+			}""");
 	}
 	if (bereq.url == "/gzip") {
 		# Decompress a zlib-compressed asset

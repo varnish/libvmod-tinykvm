@@ -98,6 +98,8 @@ static void syscall_adns_new(vCPU& cpu, MachineInstance& inst)
 	 **/
 	std::string tag = std::to_string((uint32_t)regs.rdi) + std::to_string((uintptr_t)&inst.program());
 
+	// XXX: ***Enforce that we own the tag here***
+
 	auto ret = ADNS_tag(tag.c_str(), inst.program().get_adns_key());
 	if (ret < 0) {
 		inst.logf("libadns: Tag %s failed (%s)",
@@ -232,6 +234,71 @@ static void syscall_adns_get(vCPU& cpu, MachineInstance& inst)
 		regs.rax = -1;
 	}
 	cpu.set_registers(regs);
+}
+
+struct BlockingADNSData
+{
+	AsyncDNSEntry entry;
+};
+
+static void blocking_adns_callback(struct adns_info_list *new_list,
+    struct adns_info_list *present, struct adns_info_list *removed,
+    struct adns_hints *hints, void *priv)
+{
+	(void) removed;
+	(void) hints;
+	assert(priv != nullptr && new_list != nullptr && present != nullptr);
+	auto* adns = (BlockingADNSData *)priv;
+
+	AsyncDNSEntry entry;
+	struct adns_info *info = nullptr;
+	VTAILQ_FOREACH(info, &new_list->head, list) {
+		adns->entry = from_list_entry(info);
+		return;
+	}
+	VTAILQ_FOREACH(info, &present->head, list) {
+		adns->entry = from_list_entry(info);
+		return;
+	}
+	// Not found
+}
+
+std::string adns_interp(MachineInstance& inst, std::string url)
+{
+	auto off = url.find("://${");
+	if (off != std::string::npos) {
+		auto offe = url.find("}", off);
+		if (offe != std::string::npos) {
+			auto name_off = off + 5;
+			auto dns_tag = url.substr(name_off, offe - name_off);
+			//printf("DNS tag: %s\n", dns_tag.c_str());
+			const char *ctag = dns_tag.c_str();
+			auto *vcl = inst.program().get_adns_key();
+
+			// Refcount tag keeping it alive.
+			if (ADNS_tag(ctag, vcl) == 0)
+			{
+				BlockingADNSData data;
+				// Receive DNS updates on tag in callback.
+				ADNS_subscribe(ctag, vcl, blocking_adns_callback, &data);
+				// Blocking wait for refresh in order to get address in callback.
+				ADNS_refresh(ctag, vcl, ADNS_REFRESH_INFO, 1);
+				// Unsubscribe as we do not have a way to re-use the subscription afterwards
+				ADNS_unsubscribe(ctag, vcl, blocking_adns_callback, &data);
+				// Release refcount on tag.
+				ADNS_untag(ctag, vcl);
+
+				if (UNLIKELY(data.entry.name.empty())) {
+					// The ADNS resolution didn't happen, reject request.
+					throw std::runtime_error("ADNS tag not resolved: " + dns_tag);
+				}
+
+				// Re-construct URI with new address, adding ://.
+				return url.substr(0, off+3) + data.entry.name + url.substr(offe+1);
+			}
+		}
+	}
+	return url;
 }
 
 } // kvm

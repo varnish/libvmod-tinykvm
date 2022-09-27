@@ -14,6 +14,7 @@ extern "C" {
 #include <curl/curl.h>
 
 namespace kvm {
+extern std::string adns_interp(MachineInstance& inst, std::string);
 typedef size_t (*read_callback)(char *buffer, size_t size, size_t nitems, void *);
 typedef size_t (*write_callback)(char *, size_t, size_t, void *);
 typedef size_t (*header_callback)(char *buffer, size_t size, size_t nitems, void *);
@@ -54,7 +55,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		constexpr uint64_t CURL_BUFFER_MAX = 256UL * 1024UL * 1024UL;
 
 		/* URL */
-		const auto url = vcpu.machine().buffer_to_string(regs.rdi, regs.rsi, 512);
+		const auto url = adns_interp(inst, vcpu.machine().buffer_to_string(regs.rdi, regs.rsi, 512));
 
 		constexpr size_t CONTENT_TYPE_LEN = 128;
 		constexpr size_t CURL_FIELDS_NUM = 12;
