@@ -21,7 +21,7 @@ set (SOURCES
 	${LIBPATH}/libvarnish/vtim.c
 )
 
-add_library(adns STATIC ${SOURCES} ${VSC_COMPILED})
+add_library(adns SHARED ${SOURCES} ${VSC_COMPILED})
 target_include_directories(adns PUBLIC ${VARNISH_PATH}/include/adns) # Why?
 target_link_libraries(adns PUBLIC vapi_static resolv)
 set_property(TARGET adns PROPERTY POSITION_INDEPENDENT_CODE 1)
