@@ -21,7 +21,7 @@ struct VirtBuffer {
  * data transfers, and is then put back in a blocking queue.
 **/
 struct VMPoolItem {
-	VMPoolItem(const MachineInstance&, const vrt_ctx*, TenantInstance*, ProgramInstance*);
+	VMPoolItem(const MachineInstance&, TenantInstance*, ProgramInstance*);
 	// VM instance
 	std::unique_ptr<MachineInstance> mi;
 	// Communicate with this VM using single thread pool

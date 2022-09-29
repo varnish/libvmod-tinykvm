@@ -38,14 +38,14 @@ static constexpr bool VERBOSE_STORAGE_TASK = false;
 static constexpr bool VERBOSE_PROGRAM_STARTUP = false;
 
 VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
-	const vrt_ctx* ctx, TenantInstance* ten, ProgramInstance* prog)
+	TenantInstance* ten, ProgramInstance* prog)
 {
 	// Spawn forked VM on dedicated thread, blocking.
 	tp.enqueue(
 	[&] () -> long {
 		try {
 			this->mi = std::make_unique<MachineInstance> (
-				main_vm, ctx, ten, prog);
+				main_vm, ten, prog);
 			return 0;
 		} catch (...) {
 			return -1;
@@ -161,30 +161,54 @@ ProgramInstance::ProgramInstance(
 long ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *ten, bool debug)
 {
 	try {
+		const size_t max_vms = ten->config.group.max_concurrency;
+		if (max_vms < 1)
+			throw std::runtime_error(ten->config.name + ": Concurrency must be at least 1");
+
 		TIMING_LOCATION(t0);
+		// Create the master VM, forked later for request concurrency.
 		main_vm = std::make_unique<MachineInstance>
 			(this->binary, ctx, ten, this, debug);
 
+		// The extra vCPU is used for async storage access.
 		main_vm_extra_cpu_stack = EXTRA_CPU_STACK_SIZE +
 			main_vm->machine().mmap_allocate(EXTRA_CPU_STACK_SIZE);
 
+		// Run through main, verify wait_for_requests() etc.
 		main_vm->initialize();
+		// We do not need a VRT CTX after initialization.
+		main_vm->set_ctx(nullptr);
+
 		TIMING_LOCATION(t1);
 
-		const size_t max_vms = ten->config.group.max_concurrency;
-		for (size_t i = 0; i < max_vms; i++) {
-			// Instantiate forked VMs on dedicated threads,
-			// in order to prevent KVM migrations.
-			m_vms.emplace_back(*main_vm, ctx, ten, this);
-			m_vmqueue.enqueue(&m_vms.back());
-		}
+		// Instantiate forked VMs on dedicated threads, in
+		// order to prevent KVM migrations. First we create
+		// one forked VM and immediately start accepting
+		// requests, while we continously add more concurrency
+		// to the queue.
+
+		// Instantiate first forked VM
+		m_vms.emplace_back(*main_vm, ten, this);
+		m_vmqueue.enqueue(&m_vms.back());
+
+		// Start accepting incoming requests on thread pool.
+		this->unlock_and_initialized();
+
 		TIMING_LOCATION(t2);
 
-		printf("Program '%s' is loaded (%s, %s, boot=%.2fms, pool=%.2fms)\n",
+		// Instantiate remaining concurrency
+		for (size_t i = 1; i < max_vms; i++) {
+			m_vms.emplace_back(*main_vm, ten, this);
+			m_vmqueue.enqueue(&m_vms.back());
+		}
+
+		(void) t1;
+		printf("Program '%s' is loaded (%s, %s, ready=%.2fms)\n",
 			main_vm->name().c_str(),
 			this->binary_was_local() ? "local" : "remote",
 			this->binary_was_cached() ? "cached" : "not cached",
-			nanodiff(t0, t1) / 1e6, nanodiff(t1, t2) / 1e6);
+			nanodiff(t0, t2) / 1e6);
+		return 0;
 
 	} catch (...) {
 		/* Make sure we signal that there is no program, if the
@@ -193,11 +217,6 @@ long ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 		this->unlock_and_initialized();
 		return -1;
 	}
-
-	/* We do not have a storage CTX after this point. */
-	main_vm->set_ctx(nullptr);
-	this->unlock_and_initialized();
-	return 0;
 }
 ProgramInstance::~ProgramInstance()
 {

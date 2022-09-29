@@ -100,9 +100,8 @@ void MachineInstance::initialize()
 }
 
 MachineInstance::MachineInstance(
-	const MachineInstance& source, const vrt_ctx* ctx,
-	const TenantInstance* ten, ProgramInstance* inst)
-	: m_ctx(ctx),
+	const MachineInstance& source, const TenantInstance* ten, ProgramInstance* inst)
+	: m_ctx(nullptr),
 	  m_machine(source.machine(), tinykvm::MachineOptions{
 		.max_mem = ten->config.max_main_memory(),
 		.max_cow_mem = ten->config.max_req_memory(),
