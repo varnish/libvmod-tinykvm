@@ -22,8 +22,9 @@
 #include "program_instance.hpp"
 
 #include "curl_fetch.hpp"
-#include "tenant_instance.hpp"
 #include "settings.hpp"
+#include "tenant_instance.hpp"
+#include "timing.hpp"
 #include "varnish.hpp"
 #include <cstring>
 #include <tinykvm/rsp_client.hpp>
@@ -160,6 +161,7 @@ ProgramInstance::ProgramInstance(
 long ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *ten, bool debug)
 {
 	try {
+		TIMING_LOCATION(t0);
 		main_vm = std::make_unique<MachineInstance>
 			(this->binary, ctx, ten, this, debug);
 
@@ -167,6 +169,7 @@ long ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 			main_vm->machine().mmap_allocate(EXTRA_CPU_STACK_SIZE);
 
 		main_vm->initialize();
+		TIMING_LOCATION(t1);
 
 		const size_t max_vms = ten->config.group.max_concurrency;
 		for (size_t i = 0; i < max_vms; i++) {
@@ -175,11 +178,13 @@ long ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 			m_vms.emplace_back(*main_vm, ctx, ten, this);
 			m_vmqueue.enqueue(&m_vms.back());
 		}
+		TIMING_LOCATION(t2);
 
-		printf("Program '%s' is loaded (%s, %s)\n",
+		printf("Program '%s' is loaded (%s, %s, boot=%.2fms, pool=%.2fms)\n",
 			main_vm->name().c_str(),
 			this->binary_was_local() ? "local" : "remote",
-			this->binary_was_cached() ? "cached" : "not cached");
+			this->binary_was_cached() ? "cached" : "not cached",
+			nanodiff(t0, t1) / 1e6, nanodiff(t1, t2) / 1e6);
 
 	} catch (...) {
 		/* Make sure we signal that there is no program, if the

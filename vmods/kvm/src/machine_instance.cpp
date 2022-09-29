@@ -13,17 +13,13 @@
  * 
 **/
 #include "machine_instance.hpp"
-#include "tenant_instance.hpp"
 #include "settings.hpp"
+#include "tenant_instance.hpp"
+#include "timing.hpp"
 #include "varnish.hpp"
 extern "C" int close(int);
 extern void setup_kvm_system_calls();
 
-//#define ENABLE_TIMING
-#define TIMING_LOCATION(x) \
-	asm("" ::: "memory"); \
-	auto x = time_now();  \
-	asm("" ::: "memory");
 
 namespace kvm {
 
