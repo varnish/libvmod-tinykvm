@@ -5,7 +5,7 @@
         "max_request_time": 6.0,
         "max_memory": 512,
         "max_request_memory": 512,
-        "req_mem_limit_after_reset": 32
+        "req_mem_limit_after_reset": 32 /* Mbytes */
     },
     "avif": {
         "group": "compute",

@@ -16,6 +16,7 @@ sub vcl_init {
 	compute.library("https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/compute.json");
 	# Start the AVIF transcoder, but don't delay Varnish startup.
 	compute.start("avif");
+	#compute.set_concurrency("avif", 64, 20);
 }
 sub vcl_recv {
 	return (pass);
@@ -38,17 +39,18 @@ sub vcl_backend_fetch {
 		set bereq.backend = compute.program("zstd", "http://127.0.0.1:8080/zstd/compress",
 			"""{
 				"action": "decompress",
-				"headers": [
+				"resp_headers": [
 					"Content-Disposition: inline; filename=waterfall.png"
 				]
 			}""");
 	}
 	if (bereq.url == "/zstd/compress") {
 		# Compress data using zstandard
-		set bereq.backend = compute.program("zstd", "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/waterfall.png",
+		set bereq.backend = compute.program("zstd", "https://${vafb}/nsyb0c1pvwa7ecf9/waterfall.png",
 			"""{
 				"action": "compress",
-				"level": 6
+				"level": 6,
+				"headers": ["Host: filebin.varnish-software.com"]
 			}""");
 	}
 	if (bereq.url == "/ftp") {
