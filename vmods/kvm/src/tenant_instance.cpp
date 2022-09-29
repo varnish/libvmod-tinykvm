@@ -85,6 +85,8 @@ void TenantInstance::begin_initialize(VRT_CTX)
 			this->program = std::make_shared<ProgramInstance> (
 				config.uri, std::move(filename_mtime), ctx, this);
 		} catch (const std::exception& e) {
+			/* TODO: Retry with file loader here from local filesyste, if
+			   the cURL fetch does not succeed. */
 			this->handle_exception(config, e);
 		}
 		return;
