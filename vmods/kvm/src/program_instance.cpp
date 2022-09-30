@@ -127,7 +127,7 @@ ProgramInstance::ProgramInstance(
 			if (res != 0) {
 				this->binary = {};
 				this->main_vm = nullptr;
-				this->unlock_and_initialized();
+				this->unlock_and_initialized(false);
 				return -1;
 			}
 
@@ -153,7 +153,7 @@ ProgramInstance::ProgramInstance(
 			/* XXX: Reset binary when it fails. */
 			this->binary = {};
 			this->main_vm = nullptr;
-			this->unlock_and_initialized();
+			this->unlock_and_initialized(false);
 			return -1;
 		}
 	});
@@ -192,7 +192,7 @@ long ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 		m_vmqueue.enqueue(&m_vms.back());
 
 		// Start accepting incoming requests on thread pool.
-		this->unlock_and_initialized();
+		this->unlock_and_initialized(true);
 
 		TIMING_LOCATION(t2);
 
@@ -214,7 +214,7 @@ long ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 		/* Make sure we signal that there is no program, if the
 			program fails to intialize. */
 		main_vm = nullptr;
-		this->unlock_and_initialized();
+		this->unlock_and_initialized(false);
 		return -1;
 	}
 }
@@ -561,7 +561,7 @@ void ProgramInstance::try_wait_for_startup_and_initialization()
 
 	int retries = MAX_RETRIES; /* 5000ms maximum wait */
 	while (
-		(!this->initialization_complete || !varnish_is_accepting_connections())
+		(m_initialization_complete == 0 || !varnish_is_accepting_connections())
 		&& retries > 0)
 	{
 		usleep(WAIT_TIME);

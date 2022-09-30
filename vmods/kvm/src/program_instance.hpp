@@ -165,25 +165,26 @@ private:
 	long begin_initialization(const vrt_ctx *, TenantInstance *, bool debug);
 	/* Wait for Varnish to listen and this program to complete initialization. */
 	void try_wait_for_startup_and_initialization();
-	void unlock_and_initialized() {
-		this->initialization_complete = true;
+	void unlock_and_initialized(bool success) {
+		this->m_initialization_complete = success ? 1 : -1;
 		this->mtx_future_init.unlock();
 	}
 
 	std::future<long> m_future;
 	std::mutex mtx_future_init;
-	bool initialization_complete = false;
+	int8_t m_initialization_complete = 0;
 	bool m_binary_was_local = false;
 	bool m_binary_was_cached = false;
 };
 
 inline bool ProgramInstance::wait_for_main_vm()
 {
-	if (this->initialization_complete) return true;
+	if (this->m_initialization_complete)
+		return this->m_initialization_complete > 0;
 
 	std::scoped_lock lock(this->mtx_future_init);
 
-	return this->initialization_complete;
+	return this->m_initialization_complete > 0;
 }
 
 } // kvm

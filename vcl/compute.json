@@ -5,7 +5,7 @@
         "max_request_time": 6.0,
         "max_memory": 512,
         "max_request_memory": 512,
-        "req_mem_limit_after_reset": 32 /* Mbytes */
+        "req_mem_limit_after_reset": 16 /* Mbytes */
     },
     "avif": {
         "group": "compute",
@@ -25,6 +25,14 @@
         "group": "compute",
         "uri": "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/inflate",
         "filename": "/tmp/compute_fetch"
+    },
+    "minimal": {
+        "group": "compute",
+        "uri": "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/minimal",
+        "filename": "/tmp/compute_minimal",
+        "max_memory": 32,
+        "max_request_memory": 16,
+        "concurrency": 2
     },
     "zstd": {
         "group": "compute",

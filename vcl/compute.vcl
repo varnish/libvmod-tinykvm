@@ -16,6 +16,10 @@ sub vcl_init {
 	compute.library("https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/compute.json");
 	# Start the AVIF transcoder, but don't delay Varnish startup.
 	compute.start("avif");
+	#compute.start("fetch");
+	#compute.start("inflate");
+	compute.start("minimal");
+	#compute.start("zstd");
 	#compute.set_concurrency("avif", 64, 20);
 }
 sub vcl_recv {
@@ -52,6 +56,9 @@ sub vcl_backend_fetch {
 				"level": 6,
 				"headers": ["Host: filebin.varnish-software.com"]
 			}""");
+	}
+	if (bereq.url == "/min") {
+		set bereq.backend = compute.program("minimal", "");
 	}
 	if (bereq.url == "/ftp") {
 		# Fetch something with cURL
