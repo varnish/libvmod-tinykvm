@@ -7,6 +7,7 @@ namespace kvm
 
     static constexpr size_t MAIN_STACK_SIZE = 1UL << 22; /* 4MB */
     static constexpr size_t MAIN_MEMORY_SIZE = 256; /* 256MB */
+    static constexpr size_t SHARED_MEMORY_SIZE = 1; /* 1MB */
     static constexpr float  STARTUP_TIMEOUT = 16.0f;
 
     static constexpr size_t REQUEST_MEMORY_SIZE = 64; /* 64MB */

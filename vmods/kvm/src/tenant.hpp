@@ -41,13 +41,13 @@ struct TenantGroup {
 	void set_shared_mem(uint64_t newmax_mb) { this->shared_memory = newmax_mb * 1048576ul; }
 
 	TenantGroup(std::string n)
-		: name{n},
+		: name{n}, // From settings.hpp:
 		  max_boot_time(STARTUP_TIMEOUT),
 		  max_req_time(REQUEST_VM_TIMEOUT),
 		  max_storage_time(STORAGE_TIMEOUT),
 		  max_main_memory(MAIN_MEMORY_SIZE * 1048576ul),
 		  max_req_mem(REQUEST_MEMORY_SIZE * 1048576ul),
-		  shared_memory(max_main_memory / 8)
+		  shared_memory(SHARED_MEMORY_SIZE)
 		{}
 };
 
