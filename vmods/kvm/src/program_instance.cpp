@@ -270,8 +270,8 @@ Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 	m_vmqueue.wait_dequeue(slot);
 	assert(slot && ctx);
 
-	/* Reset and reference the active program. */
-	slot->mi->reset_to(ctx, *prog->main_vm);
+	/* Set the new active VRT CTX. */
+	slot->mi->set_ctx(ctx);
 
 	/* This creates a self-reference, which ensures that open
 	   Machine instances will keep the program instance alive. */
@@ -281,12 +281,18 @@ Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 	return {slot, [] (void* slotv) {
 		auto* slot = (VMPoolItem *)slotv;
 		auto& mi = *slot->mi;
+		// Free regexes, file descriptors etc.
 		mi.tail_reset();
+
+		// Reset to the current program (even though it might die before next req).
+		mi.reset_to(nullptr, *mi.program().main_vm);
+
+		// XXX: Is this racy? We want to enq the slot with the ref.
+		// We are the sole owner of the slot, so no need for atomics here.
+		auto ref = std::move(slot->prog_ref);
 		// Signal waiters that slot is ready again
-		// If there any waiters, they keep the program referenced
-		mi.program().m_vmqueue.enqueue(slot);
-		// Last action: Unassign program, which can destruct the program
-		slot->prog_ref = nullptr;
+		// If there any waiters, they keep the program referenced (atomically)
+		ref->m_vmqueue.enqueue(slot);
 	}};
 }
 
