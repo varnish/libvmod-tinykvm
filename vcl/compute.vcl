@@ -34,6 +34,9 @@ sub vcl_backend_fetch {
 				"headers": ["Host: filebin.varnish-software.com"]
 			}""");
 	}
+	if (bereq.url == "/avif/bench") {
+		set bereq.backend = compute.program("avif", "");
+	}
 	if (bereq.url == "/gzip") {
 		# Decompress a zlib-compressed asset
 		set bereq.backend = compute.program("inflate", "http://httpbin.org/gzip");

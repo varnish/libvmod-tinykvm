@@ -58,8 +58,9 @@ void MachineInstance::initialize()
 		   This calculation results in a panic when the stack is
 		   below the program and heap. Workaround: Move above.
 		   TOOD: Make sure we have room for it, using memory limits. */
-		auto stack = machine().mmap_allocate(MAIN_STACK_SIZE);
-		machine().set_stack_address(stack + MAIN_STACK_SIZE);
+		const auto stack = machine().mmap_allocate(MAIN_STACK_SIZE);
+		const auto stack_end = stack + MAIN_STACK_SIZE;
+		machine().set_stack_address(stack_end);
 		//printf("Heap BRK: 0x%lX -> 0x%lX\n", machine().heap_address(), machine().heap_address() + tinykvm::Machine::BRK_MAX);
 		//printf("Stack: 0x%lX -> 0x%lX\n", stack, stack + MAIN_STACK_SIZE);
 		// Build stack, auxvec, envp and program arguments
@@ -75,7 +76,7 @@ void MachineInstance::initialize()
 
 		// Global shared memory boundary
 		uint64_t shm_boundary = shared_memory_boundary();
-		if (m_global_shared_memory) shm_boundary = machine().stack_address();
+		if (m_global_shared_memory) shm_boundary = stack_end;
 
 		// Make forkable (with working memory)
 		// TODO: Tenant config variable for storage memory
