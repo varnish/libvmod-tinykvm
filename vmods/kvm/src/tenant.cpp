@@ -162,7 +162,7 @@ void delete_temporary_tenant(VCL_PRIV task,
 }
 
 template <typename It>
-static void configure_group(kvm::TenantGroup& group, const It& obj)
+static void configure_group(const std::string& name, kvm::TenantGroup& group, const It& obj)
 {
 	// All group parameters are treated as optional and can be defined in a
 	// tenant configuration or in a group configuration.
@@ -174,54 +174,70 @@ static void configure_group(kvm::TenantGroup& group, const It& obj)
 	{
 		group.max_req_time = obj.value();
 	}
-	if (obj.key() == "max_storage_time")
+	else if (obj.key() == "max_storage_time")
 	{
 		group.max_req_time = obj.value();
 	}
-	if (obj.key() == "max_memory")
+	else if (obj.key() == "max_memory")
 	{
 		// Limits the memory of the Main VM.
 		group.set_max_memory(obj.value());
 	}
-	if (obj.key() == "max_request_memory")
+	else if (obj.key() == "max_request_memory")
 	{
 		// Limits the memory of an ephemeral VM. Ephemeral VMs are used to handle
 		// requests (and faults in pages one by one using CoW). They are based
 		// off of the bigger Main VMs which use "max_memory" (and are identity-mapped).
 		group.set_max_workmem(obj.value());
 	}
-	if (obj.key() == "req_mem_limit_after_reset")
+	else if (obj.key() == "req_mem_limit_after_reset")
 	{
 		// Limits the memory of an ephemeral VM after request completion.
 		// Without a limit, the request memory is kept in order to make future
 		// requests faster due to not having to create memory banks.
 		group.set_limit_workmem_after_req(obj.value());
 	}
-	if (obj.key() == "shared_memory")
+	else if (obj.key() == "shared_memory")
 	{
 		// Sets the size of shared memory between VMs.
 		// Cannot be larger than half of max memory.
 		group.set_shared_mem(obj.value());
 	}
-	if (obj.key() == "concurrency")
+	else if (obj.key() == "concurrency")
 	{
 		group.max_concurrency = obj.value();
 	}
-	if (obj.key() == "hugepages")
+	else if (obj.key() == "hugepages")
 	{
 		group.hugepages = obj.value();
 	}
-	if (obj.key() == "allow_debug")
+	else if (obj.key() == "allow_debug")
 	{
 		group.allow_debug = obj.value();
 	}
-	if (obj.key() == "allow_make_ephemeral")
+	else if (obj.key() == "allow_make_ephemeral")
 	{
 		group.allow_make_ephemeral = obj.value();
 	}
-	if (obj.key() == "allowed_paths")
+	else if (obj.key() == "allowed_paths")
 	{
 		group.allowed_paths = obj.value().template get<std::vector<std::string>>();
+	}
+	else if (obj.key() == "experimental_do_reset")
+	{
+		group.experimental_do_reset = obj.value();
+	}
+	else if (obj.key() == "group") { /* Silently ignore. */ }
+	else if (obj.key() == "filename") { /* Silently ignore. */ }
+	else if (obj.key() == "uri") { /* Silently ignore. */ }
+	else
+	{
+		VSL(SLT_Error, 0,
+			"vmod_kvm: Unknown configuration key for '%s': %s",
+			name.c_str(), obj.key().c_str());
+		fprintf(stderr,
+			"vmod_kvm: Unknown configuration key for '%s': %s\n",
+			name.c_str(), obj.key().c_str());
 	}
 }
 
@@ -281,7 +297,7 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 
 		// Set/override both group and tenant settings in one place
 		for (auto it = obj.begin(); it != obj.end(); ++it) {
-			configure_group(group, it);
+			configure_group(grname, group, it);
 		}
 
 		// Tenant configuration
@@ -388,7 +404,7 @@ void kvm_init_tenants_str(VRT_CTX, VCL_PRIV task, const char* filename,
 			"vmod_kvm: Exception when loading tenants from string '%s': %s",
 			filename, e.what());
 		fprintf(stderr,
-			"vmod_kvm: Exception when loading tenants from string '%s': %s",
+			"vmod_kvm: Exception when loading tenants from string '%s': %s\n",
 			filename, e.what());
 	}
 }
@@ -407,7 +423,7 @@ int kvm_init_tenants_file(VRT_CTX, VCL_PRIV task, const char* filename, int init
 			"vmod_kvm: Exception when loading tenants from file '%s': %s",
 			filename, e.what());
 		fprintf(stderr,
-			"vmod_kvm: Exception when loading tenants from file '%s': %s",
+			"vmod_kvm: Exception when loading tenants from file '%s': %s\n",
 			filename, e.what());
 		return 0;
 	}
@@ -434,7 +450,7 @@ int kvm_init_tenants_uri(VRT_CTX, VCL_PRIV task, const char* uri, int init)
 				"vmod_kvm: Exception when loading tenants from URI '%s': %s",
 				ftd->url, e.what());
 			fprintf(stderr,
-				"vmod_kvm: Exception when loading tenants from URI '%s': %s",
+				"vmod_kvm: Exception when loading tenants from URI '%s': %s\n",
 				ftd->url, e.what());
 		}
 	}, &ftd);
@@ -452,14 +468,16 @@ void kvm_tenant_configure(VRT_CTX, kvm::TenantInstance* ten, const char* str)
 		const json j = json::parse(jstr.begin(), jstr.end(), nullptr, true, true);
 		/* Iterate through all elements, pass to tenants "group" config. */
 		for (auto it = j.begin(); it != j.end(); ++it) {
-			kvm::configure_group(ten->config.group, it);
+			kvm::configure_group(ten->config.name, ten->config.group, it);
 		}
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
 			"vmod_kvm: Exception when overriding program configuration '%s': %s",
 			ten->config.name.c_str(), e.what());
+		VSL(SLT_Error, 0, "JSON: %s\n", str);
 		fprintf(stderr,
-			"vmod_kvm: Exception when overriding program configuration '%s': %s",
+			"vmod_kvm: Exception when overriding program configuration '%s': %s\n",
 			ten->config.name.c_str(), e.what());
+		fprintf(stderr, "JSON: %s\n", str);
 	}
 }

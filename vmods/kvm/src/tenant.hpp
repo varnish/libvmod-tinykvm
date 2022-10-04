@@ -28,6 +28,7 @@ struct TenantGroup {
 	bool     ephemeral_hugepages = false;
 	bool     allow_debug = false;
 	bool     allow_make_ephemeral = false;
+	bool     experimental_do_reset = true;
 
 	std::vector<std::string> environ {
 		"LC_TYPE=C", "LC_ALL=C", "USER=root"
