@@ -69,7 +69,8 @@ ProgramInstance::ProgramInstance(
 	this->m_binary_was_cached = false;
 	this->m_future = m_main_queue.enqueue(
 	[=] () -> long {
-		return begin_initialization(ctx, ten, debug);
+		begin_initialization(ctx, ten, debug);
+		return 0;
 	});
 }
 ProgramInstance::ProgramInstance(
@@ -101,7 +102,8 @@ ProgramInstance::ProgramInstance(
 
 			/* Blocking cURL fetch, retrieving the program. May
 			   return 304 if the program is newer locally.
-			   TODO: Figure out how trust-worthy stat mtime is. */
+			   TODO: Figure out how trust-worthy stat mtime is.
+			   TODO: Verify binaries against hash? */
 			int res = kvm_curl_fetch(uri.c_str(),
 			[] (void* usr, long status, MemoryStruct* chunk) {
 				auto* data = (CurlData *)usr;
@@ -119,12 +121,12 @@ ProgramInstance::ProgramInstance(
 						std::vector<uint8_t> (chunk->memory, chunk->memory + chunk->size);
 				} else {
 					// Unhandled HTTP status?
-					throw std::runtime_error("");
+					throw std::runtime_error("Fetching program '" + data->ten->config.name + "' failed");
 				}
 			}, &data, ifmodsince.c_str());
 
-			/* XXX: Reset binary when it fails. */
 			if (res != 0) {
+				// XXX: Reset binary when it fails.
 				this->binary = {};
 				this->main_vm = nullptr;
 				this->unlock_and_initialized(false);
@@ -135,22 +137,27 @@ ProgramInstance::ProgramInstance(
 			this->m_binary_was_local = this->m_binary_was_cached;
 
 			/* Initialization phase and request VM forking. */
-			long result = begin_initialization(ctx, ten, debug);
+			begin_initialization(ctx, ten, debug);
 
-			/* Check that the program booted OK. */
-			if (result == 0) {
-				/* Store binary to disk when cURL reports 200 OK. */
-				if (data.status == 200 && !ten->config.filename.empty()) {
-					/* Cannot throw, but reports true/false on write success.
-					   We *DO NOT* care if the write failed. Only a cached binary. */
-					file_writer(ten->config.filename, this->binary);
-				}
+			/* Store binary to disk when cURL reports 200 OK. */
+			if (data.status == 200 && !ten->config.filename.empty()) {
+				/* Cannot throw, but reports true/false on write success.
+					We *DO NOT* care if the write failed. Only a cached binary. */
+				file_writer(ten->config.filename, this->binary);
 			}
 
-			return result;
+			return 0;
 		}
-		catch (...) {
-			/* XXX: Reset binary when it fails. */
+		catch (const std::exception& e) {
+			// Report errors here, because we cannot propagate them further.
+			// Async initialization does not eventually get() the future.
+			VSL(SLT_Error, 0,
+				"kvm: Program '%s' failed initialization: %s",
+					ten->config.name.c_str(), e.what());
+			fprintf(stderr,
+				"kvm: Program '%s' failed initialization: %s\n",
+					ten->config.name.c_str(), e.what());
+			// XXX: Reset binary when it fails.
 			this->binary = {};
 			this->main_vm = nullptr;
 			this->unlock_and_initialized(false);
@@ -158,12 +165,12 @@ ProgramInstance::ProgramInstance(
 		}
 	});
 }
-long ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *ten, bool debug)
+void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *ten, bool debug)
 {
 	try {
 		const size_t max_vms = ten->config.group.max_concurrency;
 		if (max_vms < 1)
-			throw std::runtime_error(ten->config.name + ": Concurrency must be at least 1");
+			throw std::runtime_error("Concurrency must be at least 1");
 
 		TIMING_LOCATION(t0);
 		// Create the master VM, forked later for request concurrency.
@@ -208,14 +215,13 @@ long ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 			this->binary_was_local() ? "local" : "remote",
 			this->binary_was_cached() ? "cached" : "not cached",
 			max_vms, nanodiff(t0, t2) / 1e6);
-		return 0;
 
-	} catch (...) {
-		/* Make sure we signal that there is no program, if the
-			program fails to intialize. */
+	} catch (const std::exception& e) {
+		// Make sure we signal that there is no program, if the
+		// program fails to intialize.
 		main_vm = nullptr;
 		this->unlock_and_initialized(false);
-		return -1;
+		throw;
 	}
 }
 ProgramInstance::~ProgramInstance()

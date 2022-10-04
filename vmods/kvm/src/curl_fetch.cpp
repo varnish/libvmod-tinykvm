@@ -2,6 +2,7 @@
 
 #include <curl/curl.h>
 #include <cstring>
+#include <exception>
 #include <malloc.h>
 #include "varnish.hpp"
 typedef size_t (*write_callback)(char *, size_t, size_t, void *);
@@ -77,7 +78,11 @@ int kvm_curl_fetch(
 			callback(usr, status, &chunk);
 			retvalue = 0;
 		}
-		catch (...) {
+		catch (const std::exception& e) {
+			VSL(SLT_Error, 0,
+				"kvm.curl_fetch(): cURL failed: %s", e.what());
+			fprintf(stderr,
+				"kvm.curl_fetch(): cURL failed: %s\n", e.what());
 			retvalue = -1;
 		}
 	}
