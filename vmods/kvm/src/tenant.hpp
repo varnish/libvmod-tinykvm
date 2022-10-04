@@ -57,10 +57,10 @@ struct TenantConfig
 	using dynfun_map = std::map<uint32_t, ghandler_t>;
 
 	std::string    name;
+	uint32_t       hash;
+	mutable TenantGroup group;
 	std::string    filename;  /* Stored locally here. */
 	std::string    key;
-	uint32_t       hash;
-	TenantGroup    group;
 	std::string    uri;       /* Can be fetched here. */
 
 	float    max_boot_time() const noexcept { return group.max_boot_time; }

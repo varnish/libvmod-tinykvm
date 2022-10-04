@@ -69,9 +69,10 @@ const std::string TenantConfig::guest_state_file = "state";
 
 TenantConfig::TenantConfig(
 	std::string n, std::string f, std::string k,
-	TenantGroup grp, std::string uri, dynfun_map& dfm)
-	: name(std::move(n)), filename(std::move(f)), key(std::move(k)), hash{crc32c_hw(n)},
-	  group{std::move(grp)}, uri(std::move(uri)), dynamic_functions_ref{dfm}
+	TenantGroup grp, std::string uri, dynfun_map &dfm)
+	: name(std::move(n)), hash{crc32c_hw(n)}, group{std::move(grp)},
+	  filename(std::move(f)), key(std::move(k)),
+	  uri(std::move(uri)), dynamic_functions_ref{dfm}
 {
 	this->allowed_file = filename + ".state";
 }
@@ -160,6 +161,70 @@ void delete_temporary_tenant(VCL_PRIV task,
 		"Could not delete temporary tenant: " + ten->config.name);
 }
 
+template <typename It>
+static void configure_group(kvm::TenantGroup& group, const It& obj)
+{
+	// All group parameters are treated as optional and can be defined in a
+	// tenant configuration or in a group configuration.
+	if (obj.key() == "max_boot_time")
+	{
+		group.max_boot_time = obj.value();
+	}
+	else if (obj.key() == "max_request_time")
+	{
+		group.max_req_time = obj.value();
+	}
+	if (obj.key() == "max_storage_time")
+	{
+		group.max_req_time = obj.value();
+	}
+	if (obj.key() == "max_memory")
+	{
+		// Limits the memory of the Main VM.
+		group.set_max_memory(obj.value());
+	}
+	if (obj.key() == "max_request_memory")
+	{
+		// Limits the memory of an ephemeral VM. Ephemeral VMs are used to handle
+		// requests (and faults in pages one by one using CoW). They are based
+		// off of the bigger Main VMs which use "max_memory" (and are identity-mapped).
+		group.set_max_workmem(obj.value());
+	}
+	if (obj.key() == "req_mem_limit_after_reset")
+	{
+		// Limits the memory of an ephemeral VM after request completion.
+		// Without a limit, the request memory is kept in order to make future
+		// requests faster due to not having to create memory banks.
+		group.set_limit_workmem_after_req(obj.value());
+	}
+	if (obj.key() == "shared_memory")
+	{
+		// Sets the size of shared memory between VMs.
+		// Cannot be larger than half of max memory.
+		group.set_shared_mem(obj.value());
+	}
+	if (obj.key() == "concurrency")
+	{
+		group.max_concurrency = obj.value();
+	}
+	if (obj.key() == "hugepages")
+	{
+		group.hugepages = obj.value();
+	}
+	if (obj.key() == "allow_debug")
+	{
+		group.allow_debug = obj.value();
+	}
+	if (obj.key() == "allow_make_ephemeral")
+	{
+		group.allow_make_ephemeral = obj.value();
+	}
+	if (obj.key() == "allowed_paths")
+	{
+		group.allowed_paths = obj.value().template get<std::vector<std::string>>();
+	}
+}
+
 static void init_tenants(VRT_CTX, VCL_PRIV task,
 	const std::string_view json_strview, const char* source, bool initialize)
 {
@@ -213,53 +278,12 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			grit = ret.first;
 		}
 		auto& group = grit->second;
-		// All group parameters are treated as optional and can be defined in a
-		// tenant configuration or in a group configuration.
-		if (obj.contains("max_boot_time")) {
-			group.max_boot_time = obj["max_boot_time"];
+
+		// Set/override both group and tenant settings in one place
+		for (auto it = obj.begin(); it != obj.end(); ++it) {
+			configure_group(group, it);
 		}
-		if (obj.contains("max_request_time")) {
-			group.max_req_time = obj["max_request_time"];
-		}
-		if (obj.contains("max_storage_time")) {
-			group.max_req_time = obj["max_storage_time"];
-		}
-		if (obj.contains("max_memory")) {
-			// Limits the memory of the Main VM.
-			group.set_max_memory(obj["max_memory"]);
-		}
-		if (obj.contains("max_request_memory")) {
-			// Limits the memory of an ephemeral VM. Ephemeral VMs are used to handle
-			// requests (and faults in pages one by one using CoW). They are based
-			// off of the bigger Main VMs which use "max_memory" (and are identity-mapped).
-			group.set_max_workmem(obj["max_request_memory"]);
-		}
-		if (obj.contains("req_mem_limit_after_reset")) {
-			// Limits the memory of an ephemeral VM after request completion.
-			// Without a limit, the request memory is kept in order to make future
-			// requests faster due to not having to create memory banks.
-			group.set_limit_workmem_after_req(obj["req_mem_limit_after_reset"]);
-		}
-		if (obj.contains("shared_memory")) {
-			// Sets the size of shared memory between VMs.
-			// Cannot be larger than half of max memory.
-			group.set_shared_mem(obj["shared_memory"]);
-		}
-		if (obj.contains("concurrency")) {
-			group.max_concurrency = obj["concurrency"];
-		}
-		if (obj.contains("hugepages")) {
-			group.hugepages = obj["hugepages"];
-		}
-		if (obj.contains("allow_debug")) {
-			group.allow_debug = obj["allow_debug"];
-		}
-		if (obj.contains("allow_make_ephemeral")) {
-			group.allow_make_ephemeral = obj["allow_make_ephemeral"];
-		}
-		if (obj.contains("allowed_paths")) {
-			group.allowed_paths = obj["allowed_paths"].get<std::vector<std::string>>();
-		}
+
 		// Tenant configuration
 		if (obj.contains("group"))
 		{
@@ -415,4 +439,27 @@ int kvm_init_tenants_uri(VRT_CTX, VCL_PRIV task, const char* uri, int init)
 		}
 	}, &ftd);
 	return (res == 0);
+}
+
+extern "C"
+void kvm_tenant_configure(VRT_CTX, kvm::TenantInstance* ten, const char* str)
+{
+	(void)ctx;
+	/* Override program configuration from a JSON string. */
+	try {
+		const std::string_view jstr { str, __builtin_strlen(str) };
+		/* Parse JSON with comments enabled. */
+		const json j = json::parse(jstr.begin(), jstr.end(), nullptr, true, true);
+		/* Iterate through all elements, pass to tenants "group" config. */
+		for (auto it = j.begin(); it != j.end(); ++it) {
+			kvm::configure_group(ten->config.group, it);
+		}
+	} catch (const std::exception& e) {
+		VSL(SLT_Error, 0,
+			"vmod_kvm: Exception when overriding program configuration '%s': %s",
+			ten->config.name.c_str(), e.what());
+		fprintf(stderr,
+			"vmod_kvm: Exception when overriding program configuration '%s': %s",
+			ten->config.name.c_str(), e.what());
+	}
 }

@@ -27,13 +27,29 @@ VCL_BOOL vmod_library(VRT_CTX, VCL_PRIV task, VCL_STRING uri)
 	return (kvm_init_tenants_uri(ctx, task, uri, NO_INIT_PROGRAMS));
 }
 
+VCL_BOOL vmod_configure(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_STRING json)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	if (json == NULL || json[0] == 0) {
+		VRT_fail(ctx, "No configuration provided for '%s'", program);
+		return (0);
+	}
+
+	struct vmod_kvm_tenant *tenant = kvm_tenant_find(task, program);
+	if (tenant != NULL) {
+		return (kvm_tenant_configure(ctx, tenant, json));
+	} else {
+		VRT_fail(ctx, "No such program '%s' for configure", program);
+		return (0);
+	}
+}
+
 VCL_BOOL vmod_start(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_BOOL async)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	(void) async;
 
 	struct vmod_kvm_tenant *tenant = kvm_tenant_find(task, program);
-
 	if (tenant != NULL) {
 		return (kvm_tenant_async_start(ctx, tenant));
 	} else {

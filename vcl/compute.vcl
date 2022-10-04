@@ -14,13 +14,16 @@ sub vcl_init {
 	# Download and activate a Varnish-provided library of compute programs.
 	# A full list of programs and how they can be used would be on the docs site.
 	compute.library("https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/compute.json");
+	# Configure program 'fetch' with some overriding settings
+	compute.configure("avif", """{
+		"max_memory": 24 /* MBytes */
+	}""");
 	# Start the AVIF transcoder, but don't delay Varnish startup.
 	compute.start("avif");
 	#compute.start("fetch");
 	#compute.start("inflate");
 	compute.start("minimal");
 	#compute.start("zstd");
-	#compute.set_concurrency("avif", 64, 20);
 }
 sub vcl_recv {
 	return (pass);
