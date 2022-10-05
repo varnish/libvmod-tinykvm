@@ -228,8 +228,9 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		group.experimental_do_reset = obj.value();
 	}
 	else if (obj.key() == "group") { /* Silently ignore. */ }
+	else if (obj.key() == "key")   { /* Silently ignore. */ }
+	else if (obj.key() == "uri")   { /* Silently ignore. */ }
 	else if (obj.key() == "filename") { /* Silently ignore. */ }
-	else if (obj.key() == "uri") { /* Silently ignore. */ }
 	else
 	{
 		VSL(SLT_Error, 0,
