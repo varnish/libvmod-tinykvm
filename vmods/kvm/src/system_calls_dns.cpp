@@ -17,17 +17,17 @@ union sys_adns_rules {
 	uint64_t reg;
 
 	adns_rules to_rules() const {
-		if (UNLIKELY(e.ipv >= ADNS_IPV_LAST))
+		if (UNLIKELY(e.ipv >= ADNS_IPV__LAST))
 			throw std::runtime_error("Invalid ADNS IPV value");
-		if (UNLIKELY(e.ttl >= ADNS_TTL_LAST))
+		if (UNLIKELY(e.ttl >= ADNS_TTL__LAST))
 			throw std::runtime_error("Invalid ADNS TTL value");
-		if (UNLIKELY(e.port >= ADNS_PORT_LAST))
+		if (UNLIKELY(e.port >= ADNS_PORT__LAST))
 			throw std::runtime_error("Invalid ADNS PORT value");
-		if (UNLIKELY(e.mode >= ADNS_MODE_LAST))
+		if (UNLIKELY(e.mode >= ADNS_MODE__LAST))
 			throw std::runtime_error("Invalid ADNS MODE value");
-		if (UNLIKELY(e.update >= ADNS_UPDATE_LAST))
+		if (UNLIKELY(e.update >= ADNS_UPDATE__LAST))
 			throw std::runtime_error("Invalid ADNS UPDATE value");
-		if (UNLIKELY(e.nsswitch >= ADNS_NSSWITCH_LAST))
+		if (UNLIKELY(e.nsswitch >= ADNS_NSSWITCH__LAST))
 			throw std::runtime_error("Invalid ADNS NSSWITCH value");
 		return adns_rules {
 			.magic = ADNS_RULES_MAGIC,
