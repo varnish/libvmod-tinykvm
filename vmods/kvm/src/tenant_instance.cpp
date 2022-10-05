@@ -204,6 +204,7 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 			}
 
 			// Reserve a machine through blocking queue.
+			// May throw if dequeue from the queue times out.
 			Reservation resv = prog->reserve_vm(ctx, this, std::move(prog));
 			// prog is nullptr after this ^
 

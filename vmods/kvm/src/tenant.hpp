@@ -16,6 +16,7 @@ struct TenantGroup {
 	float    max_boot_time; /* Seconds */
 	float    max_req_time; /* Seconds */
 	float    max_storage_time; /* Seconds */
+	uint32_t max_queue_time; /* Seconds */
 	uint64_t max_main_memory; /* Megabytes */
 	uint32_t max_req_mem; /* Megabytes */
 	uint32_t limit_req_mem; /* Megabytes of memory banks to keep after request completion */
@@ -46,6 +47,7 @@ struct TenantGroup {
 		  max_boot_time(STARTUP_TIMEOUT),
 		  max_req_time(REQUEST_VM_TIMEOUT),
 		  max_storage_time(STORAGE_TIMEOUT),
+		  max_queue_time(RESV_QUEUE_TIMEOUT),
 		  max_main_memory(MAIN_MEMORY_SIZE * 1048576ul),
 		  max_req_mem(REQUEST_MEMORY_SIZE * 1048576ul),
 		  shared_memory(SHARED_MEMORY_SIZE)

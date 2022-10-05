@@ -10,6 +10,7 @@ namespace kvm
     static constexpr size_t SHARED_MEMORY_SIZE = 1; /* 1MB */
     static constexpr float  STARTUP_TIMEOUT = 16.0f;
 
+    static constexpr uint32_t RESV_QUEUE_TIMEOUT = 60; /* Seconds */
     static constexpr size_t REQUEST_MEMORY_SIZE = 64; /* 64MB */
     static constexpr int    REQUEST_VM_NICE = 10;
     static constexpr float  REQUEST_VM_TIMEOUT = 4.0f;

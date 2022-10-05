@@ -270,10 +270,13 @@ void ProgramInstance::set_entry_at(const int idx, gaddr_t addr)
 }
 
 Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
-	TenantInstance*, std::shared_ptr<ProgramInstance> prog)
+	TenantInstance* ten, std::shared_ptr<ProgramInstance> prog)
 {
+	const auto tmo = std::chrono::seconds(ten->config.group.max_queue_time);
 	VMPoolItem* slot = nullptr;
-	m_vmqueue.wait_dequeue(slot);
+	if (UNLIKELY(!m_vmqueue.wait_dequeue_timed(slot, tmo))) {
+		throw std::runtime_error("Queue timeout");
+	}
 	assert(slot && ctx);
 
 	/* Set the new active VRT CTX. */
