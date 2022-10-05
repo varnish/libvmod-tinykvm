@@ -64,6 +64,7 @@ target_include_directories(varnishapi PUBLIC ${CMAKE_BINARY_DIR}/libvarnish)
 # build libvarnishapi.so into the top binary folder
 set_target_properties(varnishapi
 	PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+	SOVERSION 1
 )
 if (LIBFUZZER)
 	target_link_libraries(varnishapi PUBLIC "${FUZZER_LFLAGS}")
