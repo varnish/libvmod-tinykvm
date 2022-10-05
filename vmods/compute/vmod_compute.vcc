@@ -4,14 +4,16 @@ DESCRIPTION
 ===========
 
 vmod_compute allows using libraries of sandboxed programs to
-safely transform data without having to worry about security
-issues. Programs are loaded as-needed and can be swapped out
-at any time.
+safely communicate with other systems, retrieve and transform data
+without having to worry about security and integrity issues.
+Programs are loaded as-needed and can be individually configured to
+meet the specific needs of each Varnish cache server.
 
-Each program provided by the library is ready-to-use. Each
-program has a specific purpose and comes with a simple explanation
-of what it does, and what JSON configuration should be provided
-to make the program perform a given function.
+Each program provided by the library is ready-to-use, and will often
+have one single purpose. Programs are documented on the Varnish Software
+docs website and comes with a simple explanation of what it does, and
+what JSON configuration should be provided to make the program perform
+a given function.
 
 
 LIBRARY
@@ -26,19 +28,23 @@ the VCL writer to tailor the program to his needs.
 See http://compute.varnish-software.com for a list of official programs.
 
 Example:
-	set bereq.backend = compute.backend("avif",
-		"https://backend2.myorg.co.uk/assets/" + bereq.url);
+	sub vcl_init {
+		new vafb = activedns.dns_group();
+		vafb.set_host("filebin.varnish-software.com");
+	}
 
-	The avif program will transcode a valid JPEG to AVIF, or if it fails,
-	deliver the original JPEG instead. The program will fetch the image from the
-	argument URL, and then transcode it. You can use any valid URL that can be
-	fetched with cURL, such as FTP, HTTPS and local files with
-	file:///home/user/file.
+	sub vcl_backend_fetch {
+		set bereq.backend = compute.backend("avif",
+			"https://${vafb}/images/" + bereq.url);
+	}
 
-	The JSON configuration for each officially supported program uses a common
-	scheme between all programs in order to make advanced DNS configuration easy.
-	Each parameter in the DNS configuration is named and works exactly like in
-	the Goto VMOD, and uses the same source for DNS.
+	The avif program will fetch a JPEG file from a backend, transcode it to the
+	AVIF image format, or if it fails, deliver the original JPEG instead. Then
+	send it the requesting client(s). You can use any valid URL that can be
+	fetched with cURL, such as FTP, HTTPS and local files.
+
+	DNS configuration can be handled using ActiveDNS, and uses the ${name} string-
+	interpolation method.
 
 
 API
@@ -50,17 +56,21 @@ $Function BOOL library(PRIV_VCL, STRING uri)
 
 - Load library of programs that is pre-installed with Varnish Enterprise.
 - All programs are retrieved, but are started only on-demand.
+- Must be called from vcl_init.
 
 $Function BOOL configure(PRIV_VCL, STRING program, STRING json)
 
 - Provide a JSON configuration to override defaults to unstarted programs.
+- Must be called from vcl_init.
 
 $Function BOOL start(PRIV_VCL, STRING program, BOOL async = 1)
 
 - Start program during early Varnish startup.
 - When async, program intialization will not delay Varnish from starting up.
+- Must be called from vcl_init.
 
 $Function BACKEND program(PRIV_VCL, STRING program, STRING arg, STRING config = "")
 
 - Returns a backend that will call the given program to produce a response.
 - Supports GET and POST requests.
+- Must be called from vcl_backend_fetch.
