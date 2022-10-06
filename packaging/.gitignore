@@ -1,4 +1,5 @@
 *.deb
 *.tar.xz
 varnish-compute_1.0-*
-varnish-compute/debian/varnish-compute1/
+varnish-compute/debian/varnish-compute0/
+varnish-compute/debian/varnish-compute0.substvars

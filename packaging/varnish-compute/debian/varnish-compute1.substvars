@@ -1,3 +1,0 @@
-shlibs:Depends=libc6 (>= 2.34), libcurl4 (>= 7.16.2), libgcc-s1 (>= 3.0), libstdc++6 (>= 12), varnish-plus
-misc:Depends=
-misc:Pre-Depends=

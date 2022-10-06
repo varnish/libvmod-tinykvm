@@ -17,9 +17,9 @@ Rules-Requires-Root: no
 #Description: Compute VMOD for Varnish Plus
 # <insert long description, indented with spaces>
 
-Package: varnish-compute1
-Architecture: any
+Package: varnish-compute0
+Architecture: amd64
 Multi-Arch: same
-Depends: ${shlibs:Depends}, ${misc:Depends}
+#Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Compute VMOD for Varnish Plus
  <insert long description, indented with spaces>
