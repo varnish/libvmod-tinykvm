@@ -21,7 +21,16 @@ set (SOURCES
 	${LIBPATH}/libvarnish/vtim.c
 )
 
-add_library(adns SHARED ${SOURCES} ${VSC_COMPILED})
-target_include_directories(adns PUBLIC ${VARNISH_PATH}/include/adns) # Why?
-target_link_libraries(adns PUBLIC vapi_static resolv)
-set_property(TARGET adns PROPERTY POSITION_INDEPENDENT_CODE 1)
+if (VMOD_RELEASE_BUILD)
+	# Import from release-installation (globally)
+	add_library(adns SHARED IMPORTED GLOBAL)
+	set_target_properties(adns PROPERTIES IMPORTED_LOCATION "/usr/lib/varnish-plus/libadns.so")
+	target_include_directories(adns INTERFACE ${VARNISH_PATH}/include/adns)
+else()
+	# Build internally (always global)
+	add_library(adns SHARED ${SOURCES} ${VSC_COMPILED})
+	target_link_libraries(adns PUBLIC vapi_static resolv)
+	set_property(TARGET adns PROPERTY POSITION_INDEPENDENT_CODE 1)
+	target_include_directories(adns PUBLIC ${VARNISH_PATH}/include/adns)
+endif()
+

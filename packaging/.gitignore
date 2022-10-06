@@ -1,0 +1,4 @@
+*.deb
+*.tar.xz
+varnish-compute_1.0-*
+varnish-compute/debian/varnish-compute1/

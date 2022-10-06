@@ -23,5 +23,8 @@ option(USE_MOLD     "Always link with MOLD" OFF)
 option(SINGLE_PROCESS "Disable fork() and run in single-process mode" OFF)
 option(WORKSPACE_EMULATOR "Replace workspace with checked emulator" OFF)
 
+# Enabling this forces usage of release binaries in /usr/lib/varnish-plus:
+option(VMOD_RELEASE_BUILD "Build with Varnish release packages" OFF)
+
 enable_testing()
 add_subdirectory(cmake)

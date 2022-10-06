@@ -1,0 +1,25 @@
+Source: varnish-compute
+Priority: optional
+Maintainer: Gonzo <fwsgonzo@hotmail.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.0
+Section: libs
+Homepage: docs.varnish-software.com
+#Vcs-Browser: https://salsa.debian.org/debian/varnish-compute
+#Vcs-Git: https://salsa.debian.org/debian/varnish-compute.git
+Rules-Requires-Root: no
+
+#Package: varnish-compute-dev
+#Section: libdevel
+#Architecture: any
+#Multi-Arch: same
+#Depends: varnish-compute0 (= ${binary:Version}), ${misc:Depends}
+#Description: Compute VMOD for Varnish Plus
+# <insert long description, indented with spaces>
+
+Package: varnish-compute1
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Compute VMOD for Varnish Plus
+ <insert long description, indented with spaces>
