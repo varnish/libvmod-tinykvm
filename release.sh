@@ -1,4 +1,5 @@
 # cmake .. -DKVM_ADNS=ON -DOVERRIDE_VMOD_API="Varnish Plus 6.0.10r1 46f744d2ab5e7c30737dfcf8bbe823b01341efe8"
+VMOD_API="Varnish Plus 6.0.10r3 4f67b6ec0d63f04560913cc7e195a3919bdf0366"
 
 # python3
 # libbrotli-dev libpcre3-dev
@@ -24,9 +25,12 @@ popd
 pushd build_rlinux9
 distrobox enter rockylinux-9 -- bash -c "\"make -j4 vmod_kvm\""
 popd
-pushd build_ubuntu22
+pushd build_ubuntu20
 distrobox enter ubuntu -- bash -c "\"ninja vmod_kvm\""
 popd
+#pushd build_ubuntu22
+#distrobox enter ubuntu -- bash -c "\"ninja vmod_kvm\""
+#popd
 
 cp build_alpine/libvmod_kvm.so ~/vcp6-kvm/vmod/alpine
 cp build_debian10/libvmod_kvm.so ~/vcp6-kvm/vmod/debian-10
@@ -34,5 +38,5 @@ cp build_debian11/libvmod_kvm.so ~/vcp6-kvm/vmod/debian-11
 cp build_fedora/libvmod_kvm.so ~/vcp6-kvm/vmod/fedora-36
 cp build_rlinux8/libvmod_kvm.so ~/vcp6-kvm/vmod/rocky-8
 cp build_rlinux9/libvmod_kvm.so ~/vcp6-kvm/vmod/rocky-9
-cp build/libvmod_kvm.so ~/vcp6-kvm/vmod/ubuntu-20
-cp build_ubuntu22/libvmod_kvm.so ~/vcp6-kvm/vmod/ubuntu-22
+cp build_ubuntu20/libvmod_kvm.so ~/vcp6-kvm/vmod/ubuntu-20
+cp build/libvmod_kvm.so ~/vcp6-kvm/vmod/ubuntu-22

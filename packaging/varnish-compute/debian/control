@@ -1,7 +1,7 @@
 Source: varnish-compute
 Priority: optional
 Maintainer: Gonzo <fwsgonzo@hotmail.com>
-Build-Depends: debhelper-compat (= 13)
+Build-Depends: debhelper-compat (= 12)
 Standards-Version: 4.6.0
 Section: libs
 Homepage: docs.varnish-software.com

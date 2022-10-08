@@ -1,5 +1,8 @@
 *.deb
+*.ddeb
 *.tar.xz
+.debhelper/
 varnish-compute_1.0-*
 varnish-compute/debian/varnish-compute0/
 varnish-compute/debian/varnish-compute0.substvars
+varnish-compute/usr/lib/varnish-plus/vmods
