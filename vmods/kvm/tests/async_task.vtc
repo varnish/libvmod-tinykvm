@@ -13,7 +13,7 @@ static void my_task(void *arg)
 	__sync_fetch_and_add(&counter, 1);
 }
 
-static void on_get(const char *url)
+static void on_get(const char *url, const char* arg)
 {
 	static const char ctype[] = "text/plain";
 
@@ -51,7 +51,6 @@ vcl 4.1;
 		kvm.embed_tenants("""{
 			"xpizza.com": {
 				"filename": "${tmpdir}/${testname}",
-				"key": "",
 				"group": "test"
 			}
 		}""");

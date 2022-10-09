@@ -168,7 +168,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 			if (UNLIKELY(vm_entry_addr == 0x0))
 				throw std::runtime_error("The GET callback has not been registered");
 			vm.timed_reentry(vm_entry_addr,
-				ERROR_HANDLING_TIMEOUT, vkb->funcarg[0], exception);
+				ERROR_HANDLING_TIMEOUT, vkb->inputs.url, exception);
 
 			/* Make sure no SMP work is in-flight. */
 			vm.smp_wait();
@@ -227,8 +227,8 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 		auto fut = slot->tp.enqueue(
 		[&] {
 			if constexpr (VERBOSE_BACKEND) {
-				printf("Begin backend %s %s (arg=%s)\n", (post == nullptr) ? "GET" : "POST",
-					vkb->funcarg[0], vkb->funcarg[1]);
+				printf("Begin backend %s %s (arg=%s)\n", vkb->inputs.method,
+					vkb->inputs.url, vkb->inputs.argument);
 			}
 			kvm_ts(ctx->vsl, "ProgramCall", t_work, t_prev, VTIM_real());
 			/* Enforce that guest program calls the backend_response system call. */
@@ -245,10 +245,10 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					throw std::runtime_error("The GET callback has not been registered");
 				if (machine.is_ephemeral()) {
 					/* Call into VM doing a full pagetable/cache flush. */
-					vm.timed_vmcall(vm_entry_addr, timeout, vkb->funcarg[0], vkb->funcarg[1]);
+					vm.timed_vmcall(vm_entry_addr, timeout, vkb->inputs.url, vkb->inputs.argument);
 				} else {
 					/* Call into VM without flushing anything. */
-					vm.timed_reentry(vm_entry_addr, timeout, vkb->funcarg[0], vkb->funcarg[1]);
+					vm.timed_reentry(vm_entry_addr, timeout, vkb->inputs.url, vkb->inputs.argument);
 				}
 			} else {
 				/* Try to reduce POST mmap allocation */
@@ -258,8 +258,8 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				if (UNLIKELY(vm_entry_addr == 0x0))
 					throw std::runtime_error("The POST callback has not been registered");
 				vm.timed_vmcall(vm_entry_addr,
-					timeout, vkb->funcarg[0],
-					(uint64_t) post->address, (uint64_t) post->length, vkb->funcarg[1]);
+					timeout, vkb->inputs.url, vkb->inputs.argument,
+					(uint64_t)post->address, (uint64_t)post->length);
 			}
 			kvm_ts(ctx->vsl, "ProgramResponse", t_work, t_prev, VTIM_real());
 
@@ -267,7 +267,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			vm.smp_wait();
 
 			if constexpr (VERBOSE_BACKEND) {
-				printf("Finish backend GET %s\n", vkb->funcarg[0]);
+				printf("Finish backend GET %s\n", vkb->inputs.url);
 			}
 			/* Verify response and fill out result struct. */
 			fetch_result(slot, machine, result);
@@ -329,12 +329,12 @@ int kvm_backend_streaming_post(struct backend_post *post,
 				const auto timeout = mi.max_req_time();
 				if (post->length == 0) {
 					vm.timed_vmcall(call_addr, timeout,
-						post->argument,
+						post->inputs.url, post->inputs.argument,
 						(uint64_t)post->address, (uint64_t)data_len,
 						(uint64_t)post->length);
 				} else {
 					vm.timed_reentry(call_addr, timeout,
-						post->argument,
+						post->inputs.url, post->inputs.argument,
 						(uint64_t)post->address, (uint64_t)data_len,
 						(uint64_t)post->length);
 				}

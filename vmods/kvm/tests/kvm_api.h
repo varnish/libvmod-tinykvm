@@ -45,16 +45,15 @@ extern void register_func(int, ...);
  *
  * Register callbacks for various modes of operation:
  **/
-static inline void set_backend_get(void(*f)(const char *url)) { register_func(1, f); }
-static inline void set_backend_get2(void(*f)(const char *url, const char *arg)) { register_func(1, f); }
-static inline void set_backend_post(void(*f)(const char *url, const uint8_t*, size_t)) { register_func(2, f); }
+static inline void set_backend_get(void(*f)(const char *url, const char *arg)) { register_func(1, f); }
+static inline void set_backend_post(void(*f)(const char *url, const char *arg, const uint8_t*, size_t)) { register_func(2, f); }
 
 /* Streaming POST will receive each data segment as they arrive. A final POST
    call happens at the end. This call needs some further improvements, because
    right now Varnish will fill the VM with the whole POST data no matter what,
    but call the streaming POST callback on each segment. Instead, it should put
    each segment on stack and the callee may choose to build a complete buffer. */
-static inline void set_backend_stream_post(long(*f)(const char *url, const uint8_t *data, size_t len, size_t off)) { register_func(3, f); }
+static inline void set_backend_stream_post(long(*f)(const char *url, const char *arg, const uint8_t *, size_t len, size_t off)) { register_func(3, f); }
 
 /* When uploading a new program, there is an opportunity to pass on
    state to the next program, using the live update and restore callbacks. */

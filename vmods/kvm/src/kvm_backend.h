@@ -8,13 +8,20 @@ struct VMBuffer {
 };
 struct vsl_log;
 
+struct vmod_kvm_inputs
+{
+	const char *method;
+	const char *url;
+	const char *argument;
+};
+
 struct vmod_kvm_backend
 {
 	uint64_t magic;
 	struct director *dir;
 
 	struct vmod_kvm_tenant *tenant;
-	const char *funcarg[2];
+	struct vmod_kvm_inputs inputs;
 	int debug;
 	uint64_t max_response_size;
 	const struct director* backend;
@@ -51,5 +58,5 @@ struct backend_post {
 	uint64_t address;
 	uint64_t capacity;
 	size_t length;
-	const char *argument;
+	struct vmod_kvm_inputs inputs;
 };

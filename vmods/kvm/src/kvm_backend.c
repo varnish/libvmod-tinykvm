@@ -166,9 +166,10 @@ kvmbe_gethdrs(const struct director *dir,
 	kvm_ts(ctx.vsl, "TenantReserve", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
 
 	struct backend_post *post = NULL;
+	kvmr->inputs.method = bo->bereq->hd[0].b;
 	/* The HTTP method is stored in the first header field.
 	   We may want to change the API, passing the method as argument. */
-	const bool is_post = strcmp(bo->bereq->hd[0].b, "POST") == 0;
+	const bool is_post = strcmp(kvmr->inputs.method, "POST") == 0;
 	if (is_post)
 	{
 		/* Retrieve body by copying directly into backend VM. */
@@ -182,7 +183,7 @@ kvmbe_gethdrs(const struct director *dir,
 		post->address = kvm_allocate_memory(slot, POST_BUFFER); /* Buffer bytes */
 		post->capacity = POST_BUFFER;
 		post->length  = 0;
-		post->argument = kvmr->funcarg[0];
+		post->inputs = kvmr->inputs;
 		int ret = kvm_get_body(post, bo);
 		if (ret < 0) {
 			VSLb(ctx.vsl, SLT_Error, "KVM: Unable to aggregate POST data");
@@ -264,6 +265,15 @@ static void init_director(VRT_CTX, struct vmod_kvm_backend *kvmr)
 	dir->finish  = kvmbe_finish;
 	dir->panic   = kvmbe_panic;
 }
+static void init_kvmr(struct vmod_kvm_backend *kvmr,
+	const char *url, const char *arg)
+{
+	INIT_OBJ(kvmr, KVM_BACKEND_MAGIC);
+	kvmr->t_work = VTIM_real();
+	kvmr->inputs.method = "";
+	kvmr->inputs.url = url ? url : "";
+	kvmr->inputs.argument = arg ? arg : "";
+}
 
 void vmod_kvm_set_kvmr_backend(struct director *dir, VCL_BACKEND backend)
 {
@@ -290,8 +300,7 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 		return (NULL);
 	}
 
-	INIT_OBJ(kvmr, KVM_BACKEND_MAGIC);
-	kvmr->t_work = VTIM_real();
+	init_kvmr(kvmr, url, arg);
 
 	/* Lookup internal tenant using VCL task */
 	kvmr->tenant = kvm_tenant_find(task, tenant);
@@ -299,11 +308,6 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 		VRT_fail(ctx, "KVM: Tenant not found: %s", tenant);
 		return (NULL);
 	}
-
-	kvmr->funcarg[0] = url ? url : "";
-	kvmr->funcarg[1] = arg ? arg : "";
-	kvmr->debug = 0;
-	kvmr->max_response_size = 0;
 
 	init_director(ctx, kvmr);
 	return (kvmr->dir);
@@ -328,8 +332,8 @@ VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
 		return (NULL);
 	}
 
-	INIT_OBJ(kvmr, KVM_BACKEND_MAGIC);
-	kvmr->t_work = VTIM_real();
+	init_kvmr(kvmr, url, arg);
+	kvmr->debug = 1;
 
 	/* Lookup internal tenant using VCL task */
 	kvmr->tenant = kvm_tenant_find_key(task, tenant, key);
@@ -341,11 +345,6 @@ VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
 		VRT_fail(ctx, "KVM: Tenant not allowed to live-debug: %s", tenant);
 		return (NULL);
 	}
-
-	kvmr->funcarg[0] = url ? url : "";
-	kvmr->funcarg[1] = arg ? arg : "";
-	kvmr->debug = 1;
-	kvmr->max_response_size = 0;
 
 	init_director(ctx, kvmr);
 	return (kvmr->dir);

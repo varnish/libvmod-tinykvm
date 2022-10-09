@@ -1,6 +1,8 @@
+set -e
 
 # Ubuntu 22.04:
 pushd varnish-compute
+mkdir -p usr/lib/varnish-plus
 pushd usr/lib/varnish-plus
 ln -fs ../../../../../build_compute .
 rm -f vmods
