@@ -11,15 +11,19 @@ set (SOURCES
 	${LIBPATH}/libadns/adns_search.c
 	${LIBPATH}/libadns/adns_store.c
 	${LIBPATH}/libadns/adns_utils.c
-	# Giga-hack to compile portions of libvarnish with fPIC
-	${LIBPATH}/libvarnish/version.c
-	${LIBPATH}/libvarnish/vas.c
-	${LIBPATH}/libvarnish/vct.c
-	${LIBPATH}/libvarnish/vjsn.c
-	${LIBPATH}/libvarnish/vrnd.c
-	${LIBPATH}/libvarnish/vsa.c
-	${LIBPATH}/libvarnish/vtim.c
 )
+if (GIGAHACK)
+	# Giga-hack to compile portions of libvarnish with fPIC
+	list(APPEND
+		${LIBPATH}/libvarnish/version.c
+		${LIBPATH}/libvarnish/vas.c
+		${LIBPATH}/libvarnish/vct.c
+		${LIBPATH}/libvarnish/vjsn.c
+		${LIBPATH}/libvarnish/vrnd.c
+		${LIBPATH}/libvarnish/vsa.c
+		${LIBPATH}/libvarnish/vtim.c
+	)
+endif()
 
 if (VMOD_RELEASE_BUILD)
 	# Import from release-installation (globally)
@@ -33,4 +37,3 @@ else()
 	set_property(TARGET adns PROPERTY POSITION_INDEPENDENT_CODE 1)
 	target_include_directories(adns PUBLIC ${VARNISH_PATH}/include/adns)
 endif()
-
