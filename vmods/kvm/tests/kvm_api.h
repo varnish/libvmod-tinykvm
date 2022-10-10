@@ -3,7 +3,7 @@
  * @author Alf-André Walla (fwsgonzo@hotmail.com)
  * @brief 
  * @version 0.1
- * @date 2022-08-09
+ * @date 2022-10-10
  * 
  * Single-source-of-truth API header for the KVM VMOD. Languages can
  * use the C API directly, or indirectly through API-generation based on

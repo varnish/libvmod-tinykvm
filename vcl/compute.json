@@ -30,8 +30,9 @@
         "group": "compute",
         "uri": "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/minimal",
         "filename": "/tmp/compute_minimal",
-        "max_memory": 12,
-        "max_request_memory": 4,
+        "experimental_do_reset": false,
+        "max_memory": 11,
+        "max_request_memory": 3,
         "concurrency": 16
     },
     "zstd": {
