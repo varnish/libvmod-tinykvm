@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-static const uint64_t POST_BUFFER = (1UL << 28); /* 256MB */
+static const uint64_t POST_BUFFER = (1UL << 29); /* 512MB */
 
 struct VMBuffer {
 	const char *data;

@@ -3,9 +3,9 @@
  * @author Alf-André Walla (fwsgonzo@hotmail.com)
  * @brief Callbacks for Varnish POST body aggregation.
  * @version 0.1
- * @date 2022-07-23
+ * @date 2022-10-10
  * 
- * Routines for retrieving POST bodies either all at once, or
+ * Routines for retrieving request bodies either all at once, or
  * in parts (streaming POST).
  * 
  */
@@ -25,12 +25,13 @@ kvm_get_aggregate_body(void *priv, int flush, int last, const void *ptr, ssize_t
 {
 	struct backend_post *post = (struct backend_post *)priv;
 	(void)flush;
+	(void)last;
 
 	/* We will want to call backend stream once per segment, and not
 	   finally with len=0 and last=1. Instead we can use the on_post
 	   callback to trigger any finishing logic. The on_post callback
 	   will get called right after returning from here. */
-	if (!last)
+	if (len != 0)
 		return (kvm_backend_streaming_post(post, ptr, len));
 	else
 		return (0);

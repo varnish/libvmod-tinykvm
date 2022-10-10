@@ -3,7 +3,7 @@
  * @author Alf-André Walla (fwsgonzo@hotmail.com)
  * @brief Glue between C and C++ for KVM backends.
  * @version 0.1
- * @date 2022-07-23
+ * @date 2022-10-10
  * 
  * The main functions for handling backend GET, POST and streaming
  * POST methods. All errors thrown inside the library are ultimately
@@ -348,6 +348,11 @@ int kvm_backend_streaming_post(struct backend_post *post,
 	auto& mi = *slot.mi;
 	try {
 		auto& vm = mi.machine();
+
+		/* Not an overflow check, just stopping wildly large payloads. */
+		if (UNLIKELY(post->length + data_len > post->capacity)) {
+			throw tinykvm::MachineException("POST request too large", post->capacity);
+		}
 
 		/* Copy the data segment into VM */
 		vm.copy_to_guest(post->address, data_ptr, data_len);

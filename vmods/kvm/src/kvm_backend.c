@@ -3,7 +3,7 @@
  * @author Alf-André Walla (fwsgonzo@hotmail.com)
  * @brief
  * @version 0.1
- * @date 2022-07-23
+ * @date 2022-10-10
  *
  *
  * This file contains all the glue between Varnish backend functionality
@@ -167,15 +167,15 @@ kvmbe_gethdrs(const struct director *dir,
 
 	struct backend_post *post = NULL;
 	kvmr->inputs.method = bo->bereq->hd[0].b;
-	/* The HTTP method is stored in the first header field.
-	   We may want to change the API, passing the method as argument. */
-	const bool is_post = strcmp(kvmr->inputs.method, "POST") == 0;
+	/* Gather request body data if it exists. Check taken from stp_fetch.
+	   If the body is cached already, bereq_body will be non-null. */
+	const bool is_post = bo->initial_req_body_status != REQ_BODY_NONE || bo->bereq_body != NULL;
 	if (is_post)
 	{
 		/* Retrieve body by copying directly into backend VM. */
 		post = (struct backend_post *)WS_Alloc(bo->ws, sizeof(struct backend_post));
 		if (post == NULL) {
-			VSLb(ctx.vsl, SLT_Error, "KVM: Out of workspace for post");
+			VSLb(ctx.vsl, SLT_Error, "KVM: Out of workspace for request body");
 			return (-1);
 		}
 		post->ctx = &ctx;
@@ -186,7 +186,7 @@ kvmbe_gethdrs(const struct director *dir,
 		post->inputs = kvmr->inputs;
 		int ret = kvm_get_body(post, bo);
 		if (ret < 0) {
-			VSLb(ctx.vsl, SLT_Error, "KVM: Unable to aggregate POST data");
+			VSLb(ctx.vsl, SLT_Error, "KVM: Unable to aggregate request body data");
 			return (-1);
 		}
 		kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
