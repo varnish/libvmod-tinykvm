@@ -4,7 +4,7 @@ shell {
 cat >${tmpdir}/${testname}.c <<-EOF
 #include "kvm_api.h"
 
-static void on_get(const char *url)
+static void on_get(const char *url, const char *arg)
 {
 	set_cacheable(0, 1.0f, 0.0f, 0.0f);
 

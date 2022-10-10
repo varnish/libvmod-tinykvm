@@ -48,22 +48,32 @@ extern void register_func(int, ...);
 static inline void set_backend_get(void(*f)(const char *url, const char *arg)) { register_func(1, f); }
 static inline void set_backend_post(void(*f)(const char *url, const char *arg, const uint8_t*, size_t)) { register_func(2, f); }
 
+struct backend_request {
+	const char *method;
+	const char *url;
+	const char *argument;
+	const void *resv;
+	const uint8_t *data; /* Can be NULL. */
+	const size_t   datalen;
+};
+static inline void set_backend_request(void(*f)(const struct backend_request*)) { register_func(3, f); }
+
 /* Streaming POST will receive each data segment as they arrive. A final POST
    call happens at the end. This call needs some further improvements, because
    right now Varnish will fill the VM with the whole POST data no matter what,
    but call the streaming POST callback on each segment. Instead, it should put
    each segment on stack and the callee may choose to build a complete buffer. */
-static inline void set_backend_stream_post(long(*f)(const char *url, const char *arg, const uint8_t *, size_t len, size_t off)) { register_func(3, f); }
-
-/* When uploading a new program, there is an opportunity to pass on
-   state to the next program, using the live update and restore callbacks. */
-static inline void set_on_live_update(void(*f)()) { register_func(4, f); }
-static inline void set_on_live_restore(void(*f)(size_t datalen)) { register_func(5, f); }
+static inline void set_backend_stream_post(long(*f)(const char *url, const char *arg, const uint8_t *, size_t len, size_t off)) { register_func(4, f); }
 
 /* When an exception happens that terminates the request it is possible to
    produce a custom response instead of a generic HTTP 500. There is very
    limited time to produce the response, typically 1.0 seconds. */
-static inline void set_on_error(void (*f)(const char *url, const char *exception)) { register_func(6, f); }
+static inline void set_on_error(void (*f)(const char *url, const char *arg, const char *exception)) { register_func(5, f); }
+
+/* When uploading a new program, there is an opportunity to pass on
+   state to the next program, using the live update and restore callbacks. */
+static inline void set_on_live_update(void(*f)()) { register_func(6, f); }
+static inline void set_on_live_restore(void(*f)(size_t datalen)) { register_func(7, f); }
 
 /* Wait for requests without terminating machine. Call this just before
    the end of int main(). It will preserve the state of the whole machine,

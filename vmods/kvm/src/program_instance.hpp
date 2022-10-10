@@ -36,12 +36,13 @@ struct Reservation {
 
 enum class ProgramEntryIndex : uint8_t {
 	ON_RECV = 0,
-	BACKEND_COMP = 1,
+	BACKEND_GET  = 1,
 	BACKEND_POST = 2,
-	BACKEND_STREAM = 3,
-	LIVEUPD_SERIALIZE = 4,
-	LIVEUPD_DESERIALIZE = 5,
-	ON_ERROR = 6,
+	BACKEND_METHOD = 3,
+	BACKEND_STREAM = 4,
+	BACKEND_ERROR  = 5,
+	LIVEUPD_SERIALIZE = 6,
+	LIVEUPD_DESERIALIZE = 7,
 	TOTAL_ENTRIES
 };
 
@@ -134,8 +135,9 @@ public:
 	tinykvm::ThreadPool m_main_async_queue;
 
 	/* Entry points in the tenants program. Handlers for all types of
-	   requests, serialization mechanisms and related functionality. */
-	std::array<gaddr_t, (size_t)ProgramEntryIndex::TOTAL_ENTRIES> entry_address {};
+	   requests, serialization mechanisms and related functionality.
+	   NOTE: Limiting the entries to lower 32-bits, for now. */
+	std::array<uint32_t, (size_t)ProgramEntryIndex::TOTAL_ENTRIES> entry_address {};
 
 	/* The timer system needs to be destroyed before any of the other
 	   things, like the storage and request VMs. Timers carry capture

@@ -1,0 +1,53 @@
+varnishtest "KVM Backend: HTTP request test"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include "kvm_api.h"
+#include <string.h>
+
+static void on_request(const struct backend_request *req)
+{
+	if (strcmp(req->method, "TEST") == 0 && strcmp(req->url, "/1") == 0)
+		backend_response_str(200, "text/plain", "Hello World");
+}
+
+int main(int argc, char **argv)
+{
+	set_backend_request(on_request);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""{
+			"test.com": {
+				"filename": "${tmpdir}/${testname}",
+				"group": "test"
+			}
+		}""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+			bereq.http.Host,
+			bereq.url);
+	}
+} -start
+
+client c1 {
+	txreq -req TEST -url "/1" -hdr "Host: test.com"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+} -run

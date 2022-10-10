@@ -155,7 +155,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 
 	const auto& prog = machine.program();
 	auto* ctx = machine.ctx();
-	if (prog.entry_at(ProgramEntryIndex::ON_ERROR) != 0x0) {
+	if (prog.entry_at(ProgramEntryIndex::BACKEND_ERROR) != 0x0) {
 	try {
 		auto& vm = machine.machine();
 		auto fut = slot->tp.enqueue(
@@ -164,11 +164,11 @@ static void error_handling(kvm::VMPoolItem* slot,
 			machine.begin_call();
 
 			/* Call the on_error callback with exception reason. */
-			auto vm_entry_addr = prog.entry_at(ProgramEntryIndex::ON_ERROR);
+			auto vm_entry_addr = prog.entry_at(ProgramEntryIndex::BACKEND_ERROR);
 			if (UNLIKELY(vm_entry_addr == 0x0))
-				throw std::runtime_error("The GET callback has not been registered");
+				throw std::runtime_error("The ERROR callback has not been registered");
 			vm.timed_reentry(vm_entry_addr,
-				ERROR_HANDLING_TIMEOUT, vkb->inputs.url, exception);
+				ERROR_HANDLING_TIMEOUT, vkb->inputs.url, vkb->inputs.argument, exception);
 
 			/* Make sure no SMP work is in-flight. */
 			vm.smp_wait();
@@ -238,17 +238,49 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			const auto& prog = machine.program();
 			auto& vm = machine.machine();
 
-			if (post == nullptr) {
-				/* Call the backend compute function */
-				auto vm_entry_addr = prog.entry_at(ProgramEntryIndex::BACKEND_COMP);
-				if (UNLIKELY(vm_entry_addr == 0x0))
+			auto on_method_addr = prog.entry_at(ProgramEntryIndex::BACKEND_METHOD);
+			if (on_method_addr != 0x0) {
+				struct backend_inputs {
+					uint64_t method;
+					uint64_t url;
+					uint64_t argument;
+					uint64_t resv;
+					uint64_t data; /* Can be NULL. */
+					uint64_t datalen;
+				} inputs {};
+				__u64 stack = vm.stack_address();
+				inputs.method   = vm.stack_push_cstr(stack, vkb->inputs.method);
+				inputs.url      = vm.stack_push_cstr(stack, vkb->inputs.url);
+				inputs.argument = vm.stack_push_cstr(stack, vkb->inputs.argument);
+				if (post != nullptr) {
+					/* Try to reduce POST mmap allocation */
+					vm.mmap_relax(post->address, post->capacity, post->length);
+
+					inputs.data = post->address;
+					inputs.datalen = post->length;
+				}
+				auto struct_addr = vm.stack_push(stack, inputs);
+
+				if (machine.is_ephemeral()) {
+					/* Call into VM doing a full pagetable/cache flush. */
+					vm.timed_vmcall_stack(on_method_addr,
+						stack, timeout, (uint64_t)struct_addr);
+				} else {
+					/* Call into VM without flushing anything. */
+					vm.timed_reentry_stack(on_method_addr,
+						stack, timeout, (uint64_t)struct_addr);
+				}
+			} else if (post == nullptr) {
+				/* Call the backend GET function */
+				auto on_get_addr = prog.entry_at(ProgramEntryIndex::BACKEND_GET);
+				if (UNLIKELY(on_get_addr == 0x0))
 					throw std::runtime_error("The GET callback has not been registered");
 				if (machine.is_ephemeral()) {
 					/* Call into VM doing a full pagetable/cache flush. */
-					vm.timed_vmcall(vm_entry_addr, timeout, vkb->inputs.url, vkb->inputs.argument);
+					vm.timed_vmcall(on_get_addr, timeout, vkb->inputs.url, vkb->inputs.argument);
 				} else {
 					/* Call into VM without flushing anything. */
-					vm.timed_reentry(vm_entry_addr, timeout, vkb->inputs.url, vkb->inputs.argument);
+					vm.timed_reentry(on_get_addr, timeout, vkb->inputs.url, vkb->inputs.argument);
 				}
 			} else {
 				/* Try to reduce POST mmap allocation */
@@ -267,7 +299,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			vm.smp_wait();
 
 			if constexpr (VERBOSE_BACKEND) {
-				printf("Finish backend GET %s\n", vkb->inputs.url);
+				printf("Finish backend %s %s\n", vkb->inputs.method, vkb->inputs.url);
 			}
 			/* Verify response and fill out result struct. */
 			fetch_result(slot, machine, result);

@@ -20,6 +20,7 @@ add_vmod_tests(vmod_kvm kvm
 	tests/allowed_paths.vtc
 	tests/alternate_programs.vtc
 	tests/async_task.vtc
+	tests/backend_request.vtc
 	tests/curl_fetch.vtc
 	tests/empty.vtc
 	tests/error_handling.vtc
