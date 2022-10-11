@@ -207,7 +207,7 @@ static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
 	cpu.set_registers(regs);
 }
 
-static void syscall_http_find(vCPU& cpu, MachineInstance &inst)
+static void syscall_http_find(vCPU& cpu, MachineInstance& inst)
 {
 	auto& regs = cpu.registers();
 	const int where = regs.rdi;
@@ -238,6 +238,28 @@ static void syscall_http_find(vCPU& cpu, MachineInstance &inst)
 		}
 	} else {
 		regs.rax = 0;
+	}
+
+	cpu.set_registers(regs);
+}
+
+static void syscall_http_method(vCPU& cpu, MachineInstance& inst)
+{
+	auto& regs = cpu.registers();
+	const uint64_t g_dest    = regs.rdi;
+	const uint16_t g_destlen = regs.rsi;
+
+	auto* hp = get_http(inst.ctx(), HDR_BEREQ);
+
+	const auto& field = hp->field_array[0];
+	const uint16_t flen = field.end - field.begin;
+
+	if (g_dest != 0x0) {
+		const uint16_t size = std::min(flen, g_destlen);
+		cpu.machine().copy_to_guest(g_dest, field.begin, size);
+		regs.rax = size;
+	} else {
+		regs.rax = flen;
 	}
 
 	cpu.set_registers(regs);

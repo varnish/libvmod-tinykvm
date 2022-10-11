@@ -101,6 +101,9 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10022: // HTTP_FIND
 				syscall_http_find(cpu, inst);
 				return;
+			case 0x10023: // HTTP_METHOD
+				syscall_http_method(cpu, inst);
+				return;
 			case 0x10030: // REGEX_COMPILE
 				syscall_regex_compile(cpu, inst);
 				return;

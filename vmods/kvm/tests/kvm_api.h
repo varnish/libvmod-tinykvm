@@ -5,9 +5,9 @@
  * @version 0.1
  * @date 2022-10-10
  * 
- * Single-source-of-truth API header for the KVM VMOD. Languages can
- * use the C API directly, or indirectly through API-generation based on
- * this header.
+ * Single-source-of-truth API header for the KVM and Compute VMODs.
+ * Languages can use the C API directly, or indirectly through
+ * API-generation based on this header.
  * 
 **/
 #pragma once
@@ -21,11 +21,11 @@ extern "C" {
 extern void register_func(int, ...);
 
 /**
- * During the start of the program, one should register functions that will
- * handle different types of requests, like GET, POST and streaming POST.
+ * During the start of the program, one should register callback functions
+ * that will handle different types of requests, like GET, POST etc.
  *
  * Example:
- *   static void on_get(const char* url)
+ *   static void on_get(const char* url, const char *arg)
  *   {
  *      http_setf(BERESP, "X-Hello: World", 14);
  *      backend_response_str(200, "text/plain", "Hello World!");
@@ -36,12 +36,12 @@ extern void register_func(int, ...);
  *  	wait_for_requests();
  *   }
  *
- * The example above will register a function called 'my_request_handler' as
- * the function that will get called on every single GET request. When the
- * main body is completed, we call 'wait_for_requests()' to signal that
- * the program has successfully initialized, and is ready to handle requests.
- * The system will then pause the VM and freeze everything. The frozen state
- * will be restored on every request.
+ * The example above will register a function called 'on_get' as the
+ * function that will get called on GET requests. When the main body is
+ * completed, we call 'wait_for_requests()' to signal that the program has
+ * successfully initialized, and is ready to handle requests. The system
+ * will then pause the VM and freeze everything. The frozen state will be
+ * restored on every request.
  *
  * Register callbacks for various modes of operation:
  **/
@@ -178,10 +178,10 @@ http_unset(int where, const char *key, size_t len) { return sys_http_set(where, 
 /* Retrieve a header field by key, writing result to outb and returning actual length.
    If outb is zero, instead returns the length of header field, or zero if not found. */
 extern unsigned
-sys_http_find(int where, const char *key, size_t, const char *outb, size_t outl);
+sys_http_find(int where, const char *key, size_t, char *outb, size_t outl);
 
 static inline unsigned
-http_find_str(int where, const char *key, const char *outb, size_t outl) {
+http_find_str(int where, const char *key, char *outb, size_t outl) {
 	return sys_http_find(where, key, __builtin_strlen(key), outb, outl);
 }
 
@@ -205,6 +205,19 @@ http_alloc_find(int where, const char *key) {
 		sys_http_find(where, key, __builtin_strlen(key), buffer, sizeof(buffer));
 	char *result = (char *)__builtin_malloc(len+1);
 	__builtin_memcpy(result, buffer, len);
+	result[len] = 0;
+	return result;
+}
+#endif
+
+/* Retrieve the current HTTP method, eg. GET, POST etc. */
+extern unsigned long sys_http_method(char *outb, size_t outl);
+static inline const char * http_alloc_method();
+
+#ifdef HAS_BUILTIN_MALLOC
+static inline const char * http_alloc_method() {
+	char *result = (char *)__builtin_malloc(16);
+	const unsigned len = sys_http_method(result, 15);
 	result[len] = 0;
 	return result;
 }
@@ -671,6 +684,13 @@ asm(".global sys_http_find\n"
 	".type sys_http_find, @function\n"
 	"sys_http_find:\n"
 	"	mov $0x10022, %eax\n"
+	"	out %eax, $0\n"
+	"	ret\n");
+
+asm(".global sys_http_method\n"
+	".type sys_http_method, @function\n"
+	"sys_http_method:\n"
+	"	mov $0x10023, %eax\n"
 	"	out %eax, $0\n"
 	"	ret\n");
 
