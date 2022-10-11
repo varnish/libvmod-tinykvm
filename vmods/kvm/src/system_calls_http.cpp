@@ -122,6 +122,29 @@ inline uint32_t field_length(const txt& field)
 	return field.end - field.begin;
 }
 
+/* An incomplete guest HTTP header field validator. */
+static void validate_guest_field(const char* buffer, uint32_t len)
+{
+	if (UNLIKELY(len < 4)) // X: Y
+		throw std::runtime_error("HTTP header field was too small");
+	if (UNLIKELY(len >= 0x10000)) // 64kB limit
+		throw std::runtime_error("HTTP header field was too large");
+
+	const char* colon = (const char *)std::memchr(buffer, ':', len);
+	if (UNLIKELY(colon == nullptr))
+		throw std::runtime_error("HTTP header field had no colon");
+	if (UNLIKELY(colon == &buffer[0]))
+		throw std::runtime_error("HTTP header field starts with colon");
+	if (UNLIKELY(colon == &buffer[len-1]))
+		throw std::runtime_error("HTTP header field ends with colon");
+	if (UNLIKELY(colon[1] != ' '))
+		throw std::runtime_error("HTTP header field colon has no space after");
+	if (UNLIKELY(buffer[0] == ' '))
+		throw std::runtime_error("HTTP header field begins with space");
+	if (UNLIKELY(buffer[len-1] == ' '))
+		throw std::runtime_error("HTTP header field ends with space");
+}
+
 static unsigned
 http_header_append(struct http* hp, const char* val, uint32_t len)
 {
@@ -129,6 +152,7 @@ http_header_append(struct http* hp, const char* val, uint32_t len)
 		VSLb(hp->vsl, SLT_LostHeader, "%.*s", (int) len, val);
 		return HDR_INVALID;
 	}
+	validate_guest_field(val, len);
 
 	const unsigned idx = hp->field_count++;
 	http_SetH(hp, idx, val);
@@ -158,7 +182,7 @@ static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
 	const int where = regs.rdi;
 	const uint64_t g_what = regs.rsi;
 	const uint32_t g_wlen = regs.rdx & 0xFFFF;
-	if (UNLIKELY(g_what == 0x0 || g_wlen == 0)) {
+	if (UNLIKELY(g_wlen == 0)) {
 		regs.rax = 0;
 		cpu.set_registers(regs);
 		return;
@@ -177,6 +201,7 @@ static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
 	/* Find the ':' in the buffer */
 	const char* colon = (const char *)std::memchr(buffer, ':', g_wlen);
 	if (colon != nullptr) {
+		validate_guest_field(buffer, g_wlen);
 		const size_t namelen = colon - buffer;
 
 		/* Look for a header with an existing name */
