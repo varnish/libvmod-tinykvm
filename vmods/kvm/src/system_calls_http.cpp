@@ -237,7 +237,7 @@ static void syscall_http_find(vCPU& cpu, MachineInstance& inst)
 	auto& regs = cpu.registers();
 	const int where = regs.rdi;
 	const uint64_t g_what = regs.rsi;
-	const uint32_t g_wlen = regs.rdx & 0x7FFFFFFF;
+	const uint32_t g_wlen = regs.rdx & 0xFFFF;
 
 	auto* hp = get_http(inst.ctx(), (gethdr_e)where);
 
@@ -272,15 +272,15 @@ static void syscall_http_method(vCPU& cpu, MachineInstance& inst)
 {
 	auto& regs = cpu.registers();
 	const uint64_t g_dest    = regs.rdi;
-	const uint16_t g_destlen = regs.rsi;
+	const uint32_t g_destlen = regs.rsi & 0x7FFFFFFF;
 
 	auto* hp = get_http(inst.ctx(), HDR_BEREQ);
 
 	const auto& field = hp->field_array[0];
-	const uint16_t flen = field.end - field.begin;
+	const uint32_t flen = field.end - field.begin;
 
 	if (g_dest != 0x0) {
-		const uint16_t size = std::min(flen, g_destlen);
+		const auto size = std::min(flen, g_destlen);
 		cpu.machine().copy_to_guest(g_dest, field.begin, size);
 		regs.rax = size;
 	} else {
