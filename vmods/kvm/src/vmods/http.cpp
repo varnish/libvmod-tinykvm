@@ -36,7 +36,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 	[=] (MachineInstance& inst, tinykvm::vCPU& vcpu)
 	{
 		static constexpr bool GLOBAL_VERBOSE_CURL = false;
-		static constexpr bool GLOBAL_CURL_ALTSVC_CACHE = true;
+		static constexpr bool GLOBAL_CURL_ALTSVC_CACHE = false;
 		auto& regs = vcpu.registers();
 		/**
 		 * rdi = URL
