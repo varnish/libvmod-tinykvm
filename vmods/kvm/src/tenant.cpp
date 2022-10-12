@@ -131,36 +131,6 @@ static inline bool load_tenant(VRT_CTX, VCL_PRIV task,
 	}
 }
 
-TenantInstance* create_temporary_tenant(VCL_PRIV task,
-	const TenantInstance* vrm, const std::string& name)
-{
-	/* Create a new tenant with a temporary name,
-		 and no program file to load. */
-	TenantConfig config{vrm->config};
-	config.name = name;
-	config.filename = "";
-	config.hash = crc32c_hw(name);
-	auto it = tenancy(task).temporaries.try_emplace(
-		config.hash,
-		nullptr, config);
-	return &it.first->second;
-}
-void delete_temporary_tenant(VCL_PRIV task,
-	const TenantInstance* ten)
-{
-	auto& temps = tenancy(task).temporaries;
-	auto it = temps.find(ten->config.hash);
-	if (LIKELY(it != temps.end()))
-	{
-		assert(ten->config.name == it->second.config.name);
-		delete ten;
-		temps.erase(it);
-		return;
-	}
-	throw std::runtime_error(
-		"Could not delete temporary tenant: " + ten->config.name);
-}
-
 template <typename It>
 static void configure_group(const std::string& name, kvm::TenantGroup& group, const It& obj)
 {
@@ -374,10 +344,6 @@ kvm::TenantInstance* kvm_tenant_find(VCL_PRIV task, const char* name)
 	// regular tenants
 	auto it = t.tenants.find(hash);
 	if (LIKELY(it != t.tenants.end()))
-		return &it->second;
-	// temporary tenants (updates)
-	it = t.temporaries.find(hash);
-	if (it != t.temporaries.end())
 		return &it->second;
 	return nullptr;
 }
