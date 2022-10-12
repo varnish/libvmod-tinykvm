@@ -3,48 +3,56 @@ $Module compute 3 "High-Performance Compute For Varnish Enterprise"
 DESCRIPTION
 ===========
 
-vmod_compute allows using libraries of sandboxed programs to
-safely communicate with other systems, retrieve and transform data
+vmod_compute allows using libraries of sandboxed programs to safely
+communicate with other systems, as well as retrieve and transform data
 without having to worry about security and integrity issues.
-Programs are loaded as-needed and can be individually configured to
-meet the specific needs of each Varnish cache server.
-
-Each program provided by the library is ready-to-use, and will often
-have one single purpose. Programs are documented on the Varnish Software
-docs website and comes with a simple explanation of what it does, and
-what JSON configuration should be provided to make the program perform
-a given function.
-
-
-LIBRARY
-=======
+Programs are loaded on-demand and can also be individually configured to
+meet the specific needs of each Varnish Cache server.
 
 A library defines a group of ready-to-use programs. Varnish Enterprise has
 a list of officially supported programs, each of which solve a specific task.
+Libraries contain definitions of programs that do not consume any resources
+until a program is needed by a request. When a program is needed, it is
+fetched, then loaded and then requests may be processed. This means that the
+first requests to a program will be waiting.
 
-Further, each program comes with a specific JSON configuration that allows
-the VCL writer to tailor the program to his needs.
+Programs provided by a library are ready-to-use, and will often have one
+single purpose. Programs are documented on the Varnish Software docs website
+and comes with a simple explanation of what it does, and what JSON-
+configuration should be provided to make the program perform a given function.
 
 See http://compute.varnish-software.com for a list of official programs.
 
 Example:
 	sub vcl_init {
-		new vafb = activedns.dns_group();
-		vafb.set_host("filebin.varnish-software.com");
+		new compvs = activedns.dns_group();
+		compvs.set_host("compute.varnish-software.com");
+
+		compute.library("https://.../compute.json");
 	}
 
 	sub vcl_backend_fetch {
-		set bereq.backend = compute.backend("avif",
-			"https://${vafb}/images/" + bereq.url);
+		set bereq.backend = compute.backend("myprogram",
+			"https://${compvs}/images/" + bereq.url);
 	}
 
-	The avif program will fetch a JPEG file from a backend, transcode it to the
-	AVIF image format, or if it fails, deliver the original JPEG instead. Then
-	send it the requesting client(s). You can use any valid URL that can be
-	fetched with cURL, such as FTP, HTTPS and local files.
+	This will employ 'myprogram' as a backend. DNS configuration can be
+	handled using ActiveDNS, and uses the ${name} string-interpolation method.
 
-	DNS configuration can be handled using ActiveDNS, and uses the ${name} string-
-	interpolation method.
+
+The primary way to increase or decrease the resource consumption of a program
+is to control the concurrency level. If a program is not handling requests fast
+enough, increase the level. If the Varnish Cache is using too much CPU, try
+reducing the concurrency level.
+
+Example:
+	sub vcl_init {
+		compute.library("https://.../compute.json");
+		compute.configure("myprogram", """{
+			"concurrency": 32
+		}""");
+	}
+
 
 
 API
@@ -54,8 +62,8 @@ $Event vmod_event
 
 $Function BOOL library(PRIV_VCL, STRING uri)
 
-- Load library of programs that is pre-installed with Varnish Enterprise.
-- All programs are retrieved, but are started only on-demand.
+- Fetch library of programs that is pre-installed with Varnish Enterprise.
+- Libraries contain program definitions, but programs are only started on-demand.
 - Must be called from vcl_init.
 
 $Function BOOL configure(PRIV_VCL, STRING program, STRING json)
@@ -67,10 +75,11 @@ $Function BOOL start(PRIV_VCL, STRING program, BOOL async = 1)
 
 - Start program during early Varnish startup.
 - When async, program intialization will not delay Varnish from starting up.
+  Requests will wait until the program is fully initialized.
 - Must be called from vcl_init.
 
 $Function BACKEND program(PRIV_VCL, STRING program, STRING arg, STRING config = "")
 
 - Returns a backend that will call the given program to produce a response.
-- Supports GET and POST requests.
+- Supports GET, POST and other HTTP requests.
 - Must be called from vcl_backend_fetch.

@@ -20,6 +20,10 @@ static const int NO_INIT_PROGRAMS = 0;
 VCL_BOOL vmod_library(VRT_CTX, VCL_PRIV task, VCL_STRING uri)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	if (ctx->method != VCL_MET_INIT) {
+		VRT_fail(ctx, "compute: library() should only be called from vcl_init");
+		return (0);
+	}
 
 	/* Initialize, re-initialize and remove VMODs */
 	initialize_vmods(ctx, task);
@@ -30,6 +34,11 @@ VCL_BOOL vmod_library(VRT_CTX, VCL_PRIV task, VCL_STRING uri)
 VCL_BOOL vmod_configure(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_STRING json)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	if (ctx->method != VCL_MET_INIT) {
+		VRT_fail(ctx, "compute: configure() should only be called from vcl_init");
+		return (0);
+	}
+
 	if (json == NULL || json[0] == 0) {
 		VRT_fail(ctx, "No configuration provided for '%s'", program);
 		return (0);
@@ -46,8 +55,12 @@ VCL_BOOL vmod_configure(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_STRING j
 
 VCL_BOOL vmod_start(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_BOOL async)
 {
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	(void) async;
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	if (ctx->method != VCL_MET_INIT) {
+		VRT_fail(ctx, "compute: start() should only be called from vcl_init");
+		return (0);
+	}
 
 	struct vmod_kvm_tenant *tenant = kvm_tenant_find(task, program);
 	if (tenant != NULL) {
@@ -61,23 +74,15 @@ VCL_BOOL vmod_start(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_BOOL async)
 extern struct director *vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg);
 
-extern void vmod_kvm_set_kvmr_backend(
-	struct director *dir, VCL_BACKEND backend);
-
-/* Create a response from a KVM backend with another backend as argument. */
-VCL_BACKEND vmod_backend(VRT_CTX, VCL_PRIV task,
-	VCL_STRING program, VCL_BACKEND backend, VCL_STRING arg, VCL_STRING json_config)
-{
-	struct director *dir =
-		vmod_vm_backend(ctx, task, program, arg, json_config);
-
-	vmod_kvm_set_kvmr_backend(dir, backend);
-	return (dir);
-}
-
 /* Create a response from a KVM backend. */
 VCL_BACKEND vmod_program(VRT_CTX, VCL_PRIV task,
 	VCL_STRING program, VCL_STRING arg, VCL_STRING json_config)
 {
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	if (ctx->method != VCL_MET_BACKEND_FETCH) {
+		VRT_fail(ctx, "compute: program() should only be called from vcl_backend_fetch");
+		return (NULL);
+	}
+
 	return (vmod_vm_backend(ctx, task, program, arg, json_config));
 }
