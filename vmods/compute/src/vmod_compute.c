@@ -64,6 +64,7 @@ VCL_BOOL vmod_start(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_BOOL async)
 
 	struct vmod_kvm_tenant *tenant = kvm_tenant_find(task, program);
 	if (tenant != NULL) {
+		/* TODO: If async == false use kvm_reserve_vm() to synchronize init. */
 		return (kvm_tenant_async_start(ctx, tenant));
 	} else {
 		VRT_fail(ctx, "No such program '%s' for async start", program);
