@@ -5,7 +5,7 @@ include(../vmod.cmake vmod)
 
 add_vmod(vmod_compute vmod_compute.vcc "High-Performance Compute VMOD"
 	src/vmod_compute.c
-	src/vmod_compute_adns.c
+	src/vmod_compute_event.c
 	../kvm/src/kvm_backend.c
 	../kvm/src/kvm_post.c
 )

@@ -226,7 +226,12 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 }
 ProgramInstance::~ProgramInstance()
 {
+	// NOTE: Thread pools need to wait on jobs here
+	m_main_async_queue.wait_until_nothing_in_flight();
+	m_main_queue.wait_until_nothing_in_flight();
+
 	if (main_vm_extra_cpu) {
+		// XXX: This might be deleted too early
 		main_vm_extra_cpu->deinit();
 	}
 	for (const auto& adns : m_adns_tags) {
