@@ -21,6 +21,7 @@ typedef size_t (*header_callback)(char *buffer, size_t size, size_t nitems, void
 struct writeop {
 	tinykvm::Machine& machine;
 	uint64_t dst;
+	uint64_t max_addr;
 };
 struct readop {
 	tinykvm::Machine* machine;
@@ -57,6 +58,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		/* URL */
 		const auto url = adns_interp(inst, vcpu.machine().buffer_to_string(regs.rdi, regs.rsi, 512));
 
+		constexpr size_t CURL_RESP_HEADERS_MIN_LENGTH = 64;
 		constexpr size_t CONTENT_TYPE_LEN = 128;
 		constexpr size_t CURL_FIELDS_NUM = 12;
 		struct curl_options {
@@ -108,7 +110,12 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		}
 
 		// XXX: Fixme, mmap is basic/unreliable
-		opres.content_addr = vcpu.machine().mmap_allocate(CURL_BUFFER_MAX);
+		bool managed_content_addr = false;
+		if (opres.content_addr == 0x0) {
+			opres.content_addr = vcpu.machine().mmap_allocate(CURL_BUFFER_MAX);
+			opres.content_length = CURL_BUFFER_MAX;
+			managed_content_addr = true;
+		}
 		const bool is_post = (opres.post_addr != 0x0 && opres.post_buflen != 0x0);
 
 		if (VERBOSE_CURL) {
@@ -118,6 +125,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 		writeop op {
 			.machine = vcpu.machine(),
 			.dst     = opres.content_addr,
+			.max_addr = std::max(opres.content_addr, opres.content_addr + opres.content_length)
 		};
 
 		// NOTE: Up to this point we have not created anything that could leak,
@@ -150,6 +158,9 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			[] (char *ptr, size_t size, size_t nmemb, void *poop) -> size_t {
 				auto& woop = *(writeop *)poop;
 				const size_t total = size * nmemb;
+				/* Avoid overwriting buffer (not a security issue). */
+				if (woop.dst + total > woop.max_addr)
+					return 0;
 				try {
 					woop.machine.copy_to_guest(woop.dst, ptr, total);
 					woop.dst += total;
@@ -161,7 +172,7 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &op);
 
 			/* Response header fields. */
-			if (opres.headers == 0x0 && opres.headers_length == 0)
+			if (opres.headers_length >= CURL_RESP_HEADERS_MIN_LENGTH)
 			{
 				curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, (header_callback)
 				[] (char *buffer, size_t size, size_t nitems, void *usr) -> size_t
@@ -257,15 +268,11 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 
 			CURLcode res = curl_easy_perform(curl);
 			if (res == 0) {
-				if (!option_dummy_request) {
-					/* Calculate content length */
-					opres.content_length = op.dst - opres.content_addr;
-					/* Adjust and set new mmap base. XXX: Log failed relaxations */
+				/* Calculate content length */
+				opres.content_length = op.dst - opres.content_addr;
+				/* Adjust and set new mmap base. XXX: Log failed relaxations */
+				if (managed_content_addr) {
 					vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, opres.content_length);
-				} else {
-					opres.content_length = 0;
-					/* Adjust the buffer down to zero again, completely unmapping it. */
-					vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, 0);
 				}
 				/* Get response status and Content-Type */
 				long status;
@@ -284,13 +291,20 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 					opres.ct_length = 0;
 				}
 				/* Allocate and copy the response headers, if any. */
-				opres.headers = 0x0;
-				opres.headers_length = 0;
 				if (!headers.empty())
 				{
-					opres.headers = vcpu.machine().mmap_allocate(headers.size()+1);
-					opres.headers_length = headers.size();
-					vcpu.machine().copy_to_guest(opres.headers, headers.data(), headers.size()+1);
+					uint32_t len_with_zero = headers.size()+1;
+					if (opres.headers == 0x0) {
+						/* Automatically over-allocate headers using mmap. */
+						opres.headers = vcpu.machine().mmap_allocate(len_with_zero);
+						opres.headers_length = headers.size();
+					} else {
+						/* Guest has pre-allocated a buffer for headers. */
+						len_with_zero = std::min(len_with_zero, opres.headers_length);
+						/* Let guest know the length with hidden zero at the end. */
+						opres.headers_length = (len_with_zero > 0) ? (len_with_zero-1) : 0;
+					}
+					vcpu.machine().copy_to_guest(opres.headers, headers.data(), len_with_zero);
 				}
 				// OP result back to guest
 				vcpu.machine().copy_to_guest(op_buffer, &opres, sizeof(opres));
@@ -304,14 +318,18 @@ void initialize_curl(VRT_CTX, VCL_PRIV task)
 					printf("cURL error: %d\n", res);
 				}
 				/* Free the over-allocated fetch buffer. */
-				vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, 0u);
+				if (managed_content_addr) {
+					vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, 0u);
+				}
 				regs.rax = -res;
 			}
 		}
 		catch (...)
 		{
 			/* Free the over-allocated fetch buffer. */
-			vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, 0u);
+			if (managed_content_addr) {
+				vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, 0u);
+			}
 			regs.rax = -1;
 		}
 		curl_slist_free_all(req_list);

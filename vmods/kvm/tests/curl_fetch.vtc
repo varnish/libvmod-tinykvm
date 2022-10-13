@@ -3,15 +3,20 @@ varnishtest "KVM Backend: cURL fetch test"
 shell {
 cat >${tmpdir}/${testname}.c <<-EOF
 #include "kvm_api.h"
+#include <assert.h>
+#include <malloc.h>
 #include <string.h>
+#include <stdlib.h>
 
-static void on_get(const char *url)
+static void on_get(const char *url, const char *arg)
 {
-	set_cacheable(0, 1.0f, 0.0f, 0.0f);
-
 	if (strcmp(url, "/example") == 0) {
 		backend_response_str(200, "text/plain", "Hello Example World");
 	}
+	// **NOTE** Below is for Varnish self-requests **NOTE**
+	const char *strport = http_alloc_find(BEREQ, "X-Port");
+	const int port = atoi(&strport[8]);
+
 	if (strcmp(url, "/fetch") == 0) {
 		const char *strport = http_alloc_find(BEREQ, "X-Port");
 		const int port = atoi(&strport[8]);
@@ -21,9 +26,9 @@ static void on_get(const char *url)
 		const int curl_len =
 			snprintf(curl_url, sizeof(curl_url), "http://127.0.0.1:%d/example", port);
 
-		/* Add Host: xpizza.com to reach this tenant program. */
+		/* Add Host: test.com to reach this tenant program. */
 		struct curl_fields fields = {};
-		fields.ptr[0] = "Host: xpizza.com";
+		fields.ptr[0] = "Host: test.com";
 		fields.len[0] = strlen(fields.ptr[0]);
 
 		struct curl_op op = {};
@@ -31,7 +36,67 @@ static void on_get(const char *url)
 
 		backend_response(op.status, op.ctype, op.ctlen, op.content, op.content_length);
 	}
-	backend_response_str(200, "text/plain", "Hello World");
+	else if (strcmp(url, "/alloc_fetch") == 0) {
+		/* Create URL to reach Varnish at /example. */
+		char curl_url[64];
+		const int curl_len =
+			snprintf(curl_url, sizeof(curl_url), "http://127.0.0.1:%d/example", port);
+
+		/* Add Host: test.com to reach this tenant program. */
+		struct curl_fields fields = {};
+		fields.ptr[0] = "Host: test.com";
+		fields.len[0] = strlen(fields.ptr[0]);
+
+		struct curl_op op = {};
+		op.content_length = 20;
+		op.content = malloc(op.content_length);
+		op.headers_length = 160;
+		op.headers = malloc(op.headers_length);
+		curl_fetch(curl_url, curl_len, &op, &fields, NULL);
+
+		assert(strstr(op.headers, "text/plain") != NULL);
+
+		backend_response(op.status, op.ctype, op.ctlen, op.content, op.content_length);
+	}
+	else if (strcmp(url, "/alloc_fetch_content_fail") == 0) {
+		/* Create URL to reach Varnish at /example. */
+		char curl_url[64];
+		const int curl_len =
+			snprintf(curl_url, sizeof(curl_url), "http://127.0.0.1:%d/example", port);
+
+		/* Add Host: test.com to reach this tenant program. */
+		struct curl_fields fields = {};
+		fields.ptr[0] = "Host: test.com";
+		fields.len[0] = strlen(fields.ptr[0]);
+
+		struct curl_op op = {};
+		op.content_length = 10;
+		op.content = malloc(op.content_length);
+		curl_fetch(curl_url, curl_len, &op, &fields, NULL);
+
+		backend_response(op.status, op.ctype, op.ctlen, op.content, op.content_length);
+	}
+	else if (strcmp(url, "/alloc_fetch_headers_fail") == 0) {
+		/* Create URL to reach Varnish at /example. */
+		char curl_url[64];
+		const int curl_len =
+			snprintf(curl_url, sizeof(curl_url), "http://127.0.0.1:%d/example", port);
+
+		/* Add Host: test.com to reach this tenant program. */
+		struct curl_fields fields = {};
+		fields.ptr[0] = "Host: test.com";
+		fields.len[0] = strlen(fields.ptr[0]);
+
+		struct curl_op op = {};
+		op.headers_length = 50;
+		op.headers = malloc(op.headers_length);
+		curl_fetch(curl_url, curl_len, &op, &fields, NULL);
+
+		assert(strstr(op.headers, "text/plain") != NULL);
+
+		backend_response(op.status, op.ctype, op.ctlen, op.content, op.content_length);
+	}
+	backend_response_str(555, "text/plain", "Error");
 }
 
 int main(int argc, char **argv)
@@ -50,9 +115,8 @@ varnish v1 -vcl+backend {
 
 	sub vcl_init {
 		kvm.embed_tenants("""{
-			"xpizza.com": {
+			"test.com": {
 				"filename": "${tmpdir}/${testname}",
-				"key": "",
 				"group": "test"
 			}
 		}""");
@@ -69,19 +133,30 @@ varnish v1 -vcl+backend {
 	}
 } -start
 
-define m1 make_requests {
-	txreq -url "/fetch" -hdr "Host: xpizza.com" -hdr "X-Port: ${v1_port}"
+define m1 make_auto_request {
+	txreq -url "/fetch" -hdr "Host: test.com" -hdr "X-Port: ${v1_port}"
 	rxresp
 	expect resp.body == "Hello Example World"
 	expect resp.status == 200
 }
 
-client c1 -repeat 25 {
-	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+client c1 -repeat 10 {
+	${m1_make_auto_request}
+
+	txreq -url "/alloc_fetch" -hdr "Host: test.com" -hdr "X-Port: ${v1_port}"
 	rxresp
-	expect resp.body == "Hello World"
+	expect resp.body == "Hello Example World"
 	expect resp.status == 200
 
-	${m1_make_requests}
-	${m1_make_requests}
+	txreq -url "/alloc_fetch_content_fail" -hdr "Host: test.com" -hdr "X-Port: ${v1_port}"
+	rxresp
+	expect resp.status == 500
+
+	txreq -url "/alloc_fetch_headers_fail" -hdr "Host: test.com" -hdr "X-Port: ${v1_port}"
+	rxresp
+	expect resp.status == 500
+
+	txreq -url "/unknown" -hdr "Host: test.com" -hdr "X-Port: ${v1_port}"
+	rxresp
+	expect resp.status == 555
 } -run

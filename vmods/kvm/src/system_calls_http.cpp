@@ -144,6 +144,19 @@ static void validate_guest_field(const char* buffer, uint32_t len)
 	if (UNLIKELY(buffer[len-1] == ' '))
 		throw std::runtime_error("HTTP header field ends with space");
 }
+static void validate_guest_field_key(const char* buffer, uint32_t len)
+{
+	if (UNLIKELY(len < 1)) // X
+		throw std::runtime_error("HTTP header field name was too small");
+	if (UNLIKELY(len >= 0x10000)) // 64kB limit
+		throw std::runtime_error("HTTP header field name was too large");
+	/* XXX: Todo do an exhaustive check of the field key/name. */
+	const char* illegal_chars = ": \x00\b\e\f\t\r\n";
+	for (size_t i = 0; i < len; i++) {
+		if (UNLIKELY(strchr(illegal_chars, buffer[i]) != nullptr))
+			throw std::runtime_error("HTTP header field name had an illegal character");
+	}
+}
 
 static unsigned
 http_header_append(struct http* hp, const char* val, uint32_t len)
@@ -243,6 +256,7 @@ static void syscall_http_find(vCPU& cpu, MachineInstance& inst)
 
 	/* Read out *what* from guest, as zero-terminated string */
 	auto buffer = cpu.machine().string_or_view(g_what, g_wlen);
+	validate_guest_field_key(buffer.c_str(), buffer.size());
 
 	/* Find the header field by its name */
 	unsigned index = http_findhdr(hp, buffer.size(), buffer.begin());
