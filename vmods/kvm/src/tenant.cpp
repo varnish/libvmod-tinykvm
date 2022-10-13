@@ -188,7 +188,6 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	else if (obj.key() == "control_ephemeral")
 	{
 		group.control_ephemeral = obj.value();
-		//printf("Allow ephemeral control: %d\n", group.control_ephemeral);
 	}
 	else if (obj.key() == "allowed_paths")
 	{
@@ -216,7 +215,8 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 	/* Parse JSON with comments enabled. */
 	const json j = json::parse(json_strview.begin(), json_strview.end(), nullptr, true, true);
 
-	std::map<std::string, kvm::TenantGroup> groups {};
+	// The test group is automatically created using defaults
+	std::map<std::string, kvm::TenantGroup> groups { {"test", kvm::TenantGroup{"test"}} };
 
 	// Iterate through the user-defined tenant configuration.
 	// The configuration can either be a tenant of a group,
@@ -238,22 +238,11 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 	for (const auto& it : j.items())
 	{
 		const auto& obj = it.value();
-		// We either have a group configuration or tenant configuration.
-		// Check for the existence of the group and create it if it does not exist.
-		// The ordering of the tenants can be such that the group configuration
-		// comes after the tenants, or there is no group configuration.
-		//
-		// If the object key is a valid group, we assume this is configuration
-		// that is specific to the group.
-		//
-		// Otherwise, it must be the tenant configuration.
-		std::string grname;
-		if (obj.contains("group")) {
-			grname = obj["group"];
-		} else {
-			grname = it.key();
-		}
+		if (obj.contains("group")) continue;
+
+		const auto& grname = it.key();
 		auto grit = groups.find(grname);
+
 		if (grit == groups.end()) {
 			const auto& ret = groups.emplace(
 				std::piecewise_construct,
@@ -267,10 +256,25 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 		for (auto it = obj.begin(); it != obj.end(); ++it) {
 			configure_group(grname, group, it);
 		}
-
+	}
+	for (const auto& it : j.items())
+	{
+		const auto& obj = it.value();
 		// Tenant configuration
 		if (obj.contains("group"))
 		{
+			const std::string& grname = obj["group"];
+			auto grit = groups.find(grname);
+			if (UNLIKELY(grit == groups.end())) {
+				throw std::runtime_error("Could not find group " + grname + " for '" + it.key() + "'");
+			}
+			auto& group = grit->second;
+
+			// Set/override both group and tenant settings in one place
+			for (auto it = obj.begin(); it != obj.end(); ++it) {
+				configure_group(grname, group, it);
+			}
+
 			/* Filenames are optional. */
 			std::string filename = "";
 			if (obj.contains("filename")) filename = obj["filename"];

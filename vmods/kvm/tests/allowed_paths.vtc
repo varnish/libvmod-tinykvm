@@ -36,25 +36,21 @@ vcl 4.1;
 	backend default none;
 
 	sub vcl_init {
-		kvm.embed_tenants("""
-			{
-				"deny.com": {
-					"filename": "${tmpdir}/${testname}",
-					"key": "",
-					"group": "deny"
-				},
-				"allow.com": {
-					"filename": "${tmpdir}/${testname}",
-					"key": "",
-					"group": "allow"
-				},
-				"allow": {
-					"allowed_paths": [
-						"/tmp"
-					]
-				}
+		kvm.embed_tenants("""{
+			"allow": {
+				"allowed_paths": [
+					"/tmp"
+				]
+			},
+			"deny.com": {
+				"filename": "${tmpdir}/${testname}",
+				"group": "test"
+			},
+			"allow.com": {
+				"filename": "${tmpdir}/${testname}",
+				"group": "allow"
 			}
-		""");
+		}""");
 	}
 
 	sub vcl_recv {
