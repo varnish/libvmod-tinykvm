@@ -65,6 +65,7 @@ public:
 	void begin_call() { m_response_called = 0; }
 	void finish_call(uint8_t n) { m_response_called = n; }
 	bool response_called(uint8_t n) const noexcept { return m_response_called == n; }
+	void reset_needed_now() { m_reset_needed = true; }
 
 	void init_sha256();
 	void hash_buffer(const char* buffer, int len);
@@ -103,6 +104,7 @@ private:
 	bool        m_is_ephemeral = true;
 	bool        m_waiting_for_requests = false;
 	uint8_t     m_response_called = 0;
+	bool        m_reset_needed = false;
 	bool        m_global_shared_memory = false;
 	mutable bool m_last_newline = true;
 	gaddr_t     m_sighandler = 0;

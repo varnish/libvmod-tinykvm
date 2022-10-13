@@ -298,10 +298,8 @@ Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 		// Free regexes, file descriptors etc.
 		mi.tail_reset();
 
-		if (mi.tenant().config.group.experimental_do_reset) {
-			// Reset to the current program (even though it might die before next req).
-			mi.reset_to(nullptr, *mi.program().main_vm);
-		}
+		// Reset to the current program (even though it might die before next req).
+		mi.reset_to(nullptr, *mi.program().main_vm);
 
 		// XXX: Is this racy? We want to enq the slot with the ref.
 		// We are the sole owner of the slot, so no need for atomics here.

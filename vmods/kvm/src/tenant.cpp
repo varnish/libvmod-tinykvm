@@ -185,17 +185,14 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	{
 		group.allow_debug = obj.value();
 	}
-	else if (obj.key() == "allow_make_ephemeral")
+	else if (obj.key() == "control_ephemeral")
 	{
-		group.allow_make_ephemeral = obj.value();
+		group.control_ephemeral = obj.value();
+		//printf("Allow ephemeral control: %d\n", group.control_ephemeral);
 	}
 	else if (obj.key() == "allowed_paths")
 	{
 		group.allowed_paths = obj.value().template get<std::vector<std::string>>();
-	}
-	else if (obj.key() == "experimental_do_reset")
-	{
-		group.experimental_do_reset = obj.value();
 	}
 	else if (obj.key() == "group") { /* Silently ignore. */ }
 	else if (obj.key() == "key")   { /* Silently ignore. */ }

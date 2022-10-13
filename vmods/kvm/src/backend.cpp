@@ -150,6 +150,8 @@ static void error_handling(kvm::VMPoolItem* slot,
 	const struct vmod_kvm_backend *vkb, struct backend_result *result, const char *exception)
 {
 	auto& machine = *slot->mi;
+	/* The machine should be reset (after request). */
+	machine.reset_needed_now();
 	/* Print sane backtrace (faulting RIP) */
 	machine.print_backtrace();
 

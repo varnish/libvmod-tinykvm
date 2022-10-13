@@ -85,10 +85,10 @@ static void syscall_make_ephemeral(vCPU& cpu, MachineInstance& inst)
 {
 	const auto& regs = cpu.registers();
 	if (inst.is_storage()) {
-		if (inst.tenant().config.allow_make_ephemeral())
+		if (inst.tenant().config.control_ephemeral())
 			inst.set_ephemeral(regs.rdi != 0);
 		else
-			throw std::runtime_error("Cannot change ephemeralness. Option 'allow_make_ephemeral' not enabled.");
+			throw std::runtime_error("Cannot change ephemeralness. Option 'control_ephemeral' not enabled.");
 	} else {
 		throw std::runtime_error("Cannot change ephemeralness after initialization");
 	}

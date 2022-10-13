@@ -28,8 +28,7 @@ struct TenantGroup {
 	bool     hugepages    = false;
 	bool     ephemeral_hugepages = false;
 	bool     allow_debug = false;
-	bool     allow_make_ephemeral = false;
-	bool     experimental_do_reset = true;
+	bool     control_ephemeral = false;
 
 	std::vector<std::string> environ {
 		"LC_TYPE=C", "LC_ALL=C", "USER=root"
@@ -82,8 +81,8 @@ struct TenantConfig
 	bool     hugepages() const noexcept { return group.hugepages; }
 	bool     ephemeral_hugepages() const noexcept { return group.ephemeral_hugepages; }
 	bool     allow_debug() const noexcept { return group.allow_debug; }
-	bool     allow_make_ephemeral() const noexcept { return group.allow_make_ephemeral; }
 	bool     allow_verbose_curl() const noexcept { return true; }
+	bool     control_ephemeral() const noexcept { return group.control_ephemeral; }
 	auto&    environ() const noexcept { return group.environ; }
 
 	static bool begin_dyncall_initialization(VCL_PRIV);

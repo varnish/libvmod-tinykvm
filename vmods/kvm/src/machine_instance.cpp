@@ -151,7 +151,13 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 	MachineInstance& source)
 {
 	this->m_ctx = ctx;
-	if (this->m_is_ephemeral) {
+
+	/* If it crashed, or reset is always needed, then reset now. */
+	const bool reset_needed = this->m_reset_needed || this->m_is_ephemeral;
+
+	/* We only reset ephemeral VMs. */
+	if (reset_needed) {
+		this->m_reset_needed = false;
 		machine().reset_to(source.machine(), {
 			.max_mem = tenant().config.max_main_memory(),
 			.max_cow_mem = tenant().config.max_req_memory(),
