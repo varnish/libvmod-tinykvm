@@ -263,27 +263,17 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				}
 				auto struct_addr = vm.stack_push(stack, inputs);
 
-				if (machine.is_ephemeral()) {
-					/* Call into VM doing a full pagetable/cache flush. */
-					vm.timed_vmcall_stack(on_method_addr,
-						stack, timeout, (uint64_t)struct_addr);
-				} else {
-					/* Call into VM without flushing anything. */
-					vm.timed_reentry_stack(on_method_addr,
-						stack, timeout, (uint64_t)struct_addr);
-				}
+				/* Call into VM doing a full pagetable/cache flush. */
+				vm.timed_vmcall_stack(on_method_addr,
+					stack, timeout, (uint64_t)struct_addr);
+
 			} else if (post == nullptr) {
 				/* Call the backend GET function */
 				auto on_get_addr = prog.entry_at(ProgramEntryIndex::BACKEND_GET);
 				if (UNLIKELY(on_get_addr == 0x0))
 					throw std::runtime_error("The GET callback has not been registered");
-				if (machine.is_ephemeral()) {
-					/* Call into VM doing a full pagetable/cache flush. */
-					vm.timed_vmcall(on_get_addr, timeout, vkb->inputs.url, vkb->inputs.argument);
-				} else {
-					/* Call into VM without flushing anything. */
-					vm.timed_reentry(on_get_addr, timeout, vkb->inputs.url, vkb->inputs.argument);
-				}
+				/* Call into VM doing a full pagetable/cache flush. */
+				vm.timed_vmcall(on_get_addr, timeout, vkb->inputs.url, vkb->inputs.argument);
 			} else {
 				/* Try to reduce POST mmap allocation */
 				vm.mmap_relax(post->address, post->capacity, post->length);

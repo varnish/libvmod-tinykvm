@@ -83,14 +83,24 @@ static void syscall_all_mem_shared(vCPU& cpu, MachineInstance& inst)
 }
 static void syscall_make_ephemeral(vCPU& cpu, MachineInstance& inst)
 {
-	const auto& regs = cpu.registers();
+	auto& regs = cpu.registers();
 	if (inst.is_storage()) {
 		if (inst.tenant().config.control_ephemeral()) {
 			inst.set_ephemeral(regs.rdi != 0);
+			regs.rax = 0;
 		} else {
 			const auto& grname = inst.tenant().config.group.name;
-			throw std::runtime_error("Cannot change ephemeralness. Option 'control_ephemeral' not enabled (group: " + grname + ").");
+			if (inst.ctx()) {
+				VSLb(inst.ctx()->vsl, SLT_VCL_Log,
+					"%s: Cannot change ephemeralness. Option 'control_ephemeral' not enabled (group: %s)",
+					inst.name().c_str(), grname.c_str());
+			}
+			fprintf(stderr,
+				"%s: Cannot change ephemeralness. Option 'control_ephemeral' not enabled (group: %s)\n",
+				inst.name().c_str(), grname.c_str());
+			regs.rax = -1;
 		}
+		cpu.set_registers(regs);
 	} else {
 		throw std::runtime_error("Cannot change ephemeralness after initialization");
 	}

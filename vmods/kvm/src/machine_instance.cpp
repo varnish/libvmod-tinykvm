@@ -76,6 +76,8 @@ void MachineInstance::initialize()
 
 		// Global shared memory boundary
 		uint64_t shm_boundary = shared_memory_boundary();
+		//printf("Shared memory boundary: 0x%lX Max addr: 0x%lX\n",
+		//	shm_boundary, machine().max_address());
 		if (m_global_shared_memory) shm_boundary = stack_end;
 
 		// Make forkable (with working memory)
