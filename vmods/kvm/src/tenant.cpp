@@ -3,7 +3,7 @@
  * @author Alf-André Walla (fwsgonzo@hotmail.com)
  * @brief Tenant JSON parsing and startup configuration.
  * @version 0.1
- * @date 2022-07-24
+ * @date 2022-10-13
  *
  * The functions kvm_init_tenants_str and kvm_init_tenants_file will
  * be called during startup, from VCL. The functions will parse a JSON
@@ -252,7 +252,7 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 		}
 		auto& group = grit->second;
 
-		// Set/override both group and tenant settings in one place
+		// Set group settings
 		for (auto it = obj.begin(); it != obj.end(); ++it) {
 			configure_group(grname, group, it);
 		}
@@ -268,9 +268,10 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			if (UNLIKELY(grit == groups.end())) {
 				throw std::runtime_error("Could not find group " + grname + " for '" + it.key() + "'");
 			}
-			auto& group = grit->second;
+			// Make a copy of the selected group
+			auto group = grit->second;
 
-			// Set/override both group and tenant settings in one place
+			// Override both group and tenant settings in one place
 			for (auto it = obj.begin(); it != obj.end(); ++it) {
 				configure_group(grname, group, it);
 			}
@@ -293,7 +294,7 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 				it.key(),
 				std::move(filename),
 				std::move(lvu_key),
-				group,
+				std::move(group),
 				std::move(uri),
 				kvm::tenancy(task).dynamic_functions
 			}, initialize);

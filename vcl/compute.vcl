@@ -16,7 +16,7 @@ sub vcl_init {
 	compute.library("https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/compute.json");
 	# Configure program 'avif' with some overrides
 	compute.configure("avif", """{
-		"max_memory": 36
+        "control_ephemeral": true
 	}""");
 	# Start the AVIF transcoder, but don't delay Varnish startup.
 	#compute.start("avif");
