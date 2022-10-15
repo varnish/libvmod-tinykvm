@@ -91,7 +91,8 @@ static void syscall_make_ephemeral(vCPU& cpu, MachineInstance& inst)
 			regs.rax = 0;
 		} else {
 			const auto& grname = inst.tenant().config.group.name;
-			if (inst.ctx()) {
+			// XXX: We *really* need a wrapper for this.
+			if (inst.ctx() && inst.ctx()->vsl) {
 				VSLb(inst.ctx()->vsl, SLT_VCL_Log,
 					"%s: Cannot change ephemeralness. Option 'control_ephemeral' not enabled (group: %s)",
 					inst.name().c_str(), grname.c_str());
