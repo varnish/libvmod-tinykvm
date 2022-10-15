@@ -5,6 +5,7 @@
 #include "adns.hpp"
 #include "utils/cpptime.hpp"
 #include <blockingconcurrentqueue.h>
+#include <tinykvm/util/threadpool.h>
 struct vcl;
 
 namespace kvm {

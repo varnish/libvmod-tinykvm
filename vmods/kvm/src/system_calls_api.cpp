@@ -3,6 +3,7 @@ extern "C" {
 	void kvm_SetCacheable(VRT_CTX, bool c);
 	void kvm_SetTTLs(VRT_CTX, float ttl, float grace, float keep);
 }
+#include <tinykvm/smp.hpp>
 
 namespace kvm {
 
@@ -177,7 +178,7 @@ static void syscall_stop_storage_task(vCPU& cpu, MachineInstance& inst)
 	cpu.set_registers(regs);
 }
 
-static void syscall_multiprocess(vCPU& cpu, MachineInstance&)
+static void syscall_multiprocess(vCPU& cpu, MachineInstance& inst)
 {
 	auto& regs = cpu.registers();
 	try {
@@ -190,10 +191,12 @@ static void syscall_multiprocess(vCPU& cpu, MachineInstance&)
 		} else if (UNLIKELY(regs.rdi > 16)) {
 			/* TODO: Tenant-property */
 			throw std::runtime_error("Multiprocessing: Too many vCPUs requested");
+		} else if (UNLIKELY(!inst.tenant().config.allow_smp())) {
+			throw std::runtime_error("Multiprocessing: Not allowed");
 		}
 		const size_t num_cpus = regs.rdi - 1;
 		const size_t stack_size = 512 * 1024ul;
-		cpu.machine().timed_smpcall(num_cpus,
+		cpu.machine().smp().timed_smpcall(num_cpus,
 			cpu.machine().mmap_allocate(num_cpus * stack_size),
 			stack_size,
 			(uint64_t) regs.rsi, /* func */
@@ -209,7 +212,7 @@ static void syscall_multiprocess(vCPU& cpu, MachineInstance&)
 	}
 	cpu.set_registers(regs);
 }
-static void syscall_multiprocess_array(vCPU& cpu, MachineInstance&)
+static void syscall_multiprocess_array(vCPU& cpu, MachineInstance& inst)
 {
 	auto& regs = cpu.registers();
 	try {
@@ -222,10 +225,12 @@ static void syscall_multiprocess_array(vCPU& cpu, MachineInstance&)
 		} else if (UNLIKELY(regs.rdi > 16)) {
 			/* TODO: Tenant-property */
 			throw std::runtime_error("Multiprocessing: Too many vCPUs requested");
+		} else if (UNLIKELY(!inst.tenant().config.allow_smp())) {
+			throw std::runtime_error("Multiprocessing: Not allowed");
 		}
 		const size_t num_cpus = regs.rdi - 1;
 		const size_t stack_size = 512 * 1024ul;
-		cpu.machine().timed_smpcall_array(num_cpus,
+		cpu.machine().smp().timed_smpcall_array(num_cpus,
 			cpu.machine().mmap_allocate(num_cpus * stack_size),
 			stack_size,
 			(uint64_t) regs.rsi,  /* func */
@@ -239,7 +244,7 @@ static void syscall_multiprocess_array(vCPU& cpu, MachineInstance&)
 	}
 	cpu.set_registers(regs);
 }
-static void syscall_multiprocess_clone(vCPU& cpu, MachineInstance&)
+static void syscall_multiprocess_clone(vCPU& cpu, MachineInstance& inst)
 {
 	auto& regs = cpu.registers();
 	try {
@@ -252,9 +257,11 @@ static void syscall_multiprocess_clone(vCPU& cpu, MachineInstance&)
 		} else if (UNLIKELY(regs.rdi > 16)) {
 			/* TODO: Tenant-property */
 			throw std::runtime_error("Multiprocessing: Too many vCPUs requested");
+		} else if (UNLIKELY(!inst.tenant().config.allow_smp())) {
+			throw std::runtime_error("Multiprocessing: Not allowed");
 		}
 		const size_t num_cpus = regs.rdi - 1;
-		cpu.machine().timed_smpcall_clone(num_cpus,
+		cpu.machine().smp().timed_smpcall_clone(num_cpus,
 			regs.rsi,
 			regs.rdx,
 			2.0f, /* TODO: Tenant-property */
@@ -271,7 +278,7 @@ static void syscall_multiprocess_wait(vCPU& cpu, MachineInstance&)
 	auto& regs = cpu.registers();
 	try {
 		/* XXX: Propagate SMP exceptions */
-		cpu.machine().smp_wait();
+		cpu.machine().smp_wait(); // No-op when SMP never used
 		regs.rax = 0;
 	} catch (const std::exception& e) {
 		fprintf(stderr, "Multiprocess wait exception: %s\n", e.what());
