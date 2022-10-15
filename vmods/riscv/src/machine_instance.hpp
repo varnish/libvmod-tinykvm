@@ -7,6 +7,7 @@ namespace riscv {
 
 namespace rvs {
 
+[[maybe_unused]]
 static inline std::array<const char*, 12> callback_names = {
 	"Invalid callback",
 	"on_recv",

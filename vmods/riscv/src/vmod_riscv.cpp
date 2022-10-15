@@ -56,7 +56,7 @@ long riscv_current_call_idx(VRT_CTX, vcall_info info, const char* argument)
 	auto* script = get_machine(ctx);
 	if (script) {
 		const auto& callbacks = script->program().callback_entries;
-		if (info.idx >= 0 && info.idx < callbacks.size())
+		if (info.idx < callbacks.size())
 		{
 			auto addr = callbacks[info.idx];
 			if (addr == 0x0) {

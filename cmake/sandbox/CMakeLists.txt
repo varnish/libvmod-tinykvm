@@ -4,7 +4,7 @@ project (sandbox CXX)
 option(SHARED_LIBRISCV "Build the RISC-V sandbox as a shared library" ON)
 
 # WARNING: everything!
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++20 -O2 -g")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=gnu++20 -O2 -g")
 
 list(APPEND RISCV_SOURCES
 	src/backend.cpp
