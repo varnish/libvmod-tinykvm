@@ -59,6 +59,7 @@
 #include "utils/crc32.hpp"
 #include "varnish.hpp"
 #include <string_view>
+#include <thread>
 #include <nlohmann/json.hpp>
 #define KVM_TENANTS_MAGIC  0xc465573f
 using json = nlohmann::json;
@@ -87,7 +88,11 @@ Tenants& tenancy(VCL_PRIV task)
 	task->priv = new Tenants{};
 	task->len  = KVM_TENANTS_MAGIC;
 	task->free = [] (void* priv) {
-		delete (Tenants*)priv;
+		auto* tenants = (Tenants*)priv;
+		std::thread thr{[tenants] {
+			delete tenants;
+		}};
+		thr.detach();
 	};
 	return *(Tenants *)task->priv;
 }

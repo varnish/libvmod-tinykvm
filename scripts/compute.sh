@@ -12,4 +12,5 @@ rm -rf /tmp/varnishd/*
 
 source $file --vcp=build --optimize --mold --shared-kvm --shared-riscv --override-vmods="$VMOD_API" --build --run -a :8080 -f vcl/compute.vcl -F -n $NTMP -p $BWS $@
 #source $file --vcp=build --no-optimize --shared-kvm --shared-riscv --mold --override-vmods="$VMOD_API" --build $@ --run -a :8080 -f vcl/compute.vcl -F -n $NTMP -p $BWS
+#export ASAN_OPTIONS=detect_odr_violation=0
 #source $file --vcp=build_debug --no-optimize --sanitize --debug=$NTMP --single-process --static-kvm --disable-mold --build --run -a :8080 -f vcl/compute.vcl -F -n $NTMP -p $BWS -p $TPS $@
