@@ -102,6 +102,10 @@ public:
 	Reservation reserve_vm(const vrt_ctx*,
 		TenantInstance*, std::shared_ptr<ProgramInstance>);
 
+	/* Reserve VM from blocking queue. */
+	MachineInstance* tls_reserve_vm(const vrt_ctx*,
+		TenantInstance*, std::shared_ptr<ProgramInstance>);
+
 	/* Serialized vector-based vmcall into storage VM.
 	   NOTE: buffers are clobbered by the function call. */
 	long storage_call(tinykvm::Machine& src,

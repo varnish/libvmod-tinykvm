@@ -34,13 +34,15 @@ extern "C"
 int kvm_curl_fetch(
 	const char *url, kvm_curl_callback callback, void *usr, const char *condhdr)
 {
+	struct curl_slist *req_list = NULL;
 	int retvalue = -1;
+	const size_t url_len = strlen(url);
 
 	MemoryStruct chunk {
 		.memory = (char *)malloc(1),
 		.size = 0
 	};
-	if (chunk.memory == NULL) {
+	if (chunk.memory == NULL || url_len < 8u) {
 		return (-1);
 	}
 
@@ -48,29 +50,37 @@ int kvm_curl_fetch(
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, (write_callback)kvm_WriteMemoryCallback);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &chunk);
-	/* Many URLs go straight to redirects, and it is disabled by default. */
-	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
 
-	struct curl_slist *req_list = NULL;
-	if (condhdr != nullptr && condhdr[0] != 0) {
-		//printf("Adding header: %s\n", condhdr);
-		req_list = curl_slist_append(req_list, condhdr);
-		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, req_list);
+	const bool is_http = (memcmp(url, "http", 4) == 0);
+	if (is_http)
+	{
+		/* Many URLs go straight to redirects, and it is disabled by default. */
+		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
+
+		if (condhdr != nullptr && condhdr[0] != 0) {
+			//printf("Adding header: %s\n", condhdr);
+			req_list = curl_slist_append(req_list, condhdr);
+			curl_easy_setopt(curl, CURLOPT_HTTPHEADER, req_list);
+		}
 	}
 
 	CURLcode res = curl_easy_perform(curl);
 
 	long status;
-	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
+	if (is_http) {
+		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
+	} else {
+		status = (res == CURLE_OK) ? 200 : -1;
+	}
 
 	curl_slist_free_all(req_list);
 	curl_easy_cleanup(curl);
 
 	if (res != CURLE_OK) {
 		VSL(SLT_Error, 0,
-			"kvm.curl_fetch(): cURL failed: %s", curl_easy_strerror(res));
+			"kvm.curl_fetch(): cURL failed for '%s': %s", url, curl_easy_strerror(res));
 		fprintf(stderr,
-			"kvm.curl_fetch(): cURL failed: %s", curl_easy_strerror(res));
+			"kvm.curl_fetch(): cURL failed for '%s': %s\n", url, curl_easy_strerror(res));
 		retvalue = -1;
 	}
 	else {

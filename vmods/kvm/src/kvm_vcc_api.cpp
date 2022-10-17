@@ -174,7 +174,7 @@ static int kvm_forkcall(VRT_CTX, kvm::VMPoolItem* slot,
 			/* Make sure no SMP work is in-flight. */
 			vm.smp_wait();
 
-			auto regs = vm.registers();
+			const auto& regs = vm.registers();
 			return regs.rdi;
 		});
 		return fut.get();

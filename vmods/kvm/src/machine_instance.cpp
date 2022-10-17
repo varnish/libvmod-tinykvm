@@ -47,6 +47,8 @@ MachineInstance::MachineInstance(
 	  m_fd        {ten->config.max_fd(), "File descriptors"},
 	  m_regex     {ten->config.max_regex(), "Regex handles"}
 {
+	// By default programs start out ephemeral, but it can be overridden
+	this->m_is_ephemeral = ten->config.group.ephemeral;
 	machine().set_userdata<MachineInstance> (this);
 	machine().set_printer(get_vsl_printer());
 }

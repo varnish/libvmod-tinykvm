@@ -94,10 +94,12 @@ ProgramInstance::ProgramInstance(
 				TenantInstance*  ten;
 				ProgramInstance* prog;
 				int status;
+				const std::string& uri;
 			} data {
 				.ten  = ten,
 				.prog = this,
-				.status = 0
+				.status = 0,
+				.uri = uri
 			};
 
 			/* Blocking cURL fetch, retrieving the program. May
@@ -121,7 +123,7 @@ ProgramInstance::ProgramInstance(
 						std::vector<uint8_t> (chunk->memory, chunk->memory + chunk->size);
 				} else {
 					// Unhandled HTTP status?
-					throw std::runtime_error("Fetching program '" + data->ten->config.name + "' failed");
+					throw std::runtime_error("Fetching program '" + data->ten->config.name + "' failed. URL: " + data->uri);
 				}
 			}, &data, ifmodsince.c_str());
 
@@ -308,6 +310,17 @@ Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 		// If there any waiters, they keep the program referenced (atomically)
 		ref->m_vmqueue.enqueue(slot);
 	}};
+}
+
+MachineInstance* ProgramInstance::tls_reserve_vm(const vrt_ctx* ctx,
+	TenantInstance* ten, std::shared_ptr<ProgramInstance> prog)
+{
+	thread_local std::unique_ptr<MachineInstance> inst = nullptr;
+
+	if (inst == nullptr) {
+		inst.reset(new MachineInstance(*prog->main_vm, ten, prog.get()));
+	}
+	return inst.get();
 }
 
 long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,

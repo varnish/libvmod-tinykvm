@@ -179,24 +179,25 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t0);
 	#endif
-		std::shared_ptr<ProgramInstance> prog;
-		if (LIKELY(!debug))
-			prog = std::atomic_load(&this->program);
-		else
-			prog = std::atomic_load(&this->debug_program);
-		// First-time tenants could have no program loaded
-		if (UNLIKELY(prog == nullptr)) {
-			// Attempt to load the program (if it was never attempted)
-			// XXX: But not for debug programs (NOT IMPLEMENTED YET).
-			if (debug || this->wait_guarded_initialize(ctx, prog) == false) {
-				VRT_fail(ctx, "vmreserve: Missing program for %s. Not uploaded?",
-					config.name.c_str());
-				return nullptr;
+		try
+		{
+			std::shared_ptr<ProgramInstance> prog;
+			if (LIKELY(!debug))
+				prog = std::atomic_load(&this->program);
+			else
+				prog = std::atomic_load(&this->debug_program);
+			// First-time tenants could have no program loaded
+			if (UNLIKELY(prog == nullptr)) {
+				// Attempt to load the program (if it was never attempted)
+				// XXX: But not for debug programs (NOT IMPLEMENTED YET).
+				if (debug || this->wait_guarded_initialize(ctx, prog) == false) {
+					VRT_fail(ctx, "vmreserve: Missing program for %s. Not uploaded?",
+						config.name.c_str());
+					return nullptr;
+				}
+				// On success, prog is now loaded with the new program.
+				// XXX: Assert on prog
 			}
-			// On success, prog is now loaded with the new program.
-			// XXX: Assert on prog
-		}
-		try {
 			// Avoid reservation while still initializing. Wait for lock.
 			// Returns false if the main_vm failed to initialize.
 			if (UNLIKELY(!prog->wait_for_main_vm())) {
@@ -212,7 +213,8 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 			priv_task->len  = KVM_PROGRAM_MAGIC;
 			priv_task->free = resv.free;
 		} catch (std::exception& e) {
-			VRT_fail(ctx,
+			// It makes no sense to reserve a VM without a request w/VSL
+			VSLb(ctx->vsl, SLT_Error,
 				"VM '%s' exception: %s", config.name.c_str(), e.what());
 			return nullptr;
 		}
@@ -222,6 +224,40 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 	#endif
 	}
 	return (VMPoolItem*) priv_task->priv;
+}
+
+MachineInstance* TenantInstance::tlsreserve(const vrt_ctx* ctx, bool debug)
+{
+	std::shared_ptr<ProgramInstance> prog;
+	if (LIKELY(!debug))
+		prog = std::atomic_load(&this->program);
+	else
+		prog = std::atomic_load(&this->debug_program);
+	// First-time tenants could have no program loaded
+	if (UNLIKELY(prog == nullptr))
+	{
+		// Attempt to load the program (if it was never attempted)
+		// XXX: But not for debug programs (NOT IMPLEMENTED YET).
+		if (debug || this->wait_guarded_initialize(ctx, prog) == false)
+		{
+			VRT_fail(ctx, "vmreserve: Missing program for %s. Not uploaded?",
+					 config.name.c_str());
+			return nullptr;
+		}
+		// On success, prog is now loaded with the new program.
+		// XXX: Assert on prog
+	}
+	// Avoid reservation while still initializing. Wait for lock.
+	// Returns false if the main_vm failed to initialize.
+	if (UNLIKELY(!prog->wait_for_main_vm()))
+	{
+		return nullptr;
+	}
+
+	// Reserve a machine through blocking queue.
+	// May throw if dequeue from the queue times out.
+	return prog->tls_reserve_vm(ctx, this, std::move(prog));
+	// prog is nullptr after this ^
 }
 
 uint64_t TenantInstance::lookup(const char* name) const {

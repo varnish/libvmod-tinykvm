@@ -13,6 +13,7 @@ struct VMPoolItem;
 class TenantInstance {
 public:
 	VMPoolItem* vmreserve(const vrt_ctx*, bool debug);
+	MachineInstance* tlsreserve(const vrt_ctx*, bool debug);
 	bool no_program_loaded() const noexcept { return this->program == nullptr; }
 
 	uint64_t lookup(const char* name) const;
