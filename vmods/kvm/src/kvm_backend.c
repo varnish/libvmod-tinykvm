@@ -151,8 +151,10 @@ kvmbe_gethdrs(const struct director *dir,
 		.http_beresp = bo->beresp,
 	};
 
-	kvmr->t_prev = bo->t_prev;
-	kvm_ts(ctx.vsl, "TenantStart", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
+	if (VMOD_KVM_BACKEND_TIMINGS) {
+		kvmr->t_prev = bo->t_prev;
+		kvm_ts(ctx.vsl, "TenantStart", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
+	}
 
 	/* Reserving a VM means putting ourselves in a concurrent queue
 	   waiting for a free VM, and then getting exclusive access until
@@ -163,7 +165,9 @@ kvmbe_gethdrs(const struct director *dir,
 		VSLb(ctx.vsl, SLT_Error, "KVM: Unable to reserve machine");
 		return (-1);
 	}
-	kvm_ts(ctx.vsl, "TenantReserve", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
+	if (VMOD_KVM_BACKEND_TIMINGS) {
+		kvm_ts(ctx.vsl, "TenantReserve", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
+	}
 
 	struct backend_post *post = NULL;
 	kvmr->inputs.method = bo->bereq->hd[0].b;
@@ -189,7 +193,9 @@ kvmbe_gethdrs(const struct director *dir,
 			VSLb(ctx.vsl, SLT_Error, "KVM: Unable to aggregate request body data");
 			return (-1);
 		}
-		kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
+		if (VMOD_KVM_BACKEND_TIMINGS) {
+			kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
+		}
 	}
 
 	/* The backend_result contains many iovec-like buffers needed for
@@ -204,7 +210,10 @@ kvmbe_gethdrs(const struct director *dir,
 
 	/* Make a backend VM call (with optional POST). */
 	kvm_backend_call(&ctx, slot, kvmr, post, result);
-	kvm_ts(ctx.vsl, "TenantProcess", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
+
+	if (VMOD_KVM_BACKEND_TIMINGS) {
+		kvm_ts(ctx.vsl, "TenantProcess", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
+	}
 
 	/* Status code is sanitized in the backend call. */
 	http_PutResponse(bo->beresp, "HTTP/1.1", result->status, NULL);
@@ -244,7 +253,10 @@ kvmbe_gethdrs(const struct director *dir,
 	   See: kvmfp_pull, kvmfp_streaming_pull */
 	const bool streaming = result->content_length > 0 && result->bufcount == 0;
 	vfp_init(bo, streaming);
-	kvm_ts(ctx.vsl, "TenantResponse", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
+
+	if (VMOD_KVM_BACKEND_TIMINGS) {
+		kvm_ts(ctx.vsl, "TenantResponse", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
+	}
 	return (0);
 }
 
@@ -269,7 +281,9 @@ static void init_kvmr(struct vmod_kvm_backend *kvmr,
 	const char *url, const char *arg)
 {
 	INIT_OBJ(kvmr, KVM_BACKEND_MAGIC);
-	kvmr->t_work = VTIM_real();
+	if (VMOD_KVM_BACKEND_TIMINGS) {
+		kvmr->t_work = VTIM_real();
+	}
 	kvmr->inputs.method = "";
 	kvmr->inputs.url = url ? url : "";
 	kvmr->inputs.argument = arg ? arg : "";
