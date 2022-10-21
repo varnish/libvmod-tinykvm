@@ -15,7 +15,7 @@ sub vcl_init {
 	# A full list of programs and how they can be used would be on the docs site.
 	compute.library("https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/compute.json");
 	# Configure program 'avif' with some overrides
-	compute.configure("avif", """{
+	compute.configure("minimal", """{
         "control_ephemeral": true
 	}""");
 	# Start the AVIF transcoder, but don't delay Varnish startup.
