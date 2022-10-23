@@ -192,7 +192,13 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	}
 	else if (obj.key() == "control_ephemeral")
 	{
+		// Allow guest to control ephemeral using system call
 		group.control_ephemeral = obj.value();
+	}
+	else if (obj.key() == "ephemeral")
+	{
+		// Set the default ephemeralness for this group/tenant
+		group.ephemeral = obj.value();
 	}
 	else if (obj.key() == "allowed_paths")
 	{
