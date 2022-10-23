@@ -34,8 +34,6 @@ public:
 
 	inline long resume(uint64_t cycles);
 
-	void dynamic_call(uint32_t hash);
-
 	auto& regex() { return m_regex; }
 	auto& directors() { return m_directors; }
 

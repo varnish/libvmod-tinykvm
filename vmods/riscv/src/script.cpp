@@ -413,11 +413,6 @@ std::string Script::symbol_name(gaddr_t address) const
 	return callsite.name;
 }
 
-void Script::dynamic_call(uint32_t hash)
-{
-	vrm()->dynamic_call(hash, *this);
-}
-
 #ifdef ENABLE_TIMING
 timespec time_now()
 {

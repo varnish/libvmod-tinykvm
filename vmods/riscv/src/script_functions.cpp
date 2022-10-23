@@ -182,13 +182,6 @@ APICALL(signal)
 	auto [sig, handler] = machine.sysargs<int, gaddr_t> ();
 	get_script(machine).set_sigaction(sig, handler);
 }
-APICALL(dynamic_call)
-{
-	// call the handler using hash from T0
-	get_script(machine).dynamic_call(machine.cpu.reg(riscv::REG_T0));
-	// we short-circuit the ret pseudo-instruction:
-	//machine.cpu.jump(machine.cpu.reg(riscv::REG_RA) - 4);
-}
 APICALL(remote_call)
 {
 	auto [func] = machine.sysargs <gaddr_t> ();
@@ -912,7 +905,7 @@ void Script::setup_syscall_interface()
 		FPTR(shm_log),
 		FPTR(breakpoint),
 		FPTR(signal),
-		FPTR(rvs::dynamic_call),
+		FPTR(fail),
 		FPTR(remote_call),
 		FPTR(remote_strcall),
 

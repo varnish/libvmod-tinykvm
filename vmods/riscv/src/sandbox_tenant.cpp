@@ -99,43 +99,6 @@ Script* SandboxTenant::vmfork(VRT_CTX, bool debug)
 	return (Script*) priv_task->priv;
 }
 
-void SandboxTenant::set_dynamic_call(const std::string& name, ghandler_t handler)
-{
-	const uint32_t hash = crc32(name.c_str(), name.size());
-	printf("*** DynCall %s is registered as 0x%X\n", name.c_str(), hash);
-	auto it = m_dynamic_functions.find(hash);
-	if (it != m_dynamic_functions.end()) {
-		throw std::runtime_error("set_dynamic_call: Hash collision for " + name);
-	}
-	m_dynamic_functions.emplace(hash, std::move(handler));
-}
-void SandboxTenant::reset_dynamic_call(const std::string& name, ghandler_t handler)
-{
-	const uint32_t hash = crc32(name.c_str(), name.size());
-	m_dynamic_functions.erase(hash);
-	if (handler != nullptr) {
-		set_dynamic_call(name, std::move(handler));
-	}
-}
-void SandboxTenant::set_dynamic_calls(std::vector<std::pair<std::string, ghandler_t>> vec)
-{
-	for (const auto& pair : vec) {
-		set_dynamic_call(pair.first, std::move(pair.second));
-	}
-}
-void SandboxTenant::dynamic_call(uint32_t hash, Script& script) const
-{
-	auto it = m_dynamic_functions.find(hash);
-	if (it != m_dynamic_functions.end()) {
-		it->second(script);
-	} else {
-		fprintf(stderr,
-			"Unable to find dynamic function with hash: 0x%08x\n",
-			hash);
-		throw std::runtime_error("Unable to find dynamic function");
-	}
-}
-
 #include <unistd.h>
 std::vector<uint8_t> file_loader(const std::string& filename)
 {
