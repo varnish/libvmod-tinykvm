@@ -16,7 +16,12 @@ sub vcl_init {
 	compute.library("https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/compute.json");
 	# Configure program 'avif' with some overrides
 	compute.configure("minimal", """{
-        "control_ephemeral": true
+        "control_ephemeral": true,
+		"concurrency": 32
+	}""");
+	compute.configure("minify", """{
+        "ephemeral": true,
+		"concurrency": 16
 	}""");
 	# Start the AVIF transcoder, but don't delay Varnish startup.
 	#compute.start("avif");
@@ -28,6 +33,9 @@ sub vcl_init {
 sub vcl_recv {
 	return (pass);
 }
+sub vcl_deliver {
+	#set resp.http.X-Hello = req.http.X-Hello;
+}
 
 sub vcl_backend_fetch {
 	if (bereq.url == "/avif" || bereq.url == "/") {
@@ -37,14 +45,14 @@ sub vcl_backend_fetch {
 				"headers": ["Host: filebin.varnish-software.com"]
 			}""");
 	}
-	if (bereq.url == "/avif/bench") {
+	else if (bereq.url == "/avif/bench") {
 		set bereq.backend = compute.program("avif", "");
 	}
-	if (bereq.url == "/gzip") {
+	else if (bereq.url == "/gzip") {
 		# Decompress a zlib-compressed asset
 		set bereq.backend = compute.program("inflate", "http://httpbin.org/gzip");
 	}
-	if (bereq.url == "/zstd") {
+	else if (bereq.url == "/zstd") {
 		# Decompress a zstd-compressed asset into a PNG (without content-type)
 		set bereq.backend = compute.program("zstd", "http://127.0.0.1:8080/zstd/compress",
 			"""{
@@ -54,7 +62,7 @@ sub vcl_backend_fetch {
 				]
 			}""");
 	}
-	if (bereq.url == "/zstd/compress") {
+	else if (bereq.url == "/zstd/compress") {
 		# Compress data using zstandard
 		set bereq.backend = compute.program("zstd", "https://${vafb}/nsyb0c1pvwa7ecf9/waterfall.png",
 			"""{
@@ -63,14 +71,17 @@ sub vcl_backend_fetch {
 				"headers": ["Host: filebin.varnish-software.com"]
 			}""");
 	}
-	if (bereq.url == "/min") {
+	else if (bereq.url == "/min") {
 		set bereq.backend = compute.program("minimal", "");
 	}
-	if (bereq.url == "/ftp") {
+	else if (bereq.url == "/minify") {
+		set bereq.backend = compute.program("minify", "");
+	}
+	else if (bereq.url == "/ftp") {
 		# Fetch something with cURL
 		set bereq.backend = compute.program("fetch", "ftp://ftp.funet.fi/pub/standards/RFC/rfc959.txt");
 	}
-	if (bereq.url == "/http3") {
+	else if (bereq.url == "/http3") {
 		# Fetch HTTP/3 page with cURL. AltSvc cache enables future fetches to use HTTP/3.
 		set bereq.backend = compute.program("fetch", "https://quic.rocks:4433/");
 	}

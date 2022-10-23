@@ -1,3 +1,2 @@
-varnish-compute0-dbgsym_1.0-1_amd64.ddeb debug optional automatic=yes
 varnish-compute0_1.0-1_amd64.deb libs optional
 varnish-compute_1.0-1_amd64.buildinfo libs optional
