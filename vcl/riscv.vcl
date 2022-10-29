@@ -38,10 +38,7 @@ sub vcl_recv {
 	riscv.vcall(ON_REQUEST, req.url);
 
 	/* Make decision */
-	if (riscv.want_result() == "synth") {
-		return (synth(riscv.want_status()));
-	}
-	else if (riscv.want_result() == "backend") {
+	if (riscv.want_result() == "backend") {
 		set req.http.X-Backend-Func = riscv.result_value(1);
 		set req.http.X-Backend-Arg  = riscv.result_value(2);
 		if (riscv.result_value(0) == 0) {
@@ -49,6 +46,9 @@ sub vcl_recv {
 		} else {
 			return (hash);
 		}
+	}
+	else if (riscv.want_result() == "synth") {
+		return (synth(riscv.want_status()));
 	}
 	else if (riscv.want_result() == "compute") {
 		set req.http.X-KVM-Arg  = riscv.result_as_string(1);
