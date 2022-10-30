@@ -1,6 +1,7 @@
 vcl 4.1;
 import activedns;
 import compute;
+#import insular;
 
 backend default {
 	.host = "127.0.0.1";
@@ -16,8 +17,8 @@ sub vcl_init {
 	compute.library("https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/compute.json");
 	# Configure program 'avif' with some overrides
 	compute.configure("minimal", """{
-        "control_ephemeral": true,
-		"concurrency": 32
+        "ephemeral": false,
+		"concurrency": 16
 	}""");
 	compute.configure("minify", """{
         "ephemeral": true,
@@ -29,8 +30,11 @@ sub vcl_init {
 	#compute.start("inflate");
 	compute.start("minimal");
 	#compute.start("zstd");
+
+	#insular.program("file:///tmp/hello_frontend");
 }
 sub vcl_recv {
+	#insular.on_recv(req.url);
 	return (pass);
 }
 sub vcl_deliver {

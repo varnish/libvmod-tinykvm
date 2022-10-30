@@ -6,6 +6,7 @@
 #include "utils/cpptime.hpp"
 #include <blockingconcurrentqueue.h>
 #include <tinykvm/util/threadpool.h>
+#include <tinykvm/util/threadtask.hpp>
 struct vcl;
 
 namespace kvm {
@@ -26,7 +27,7 @@ struct VMPoolItem {
 	// VM instance
 	std::unique_ptr<MachineInstance> mi;
 	// Communicate with this VM using single thread pool
-	tinykvm::ThreadPool tp {1, REQUEST_VM_NICE, false};
+	tinykvm::ThreadTask tp {REQUEST_VM_NICE, false};
 	// Reference that keeps active program alive
 	std::shared_ptr<ProgramInstance> prog_ref = nullptr;
 };
@@ -135,9 +136,9 @@ public:
 	std::mutex m_async_mtx;
 
 	/* Queue of work to happen on main VM. Bottleneck. */
-	tinykvm::ThreadPool m_main_queue;
+	tinykvm::ThreadTask m_main_queue;
 	/* Separate queue for async calls into main VM. */
-	tinykvm::ThreadPool m_main_async_queue;
+	tinykvm::ThreadTask m_main_async_queue;
 
 	/* Entry points in the tenants program. Handlers for all types of
 	   requests, serialization mechanisms and related functionality.

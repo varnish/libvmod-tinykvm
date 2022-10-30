@@ -58,8 +58,8 @@ ProgramInstance::ProgramInstance(
 	const vrt_ctx* ctx, TenantInstance* ten,
 	bool debug)
 	: binary{std::move(elf)},
-	  m_main_queue {1, STORAGE_VM_NICE, false},
-	  m_main_async_queue {1, ASYNC_STORAGE_NICE, ASYNC_STORAGE_LOWPRIO},
+	  m_main_queue {STORAGE_VM_NICE, false},
+	  m_main_async_queue {ASYNC_STORAGE_NICE, ASYNC_STORAGE_LOWPRIO},
 	  m_vcl {ctx->vcl},
 	  rspclient{nullptr}
 {
@@ -78,8 +78,8 @@ ProgramInstance::ProgramInstance(
 	const vrt_ctx* ctx, TenantInstance* ten,
 	bool debug)
 	: binary{},
-	  m_main_queue {1, STORAGE_VM_NICE, false},
-	  m_main_async_queue {1, ASYNC_STORAGE_NICE, ASYNC_STORAGE_LOWPRIO},
+	  m_main_queue {STORAGE_VM_NICE, false},
+	  m_main_async_queue {ASYNC_STORAGE_NICE, ASYNC_STORAGE_LOWPRIO},
 	  m_vcl {ctx->vcl},
 	  rspclient{nullptr}
 {
@@ -516,29 +516,33 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 	const float timeout = main_vm->tenant().config.max_storage_time();
 
 	auto future = m_main_queue.enqueue(
-	[&] () -> SerializeResult
+	[&] () -> long
 	{
 		try {
 			/* Serialize data in the old machine */
-				main_vm->set_ctx(ctx);
-				auto &old_machine = main_vm->machine();
-				old_machine.timed_vmcall(func, timeout);
-				/* Get serialized data */
-				auto regs = old_machine.registers();
-				auto data_addr = regs.rdi;
-				auto data_len = regs.rsi;
-				if (data_addr + data_len < data_addr)
-				{
-					return {0, 0};
-			}
-			return {data_addr, data_len};
+			main_vm->set_ctx(ctx);
+			auto& old_machine = main_vm->machine();
+			old_machine.timed_vmcall(func, timeout);
+			return 0;
 		} catch (...) {
 			/* We have to make sure Varnish is not taken down */
-			return {0x0, 0};
+			return -1;
 		}
 	});
+	long result = future.get();
 
-	SerializeResult from = future.get();
+	SerializeResult from {};
+	if (result == 0) {
+		auto& old_machine = main_vm->machine();
+		/* Get serialized data */
+		auto regs = old_machine.registers();
+		auto data_addr = regs.rdi;
+		auto data_len = regs.rsi;
+		if (data_addr + data_len < data_addr) {
+			return -1;
+		}
+		from = {data_addr, data_len};
+	}
 	if (from.data == 0x0)
 		return -1;
 

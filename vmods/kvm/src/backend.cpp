@@ -161,7 +161,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 	try {
 		auto& vm = machine.machine();
 		auto fut = slot->tp.enqueue(
-		[&] {
+		[&] () -> long {
 			/* Enforce that guest program calls the backend_response system call. */
 			machine.begin_call();
 
@@ -176,6 +176,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 			vm.smp_wait();
 
 			fetch_result(slot, machine, result);
+			return 0L;
 		});
 		fut.get();
 		return;
@@ -227,7 +228,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 	kvm_ts(ctx->vsl, "ProgramStart", t_work, t_prev, VTIM_real());
 	try {
 		auto fut = slot->tp.enqueue(
-		[&] {
+		[&] () -> long {
 			if constexpr (VERBOSE_BACKEND) {
 				printf("Begin backend %s %s (arg=%s)\n", vkb->inputs.method,
 					vkb->inputs.url, vkb->inputs.argument);
@@ -297,6 +298,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			fetch_result(slot, machine, result);
 
 			kvm_ts(ctx->vsl, "ProgramProcess", t_work, t_prev, VTIM_real());
+			return 0L;
 		});
 		/* XXX: This competes with the VSL changes in the VM thread. */
 		//kvm_ts(ctx->vsl, "ProgramQueue", t_work, t_prev, VTIM_real());
@@ -354,7 +356,7 @@ int kvm_backend_streaming_post(struct backend_post *post,
 			mi.program().entry_at(ProgramEntryIndex::BACKEND_STREAM);
 		if (call_addr != 0x0) {
 			auto fut = slot.tp.enqueue(
-			[&] {
+			[&] () -> long {
 				const auto timeout = mi.max_req_time();
 				if (post->length == 0) {
 					vm.timed_vmcall(call_addr, timeout,
@@ -367,6 +369,7 @@ int kvm_backend_streaming_post(struct backend_post *post,
 						(uint64_t)post->address, (uint64_t)data_len,
 						(uint64_t)post->length);
 				}
+				return 0L;
 			});
 			fut.get();
 
@@ -412,12 +415,13 @@ ssize_t kvm_backend_streaming_delivery(
 
 		/* Call the backend streaming function, if set. */
 		auto fut = slot.tp.enqueue(
-		[&] {
+		[&] () -> long {
 			const auto timeout = STREAM_HANDLING_TIMEOUT;
 			vm.timed_reentry(result->stream_callback, timeout,
 				(uint64_t)result->stream_argument,
 				(uint64_t)max_len, (uint64_t)written,
 				(uint64_t)result->content_length);
+			return 0L;
 		});
 		fut.get();
 
