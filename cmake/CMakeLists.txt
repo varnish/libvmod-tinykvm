@@ -1,4 +1,4 @@
-set(CMAKE_C_FLAGS "-Wall -Wextra -std=c11 -O2 -g -fstack-protector-strong")
+set(CMAKE_C_FLAGS "-Wall -Wextra -std=gnu11 -O2 -g -fstack-protector-strong")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fdiagnostics-color")
 
 #set(CMAKE_C_CLANG_TIDY clang-tidy-11 -checks=-*,readability-*)

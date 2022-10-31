@@ -60,6 +60,7 @@ if (VARNISH_PLUS)
 	add_subdirectory(unix)
 	add_subdirectory(vtc)
 	add_subdirectory(xkey)
+	add_subdirectory(ykey)
 endif()
 
 enable_testing()
