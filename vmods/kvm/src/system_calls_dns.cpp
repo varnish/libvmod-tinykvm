@@ -263,7 +263,7 @@ static void blocking_adns_callback(struct adns_info_list *new_list,
 	// Not found
 }
 
-std::string adns_interp(MachineInstance& inst, std::string url)
+std::string adns_interp(struct vcl *vcl, std::string url)
 {
 	auto off = url.find("://${");
 	if (off != std::string::npos) {
@@ -273,7 +273,6 @@ std::string adns_interp(MachineInstance& inst, std::string url)
 			auto dns_tag = url.substr(name_off, offe - name_off);
 			//printf("DNS tag: %s\n", dns_tag.c_str());
 			const char *ctag = dns_tag.c_str();
-			auto *vcl = inst.program().get_adns_key();
 
 			// Refcount tag keeping it alive.
 			if (ADNS_tag(ctag, vcl) == 0)
