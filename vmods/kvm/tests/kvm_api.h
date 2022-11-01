@@ -554,21 +554,6 @@ extern int sys_is_debug();
    up for remote GDB debugging. */
 extern void sys_breakpoint();
 
-/* This cannot be used when KVM is used as a backend */
-#ifndef KVM_API_ALREADY_DEFINED
-#define DYNAMIC_CALL(name, hash, ...) \
-	asm(".global " #name "\n" \
-	#name ":\n" \
-	"	mov $" #hash ", %eax\n" \
-	"	out %eax, $1\n" \
-	"   ret\n"); \
-	extern long name(__VA_ARGS__);
-#else
-#define DYNAMIC_CALL(name, hash, ...) \
-	extern long name(__VA_ARGS__);
-#endif
-DYNAMIC_CALL(goto_dns, 0x746238D2)
-
 /* Fetch content from provided URL. Content will be allocated by Varnish
    when fetching. The fetcher will also fill out the input structure if the
    fetch succeeds. If a serious error is encountered, the function returns
@@ -577,8 +562,8 @@ DYNAMIC_CALL(goto_dns, 0x746238D2)
    ***NOT*** read response headers into them and set the values. It is a
    way to disable the feature, as it takes up extra memory if unwanted.
    *curl_fields* and *curl_options* are both optional and can be NULL.
-   NOTE: It is possible to run out of memory in mutable storage if you do a
-   lot of cURL fetching without unmapping the content buffer. */
+   NOTE: You can avoid running out of memory by pre-allocating storage
+   for the requests if using non-ephemeral VMs. */
 struct curl_op {
 	uint32_t    status;
 	uint32_t    post_buflen;
@@ -606,7 +591,7 @@ struct curl_options {
 	int8_t      dont_verify_host;
 	uint32_t    unused_opt5;
 };
-DYNAMIC_CALL(curl_fetch, 0xB86011FB, const char*, size_t, struct curl_op*, struct curl_fields*, struct curl_options*)
+extern long sys_fetch(const char*, size_t, struct curl_op*, struct curl_fields*, struct curl_options*);
 
 /* Embed binary data into executable. This data has no guaranteed alignment. */
 #define EMBED_BINARY(name, filename) \
@@ -860,6 +845,13 @@ asm(".global get_meminfo\n"
 	".type get_meminfo, @function\n"
 	"get_meminfo:\n"
 	"	mov $0x10A00, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
+
+asm(".global sys_fetch\n"
+	".type sys_fetch, @function\n"
+	"sys_fetch:\n"
+	"	mov $0x20000, %eax\n"
 	"	out %eax, $0\n"
 	"   ret\n");
 

@@ -19,6 +19,7 @@ using namespace tinykvm;
 #include "system_calls_http.cpp"
 #include "system_calls_regex.cpp"
 #include "system_calls_dns.cpp"
+#include "system_calls_fetch.cpp"
 #include "system_calls_api.cpp"
 
 namespace kvm {
@@ -172,6 +173,9 @@ void MachineInstance::setup_syscall_interface()
 				return;
 			case 0x10A00: // GET_MEMINFO
 				syscall_memory_info(cpu, inst);
+				return;
+			case 0x20000: // CURL_FETCH
+				syscall_fetch(cpu, inst);
 				return;
 			case 0x7FDEB: // IS_DEBUG
 				syscall_is_debug(cpu, inst);
@@ -382,16 +386,6 @@ void MachineInstance::setup_syscall_interface()
 			}
 			cpu.set_registers(regs);
 		});
-	Machine::install_output_handler(
-	[] (vCPU& cpu, unsigned port, unsigned data)
-	{
-		auto& inst = *cpu.machine().get_userdata<MachineInstance>();
-		switch (port) {
-			case 0x1: /* Dynamic calls */
-				inst.tenant().dynamic_call(data, cpu, inst);
-				break;
-		}
-	});
 }
 
 } // kvm

@@ -8,9 +8,6 @@ class TenantInstance;
 
 struct Tenants {
 	std::unordered_map<uint32_t, TenantInstance> tenants;
-
-	TenantConfig::dynfun_map dynamic_functions;
-	bool dyncalls_initialized = false;
 };
 
 extern Tenants& tenancy(VCL_PRIV task);

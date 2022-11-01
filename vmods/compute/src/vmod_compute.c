@@ -25,9 +25,6 @@ VCL_BOOL vmod_library(VRT_CTX, VCL_PRIV task, VCL_STRING uri)
 		return (0);
 	}
 
-	/* Initialize, re-initialize and remove VMODs */
-	initialize_vmods(ctx, task);
-
 	return (kvm_init_tenants_uri(ctx, task, uri, NO_INIT_PROGRAMS));
 }
 

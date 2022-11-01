@@ -29,7 +29,7 @@ namespace insular
 
 			program.reset(new kvm::TenantConfig(
 				"insular",
-				"/tmp/insular_elf", "", std::move(grp), url, tenants.dynamic_functions));
+				"/tmp/insular_elf", "", std::move(grp), url));
 			inst.reset(new kvm::TenantInstance{ctx, *program});
 			return 0;
 		} catch (const std::exception& e) {

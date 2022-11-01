@@ -9,7 +9,6 @@ typedef struct vmod_priv * VCL_PRIV;
 namespace tinykvm { struct vCPU; }
 
 namespace kvm {
-class MachineInstance;
 
 struct TenantGroup {
 	std::string name;
@@ -56,9 +55,6 @@ struct TenantGroup {
 
 struct TenantConfig
 {
-	using ghandler_t = std::function<void(MachineInstance&, tinykvm::vCPU&)>;
-	using dynfun_map = std::map<uint32_t, ghandler_t>;
-
 	std::string    name;
 	uint32_t       hash;
 	mutable TenantGroup group;
@@ -87,24 +83,14 @@ struct TenantConfig
 	bool     control_ephemeral() const noexcept { return group.control_ephemeral; }
 	auto&    environ() const noexcept { return group.environ; }
 
-	static bool begin_dyncall_initialization(VCL_PRIV);
-	// Install a callback function using a string name
-	// Can be invoked from the guest using the same string name
-	static void set_dynamic_call(VCL_PRIV, const std::string& name, ghandler_t);
-	static void set_dynamic_calls(VCL_PRIV, std::vector<std::pair<std::string, ghandler_t>>);
-	static void reset_dynamic_call(VCL_PRIV, const std::string& name, ghandler_t = nullptr);
-
 	TenantConfig(std::string nm, std::string fname, std::string key,
-		TenantGroup grp, std::string uri, dynfun_map& dfm);
+		TenantGroup grp, std::string uri);
 	~TenantConfig();
 
 	/* One allowed file for persistence / state-keeping */
 	std::string allowed_file;
 	/* The filename the guest will use to access the allowed file. */
 	static const std::string guest_state_file;
-
-	/* Hash map of string hashes associated with dyncall handlers */
-	dynfun_map& dynamic_functions_ref;
 };
 
 }

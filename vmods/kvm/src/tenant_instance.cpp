@@ -267,21 +267,6 @@ uint64_t TenantInstance::lookup(const char* name) const {
 	return 0x0;
 }
 
-void TenantInstance::dynamic_call(uint32_t hash, tinykvm::vCPU& cpu, MachineInstance& machine) const
-{
-	const auto& dfm = config.dynamic_functions_ref;
-
-	auto it = dfm.find(hash);
-	if (it != dfm.end()) {
-		it->second(machine, cpu);
-	} else {
-		fprintf(stderr,
-			"Unable to find dynamic function with hash: 0x%08x\n",
-			hash);
-		throw std::runtime_error("Unable to find dynamic function");
-	}
-}
-
 #include <unistd.h>
 std::vector<uint8_t> file_loader(const std::string& filename)
 {

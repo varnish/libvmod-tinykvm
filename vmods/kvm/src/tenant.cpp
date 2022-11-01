@@ -70,10 +70,10 @@ const std::string TenantConfig::guest_state_file = "state";
 
 TenantConfig::TenantConfig(
 	std::string n, std::string f, std::string k,
-	TenantGroup grp, std::string uri, dynfun_map &dfm)
+	TenantGroup grp, std::string uri)
 	: name(std::move(n)), hash{crc32c_hw(n)}, group{std::move(grp)},
 	  filename(std::move(f)), key(std::move(k)),
-	  uri(std::move(uri)), dynamic_functions_ref{dfm}
+	  uri(std::move(uri))
 {
 	this->allowed_file = filename + ".state";
 }
@@ -95,15 +95,6 @@ Tenants& tenancy(VCL_PRIV task)
 		thr.detach();
 	};
 	return *(Tenants *)task->priv;
-}
-
-/* Initialize dynamic calls only once. Returns true if we should initialize them now. */
-bool TenantConfig::begin_dyncall_initialization(VCL_PRIV task)
-{
-	auto& tcy = tenancy(task);
-	if (tcy.dyncalls_initialized) return false;
-	tcy.dyncalls_initialized = true;
-	return true;
 }
 
 static inline bool load_tenant(VRT_CTX, VCL_PRIV task,
@@ -306,8 +297,7 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 				std::move(filename),
 				std::move(lvu_key),
 				std::move(group),
-				std::move(uri),
-				kvm::tenancy(task).dynamic_functions
+				std::move(uri)
 			}, initialize);
 		}
 	}

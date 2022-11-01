@@ -2,7 +2,6 @@ cmake_minimum_required (VERSION 3.0.2)
 project (kvm_sandbox CXX)
 
 option(SHARED_KVM "Build the KVM sandbox PIC" ON)
-option(KVM_FACEDETECTION "" OFF)
 option(KVM_ADNS "" ON)
 
 # WARNING: everything!
@@ -18,22 +17,13 @@ set(KVM_SOURCES
 	src/program_instance.cpp
 	src/system_calls.cpp
 	src/tenant.cpp
-	src/tenant_dfm.cpp
 	src/tenant_instance.cpp
 	tinykvm/src/functions.cpp  # setup_kvm_system_calls
 	src/utils/crc32.cpp
 	src/varnish_interface.c
 	### cURL ###
 	src/curl_fetch.cpp
-	### VMODS ###
-	src/vmods/vmods.cpp
-	src/vmods/http.cpp
 )
-if (KVM_FACEDETECTION)
-	list(APPEND KVM_SOURCES
-		src/vmods/facedetect.cpp
-	)
-endif()
 if (KVM_ADNS)
 	list(APPEND KVM_SOURCES
 		src/adns.cpp

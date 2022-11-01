@@ -38,7 +38,6 @@ typedef struct vmod_kvm_slot * KVM_SLOT;
 extern void kvm_init_tenants_str(VRT_CTX, VCL_PRIV, const char *source, const char *, size_t, int init);
 extern int  kvm_init_tenants_file(VRT_CTX, VCL_PRIV, const char *, int init);
 extern int  kvm_init_tenants_uri(VRT_CTX, VCL_PRIV, const char *uri, int init);
-extern void initialize_vmods(VRT_CTX, VCL_PRIV);
 extern TEN_PTR kvm_tenant_find(VCL_PRIV, const char *name);
 extern TEN_PTR kvm_tenant_find_key(VCL_PRIV, const char *name, const char *key);
 extern int     kvm_tenant_debug_allowed(TEN_PTR);

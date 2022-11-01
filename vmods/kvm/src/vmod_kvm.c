@@ -53,9 +53,6 @@ VCL_VOID vmod_embed_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING json)
 		return;
 	}
 
-	/* Initialize, re-initialize and remove VMODs */
-	initialize_vmods(ctx, task);
-
 	kvm_init_tenants_str(ctx, task, "Embedded JSON", json, strlen(json), INIT_TENANTS);
 }
 
@@ -68,9 +65,6 @@ VCL_BOOL vmod_load_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING filename)
 		return (0);
 	}
 
-	/* Initialize, re-initialize and remove VMODs */
-	initialize_vmods(ctx, task);
-
 	return (kvm_init_tenants_file(ctx, task, filename, INIT_TENANTS));
 }
 
@@ -82,9 +76,6 @@ VCL_BOOL vmod_fetch_tenants(VRT_CTX, VCL_PRIV task, VCL_STRING url)
 		VRT_fail(ctx, "kvm.fetch_tenants() requires a URL");
 		return (0);
 	}
-
-	/* Initialize, re-initialize and remove VMODs */
-	initialize_vmods(ctx, task);
 
 	return (kvm_init_tenants_uri(ctx, task, url, INIT_TENANTS));
 }

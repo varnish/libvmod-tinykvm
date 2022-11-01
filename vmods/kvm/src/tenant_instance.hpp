@@ -8,6 +8,7 @@ namespace tinykvm { struct vCPU; }
 
 namespace kvm {
 class ProgramInstance;
+class MachineInstance;
 struct VMPoolItem;
 
 class TenantInstance {
@@ -17,8 +18,6 @@ public:
 	bool no_program_loaded() const noexcept { return this->program == nullptr; }
 
 	uint64_t lookup(const char* name) const;
-
-	void dynamic_call(uint32_t hash, tinykvm::vCPU&, MachineInstance&) const;
 
 	/* Used by live update mechanism to replace the main VM with a new
 	   one that was HTTP POSTed by a tenant while Varnish is running. */

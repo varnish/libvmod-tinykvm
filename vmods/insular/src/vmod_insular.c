@@ -15,9 +15,6 @@ VCL_BOOL vmod_program(VRT_CTX, VCL_PRIV task, VCL_STRING uri)
 		return (0);
 	}
 
-	/* Initialize, re-initialize and remove VMODs */
-	initialize_vmods(ctx, task);
-
 	return (insular_initial_program(ctx, task, uri));
 }
 
