@@ -4,9 +4,9 @@ set -e
 pushd varnish-compute
 mkdir -p usr/lib/varnish-plus
 pushd usr/lib/varnish-plus
-ln -fs ../../../../../build_compute .
+ln -fs ../../../../../build_ubuntu22 .
 rm -f vmods
-mv build_compute vmods
+mv build_ubuntu22 vmods
 popd
 dpkg-buildpackage -nc -i
 popd
