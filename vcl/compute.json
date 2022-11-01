@@ -1,6 +1,6 @@
 {
     "compute": {
-        "concurrency": 8,
+        "concurrency": 4,
         "max_boot_time": 8.0,
         "max_request_time": 6.0,
         "max_memory": 64,
@@ -12,8 +12,7 @@
         "uri": "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/avifencode",
         "filename": "/tmp/compute_avif",
         "max_memory": 128,
-        "max_request_memory": 64,
-        "concurrency": 16
+        "max_request_memory": 64
     },
     "fetch": {
         "group": "compute",
@@ -31,8 +30,7 @@
         "uri": "https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/minimal",
         "filename": "/tmp/compute_minimal",
         "max_memory": 11,
-        "max_request_memory": 3,
-        "concurrency": 16
+        "max_request_memory": 3
     },
     "minify": {
         "group": "compute",

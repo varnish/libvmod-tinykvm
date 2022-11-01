@@ -1,7 +1,6 @@
 vcl 4.1;
 import activedns;
 import compute;
-#import insular;
 
 backend default {
 	.host = "127.0.0.1";
@@ -9,8 +8,8 @@ backend default {
 }
 
 sub vcl_init {
-	new vafb = activedns.dns_group();
-	vafb.set_host("filebin.varnish-software.com");
+	new filebin = activedns.dns_group();
+	filebin.set_host("filebin.varnish-software.com");
 
 	# Download and activate a Varnish-provided library of compute programs.
 	# A full list of programs and how they can be used would be on the docs site.
@@ -18,33 +17,27 @@ sub vcl_init {
 	# Configure program 'avif' with some overrides
 	compute.configure("minimal", """{
         "ephemeral": false,
-		"concurrency": 16
+		"concurrency": 2
 	}""");
 	compute.configure("minify", """{
         "ephemeral": true,
-		"concurrency": 16
+		"concurrency": 2
 	}""");
 	# Start the AVIF transcoder, but don't delay Varnish startup.
 	#compute.start("avif");
 	#compute.start("fetch");
 	#compute.start("inflate");
-	compute.start("minimal");
+	#compute.start("minimal");
 	#compute.start("zstd");
-
-	#insular.program("file:///tmp/hello_frontend");
 }
 sub vcl_recv {
-	#insular.on_recv(req.url);
 	return (pass);
-}
-sub vcl_deliver {
-	#set resp.http.X-Hello = req.http.X-Hello;
 }
 
 sub vcl_backend_fetch {
 	if (bereq.url == "/avif" || bereq.url == "/") {
 		# Transform a JPEG asset to AVIF, cache and deliver it. cURL can fetch using TLS and HTTP/2.
-		set bereq.backend = compute.program("avif", "https://${vafb}/nsyb0c1pvwa7ecf9/rose.jpg",
+		set bereq.backend = compute.program("avif", "https://${filebin}/nsyb0c1pvwa7ecf9/rose.jpg",
 			"""{
 				"headers": ["Host: filebin.varnish-software.com"]
 			}""");
@@ -68,7 +61,7 @@ sub vcl_backend_fetch {
 	}
 	else if (bereq.url == "/zstd/compress") {
 		# Compress data using zstandard
-		set bereq.backend = compute.program("zstd", "https://${vafb}/nsyb0c1pvwa7ecf9/waterfall.png",
+		set bereq.backend = compute.program("zstd", "https://${filebin}/nsyb0c1pvwa7ecf9/waterfall.png",
 			"""{
 				"action": "compress",
 				"level": 6,
