@@ -362,13 +362,14 @@ kvm::TenantInstance* kvm_tenant_find_key(VCL_PRIV task, const char* name, const 
 }
 
 extern "C"
-void kvm_init_tenants_str(VRT_CTX, VCL_PRIV task, const char* filename,
+int kvm_init_tenants_str(VRT_CTX, VCL_PRIV task, const char* filename,
 	const char* str, size_t len, int init)
 {
 	/* Load tenants from a JSON string, with the filename used for logging purposes. */
 	try {
 		const std::string_view json { str, len };
 		kvm::init_tenants(ctx, task, json, filename, init);
+		return 1;
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
 			"vmod_kvm: Exception when loading tenants from string '%s': %s",
@@ -376,6 +377,7 @@ void kvm_init_tenants_str(VRT_CTX, VCL_PRIV task, const char* filename,
 		fprintf(stderr,
 			"vmod_kvm: Exception when loading tenants from string '%s': %s\n",
 			filename, e.what());
+		return 0;
 	}
 }
 

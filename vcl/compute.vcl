@@ -14,6 +14,8 @@ sub vcl_init {
 	# Download and activate a Varnish-provided library of compute programs.
 	# A full list of programs and how they can be used would be on the docs site.
 	compute.library("https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/compute.json");
+	# Add a local program directly (using default group)
+	compute.add_program("watermark", "file:///tmp/kvm_watermark");
 	# Configure program 'avif' with some overrides
 	compute.configure("minimal", """{
         "ephemeral": false,
@@ -27,7 +29,7 @@ sub vcl_init {
 	#compute.start("avif");
 	#compute.start("fetch");
 	#compute.start("inflate");
-	#compute.start("minimal");
+	compute.start("minimal");
 	#compute.start("zstd");
 }
 sub vcl_recv {
@@ -74,9 +76,15 @@ sub vcl_backend_fetch {
 	else if (bereq.url == "/minify") {
 		set bereq.backend = compute.program("minify", "");
 	}
+	else if (bereq.url == "/none") {
+		set bereq.backend = compute.program("none", "");
+	}
 	else if (bereq.url == "/ftp") {
 		# Fetch something with cURL
 		set bereq.backend = compute.program("fetch", "ftp://ftp.funet.fi/pub/standards/RFC/rfc959.txt");
+	}
+	else if (bereq.url == "/watermark") {
+		set bereq.backend = compute.program("watermark", "");
 	}
 	else if (bereq.url == "/http3") {
 		# Fetch HTTP/3 page with cURL. AltSvc cache enables future fetches to use HTTP/3.

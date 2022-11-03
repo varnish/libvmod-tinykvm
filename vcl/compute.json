@@ -43,5 +43,9 @@
         "filename": "/tmp/compute_zstd",
         "max_memory": 64,
         "max_request_memory": 16
+    },
+    "none": {
+        "group": "compute",
+        "filename": "/not_found"
     }
 }

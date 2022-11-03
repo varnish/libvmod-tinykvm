@@ -66,6 +66,13 @@ $Function BOOL library(PRIV_VCL, STRING uri)
 - Libraries contain program definitions, but programs are only started on-demand.
 - Must be called from vcl_init.
 
+$Function BOOL add_program(PRIV_VCL, STRING name, STRING uri)
+
+- Name is used to be able to refer to the program later, using configure, etc.
+- URI can also be a local filename.
+- Program is added to the default program. Use configure to override.
+- Must be called from vcl_init.
+
 $Function BOOL configure(PRIV_VCL, STRING program, STRING json)
 
 - Provide a JSON configuration to override defaults to unstarted programs.
