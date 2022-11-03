@@ -267,13 +267,14 @@ static void syscall_http_find(vCPU& cpu, MachineInstance& inst)
 
 		const uint64_t g_dest    = regs.rcx;
 		const uint16_t g_destlen = regs.r8;
-		if (g_dest != 0x0)
+		if (g_dest != 0x0 && flen <= g_destlen)
 		{
-			const uint16_t size = std::min(flen, g_destlen);
-			cpu.machine().copy_to_guest(g_dest, field.begin, size);
-			regs.rax = size;
-		} else {
+			cpu.machine().copy_to_guest(g_dest, field.begin, flen);
 			regs.rax = flen;
+		} else if (g_dest != 0x0) {
+			regs.rax = 0; /* Out buffer too small. */
+		} else {
+			regs.rax = flen; /* Out buffer 0x0. */
 		}
 	} else {
 		regs.rax = 0;
@@ -293,11 +294,13 @@ static void syscall_http_method(vCPU& cpu, MachineInstance& inst)
 	const auto& field = hp->field_array[0];
 	const uint32_t flen = field.end - field.begin;
 
-	if (g_dest != 0x0) {
-		const auto size = std::min(flen, g_destlen);
-		cpu.machine().copy_to_guest(g_dest, field.begin, size);
-		regs.rax = size;
+	if (g_dest != 0x0 && flen <= g_destlen) {
+		cpu.machine().copy_to_guest(g_dest, field.begin, flen);
+		regs.rax = flen;
+	} else if (g_dest != 0x0) {
+		regs.rax = 0; /* When buffer is too small */
 	} else {
+		/* When buffer is 0x0, return method length. */
 		regs.rax = flen;
 	}
 
@@ -307,14 +310,14 @@ static void syscall_http_method(vCPU& cpu, MachineInstance& inst)
 static void syscall_regex_copyto(vCPU& cpu, MachineInstance& inst)
 {
     auto& regs = cpu.registers();
-    const uint32_t idx = regs.rdi;
+    const uint32_t re_idx = regs.rdi;
 	const uint32_t srchp_idx = regs.rsi;
 	const uint32_t dsthp_idx = regs.rdx;
 
-	auto& entry = inst.regex().get(idx);
+	auto& entry = inst.regex().get(re_idx);
 	auto* srchp = get_http(inst.ctx(), srchp_idx);
 	auto* dsthp = get_http(inst.ctx(), dsthp_idx);
-	unsigned matches = 0;
+	unsigned appended = 0;
 
 	/* Prevent recursive loop if we are duplicating src == dst. */
 	const size_t cnt = srchp->field_count;
@@ -323,16 +326,16 @@ static void syscall_regex_copyto(vCPU& cpu, MachineInstance& inst)
 		auto* begin = srchp->field_array[u].begin;
 		auto* end   = srchp->field_array[u].end;
 
-		bool success =
+		const bool matches =
         	(VRE_exec(entry.item, begin, end - begin, 0,
             	0, nullptr, 0, nullptr) >= 0);
-		if (success) {
-			http_header_append(dsthp, begin, end - begin);
-			matches++;
+		if (matches) {
+			if (http_header_append(dsthp, begin, end - begin) != HDR_INVALID)
+				appended++;
 		}
 	}
 
-	regs.rax = matches;
+	regs.rax = appended;
     cpu.set_registers(regs);
 }
 

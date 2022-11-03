@@ -176,6 +176,7 @@ static inline long
 http_unset(int where, const char *key, size_t len) { return sys_http_set(where, key, len); }
 
 /* Retrieve a header field by key, writing result to outb and returning actual length.
+   Returns 0 when outl is too small to hold the value.
    If outb is zero, instead returns the length of header field, or zero if not found. */
 extern unsigned
 sys_http_find(int where, const char *key, size_t, char *outb, size_t outl);
@@ -210,7 +211,9 @@ http_alloc_find(int where, const char *key) {
 }
 #endif
 
-/* Retrieve the current HTTP method, eg. GET, POST etc. */
+/* Retrieve the current HTTP method, eg. GET, POST etc.
+   Returns 0 if the out buffer is too small. Returns the
+   needed buffer length when outb is 0x0. */
 extern unsigned long sys_http_method(char *outb, size_t outl);
 static inline const char * http_alloc_method();
 
