@@ -32,6 +32,12 @@ extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
 	struct vmod_kvm_backend *, struct backend_post *, struct backend_result *);
 extern int kvm_get_body(struct backend_post *, struct busyobj *);
 
+static inline void kvm_ts(struct vsl_log *vsl, const char *event,
+						  double *work, double *prev)
+{
+	VSLb_ts(vsl, event, *work, prev, VTIM_real());
+}
+
 static void v_matchproto_(vdi_panic_f)
 kvmbe_panic(const struct director *dir, struct vsb *vsb)
 {
@@ -153,7 +159,7 @@ kvmbe_gethdrs(const struct director *dir,
 
 	if (VMOD_KVM_BACKEND_TIMINGS) {
 		kvmr->t_prev = bo->t_prev;
-		kvm_ts(ctx.vsl, "TenantStart", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
+		kvm_ts(ctx.vsl, "TenantStart", &kvmr->t_work, &kvmr->t_prev);
 	}
 
 	/* Reserving a VM means putting ourselves in a concurrent queue
@@ -166,7 +172,7 @@ kvmbe_gethdrs(const struct director *dir,
 		return (-1);
 	}
 	if (VMOD_KVM_BACKEND_TIMINGS) {
-		kvm_ts(ctx.vsl, "TenantReserve", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
+		kvm_ts(ctx.vsl, "TenantReserve", &kvmr->t_work, &kvmr->t_prev);
 	}
 
 	struct backend_post *post = NULL;
@@ -194,7 +200,7 @@ kvmbe_gethdrs(const struct director *dir,
 			return (-1);
 		}
 		if (VMOD_KVM_BACKEND_TIMINGS) {
-			kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
+			kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev);
 		}
 	}
 
@@ -212,7 +218,7 @@ kvmbe_gethdrs(const struct director *dir,
 	kvm_backend_call(&ctx, slot, kvmr, post, result);
 
 	if (VMOD_KVM_BACKEND_TIMINGS) {
-		kvm_ts(ctx.vsl, "TenantProcess", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
+		kvm_ts(ctx.vsl, "TenantProcess", &kvmr->t_work, &kvmr->t_prev);
 	}
 
 	/* Status code is sanitized in the backend call. */
@@ -255,7 +261,7 @@ kvmbe_gethdrs(const struct director *dir,
 	vfp_init(bo, streaming);
 
 	if (VMOD_KVM_BACKEND_TIMINGS) {
-		kvm_ts(ctx.vsl, "TenantResponse", &kvmr->t_work, &kvmr->t_prev, VTIM_real());
+		kvm_ts(ctx.vsl, "TenantResponse", &kvmr->t_work, &kvmr->t_prev);
 	}
 	return (0);
 }

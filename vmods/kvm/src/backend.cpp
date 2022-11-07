@@ -75,11 +75,10 @@ static int16_t sanitize_status_code(int16_t code)
 	throw tinykvm::MachineException("Invalid HTTP status code returned by program", code);
 }
 
-static inline void kvm_ts(struct vsl_log *vsl, const char *event,
-		double work, double& prev, double now)
+static inline void kvm_ts(struct vsl_log *vsl, const char *event, double work, double& prev)
 {
 	if constexpr (BACKEND_TIMINGS) {
-		VSLb_ts(vsl, event, work, &prev, now);
+		VSLb_ts(vsl, event, work, &prev, VTIM_real());
 	}
 }
 
@@ -218,14 +217,19 @@ extern "C"
 void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 	struct vmod_kvm_backend *vkb, struct backend_post *post, struct backend_result *result)
 {
-	double t_prev = VTIM_real();
+	double t_prev = 0.0;
 	double t_work = t_prev;
+	if constexpr (BACKEND_TIMINGS) t_prev = VTIM_real();
 
 	auto& machine = *slot->mi;
 	/* Setting the VRT_CTX allows access to HTTP and VSL, etc. */
 	machine.set_ctx(ctx);
-	VSLb(ctx->vsl, SLT_VCL_Log, "Tenant: %s", machine.name().c_str());
-	kvm_ts(ctx->vsl, "ProgramStart", t_work, t_prev, VTIM_real());
+
+	if constexpr (VERBOSE_BACKEND) {
+		VSLb(ctx->vsl, SLT_VCL_Log, "Tenant: %s", machine.name().c_str());
+	}
+	kvm_ts(ctx->vsl, "ProgramStart", t_work, t_prev);
+
 	try {
 		auto fut = slot->tp.enqueue(
 		[&] () -> long {
@@ -233,7 +237,8 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				printf("Begin backend %s %s (arg=%s)\n", vkb->inputs.method,
 					vkb->inputs.url, vkb->inputs.argument);
 			}
-			kvm_ts(ctx->vsl, "ProgramCall", t_work, t_prev, VTIM_real());
+			kvm_ts(ctx->vsl, "ProgramCall", t_work, t_prev);
+
 			/* Enforce that guest program calls the backend_response system call. */
 			machine.begin_call();
 
@@ -286,7 +291,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					timeout, vkb->inputs.url, vkb->inputs.argument,
 					(uint64_t)post->address, (uint64_t)post->length);
 			}
-			kvm_ts(ctx->vsl, "ProgramResponse", t_work, t_prev, VTIM_real());
+			kvm_ts(ctx->vsl, "ProgramResponse", t_work, t_prev);
 
 			/* Make sure no SMP work is in-flight. */
 			vm.smp_wait();
@@ -297,11 +302,11 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			/* Verify response and fill out result struct. */
 			fetch_result(slot, machine, result);
 
-			kvm_ts(ctx->vsl, "ProgramProcess", t_work, t_prev, VTIM_real());
+			kvm_ts(ctx->vsl, "ProgramProcess", t_work, t_prev);
 			return 0L;
 		});
 		/* XXX: This competes with the VSL changes in the VM thread. */
-		//kvm_ts(ctx->vsl, "ProgramQueue", t_work, t_prev, VTIM_real());
+		//kvm_ts(ctx->vsl, "ProgramQueue", t_work, t_prev);
 		fut.get();
 		return;
 

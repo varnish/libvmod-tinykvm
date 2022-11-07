@@ -50,12 +50,6 @@ extern int kvm_synth(VRT_CTX, KVM_SLOT, struct vmod_kvm_synth *);
 extern uint64_t kvm_resolve_name(TEN_PTR, const char*);
 extern int kvm_copy_to_machine(KVM_SLOT, uint64_t dst, const void* src, size_t len);
 
-static inline void kvm_ts(struct vsl_log *vsl, const char *event,
-		double *work, double *prev, double now)
-{
-	VSLb_ts(vsl, event, *work, prev, now);
-}
-
 /* Fetch something with cURL. Returns 0: success, <0: failure */
 struct MemoryStruct
 {
