@@ -46,8 +46,10 @@ void MachineInstance::sanitize_path(char* buffer, size_t buflen)
 			return;
 		}
 	}
-	printf("Path failed: %.*s\n", (int)len, buffer);
-	throw std::runtime_error("Disallowed path used");
+	if (len > 0) {
+		printf("Path failed: %.*s\n", (int)len, buffer);
+		throw std::runtime_error("Disallowed path used");
+	}
 }
 
 void MachineInstance::sanitize_file(char* buffer, size_t buflen)
@@ -211,7 +213,7 @@ void MachineInstance::setup_syscall_interface()
 	Machine::install_syscall_handler(
 		1, [] (vCPU& cpu) { // WRITE
 			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
-			auto regs = cpu.registers();
+			auto& regs = cpu.registers();
 			const int    fd = regs.rdi;
 			const size_t bytes = regs.rdx;
 			SYSPRINT("WRITE to fd=%lld, data=0x%llX, size=%llu\n",
@@ -247,7 +249,7 @@ void MachineInstance::setup_syscall_interface()
 	Machine::install_syscall_handler(
 		3, [] (vCPU& cpu) { // CLOSE
 			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
-			auto regs = cpu.registers();
+			auto& regs = cpu.registers();
 			SYSPRINT("CLOSE to fd=%lld\n", regs.rdi);
 
 			int idx = inst.m_fd.find(regs.rdi);
@@ -263,7 +265,7 @@ void MachineInstance::setup_syscall_interface()
 	Machine::install_syscall_handler(
 		4, [] (vCPU& cpu) { // STAT
 			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
-			auto regs = cpu.registers();
+			auto& regs = cpu.registers();
 			const auto vpath = regs.rdi;
 
 			char path[256];
@@ -282,7 +284,7 @@ void MachineInstance::setup_syscall_interface()
 	Machine::install_syscall_handler(
 		5, [] (vCPU& cpu) { // FSTAT
 			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
-			auto regs = cpu.registers();
+			auto& regs = cpu.registers();
 
 			int fd = inst.m_fd.translate(regs.rdi);
 			struct stat vstat;
@@ -297,14 +299,14 @@ void MachineInstance::setup_syscall_interface()
 	Machine::install_syscall_handler(
 		8, [] (vCPU& cpu) { // LSEEK
 			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
-			auto regs = cpu.registers();
+			auto& regs = cpu.registers();
 			int fd = inst.m_fd.translate(regs.rdi);
 			regs.rax = lseek(fd, regs.rsi, regs.rdx);
 			cpu.set_registers(regs);
 		});
 	Machine::install_syscall_handler(
 		79, [](vCPU& cpu) { // GETCWD
-			auto regs = cpu.registers();
+			auto& regs = cpu.registers();
 
 			const char fakepath[] = "/";
 			if (sizeof(fakepath) <= regs.rsi) {
@@ -335,7 +337,7 @@ void MachineInstance::setup_syscall_interface()
 	Machine::install_syscall_handler(
 		257, [] (vCPU& cpu) { // OPENAT
 			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
-			auto regs = cpu.registers();
+			auto& regs = cpu.registers();
 
 			const auto vpath = regs.rsi;
 			const int  flags = regs.rdx;
@@ -384,6 +386,38 @@ void MachineInstance::setup_syscall_interface()
 					regs.rax = -1;
 				}
 			}
+			cpu.set_registers(regs);
+		});
+	Machine::install_syscall_handler(
+		262, [] (vCPU& cpu) { // NEWFSTATAT
+			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
+			auto& regs = cpu.registers();
+			const auto vpath  = regs.rsi;
+			const auto buffer = regs.rdx;
+			const int  flags  = regs.r8;
+			long fd = AT_FDCWD;
+
+			char path[PATH_MAX];
+			cpu.machine().copy_from_guest(path, vpath, sizeof(path));
+
+			try {
+				inst.sanitize_path(path, sizeof(path));
+
+				// Translate from vfd when fd != CWD
+				if ((long)regs.rdi != fd) fd = inst.m_fd.translate(regs.rdi);
+
+				struct stat64 vstat;
+				regs.rax = fstatat64(fd, path, &vstat, flags);
+				if (regs.rax == 0) {
+					cpu.machine().copy_to_guest(buffer, &vstat, sizeof(vstat));
+				}
+			} catch (...) {
+				printf("ERROR\n");
+				regs.rax = -1;
+			}
+
+			SYSPRINT("NEWFSTATAT to vfd=%lld, fd=%ld, path=%s, data=0x%llX, flags=0x%X = %lld\n",
+				regs.rdi, fd, path, buffer, flags, regs.rax);
 			cpu.set_registers(regs);
 		});
 }
