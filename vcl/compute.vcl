@@ -27,6 +27,7 @@ sub vcl_init {
 	}""");
 	# Start the AVIF transcoder, but don't delay Varnish startup.
 	#compute.start("avif");
+	compute.start("espeak");
 	#compute.start("fetch");
 	#compute.start("inflate");
 	compute.start("minimal");
@@ -37,7 +38,7 @@ sub vcl_recv {
 }
 
 sub vcl_backend_fetch {
-	if (bereq.url == "/avif" || bereq.url == "/") {
+	if (bereq.url == "/avif") {
 		# Transform a JPEG asset to AVIF, cache and deliver it. cURL can fetch using TLS and HTTP/2.
 		set bereq.backend = compute.program("avif", "https://${filebin}/nsyb0c1pvwa7ecf9/rose.jpg",
 			"""{
@@ -46,6 +47,14 @@ sub vcl_backend_fetch {
 	}
 	else if (bereq.url == "/avif/bench") {
 		set bereq.backend = compute.program("avif", "");
+	}
+	else if (bereq.url == "/espeak") {
+		# espeak-ng text-to-speech
+		if (bereq.http.X-Text) {
+			set bereq.backend = compute.program("espeak", "", bereq.http.X-Text);
+		} else {
+			set bereq.backend = compute.program("espeak", "", "Hello Varnish");
+		}
 	}
 	else if (bereq.url == "/gzip") {
 		# Decompress a zlib-compressed asset
@@ -89,6 +98,14 @@ sub vcl_backend_fetch {
 	else if (bereq.url == "/http3") {
 		# Fetch HTTP/3 page with cURL. AltSvc cache enables future fetches to use HTTP/3.
 		set bereq.backend = compute.program("fetch", "https://quic.rocks:4433/");
+	}
+	else if (bereq.url ~ "^/x") {
+		# Gameboy emulator (used by demo page)
+		set bereq.backend = compute.program("gbc", bereq.url);
+	}
+	else {
+		# All unknown URLs to demo static site
+		set bereq.backend = compute.program("demo", bereq.url);
 	}
 }
 sub vcl_backend_response {
