@@ -26,7 +26,7 @@ target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/include)
 target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/bin/varnishd)
 
 
-option(RISCV_BINARY_TRANSLATION "" OFF)
+option(RISCV_BINARY_TRANSLATION "" ON)
 option(RISCV_EXT_C "" OFF)
 option(RISCV_EXT_V "" ON)
 option(RISCV_EXPERIMENTAL "" ON)

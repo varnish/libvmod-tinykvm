@@ -9,6 +9,10 @@ sub vcl_init {
 		"test.com": {
 			"filename": "/tmp/riscv_test",
 			"group": "test"
+		},
+		"mandelbrot.com": {
+			"filename": "/tmp/riscv_mandelbrot",
+			"group": "test"
 		}
 	}""");
 	kvm.embed_tenants("""{
@@ -23,6 +27,9 @@ sub vcl_init {
 sub vcl_recv {
 	if (req.http.Host == "127.0.0.1:8080") {
 		set req.http.Host = "test.com";
+	}
+	if (req.url ~ "^/x") {
+		set req.http.Host = "mandelbrot.com";
 	}
 
 	/* Live update mechanism */

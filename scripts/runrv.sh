@@ -6,6 +6,6 @@ BWS="workspace_backend=3M"
 NTMP="/tmp/varnishd"
 mkdir -p $NTMP
 
-#source $file --vcp=build --single-process --debug=/tmp/varnishd --static-riscv --build $@ --run -a :8080 -f vcl/riscv.vcl -F -p $BWS -n $NTMP
-source $file --vcp=build --optimize --static-riscv --disable-mold --build $@ --run -a :8080 -f vcl/riscv.vcl -F -p $BWS -n $NTMP
-#source $file --vcp=build --no-optimize --static-riscv --mold --build $@ --run -a :8080 -f vcl/riscv.vcl -F -p $BWS -n $NTMP
+#source $file --vcp=build_rv --single-process --debug=/tmp/varnishd --static-riscv --build $@ --run -a :8080 -f vcl/riscv.vcl -F -p $BWS -n $NTMP
+source $file --vcp=build_rv --optimize --static-riscv --disable-mold --build $@ --run -a :8080 -f vcl/riscv.vcl -F -p $BWS -n $NTMP
+#source $file --vcp=build_rv --no-optimize --static-riscv --mold --build $@ --run -a :8080 -f vcl/riscv.vcl -F -p $BWS -n $NTMP

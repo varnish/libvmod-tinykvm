@@ -21,7 +21,7 @@
 	path = vmods/riscv/libriscv
 	url = git@github.com:fwsGonzo/libriscv.git
 [submodule "cmake/sandbox/ext/json"]
-	path = cmake/sandbox/ext/json
+	path = cmake/riscv_sandbox/ext/json
 	url = git@github.com:nlohmann/json.git
 [submodule "vmods/kvm/tinykvm"]
 	path = vmods/kvm/tinykvm

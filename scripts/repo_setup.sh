@@ -16,6 +16,6 @@ pushd ext
 git submodule update --init --depth 1 openssl-cmake
 git submodule update --init --depth 1 varnish-cache-plus
 popd
-pushd cmake/sandbox/ext
+pushd cmake/riscv_sandbox/ext
 git submodule update --init --depth 1 json
 popd
