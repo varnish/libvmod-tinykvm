@@ -19,6 +19,18 @@ namespace rvs {
 	auto x = time_now();  \
 	asm("" ::: "memory");
 
+void Script::init()
+{
+	setup_syscall_interface();
+	// Show current emulator features enabled
+	printf("[RISC-V features] Binary translation: %s  Instruction rewrites: %s\n",
+		riscv::binary_translation_enabled ? "enabled" : "disabled",
+		riscv::decoder_rewriter_enabled ? "enabled" : "disabled");
+	printf("[RISC-V features] Vectors (RVV): %s  Compressed (RVC): %s\n",
+		riscv::vector_extension ? "enabled" : "disabled",
+		riscv::compressed_enabled ? "enabled" : "disabled");
+}
+
 Script::Script(
 	const Script& source, const vrt_ctx* ctx,
 	const SandboxTenant* vrm, MachineInstance& inst)
@@ -63,11 +75,6 @@ Script::Script(
 	  m_regex     {vrm->config.max_regex()},
 	  m_directors {vrm->config.max_backends()}
 {
-}
-
-void Script::init()
-{
-	setup_syscall_interface();
 }
 
 Script::~Script()

@@ -43,7 +43,7 @@ add_subdirectory(ext/json)
 
 
 if (NATIVE)
-	target_compile_options(riscv PUBLIC -march=native -Ofast -fno-fast-math)
+	target_compile_options(riscv PUBLIC -march=native -O3 -fno-fast-math)
 endif()
 if (LTO_ENABLE)
 	target_compile_options(riscv PUBLIC -flto)
