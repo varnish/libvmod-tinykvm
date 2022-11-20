@@ -78,6 +78,7 @@ if (VARNISH_PLUS)
 		VSC_mse.vsc
 		VSC_mse_book.vsc
 		VSC_mse_store.vsc
+		VSC_slicer.vsc
 	)
 endif()
 function(build_vsc_file NAME)
