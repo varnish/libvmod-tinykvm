@@ -185,7 +185,7 @@ inline long Script::resume(uint64_t cycles)
 		if (UNLIKELY(is_debug()))
 			return resume_debugger();
 		machine().simulate<false>(cycles);
-		return machine().cpu.reg(10);
+		return machine().cpu.reg(riscv::REG_RETVAL);
 	}
 	catch (const std::exception& e) {
 		this->handle_exception(machine().cpu.pc());

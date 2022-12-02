@@ -99,12 +99,7 @@ void Script::setup_virtual_memory(bool /*init*/)
 	if (is_storage())
 		this->m_heap_base = SHEAP_BASE + stack_size();
 	else
-		this->m_heap_base = machine().memory.mmap_start() + stack_size();
-
-	mem.set_stack_initial(stack_begin());
-	// this separates heap and stack
-	mem.install_shared_page(
-		stack_begin() / Page::size(), Page::guard_page());
+		this->m_heap_base = machine().memory.heap_address();
 }
 
 void Script::machine_initialize()
@@ -233,7 +228,7 @@ void Script::machine_setup(machine_t& machine, bool init)
 		TIMING_LOCATION(t2);
 	#endif
 		// Add system call interfaces
-		machine.on_unhandled_syscall = [] (auto& m, int num) {
+		machine.on_unhandled_syscall = [] (auto& m, size_t num) {
 			auto* script = m.template get_userdata<Script>();
 			const std::string text =
 				"Unhandled system call: " + std::to_string(num);

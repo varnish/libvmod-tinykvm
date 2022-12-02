@@ -1,4 +1,5 @@
 vcl 4.1;
+import file;
 import riscv;
 import kvm;
 
@@ -22,6 +23,8 @@ sub vcl_init {
 			"group": "test"
 		}
 	}""");
+
+	new f = file.init("/tmp");
 }
 
 sub vcl_recv {
@@ -30,6 +33,12 @@ sub vcl_recv {
 	}
 	if (req.url ~ "^/x") {
 		set req.http.Host = "mandelbrot.com";
+	}
+
+	if (req.url == "/vanilla") {
+		set req.backend_hint = f.backend();
+		set req.http.Host = "file";
+		return (hash);
 	}
 
 	/* Live update mechanism */
@@ -73,18 +82,10 @@ sub vcl_hash {
 	riscv.apply_hash();
 }
 
-sub vcl_synth {
-	if (riscv.active()) {
-		if (riscv.want_resume()) {
-			riscv.resume();
-		} else {
-			riscv.vcall(ON_SYNTH);
-		}
-		return (deliver);
-	}
-}
-
 sub vcl_backend_fetch {
+	if (bereq.url == "/vanilla") {
+		return (fetch);
+	}
 	if (bereq.method == "POST") {
 		if (bereq.http.X-KVM && bereq.http.X-PostKey) {
 			/* KVM Live update POST */
@@ -118,24 +119,5 @@ sub vcl_backend_fetch {
 				bereq.http.Host,
 				bereq.url,
 				bereq.http.X-KVM-Arg);
-	}
-}
-
-sub vcl_backend_response {
-	if (riscv.active()) {
-		if (riscv.want_resume()) {
-			riscv.resume();
-		} else {
-			riscv.vcall(ON_BACKEND_RESPONSE);
-		}
-	}
-}
-
-sub vcl_deliver {
-	if (riscv.active()) {
-		if (riscv.want_resume()) {
-			riscv.resume();
-		}
-		riscv.vcall(ON_DELIVER);
 	}
 }

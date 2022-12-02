@@ -944,13 +944,6 @@ void Script::setup_syscall_interface()
 	};
 	std::memcpy(&machine_t::syscall_handlers[SYSCALL_BASE],
 		&handlers[0], sizeof(handlers));
-
-	machine_t::on_unhandled_syscall =
-		[] (auto&, int number) {
-			//VSLb(m_ctx->vsl, SLT_Debug,
-			//	"VM unhandled system call: %d\n", number);
-			printf("VM unhandled system call: %d\n", number);
-		};
 }
 
 timespec time_now()

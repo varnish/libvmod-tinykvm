@@ -26,10 +26,11 @@ target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/include)
 target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/bin/varnishd)
 
 
-option(RISCV_BINARY_TRANSLATION "" ON)
+#option(RISCV_BINARY_TRANSLATION "" ON)
 option(RISCV_EXT_C "" OFF)
-option(RISCV_EXT_V "" ON)
+#option(RISCV_EXT_V "" ON)
 option(RISCV_EXPERIMENTAL "" ON)
+option(RISCV_THREADED "" ON)
 
 add_subdirectory(libriscv/lib)
 # Make room for Linux ABI and custom ABI
