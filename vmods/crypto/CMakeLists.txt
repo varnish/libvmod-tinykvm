@@ -22,6 +22,9 @@ add_vmod(vmod_crypto ${PATH}/vmod_crypto.vcc "Crypto VMOD"
 	${PATH}/crypto_random.c
 	${PATH}/crypto_secret.c
 )
+# Le sigh
+target_include_directories(vmod_crypto
+	PRIVATE ${VARNISH_SOURCE_DIR})
 
 # VCL import name is "crypto"
 add_vmod_tests(vmod_crypto crypto

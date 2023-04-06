@@ -8,5 +8,6 @@ ext/work-plus
 .vscode
 
 vcl/kvm_tenants.json
+vcl/vclperf.vcl
 
 sledgehammer

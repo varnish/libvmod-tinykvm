@@ -293,6 +293,7 @@
 #elif defined(SANITIZERS_ENABLED)
 #define VCC_CC "exec clang-12 -ggdb3 -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -fexceptions -shared -fno-omit-frame-pointer -fsanitize=address,undefined -Wl,-x -o %o %s"
 #else
+//#define VCC_CC "exec bash /home/gonzo/github/varnish_autoperf/scripts/cached_build.sh %s %o"
 #define VCC_CC "exec gcc -ggdb3 -O2 -Wall -Werror -Wno-error=unused-result -pthread -fpic -fexceptions -shared -Wl,-x -o %o %s"
 #endif
 

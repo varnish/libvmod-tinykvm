@@ -7,6 +7,7 @@ set (PATH ${VARNISH_SOURCE_DIR}/lib/libvmod_uri)
 add_vmod(vmod_uri ${PATH}/vmod_uri.vcc "Accept VMOD"
 	${PATH}/uri_as_string.c
 	${PATH}/uri_decode.c
+	${PATH}/uri_encode.c
 	${PATH}/uri_normalize.c
 	${PATH}/uri_parse.c
 	${PATH}/uri_utils.c

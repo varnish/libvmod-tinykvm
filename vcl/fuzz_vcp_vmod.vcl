@@ -5,12 +5,12 @@ import accept;
 //import cookieplus;
 import debug;
 import headerplus;
-//import jwt;
-import slicer;
+#import jwt;
+#import slicer;
 import std;
-import str;
-import synthbackend;
-//import urlplus;
+#import str;
+#import synthbackend;
+#import urlplus;
 import uri;
 
 
@@ -129,9 +129,13 @@ sub vcl_recv {
         call test_uri;
 	}
 
-	set req.http.Range = req.http.Input;
+	#set req.http.Range = req.http.Input;
+    headerplus.init(req);
+	headerplus.attr_count(req.http.Input);
 
-	return (hash);
+	# DO NOT USE (hash)!!
+	return (pass);
+	# DO NOT USE (hash)!!
 }
 
 sub vcl_miss {
@@ -139,13 +143,13 @@ sub vcl_miss {
 }
 
 ## SLICER ##
-sub vcl_backend_fetch {
-    if (!slicer.failed()) {
-        slicer.enable();
-    }
-}
-sub vcl_backend_error {
-    if (slicer.failed()) {
-        return (retry);
-    }
-}
+#sub vcl_backend_fetch {
+#    if (!slicer.failed()) {
+#        slicer.enable();
+#    }
+#}
+#sub vcl_backend_error {
+#    if (slicer.failed()) {
+#        return (retry);
+#    }
+#}
