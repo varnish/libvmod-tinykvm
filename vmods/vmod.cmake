@@ -166,7 +166,7 @@ function(add_vmod_tests LIBNAME IMPORT_NAME)
 		foreach (FILENAME ${ARGN})
 		get_filename_component(TEST ${FILENAME} NAME_WE)
 		add_test(NAME ${LIBNAME}_${TEST}
-			COMMAND ${VARNISHTEST} -l "-Dvarnishd=${VARNISHD}" "-DVMOD_SO=\"${LIBPATH}\"" "-Dtestname=${TEST}" "-pvmod_path=${VMOD_PATH}" ${FILENAME}
+			COMMAND ${VARNISHTEST} -l "-Dvarnishd=${VARNISHD}" "-DVMOD_SO=\"${LIBPATH}\"" "-Dtestname=${TEST}" "-Dtopsrc=${VARNISH_SOURCE_DIR}" "-pvmod_path=${VMOD_PATH}" ${FILENAME}
 			WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 		)
 		set_tests_properties(${LIBNAME}_${TEST}

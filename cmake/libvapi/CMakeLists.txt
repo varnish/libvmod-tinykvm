@@ -15,12 +15,14 @@ add_custom_target(varnishapi_generate
 set (SOURCES
 	${PATH}/daemon.c
 	${PATH}/vsc.c
+	${PATH}/vsc_format.c
 	${PATH}/vsl_arg.c
 	${PATH}/vsl.c
 	${PATH}/vsl_cursor.c
 	${PATH}/vsl_dispatch.c
 	${PATH}/vsl_query.c
 	${PATH}/vsm.c
+	${PATH}/vst.c
 	${PATH}/vut.c
 	${PATH}/vxp.c
 	${PATH}/vxp_fixed_token.c

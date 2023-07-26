@@ -23,9 +23,9 @@ void Script::init()
 {
 	setup_syscall_interface();
 	// Show current emulator features enabled
-	printf("[RISC-V features] Binary translation: %s  Instruction rewrites: %s\n",
+	printf("[RISC-V features] Binary translation: %s  Memory traps: %s\n",
 		riscv::binary_translation_enabled ? "enabled" : "disabled",
-		riscv::decoder_rewriter_enabled ? "enabled" : "disabled");
+		riscv::memory_traps_enabled ? "enabled" : "disabled");
 	printf("[RISC-V features] Vectors (RVV): %s  Compressed (RVC): %s\n",
 		riscv::vector_extension ? "enabled" : "disabled",
 		riscv::compressed_enabled ? "enabled" : "disabled");
@@ -92,7 +92,6 @@ Script::~Script()
 void Script::setup_virtual_memory(bool /*init*/)
 {
 	using namespace riscv;
-	auto& mem = machine().memory;
 	// Use a different arena and stack for the storage machine
 	// Both values are offset by the stack size to guarantee
 	// room for the entire initial (main thread) stack.
