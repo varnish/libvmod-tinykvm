@@ -3,10 +3,19 @@
 extern "C" {
 #include "update_result.h"
 }
+extern "C" long riscv_call_idx(rvs::Script*, VRT_CTX, vcall_info, const char* arg);
+
+//#define ENABLE_TIMING
+#ifdef ENABLE_TIMING
+#include "timing.hpp"
+#endif
 
 namespace rvs {
 	extern SandboxTenant* create_temporary_tenant(const SandboxTenant*, const std::string&);
 	extern void delete_temporary_tenant(const SandboxTenant*);
+#ifdef ENABLE_TIMING
+static Timing timing_vmcall {"vmcall"};
+#endif
 
 inline Script* get_machine(VRT_CTX, const void* key)
 {
@@ -26,19 +35,6 @@ inline Script* get_machine(VRT_CTX)
 } // rvs
 
 extern "C"
-rvs::Script* riscv_fork(VRT_CTX, const char* tenant, int debug)
-{
-	using namespace rvs;
-
-	extern SandboxTenant* tenant_find(VRT_CTX, const char* name);
-	auto* tenptr = tenant_find(ctx, tenant);
-	if (UNLIKELY(tenptr == nullptr))
-		return nullptr;
-
-	return tenptr->vmfork(ctx, debug);
-}
-
-extern "C"
 const rvs::SandboxTenant* riscv_current_machine(VRT_CTX)
 {
 	auto* script = rvs::get_machine(ctx);
@@ -55,34 +51,7 @@ long riscv_current_call_idx(VRT_CTX, vcall_info info, const char* argument)
 
 	auto* script = get_machine(ctx);
 	if (script) {
-		const auto& callbacks = script->program().callback_entries;
-		if (info.idx < callbacks.size())
-		{
-			auto addr = callbacks[info.idx];
-			if (addr == 0x0) {
-				VSLb(ctx->vsl, SLT_Error,
-					"VM call '%s' skipped: The function at index %d is not available",
-					callback_names.at(info.idx), info.idx);
-				return -1;
-			}
-		#ifdef ENABLE_TIMING
-			TIMING_LOCATION(t1);
-		#endif
-			// VRT ctx can easily change even on the same request due to waitlist
-			script->set_ctx(ctx);
-			int ret = 0;
-			if (argument != nullptr)
-				ret = script->call(addr, argument, (int) info.arg1, (int) info.arg2);
-			else
-				ret = script->call(addr, (int) info.arg1, (int) info.arg2);
-		#ifdef ENABLE_TIMING
-			TIMING_LOCATION(t2);
-			printf("Time spent in forkcall(): %ld ns\n", nanodiff(t1, t2));
-		#endif
-			return ret;
-		}
-		VRT_fail(ctx, "VM call failed (invalid index given: %d)", info.idx);
-		return -1;
+		return riscv_call_idx(script, ctx, info, argument);
 	}
 	VRT_fail(ctx, "current_call_idx() failed (no running machine)");
 	return -1;

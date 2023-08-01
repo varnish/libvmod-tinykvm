@@ -16,8 +16,9 @@ list(APPEND RISCV_SOURCES
 	src/script_functions.cpp
 	src/script_sha256.cpp
 	src/tenancy.cpp
-	src/vmod_riscv.cpp
 	src/varnish_interface.c
+	src/varnish_cpp_interface.cpp
+	src/vmod_cpp_interface.cpp
 	src/vmods/goto.cpp
 )
 
@@ -29,8 +30,8 @@ target_include_directories(sandbox PRIVATE ${VARNISH_PATH}/bin/varnishd)
 #option(RISCV_BINARY_TRANSLATION "" ON)
 option(RISCV_EXT_C "" OFF)
 #option(RISCV_EXT_V "" ON)
-option(RISCV_EXPERIMENTAL "" ON)
 option(RISCV_THREADED "" ON)
+option(RISCV_MEMORY_TRAPS "" OFF)
 
 add_subdirectory(libriscv/lib)
 # Make room for Linux ABI and custom ABI

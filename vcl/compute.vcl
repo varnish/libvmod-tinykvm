@@ -27,10 +27,10 @@ sub vcl_init {
 	}""");
 	# Start the AVIF transcoder, but don't delay Varnish startup.
 	#compute.start("avif");
-	compute.start("espeak");
+	#compute.start("espeak");
 	#compute.start("fetch");
 	#compute.start("inflate");
-	compute.start("minimal");
+	#compute.start("minimal");
 	#compute.start("zstd");
 }
 sub vcl_recv {

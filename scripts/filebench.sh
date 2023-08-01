@@ -7,4 +7,4 @@ mkdir -p $NTMP
 # fixes VMOD cache bugs
 rm -rf /tmp/varnishd/*
 
-source $file --vcp=build --no-optimize --build $@ --run -a :8080 -f vcl/filebench.vcl -F -n $NTMP
+source $file --vcp=build --optimize --build $@ --run -a :8080 -f vcl/filebench.vcl -F -n $NTMP

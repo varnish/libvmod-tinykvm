@@ -82,6 +82,17 @@ sub vcl_hash {
 	riscv.apply_hash();
 }
 
+sub vcl_synth {
+	if (riscv.active()) {
+		if (riscv.want_resume()) {
+			riscv.resume();
+		} else {
+			riscv.vcall(ON_SYNTH);
+		}
+		return (deliver);
+	}
+}
+
 sub vcl_backend_fetch {
 	if (bereq.url == "/vanilla") {
 		return (fetch);
@@ -119,5 +130,24 @@ sub vcl_backend_fetch {
 				bereq.http.Host,
 				bereq.url,
 				bereq.http.X-KVM-Arg);
+	}
+}
+
+sub vcl_backend_response {
+	if (riscv.active()) {
+		if (riscv.want_resume()) {
+			riscv.resume();
+		} else {
+			riscv.vcall(ON_BACKEND_RESPONSE);
+		}
+	}
+}
+
+sub vcl_deliver {
+	if (riscv.active()) {
+		if (riscv.want_resume()) {
+			riscv.resume();
+		}
+		riscv.vcall(ON_DELIVER);
 	}
 }

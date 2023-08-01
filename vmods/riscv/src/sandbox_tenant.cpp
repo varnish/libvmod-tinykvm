@@ -3,11 +3,13 @@
 #include <libriscv/util/crc32.hpp>
 using riscv::crc32;
 
-namespace rvs {
-
 //#define ENABLE_TIMING
 #ifdef ENABLE_TIMING
 #include "timing.hpp"
+#endif
+
+namespace rvs {
+#ifdef ENABLE_TIMING
 static Timing timing_constr {"constructor"};
 static Timing timing_destr {"destructor"};
 #endif
@@ -78,7 +80,7 @@ Script* SandboxTenant::vmfork(VRT_CTX, bool debug)
 				"VM '%s' exception: %s", script->name().c_str(), e.what());
 			return nullptr;
 		}
-#ifdef ENABLE_TIMING
+	#ifdef ENABLE_TIMING
 		TIMING_LOCATION(t1);
 		timing_constr.add(t0, t1);
 	#endif

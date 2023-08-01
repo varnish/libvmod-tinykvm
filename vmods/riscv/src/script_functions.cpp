@@ -692,7 +692,9 @@ APICALL(header_field_append)
 	}
 
 	const int idx = hp->field_count++;
-	http_SetH(hp, idx, val);
+	hp->field_array[idx].begin = val;
+	hp->field_array[idx].end   = val + len;
+	hp->field_flags[idx] = 0;
 	machine.set_result(idx);
 }
 
@@ -743,7 +745,10 @@ APICALL(header_field_copy)
 			const auto& src_field = src_hp->field_array[src_index];
 
 			/* Apply it at the given index */
-			http_SetH(hp, index, src_field.begin);
+			hp->field_array[index].begin = src_field.begin;
+			hp->field_array[index].end   = src_field.end;
+			hp->field_flags[index] = 0;
+
 			machine.set_result(field_length(src_field));
 			return;
 		}
