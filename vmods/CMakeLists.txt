@@ -16,6 +16,7 @@ if (VARNISH_PLUS)
 	add_subdirectory(compute)
 	add_subdirectory(crypto)
 	add_subdirectory(deviceatlas)
+	add_subdirectory(edgestash)
 	add_subdirectory(file)
 	add_subdirectory(goto)
 
