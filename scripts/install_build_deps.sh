@@ -8,6 +8,7 @@ DEBIAN_FRONTEND=noninteractive sudo -E apt install -y \
 	ccache \
 	clang-12 lld-12 \
 	python3 python3-pip \
+	libarchive-dev \
 	libcurl4-openssl-dev \
 	libssl-dev \
 	libpcre3-dev \
