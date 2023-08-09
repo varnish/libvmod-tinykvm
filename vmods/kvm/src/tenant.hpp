@@ -58,9 +58,12 @@ struct TenantConfig
 	std::string    name;
 	uint32_t       hash;
 	mutable TenantGroup group;
-	std::string    filename;  /* Stored locally here. */
+	std::string    filename;  /* Stored locally here (program path prefix). */
 	std::string    key;
-	std::string    uri;       /* Can be fetched here. */
+	std::string    uri;       /* Can be fetched here (program URI archive). */
+
+	std::string request_program_filename() const noexcept { return this->filename; }
+	std::string storage_program_filename() const noexcept { return this->filename + "_storage"; }
 
 	float    max_boot_time() const noexcept { return group.max_boot_time; }
 	float    max_req_time(bool debug) const noexcept {

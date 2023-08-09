@@ -54,12 +54,14 @@ VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
 }
 
 ProgramInstance::ProgramInstance(
-	std::vector<uint8_t> elf,
+	std::vector<uint8_t> request_elf,
+	std::vector<uint8_t> storage_elf,
 	const vrt_ctx* ctx, TenantInstance* ten,
 	bool debug)
-	: binary{std::move(elf)},
-	  m_main_queue {STORAGE_VM_NICE, false},
-	  m_main_async_queue {ASYNC_STORAGE_NICE, ASYNC_STORAGE_LOWPRIO},
+	: request_binary{std::move(request_elf)},
+	  storage_binary{std::move(storage_elf)},
+	  m_storage_queue {STORAGE_VM_NICE, false},
+	  m_storage_async_queue {ASYNC_STORAGE_NICE, ASYNC_STORAGE_LOWPRIO},
 	  m_vcl {ctx->vcl},
 	  rspclient{nullptr}
 {
@@ -67,7 +69,7 @@ ProgramInstance::ProgramInstance(
 
 	this->m_binary_was_local = true;
 	this->m_binary_was_cached = false;
-	this->m_future = m_main_queue.enqueue(
+	this->m_future = m_storage_queue.enqueue(
 	[=] () -> long {
 		begin_initialization(ctx, ten, debug);
 		return 0;
@@ -77,16 +79,16 @@ ProgramInstance::ProgramInstance(
 	const std::string& uri, std::string ifmodsince,
 	const vrt_ctx* ctx, TenantInstance* ten,
 	bool debug)
-	: binary{},
-	  m_main_queue {STORAGE_VM_NICE, false},
-	  m_main_async_queue {ASYNC_STORAGE_NICE, ASYNC_STORAGE_LOWPRIO},
+	: request_binary{}, storage_binary{},
+	  m_storage_queue {STORAGE_VM_NICE, false},
+	  m_storage_async_queue {ASYNC_STORAGE_NICE, ASYNC_STORAGE_LOWPRIO},
 	  m_vcl {ctx->vcl},
 	  rspclient{nullptr}
 {
 	mtx_future_init.lock();
 
 	this->m_binary_was_local = false;
-	this->m_future = m_main_queue.enqueue(
+	this->m_future = m_storage_queue.enqueue(
 	[=] () -> long {
 		try {
 			/* Helper structure for cURL fetch. */
@@ -114,12 +116,12 @@ ProgramInstance::ProgramInstance(
 					if constexpr (VERBOSE_PROGRAM_STARTUP) {
 						printf("Loading '%s' from local disk\n", data->ten->config.name.c_str());
 					}
-					data->prog->binary = file_loader(data->ten->config.filename);
+					data->prog->request_binary = file_loader(data->ten->config.request_program_filename());
 				} else if (status == 200) {
 					if constexpr (VERBOSE_PROGRAM_STARTUP) {
 						printf("Loading '%s' from HTTP response\n", data->ten->config.name.c_str());
 					}
-					data->prog->binary = 
+					data->prog->request_binary = 
 						std::vector<uint8_t> (chunk->memory, chunk->memory + chunk->size);
 				} else {
 					// Unhandled HTTP status?
@@ -129,8 +131,10 @@ ProgramInstance::ProgramInstance(
 
 			if (res != 0) {
 				// XXX: Reset binary when it fails.
-				this->binary = {};
+				this->request_binary = {};
+				this->storage_binary = {};
 				this->main_vm = nullptr;
+				this->storage_vm = nullptr;
 				this->unlock_and_initialized(false);
 				return -1;
 			}
@@ -145,7 +149,10 @@ ProgramInstance::ProgramInstance(
 			if (data.status == 200 && !ten->config.filename.empty()) {
 				/* Cannot throw, but reports true/false on write success.
 					We *DO NOT* care if the write failed. Only a cached binary. */
-				file_writer(ten->config.filename, this->binary);
+				file_writer(ten->config.request_program_filename(), this->request_binary);
+				/* Also, write storage binary, if it exists. */
+				if (!this->storage_binary.empty())
+					file_writer(ten->config.storage_program_filename(), this->storage_binary);
 			}
 
 			return 0;
@@ -160,8 +167,10 @@ ProgramInstance::ProgramInstance(
 				"kvm: Program '%s' failed initialization: %s\n",
 					ten->config.name.c_str(), e.what());
 			// XXX: Reset binary when it fails.
-			this->binary = {};
+			this->request_binary = {};
+			this->storage_binary = {};
 			this->main_vm = nullptr;
+			this->storage_vm = nullptr;
 			this->unlock_and_initialized(false);
 			return -1;
 		}
@@ -175,13 +184,34 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 			throw std::runtime_error("Concurrency must be at least 1");
 
 		TIMING_LOCATION(t0);
-		// Create the master VM, forked later for request concurrency.
-		main_vm = std::make_unique<MachineInstance>
-			(this->binary, ctx, ten, this, debug);
+
+		// 1. Create the storage VM, used for shared mutable storage.
+		storage_vm = std::make_unique<MachineInstance>
+			(this->storage_binary, ctx, ten, this, true, debug);
 
 		// The extra vCPU is used for async storage access.
-		main_vm_extra_cpu_stack = EXTRA_CPU_STACK_SIZE +
-			main_vm->machine().mmap_allocate(EXTRA_CPU_STACK_SIZE);
+		storage_vm_extra_cpu_stack = EXTRA_CPU_STACK_SIZE +
+			storage_vm->machine().mmap_allocate(EXTRA_CPU_STACK_SIZE);
+
+		// Run through main, verify wait_for_requests() etc.
+		storage_vm->initialize();
+		// We do not need a VRT CTX after initialization.
+		storage_vm->set_ctx(nullptr);
+
+		// 2. Create the master VM, forked later for request concurrency.
+		// NOTE: The request VM can make calls into the storage VM, so
+		// we need to initialize storage first!
+		main_vm = std::make_unique<MachineInstance>
+			(this->request_binary, ctx, ten, this, false, debug);
+
+		// Automatic remote connection with storage VM is done by calculating the
+		// gigapage of the start address, and if non-zero do a remote connection.
+		// Figure out the starting address for storage VM stuff
+		auto storage_base_gigapage = storage_vm->machine().start_address() >> 30U;
+		if (storage_base_gigapage > 0)
+		{
+			main_vm->machine().remote_connect(storage_vm->machine());
+		}
 
 		// Run through main, verify wait_for_requests() etc.
 		main_vm->initialize();
@@ -222,6 +252,7 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 		// Make sure we signal that there is no program, if the
 		// program fails to intialize.
 		main_vm = nullptr;
+		storage_vm = nullptr;
 		this->unlock_and_initialized(false);
 		throw;
 	}
@@ -229,12 +260,12 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 ProgramInstance::~ProgramInstance()
 {
 	// NOTE: Thread pools need to wait on jobs here
-	m_main_async_queue.wait_until_nothing_in_flight();
-	m_main_queue.wait_until_nothing_in_flight();
+	m_storage_async_queue.wait_until_nothing_in_flight();
+	m_storage_queue.wait_until_nothing_in_flight();
 
-	if (main_vm_extra_cpu) {
+	if (storage_vm_extra_cpu) {
 		// XXX: This might be deleted too early
-		main_vm_extra_cpu->deinit();
+		storage_vm_extra_cpu->deinit();
 	}
 	for (const auto& adns : m_adns_tags) {
 		if (!adns.tag.empty())
@@ -333,13 +364,13 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 	if constexpr (VERBOSE_STORAGE_TASK) {
 		printf("Storage task on main queue\n");
 	}
-	auto future = m_main_queue.enqueue(
+	auto future = m_storage_queue.enqueue(
 	[&] () -> long
 	{
 		if constexpr (VERBOSE_STORAGE_TASK) {
 			printf("-> Storage task on main queue ENTERED\n");
 		}
-		auto& stm = main_vm->machine();
+		auto& stm = storage_vm->machine();
 		uint64_t vaddr = stm.stack_address();
 
 		for (size_t i = 0; i < n; i++) {
@@ -360,8 +391,8 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 				printf("Storage task calling 0x%lX with stack 0x%lX\n",
 					func, new_stack);
 			}
-			const float timeout = main_vm->tenant().config.max_storage_time();
-			main_vm->begin_call();
+			const float timeout = storage_vm->tenant().config.max_storage_time();
+			storage_vm->begin_call();
 
 			/* Build call manually. */
 			tinykvm::tinykvm_x86regs regs;
@@ -371,17 +402,14 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			stm.set_registers(regs);
 
 			/* Check if this is a debug program. */
-			if (main_vm->is_debug()) {
-				main_vm->storage_debugger(timeout);
+			if (storage_vm->is_debug()) {
+				storage_vm->storage_debugger(timeout);
 			} else {
 				stm.run(timeout);
 			}
 
-			//stm.timed_reentry_stack(func, new_stack, timeout,
-			//	(uint64_t)n, (uint64_t)stm_bufaddr, (uint64_t)res_size);
-
 			/* The machine must be stopped, and it must have called storage_return. */
-			if (!stm.stopped() || !main_vm->response_called(2)) {
+			if (!stm.stopped() || !storage_vm->response_called(2)) {
 				throw std::runtime_error("Storage did not respond properly");
 			}
 
@@ -429,13 +457,13 @@ long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 	if (async == false)
 	{
 		m_async_tasks.push_back(
-			m_main_queue.enqueue(
+			m_storage_queue.enqueue(
 		[=] () -> long
 		{
 			if constexpr (VERBOSE_STORAGE_TASK) {
 				printf("-> Async task on main queue\n");
 			}
-			auto& stm = main_vm->machine();
+			auto& stm = storage_vm->machine();
 
 			try {
 				if constexpr (VERBOSE_STORAGE_TASK) {
@@ -458,36 +486,36 @@ long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 			}
 		}));
 	} else {
-		/* Use separate queue: m_main_async_queue. */
+		/* Use separate queue: m_storage_async_queue. */
 		m_async_tasks.push_back(
-			m_main_async_queue.enqueue(
+			m_storage_async_queue.enqueue(
 		[=] () -> long
 		{
 			if constexpr (VERBOSE_STORAGE_TASK) {
 				printf("-> Async task on async queue\n");
 			}
-			auto& stm = main_vm->machine();
+			auto& stm = storage_vm->machine();
 
 			try {
 				if constexpr (VERBOSE_STORAGE_TASK) {
 					printf("Calling 0x%lX with stack 0x%lX\n",
-						func, main_vm_extra_cpu_stack);
+						func, storage_vm_extra_cpu_stack);
 				}
 				/* Avoid async storage while still initializing. */
 				this->try_wait_for_startup_and_initialization();
 
-				if (!main_vm_extra_cpu) {
-					main_vm_extra_cpu.reset(new tinykvm::vCPU);
-					main_vm_extra_cpu->smp_init(EXTRA_CPU_ID, stm);
+				if (!storage_vm_extra_cpu) {
+					storage_vm_extra_cpu.reset(new tinykvm::vCPU);
+					storage_vm_extra_cpu->smp_init(EXTRA_CPU_ID, stm);
 				}
 				/* For the love of GOD don't try to change this to
 				   a timed_reentry_stack call *again*. This function
-				   specfically uses *main_vm_extra_cpu*. */
+				   specfically uses *storage_vm_extra_cpu*. */
 				tinykvm::tinykvm_x86regs regs;
-				stm.setup_call(regs, func, main_vm_extra_cpu_stack, (uint64_t)arg);
+				stm.setup_call(regs, func, storage_vm_extra_cpu_stack, (uint64_t)arg);
 				//regs.rip = stm.reentry_address();
-				main_vm_extra_cpu->set_registers(regs);
-				main_vm_extra_cpu->run(ASYNC_STORAGE_TIMEOUT);
+				storage_vm_extra_cpu->set_registers(regs);
+				storage_vm_extra_cpu->run(ASYNC_STORAGE_TIMEOUT);
 				if constexpr (VERBOSE_STORAGE_TASK) {
 					printf("<- Async task finished 0x%lX\n", func);
 				}
@@ -513,15 +541,15 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 		uint64_t data;
 		uint64_t len;
 	};
-	const float timeout = main_vm->tenant().config.max_storage_time();
+	const float timeout = storage_vm->tenant().config.max_storage_time();
 
-	auto future = m_main_queue.enqueue(
+	auto future = m_storage_queue.enqueue(
 	[&] () -> long
 	{
 		try {
 			/* Serialize data in the old machine */
-			main_vm->set_ctx(ctx);
-			auto& old_machine = main_vm->machine();
+			storage_vm->set_ctx(ctx);
+			auto& old_machine = storage_vm->machine();
 			old_machine.timed_vmcall(func, timeout);
 			return 0;
 		} catch (...) {
@@ -533,7 +561,7 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 
 	SerializeResult from {};
 	if (result == 0) {
-		auto& old_machine = main_vm->machine();
+		auto& old_machine = storage_vm->machine();
 		/* Get serialized data */
 		auto regs = old_machine.registers();
 		auto data_addr = regs.rdi;
@@ -546,13 +574,13 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 	if (from.data == 0x0)
 		return -1;
 
-	auto new_future = new_prog.m_main_queue.enqueue(
+	auto new_future = new_prog.m_storage_queue.enqueue(
 	[&] () -> long
 	{
 		try {
-			auto &new_machine = new_prog.main_vm->machine();
+			auto &new_machine = new_prog.storage_vm->machine();
 			/* Begin resume procedure */
-			new_prog.main_vm->set_ctx(ctx);
+			new_prog.storage_vm->set_ctx(ctx);
 
 			new_machine.timed_vmcall(newfunc, timeout, (uint64_t)from.len);
 
@@ -562,7 +590,7 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 			auto res_size = std::min((uint64_t)regs.rsi, from.len);
 			if (res_data != 0x0)
 			{ // Just a courtesy, we *do* check permissions.
-				auto& old_machine = main_vm->machine();
+				auto& old_machine = storage_vm->machine();
 				new_machine.copy_from_machine(
 					res_data, old_machine, from.data, res_size);
 				/* Resume the new machine, allowing it to deserialize data */

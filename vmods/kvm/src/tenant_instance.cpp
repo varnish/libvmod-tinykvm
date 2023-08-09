@@ -115,9 +115,19 @@ void TenantInstance::begin_initialize(VRT_CTX)
 
 	/* 4. Load the program from filesystem now. */
 	try {
-		auto elf = file_loader(config.filename);
-		this->program =
-			std::make_shared<ProgramInstance> (std::move(elf), ctx, this);
+		auto elf = file_loader(config.request_program_filename());
+		/* Check for a storage program */
+		if (access(config.storage_program_filename().c_str(), R_OK) == 0)
+		{
+			auto storage_elf = file_loader(config.storage_program_filename());
+			this->program =
+				std::make_shared<ProgramInstance> (std::move(elf), std::move(storage_elf), ctx, this);
+		}
+		else
+		{
+			this->program =
+				std::make_shared<ProgramInstance> (elf, elf, ctx, this);
+		}
 	} catch (const std::exception& e) {
 		this->handle_exception(config, e);
 	}

@@ -67,7 +67,9 @@ public:
 	using gaddr_t = MachineInstance::gaddr_t;
 	static constexpr size_t ADNS_MAX = 8;
 
-	ProgramInstance(std::vector<uint8_t> binary,
+	ProgramInstance(
+		std::vector<uint8_t> request_binary,
+		std::vector<uint8_t> storage_binary,
 		const vrt_ctx*, TenantInstance*, bool debug = false);
 	ProgramInstance(const std::string& uri, std::string ifmodsince,
 		const vrt_ctx*, TenantInstance*, bool debug = false);
@@ -119,12 +121,15 @@ public:
 	long live_update_call(const vrt_ctx*,
 		gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc);
 
-	std::vector<uint8_t> binary;
-	/* Ready-made _main_ VM that can be forked into many small VMs */
+	std::vector<uint8_t> request_binary;
+	std::vector<uint8_t> storage_binary;
+	/* Ready-made *request* VM that can be forked into many small VMs */
 	std::unique_ptr<MachineInstance> main_vm;
+	/* Ready-made *storage* VM that provides a shared mutable storage */
+	std::unique_ptr<MachineInstance> storage_vm;
 	/* Extra vCPU used for async storage tasks */
-	std::unique_ptr<tinykvm::vCPU> main_vm_extra_cpu = nullptr;
-	uint64_t main_vm_extra_cpu_stack = 0x0;
+	std::unique_ptr<tinykvm::vCPU> storage_vm_extra_cpu = nullptr;
+	uint64_t storage_vm_extra_cpu_stack = 0x0;
 
 	/* Ticket-machine that gives access rights to VMs. */
 	moodycamel::BlockingConcurrentQueue<VMPoolItem*> m_vmqueue;
@@ -135,10 +140,10 @@ public:
 	std::deque<std::future<long>> m_async_tasks;
 	std::mutex m_async_mtx;
 
-	/* Queue of work to happen on main VM. Bottleneck. */
-	tinykvm::ThreadTask m_main_queue;
+	/* Queue of work to happen on storage VM. Serialized access. */
+	tinykvm::ThreadTask m_storage_queue;
 	/* Separate queue for async calls into main VM. */
-	tinykvm::ThreadTask m_main_async_queue;
+	tinykvm::ThreadTask m_storage_async_queue;
 
 	/* Entry points in the tenants program. Handlers for all types of
 	   requests, serialization mechanisms and related functionality.

@@ -17,6 +17,7 @@
 #include "tenant_instance.hpp"
 #include "timing.hpp"
 #include "varnish.hpp"
+#include <tinykvm/util/elf.h>
 extern "C" int close(int);
 extern void setup_kvm_system_calls();
 
@@ -30,20 +31,34 @@ void MachineInstance::kvm_initialize()
 	setup_syscall_interface();
 }
 
+static uint64_t detect_gigapage_from(const std::vector<uint8_t>& binary)
+{
+	if (binary.size() < 128U)
+		throw std::runtime_error("Invalid ELF program (binary too small)");
+	auto* elf = (Elf64_Ehdr *)binary.data();
+
+	auto start_address_gigapage = elf->e_entry >> 30U;
+	if (start_address_gigapage >= 64)
+		throw std::runtime_error("Invalid ELF start address (adress was > 64GB)");
+
+	return start_address_gigapage << 30U;
+}
+
 MachineInstance::MachineInstance(
 	const std::vector<uint8_t>& binary, const vrt_ctx* ctx,
 	const TenantInstance* ten, ProgramInstance* inst,
-	bool debug)
+	bool storage, bool debug)
 	: m_ctx(ctx),
 	  m_machine(binary, tinykvm::MachineOptions{
 		.max_mem = ten->config.max_main_memory(),
-		.max_cow_mem = ten->config.max_req_memory(),
+		.max_cow_mem = 0UL,
+		.vmem_base_address = detect_gigapage_from(binary),
 		.hugepages = ten->config.hugepages(),
 		.master_direct_memory_writes = false,
 	  }),
 	  m_tenant(ten), m_inst(inst),
 	  m_is_debug(debug),
-	  m_is_storage(true),
+	  m_is_storage(storage),
 	  m_fd        {ten->config.max_fd(), "File descriptors"},
 	  m_regex     {ten->config.max_regex(), "Regex handles"}
 {
@@ -75,24 +90,26 @@ void MachineInstance::initialize()
 		if (!is_waiting_for_requests()) {
 			throw std::runtime_error("Program did not wait for requests");
 		}
+		// Only request VMs need the copy-on-write mechanism enabled
+		if (!is_storage())
+		{
+			// Global shared memory boundary
+			uint64_t shm_boundary = shared_memory_boundary();
+			//printf("Shared memory boundary: 0x%lX Max addr: 0x%lX\n",
+			//	shm_boundary, machine().max_address());
+			if (m_global_shared_memory) shm_boundary = stack_end;
 
-		// Global shared memory boundary
-		uint64_t shm_boundary = shared_memory_boundary();
-		//printf("Shared memory boundary: 0x%lX Max addr: 0x%lX\n",
-		//	shm_boundary, machine().max_address());
-		if (m_global_shared_memory) shm_boundary = stack_end;
-
-		// Make forkable (with working memory)
-		// TODO: Tenant config variable for storage memory
-		// Max memory here is the available CoW memory for storage
-		machine().prepare_copy_on_write(
-			tenant().config.max_main_memory(), shm_boundary);
+			// Make forkable (with *NO* working memory)
+			machine().prepare_copy_on_write(0UL, shm_boundary);
+		}
 
 		// Set new vmcall stack base lower than current RSP, in
 		// order to avoid trampling stack-allocated things in main.
 		auto rsp = machine().registers().rsp;
-		rsp = (rsp - 128UL) & ~0xFLL; // Avoid red-zone if main is leaf
-		machine().set_stack_address(rsp);
+		if (rsp >= stack && rsp < stack_end) {
+			rsp = (rsp - 128UL) & ~0xFLL; // Avoid red-zone if main is leaf
+			machine().set_stack_address(rsp);
+		}
 	}
 	catch (const std::exception& e)
 	{

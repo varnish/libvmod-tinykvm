@@ -217,10 +217,6 @@ if (VARNISH_PLUS)
 	set(LMDB_PATH ${LIBPATH}/liblmdb/LMDB_0.9.23)
 	set(LMDB_SOURCES
 		${LMDB_PATH}/mdb.c
-		${LMDB_PATH}/mdb_dump.c
-		${LMDB_PATH}/mdb_stat.c
-		${LMDB_PATH}/mdb_copy.c
-		${LMDB_PATH}/mdb_load.c
 		${LMDB_PATH}/midl.c
 	)
 	add_library(lmdb ${LMDB_SOURCES})

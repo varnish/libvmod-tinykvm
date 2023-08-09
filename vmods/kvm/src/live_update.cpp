@@ -38,8 +38,8 @@ kvm_live_update(VRT_CTX, kvm::TenantInstance* ten, struct update_params *params)
 
 		/* If this throws an exception, we instantly fail the update */
 		auto inst = std::make_shared<ProgramInstance>(
-			std::move(binary), ctx, ten, params->is_debug);
-		const auto& live_binary = inst->binary;
+			binary, binary, ctx, ten, params->is_debug);
+		const auto& live_binary = inst->request_binary;
 
 		/* Complex dance to replace the currently running program */
 		inst->wait_for_initialization();
@@ -50,7 +50,7 @@ kvm_live_update(VRT_CTX, kvm::TenantInstance* ten, struct update_params *params)
 		printf("Time spent updating: %ld ns\n", nanodiff(t0, t1));
 	#endif
 		/* Don't save debug binaries and empty filenames. */
-		const auto& filename = ten->config.filename;
+		const auto& filename = ten->config.request_program_filename();
 		if (!params->is_debug && !filename.empty())
 		{
 			/* Filename is not empty, so we can now check to see if it's a URI. */

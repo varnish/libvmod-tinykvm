@@ -4,7 +4,7 @@ set -e
 pushd vmods/riscv
 git submodule update --init --depth 1 libriscv
 pushd libriscv
-NO_BUILD=1 ./setup.sh
+#NO_BUILD=1 ./setup.sh
 popd
 popd
 # KVM sandbox

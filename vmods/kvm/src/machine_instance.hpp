@@ -80,7 +80,7 @@ public:
 	void storage_debugger(float timeout);
 
 	static void kvm_initialize();
-	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool dbg);
+	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool storage, bool dbg);
 	MachineInstance(const MachineInstance&, const TenantInstance*, ProgramInstance*);
 	void initialize();
 	~MachineInstance();

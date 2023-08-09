@@ -1,22 +1,24 @@
-varnishtest "KVM Backend: Basic storage test"
+varnishtest "KVM Backend: Shared memory storage test"
 
 shell {
+cat >${tmpdir}/${testname}_storage.c <<-EOF
+#include "kvm_api.h"
+int storage_counter = 0;
+
+int main()
+{
+	wait_for_requests();
+}
+EOF
 cat >${tmpdir}/${testname}.c <<-EOF
 #include <string.h>
 #include "kvm_api.h"
-
-static int counter = 0;
-static void my_storage()
-{
-	counter ++;
-	storage_return_nothing();
-}
+extern int storage_counter;
 
 static void my_backend(char *arg)
 {
-	storage_call(my_storage, NULL, 0, NULL, 0);
-
-	arg[11] = '0' + (counter % 10);
+	__sync_fetch_and_add(&storage_counter, 1);
+	arg[11] = '0' + (storage_counter % 10);
 
 	const char ctype[] = "text/plain";
 	backend_response(200, ctype, sizeof(ctype)-1, arg, strlen(arg));
@@ -24,15 +26,13 @@ static void my_backend(char *arg)
 
 int main()
 {
-	// With this enabled we can see the global memory of
-	// the storage VM without copying data out.
-	make_storage_memory_shared();
-
 	set_backend_get(my_backend);
 	wait_for_requests();
 }
 EOF
-gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+gcc -static -O2 -Wl,-Ttext-segment=0x44000000 ${tmpdir}/${testname}_storage.c -I${testdir} -o ${tmpdir}/${testname}_storage
+objcopy -w --extract-symbol --strip-symbol=!*storage* --strip-symbol=* ${tmpdir}/${testname}_storage ${tmpdir}/${testname}_storage.syms
+gcc -static -O2 -Wl,--just-symbols=${tmpdir}/${testname}_storage.syms ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
 }
 
 varnish v1 -vcl+backend {
