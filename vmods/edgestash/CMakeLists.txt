@@ -14,7 +14,7 @@ set(LIBES_SOURCES
 	${ESPATH}/ves_var.c
 	${ESPATH}/ves_vec_gen.c
 )
-add_library(edgestash ${LIBES_SOURCES})
+add_library(edgestash SHARED ${LIBES_SOURCES})
 target_include_directories(edgestash PRIVATE ${CMAKE_BINARY_DIR})
 target_include_directories(edgestash PRIVATE ${CMAKE_SOURCE_DIR}/cmake/include)
 target_include_directories(edgestash PRIVATE ${VARNISH_SOURCE_DIR}/include)
