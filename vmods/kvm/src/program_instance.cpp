@@ -28,6 +28,7 @@
 #include "varnish.hpp"
 #include <cstring>
 #include <tinykvm/rsp_client.hpp>
+#include <unistd.h>
 extern "C" int usleep(uint32_t usec);
 
 namespace kvm {
@@ -117,16 +118,31 @@ ProgramInstance::ProgramInstance(
 						printf("Loading '%s' from local disk\n", data->ten->config.name.c_str());
 					}
 					data->prog->request_binary = file_loader(data->ten->config.request_program_filename());
+					// If the storage binary exists, use it
+					if (access(data->ten->config.storage_program_filename().c_str(), R_OK) == 0)
+					{
+						data->prog->storage_binary = file_loader(data->ten->config.storage_program_filename());
+					}
+					else // Otherwise, use the request program
+					{
+						data->prog->storage_binary = data->prog->request_binary;
+					}
+
 				} else if (status == 200) {
 					if constexpr (VERBOSE_PROGRAM_STARTUP) {
 						printf("Loading '%s' from HTTP response\n", data->ten->config.name.c_str());
 					}
 					data->prog->request_binary = 
 						std::vector<uint8_t> (chunk->memory, chunk->memory + chunk->size);
+					// For now just assume it's the same program.
+					// TODO: Check if the binary is an archive
+					data->prog->storage_binary = data->prog->request_binary;
+
 				} else {
 					// Unhandled HTTP status?
 					throw std::runtime_error("Fetching program '" + data->ten->config.name + "' failed. URL: " + data->uri);
 				}
+
 			}, &data, ifmodsince.c_str());
 
 			if (res != 0) {
