@@ -13,18 +13,9 @@ sub vcl_init {
 
 	# Download and activate a Varnish-provided library of compute programs.
 	# A full list of programs and how they can be used would be on the docs site.
-	compute.library("https://filebin.varnish-software.com/nsyb0c1pvwa7ecf9/compute.json");
+	compute.library("https://filebin.varnish-software.com/kvmprograms/compute.json");
 	# Add a local program directly (using default group)
 	compute.add_program("watermark", "file:///tmp/kvm_watermark");
-	# Configure program 'avif' with some overrides
-	compute.configure("minimal", """{
-        "ephemeral": false,
-		"concurrency": 2
-	}""");
-	compute.configure("minify", """{
-        "ephemeral": true,
-		"concurrency": 2
-	}""");
 	# Start the AVIF transcoder, but don't delay Varnish startup.
 	#compute.start("avif");
 	#compute.start("espeak");
@@ -40,7 +31,7 @@ sub vcl_recv {
 sub vcl_backend_fetch {
 	if (bereq.url == "/avif") {
 		# Transform a JPEG asset to AVIF, cache and deliver it. cURL can fetch using TLS and HTTP/2.
-		set bereq.backend = compute.program("avif", "https://${filebin}/nsyb0c1pvwa7ecf9/rose.jpg",
+		set bereq.backend = compute.program("avif", "https://${filebin}/kvmprograms/rose.jpg",
 			"""{
 				"headers": ["Host: filebin.varnish-software.com"]
 			}""");
@@ -72,7 +63,7 @@ sub vcl_backend_fetch {
 	}
 	else if (bereq.url == "/zstd/compress") {
 		# Compress data using zstandard
-		set bereq.backend = compute.program("zstd", "https://${filebin}/nsyb0c1pvwa7ecf9/waterfall.png",
+		set bereq.backend = compute.program("zstd", "https://${filebin}/kvmprograms/waterfall.png",
 			"""{
 				"action": "compress",
 				"level": 6,

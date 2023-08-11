@@ -35,8 +35,9 @@ namespace kvm {
 extern std::vector<uint8_t> file_loader(const std::string&);
 extern bool file_writer(const std::string& file, const std::vector<uint8_t>&);
 extern void libadns_untag(const std::string&, struct vcl*);
+extern void extract_programs_to(kvm::ProgramInstance&, const char *, size_t);
 static constexpr bool VERBOSE_STORAGE_TASK = false;
-static constexpr bool VERBOSE_PROGRAM_STARTUP = false;
+static constexpr bool VERBOSE_PROGRAM_STARTUP = true;
 
 VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
 	TenantInstance* ten, ProgramInstance* prog)
@@ -130,13 +131,10 @@ ProgramInstance::ProgramInstance(
 
 				} else if (status == 200) {
 					if constexpr (VERBOSE_PROGRAM_STARTUP) {
-						printf("Loading '%s' from HTTP response\n", data->ten->config.name.c_str());
+						printf("Loading '%s' from %s\n",
+							data->ten->config.name.c_str(), data->uri.c_str());
 					}
-					data->prog->request_binary = 
-						std::vector<uint8_t> (chunk->memory, chunk->memory + chunk->size);
-					// For now just assume it's the same program.
-					// TODO: Check if the binary is an archive
-					data->prog->storage_binary = data->prog->request_binary;
+					extract_programs_to(*data->prog, chunk->memory, chunk->size);
 
 				} else {
 					// Unhandled HTTP status?
