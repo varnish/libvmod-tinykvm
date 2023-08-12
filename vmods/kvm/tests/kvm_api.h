@@ -596,6 +596,9 @@ struct curl_options {
 };
 extern long sys_fetch(const char*, size_t, struct curl_op*, struct curl_fields*, struct curl_options*);
 
+/* Varnish self-request */
+extern long sys_request(const char*, size_t, struct curl_op*, struct curl_fields*, struct curl_options*);
+
 /* Embed binary data into executable. This data has no guaranteed alignment. */
 #define EMBED_BINARY(name, filename) \
 	asm(".pushsection .rodata\n" \
@@ -855,6 +858,13 @@ asm(".global sys_fetch\n"
 	".type sys_fetch, @function\n"
 	"sys_fetch:\n"
 	"	mov $0x20000, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
+
+asm(".global sys_request\n"
+	".type sys_request, @function\n"
+	"sys_request:\n"
+	"	mov $0x20001, %eax\n"
 	"	out %eax, $0\n"
 	"   ret\n");
 

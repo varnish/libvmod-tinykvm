@@ -6,6 +6,16 @@ typedef size_t (*read_callback)(char *buffer, size_t size, size_t nitems, void *
 typedef size_t (*write_callback)(char *, size_t, size_t, void *);
 typedef size_t (*header_callback)(char *buffer, size_t size, size_t nitems, void *);
 
+static constexpr bool GLOBAL_VERBOSE_CURL = false;
+static constexpr bool GLOBAL_CURL_ALTSVC_CACHE = false;
+static constexpr size_t CURL_REQ_URL_MAX_LENGTH = 1024u;
+static constexpr size_t CURL_RESP_HEADERS_MIN_LENGTH = 64;
+static constexpr size_t CONTENT_TYPE_LEN = 128;
+static constexpr size_t CURL_FIELDS_NUM = 12;
+/* We can over-allocate the buffer because we are immediately
+	relaxing it after finishing the fetch operation. */
+static constexpr uint64_t CURL_BUFFER_MAX = 256UL * 1024UL * 1024UL;
+
 struct writeop {
 	tinykvm::Machine& machine;
 	uint64_t dst;
@@ -16,60 +26,43 @@ struct readop {
 	uint64_t src;
 	size_t   bytes;
 };
+struct curl_options {
+	uint64_t  interface;
+	uint64_t  unused;
+	int8_t    follow_location; /* Follow Location in 301. */
+	int8_t    dummy_fetch;    /* Does not allocate content. */
+	int8_t    tcp_fast_open;  /* Enables TCP Fast Open. */
+	int8_t    dont_verify_host;
+	uint32_t  unused_opt5;
+};
+struct opfields {
+	uint64_t addr[CURL_FIELDS_NUM];
+	uint16_t len[CURL_FIELDS_NUM];
+};
+struct opresult {
+	uint32_t status;
+	uint32_t post_buflen;
+	uint64_t post_addr;
+	uint64_t headers;
+	uint32_t headers_length;
+	uint32_t unused1;
+	uint64_t content_addr;
+	uint32_t content_length;
+	uint32_t ct_length;
+	char     ctype[CONTENT_TYPE_LEN];
+};
 
-static void syscall_fetch(vCPU& vcpu, MachineInstance& inst)
+static void syscall_curl_fetch_helper(
+	vCPU& vcpu, MachineInstance& inst,
+	const std::string& url,
+	const uint64_t op_buffer,
+	const uint64_t fields_buffer,
+	const uint64_t options_buffer)
 {
-    static constexpr bool GLOBAL_VERBOSE_CURL = false;
-    static constexpr bool GLOBAL_CURL_ALTSVC_CACHE = false;
     auto& regs = vcpu.registers();
-    /**
-     * rdi = URL
-     * rsi = URL length
-     * rdx = result buffer
-     * rcx = fields buffer
-     * r8  = options buffer
-     **/
-    const uint64_t op_buffer = regs.rdx;
-    const uint64_t fields_buffer = regs.rcx;
-    const uint64_t options_buffer = regs.r8;
     const int CONN_TIMEOUT = 5;
     const int READ_TIMEOUT = 8;
-    /* We can over-allocate the buffer because we are immediately
-        relaxing it after finishing the fetch operation. */
-    constexpr uint64_t CURL_BUFFER_MAX = 256UL * 1024UL * 1024UL;
 
-    /* URL */
-    const auto url = adns_interp(inst.program().get_adns_key(),
-        vcpu.machine().buffer_to_string(regs.rdi, regs.rsi, 512));
-
-    constexpr size_t CURL_RESP_HEADERS_MIN_LENGTH = 64;
-    constexpr size_t CONTENT_TYPE_LEN = 128;
-    constexpr size_t CURL_FIELDS_NUM = 12;
-    struct curl_options {
-        uint64_t  interface;
-        uint64_t  unused;
-        int8_t    follow_location; /* Follow Location in 301. */
-        int8_t    dummy_fetch;    /* Does not allocate content. */
-        int8_t    tcp_fast_open;  /* Enables TCP Fast Open. */
-        int8_t    dont_verify_host;
-        uint32_t  unused_opt5;
-    };
-    struct opfields {
-        uint64_t addr[CURL_FIELDS_NUM];
-        uint16_t len[CURL_FIELDS_NUM];
-    };
-    struct opresult {
-        uint32_t status;
-        uint32_t post_buflen;
-        uint64_t post_addr;
-        uint64_t headers;
-        uint32_t headers_length;
-        uint32_t unused1;
-        uint64_t content_addr;
-        uint32_t content_length;
-        uint32_t ct_length;
-        char     ctype[CONTENT_TYPE_LEN];
-    };
     opresult opres;
     vcpu.machine().copy_from_guest(&opres, op_buffer, sizeof(opresult));
 
@@ -321,5 +314,63 @@ static void syscall_fetch(vCPU& vcpu, MachineInstance& inst)
     curl_easy_cleanup(curl);
     vcpu.set_registers(regs);
 } // curl_fetch
+
+static void syscall_fetch(vCPU& vcpu, MachineInstance& inst)
+{
+    auto& regs = vcpu.registers();
+    /**
+     * rdi = URL
+     * rsi = URL length
+     * rdx = result buffer
+     * rcx = fields buffer
+     * r8  = options buffer
+     **/
+    const uint64_t op_buffer = regs.rdx;
+    const uint64_t fields_buffer = regs.rcx;
+    const uint64_t options_buffer = regs.r8;
+
+    /* URL */
+    const auto url = adns_interp(inst.program().get_adns_key(),
+        vcpu.machine().buffer_to_string(regs.rdi, regs.rsi, CURL_REQ_URL_MAX_LENGTH));
+
+    opresult opres;
+    vcpu.machine().copy_from_guest(&opres, op_buffer, sizeof(opresult));
+
+	syscall_curl_fetch_helper(
+		vcpu, inst,
+		url,
+		op_buffer,
+		fields_buffer,
+		options_buffer);
+}
+
+static void syscall_request(vCPU& vcpu, MachineInstance& inst)
+{
+    auto& regs = vcpu.registers();
+    /**
+     * rdi = URL
+     * rsi = URL length
+     * rdx = result buffer
+     * rcx = fields buffer
+     * r8  = options buffer
+     **/
+    const uint64_t op_buffer = regs.rdx;
+    const uint64_t fields_buffer = regs.rcx;
+    const uint64_t options_buffer = regs.r8;
+
+    /* Self-requesting URL */
+    const auto url = "http://localhost:8080" +
+        vcpu.machine().buffer_to_string(regs.rdi, regs.rsi, CURL_REQ_URL_MAX_LENGTH);
+
+    opresult opres;
+    vcpu.machine().copy_from_guest(&opres, op_buffer, sizeof(opresult));
+
+	syscall_curl_fetch_helper(
+		vcpu, inst,
+		url,
+		op_buffer,
+		fields_buffer,
+		options_buffer);
+}
 
 } // kvm
