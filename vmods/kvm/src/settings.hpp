@@ -19,12 +19,12 @@ namespace kvm
 
     /* Serialized storage VM access */
     static constexpr int   STORAGE_VM_NICE = 0;
-    static constexpr float STORAGE_TIMEOUT = 3.0f;
+    static constexpr float STORAGE_TIMEOUT = 10.0f;
     static constexpr float STORAGE_CLEANUP_TIMEOUT = 1.0f;
     static constexpr float STORAGE_DESERIALIZE_TIMEOUT = 2.0f;
     static constexpr int   STORAGE_TASK_MAX_TIMERS = 15;
     /* Async storage VM access */
-    static constexpr float ASYNC_STORAGE_TIMEOUT = 3.0f;
+    static constexpr float ASYNC_STORAGE_TIMEOUT = 15.0f;
     static constexpr int   ASYNC_STORAGE_NICE = 15;
     static constexpr bool  ASYNC_STORAGE_LOWPRIO = true;
     /* Async storage vCPU settings */
