@@ -97,5 +97,8 @@ namespace kvm
 			archive_read_free(a);
 			throw;
 		}
+		// Use the same program for both request and storage, as a fallback
+		if (program.storage_binary.empty())
+			program.storage_binary = program.request_binary;
 	}
-}
+} // kvm
