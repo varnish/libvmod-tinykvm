@@ -529,17 +529,23 @@ long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 				stm.setup_call(regs, func, storage_vm_extra_cpu_stack, (uint64_t)arg);
 				//regs.rip = stm.reentry_address();
 				storage_vm_extra_cpu->set_registers(regs);
-				storage_vm_extra_cpu->run(ASYNC_STORAGE_TIMEOUT);
+				storage_vm_extra_cpu->run(tinykvm::to_ticks(ASYNC_STORAGE_TIMEOUT));
 				if constexpr (VERBOSE_STORAGE_TASK) {
 					printf("<- Async task finished 0x%lX\n", func);
 				}
 				return 0;
 			}
+			catch (const tinykvm::MachineTimeoutException& me) {
+				printf("Async storage task timed out: %s (%fs)\n",
+					me.what(), me.seconds());
+				return -1;
+			}
 			catch (const tinykvm::MachineException& me) {
 				printf("Async storage task error: %s (0x%lX)\n",
 					me.what(), me.data());
 				return -1;
-			} catch (const std::exception& e) {
+			}
+			catch (const std::exception& e) {
 				printf("Async storage task error: %s\n", e.what());
 				return -1;
 			}
