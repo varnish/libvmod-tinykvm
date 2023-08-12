@@ -25,7 +25,7 @@ sub vcl_init {
 	#compute.start("zstd");
 }
 sub vcl_recv {
-	return (pass);
+	//return (pass);
 }
 
 sub vcl_backend_fetch {
@@ -75,6 +75,19 @@ sub vcl_backend_fetch {
 	}
 	else if (bereq.url == "/minify") {
 		set bereq.backend = compute.program("minify", "");
+	}
+	else if (bereq.url ~ "/thumbnails") {
+		set bereq.backend = compute.program("thumbnails",
+			bereq.url,
+			"""{
+				"url": "https://${filebin}/kvmprograms/723-1200x1200.jpg",
+				"sizes": {
+					"tiny": 128,
+					"small": 256,
+					"medium": 512
+				},
+				"headers": ["Host: filebin.varnish-software.com"]
+			}""");
 	}
 	else if (bereq.url == "/none") {
 		set bereq.backend = compute.program("none", "");
