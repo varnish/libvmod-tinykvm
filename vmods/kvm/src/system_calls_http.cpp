@@ -1,20 +1,25 @@
 #include <cstdint>
-extern "C" {
-	void http_SetH(struct http *to, unsigned n, const char *fm);
-	void http_UnsetIdx(struct http *hp, unsigned idx);
-	void http_PrintfHeader(struct http *to, const char *fmt, ...);
-}
 struct txt {
 	const char* begin;
 	const char* end;
 };
+extern "C" {
+	void http_SetH(struct http *to, unsigned n, const char *fm);
+	void http_UnsetIdx(struct http *hp, unsigned idx);
+	void http_PrintfHeader(struct http *to, const char *fmt, ...);
+enum {
+#define SLTH(tag, ind, req, resp, sdesc, ldesc)	ind,
+#include "tbl/vsl_tags_http.h"
+};
+void VSLbt(struct vsl_log *vsl, enum VSL_tag_e tag, txt t);
+}
 struct http {
 	unsigned       magic;
 	uint16_t       fields_max;
 	txt*           field_array;
 	unsigned char* field_flags;
 	uint16_t       field_count;
-	int some_shit;
+	int            logtag;
 	struct vsl_log*vsl;
 	void*          ws;
 	uint16_t       status;
@@ -109,6 +114,11 @@ http_unsetat(struct http *hp, unsigned idx)
 
 	assert(idx >= HDR_FIRST); /* Avoid proto fields */
 	assert(idx < hp->field_count); /* Out of bounds */
+
+	if (hp->vsl != NULL) {
+		const int i = (HTTP_HDR_UNSET - HTTP_HDR_METHOD) + hp->logtag;
+		VSLbt(hp->vsl, (enum VSL_tag_e)i, hp->field_array[idx]);
+	}
 
 	/* Inefficient, but preserves order (assuming sorted?) */
 	count = hp->field_count - idx - 1;
