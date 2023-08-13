@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-static const int VMOD_KVM_BACKEND_TIMINGS = 0;
+static const int VMOD_KVM_BACKEND_TIMINGS = 1;
 static const uint64_t POST_BUFFER = (1UL << 29); /* 512MB */
 
 struct VMBuffer {
