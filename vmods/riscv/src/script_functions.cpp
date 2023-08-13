@@ -4,6 +4,11 @@
 #include "varnish.hpp"
 extern "C" {
 # include "varnish_interface.h"
+enum {
+#define SLTH(tag, ind, req, resp, sdesc, ldesc)	ind,
+#include "tbl/vsl_tags_http.h"
+};
+void VSLbt(struct vsl_log *vsl, enum VSL_tag_e tag, txt t);
 }
 
 namespace rvs {
@@ -99,6 +104,11 @@ http_unsetat(struct http *hp, unsigned idx)
 
 	assert(idx >= HDR_FIRST); /* Avoid proto fields */
 	assert(idx < hp->field_count); /* Out of bounds */
+
+	if (hp->vsl != NULL) {
+		const int i = (HTTP_HDR_UNSET - HTTP_HDR_METHOD) + hp->logtag;
+		VSLbt(hp->vsl, (enum VSL_tag_e)i, hp->field_array[idx]);
+	}
 
 	/* Inefficient, but preserves order (assuming sorted?) */
 	count = hp->field_count - idx - 1;

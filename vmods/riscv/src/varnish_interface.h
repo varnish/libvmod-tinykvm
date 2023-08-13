@@ -10,9 +10,9 @@ struct http {
 	txt*           field_array;
 	unsigned char* field_flags;
 	uint16_t       field_count;
-	int some_shit;
+	enum VSL_tag_e logtag;
 	struct vsl_log*vsl;
-	void*          ws;
+	struct ws*     ws;
 	uint16_t       status;
 	uint8_t        protover;
 	uint8_t        conds;
