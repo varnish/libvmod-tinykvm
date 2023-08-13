@@ -132,19 +132,12 @@ vfp_init(struct busyobj *bo, bool streaming)
 }
 
 static int
-kvmbe_write_response(const struct director *dir,
-	struct worker *wrk, struct busyobj *bo,
+kvmbe_write_response(struct busyobj *bo,
 	VRT_CTX, struct backend_result* result)
 {
 	/* Status code is sanitized in the backend call. */
 	http_PutResponse(bo->beresp, "HTTP/1.1", result->status, NULL);
 
-	/* Explicitly set content-type when known. */
-	if (result->tsize > 0)
-	{
-		http_PrintfHeader(bo->beresp, "Content-Type: %.*s",
-			(int) result->tsize, result->type);
-	}
 	/* Always set content-length, always known. */
 	http_PrintfHeader(bo->beresp,
 		"Content-Length: %zu", result->content_length);
@@ -321,13 +314,30 @@ kvmbe_gethdrs(const struct director *dir,
 		if (VMOD_KVM_BACKEND_TIMINGS) {
 			kvm_ts(ctx.vsl, "TenantProcess", &kvmr->t_work, &kvmr->t_prev);
 		}
+
+		if (result->status >= 500) {
+			VSLb(ctx.vsl, SLT_Error,
+				"KVM: Error status %u from call to %s at index %d in chain",
+				result->status, kvm_tenant_name(invocation->tenant), index);
+			break;
+		}
+
+		/* Explicitly set content-type when present. This allows
+		   other programs in the chain to read it as needed.
+		   An empty content-type is treated as no-change. Programs
+		   and VCL can unset the content-type if needed. */
+		if (result->tsize > 0)
+		{
+			http_PrintfHeader(bo->beresp, "Content-Type: %.*s",
+				(int) result->tsize, result->type);
+		}
 	}
 
 	/* Finish the response.
 	   After the last function call, the result buffer is filled with
 	   the last result, etc. Send backend response to varnish storage. */
 	const int res = kvmbe_write_response(
-		dir, wrk, bo, &ctx, result);
+		bo, &ctx, result);
 
 	if (VMOD_KVM_BACKEND_TIMINGS) {
 		kvm_ts(ctx.vsl, "TenantResponse", &kvmr->t_work, &kvmr->t_prev);

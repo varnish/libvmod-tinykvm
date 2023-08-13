@@ -22,6 +22,7 @@ sub vcl_init {
 	#compute.start("fetch");
 	#compute.start("inflate");
 	#compute.start("minimal");
+	#compute.start("thumbnails");
 	#compute.start("zstd");
 }
 sub vcl_recv {
@@ -94,6 +95,38 @@ sub vcl_backend_fetch {
 					"medium": 512
 				},
 				"headers": ["Host: filebin.varnish-software.com"]
+			}""");
+		compute.chain("zstd", bereq.url,
+			"""{
+				"action": "compress"
+			}""");
+		compute.chain("zstd", bereq.url,
+			"""{
+				"action": "decompress"
+			}""");
+		compute.chain("zstd", bereq.url,
+			"""{
+				"action": "compress"
+			}""");
+		compute.chain("zstd", bereq.url,
+			"""{
+				"action": "decompress"
+			}""");
+		compute.chain("zstd", bereq.url,
+			"""{
+				"action": "compress"
+			}""");
+		compute.chain("zstd", bereq.url,
+			"""{
+				"action": "decompress"
+			}""");
+		compute.chain("zstd", bereq.url,
+			"""{
+				"action": "compress"
+			}""");
+		compute.chain("zstd", bereq.url,
+			"""{
+				"action": "decompress"
 			}""");
 		set bereq.backend = compute.program("avif");
 	}
