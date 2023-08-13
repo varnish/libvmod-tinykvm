@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cmake/kvm_sandbox/tinykvm" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cmake/kvm_sandbox/tinykvm/tests/Catch2" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cmake/riscv_sandbox/ext/json" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cmake/riscv_sandbox/libriscv" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ext/C-Thread-Pool" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ext/FlameGraph" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ext/openssl-cmake" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ext/varnish-cache" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ext/varnish-cache-plus" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/vmods/kvm/tinykvm" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/vmods/kvm/tinykvm/tests/Catch2" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/vmods/riscv/libriscv" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/vmods/waf/modsec/ModSecurity" vcs="Git" />
+  </component>
+</project>
