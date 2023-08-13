@@ -16,13 +16,24 @@ struct vmod_kvm_inputs
 	const char *argument;
 };
 
+struct kvm_chain_item
+{
+	struct vmod_kvm_tenant *tenant;
+	struct vmod_kvm_inputs inputs;
+};
+struct kvm_program_chain
+{
+	struct kvm_chain_item chain[16];
+	int count;
+};
+
 struct vmod_kvm_backend
 {
 	uint64_t magic;
 	struct director *dir;
 
-	struct vmod_kvm_tenant *tenant;
-	struct vmod_kvm_inputs inputs;
+	struct kvm_program_chain chain;
+
 	int debug;
 	uint64_t max_response_size;
 	const struct director* backend;

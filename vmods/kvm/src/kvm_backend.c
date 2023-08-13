@@ -29,8 +29,10 @@
 #include "vcc_if.h"
 extern uint64_t kvm_allocate_memory(KVM_SLOT, uint64_t bytes);
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
-	struct vmod_kvm_backend *, struct backend_post *, struct backend_result *);
+	struct kvm_chain_item *, struct backend_post *, struct backend_result *);
 extern int kvm_get_body(struct backend_post *, struct busyobj *);
+extern int kvm_backend_streaming_post(struct backend_post *, const void*, ssize_t);
+__thread struct kvm_program_chain kqueue;
 
 static inline void kvm_ts(struct vsl_log *vsl, const char *event,
 						  double *work, double *prev)
@@ -129,6 +131,52 @@ vfp_init(struct busyobj *bo, bool streaming)
 	vfe->priv2 = 0;
 }
 
+static int
+kvmbe_write_response(const struct director *dir,
+	struct worker *wrk, struct busyobj *bo,
+	VRT_CTX, struct backend_result* result)
+{
+	/* Status code is sanitized in the backend call. */
+	http_PutResponse(bo->beresp, "HTTP/1.1", result->status, NULL);
+
+	/* Explicitly set content-type when known. */
+	if (result->tsize > 0)
+	{
+		http_PrintfHeader(bo->beresp, "Content-Type: %.*s",
+			(int) result->tsize, result->type);
+	}
+	/* Always set content-length, always known. */
+	http_PrintfHeader(bo->beresp,
+		"Content-Length: %zu", result->content_length);
+
+	/* TODO: Tie Last-Modified to content? */
+	char timestamp[VTIM_FORMAT_SIZE];
+	VTIM_format(VTIM_real(), timestamp);
+	http_PrintfHeader(bo->beresp, "Last-Modified: %s", timestamp);
+
+	/* HTTP connection of BusyObj on workspace. */
+	bo->htc = WS_Alloc(bo->ws, sizeof *bo->htc);
+	if (bo->htc == NULL) {
+		VSLb(ctx->vsl, SLT_Error, "KVM: Out of workspace for HTC");
+		return (-1);
+	}
+	INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
+
+	/* Store the result in workspace and free result. */
+	bo->htc->content_length = result->content_length;
+	bo->htc->priv = (void *)result;
+	bo->htc->body_status = BS_LENGTH;
+
+	/* Initialize fetch processor, which will retrieve the data from
+	   the VM, buffer by buffer, and send it to Varnish storage.
+	   It is a streamed response if the buffer-count is zero, but the
+	   content-length is non-zero. We also must have a callback function.
+	   See: kvmfp_pull, kvmfp_streaming_pull */
+	const bool streaming = result->content_length > 0 && result->bufcount == 0;
+	vfp_init(bo, streaming);
+	return (0);
+}
+
 static int v_matchproto_(vdi_gethdrs_f)
 kvmbe_gethdrs(const struct director *dir,
 	struct worker *wrk, struct busyobj *bo)
@@ -157,51 +205,19 @@ kvmbe_gethdrs(const struct director *dir,
 		.http_beresp = bo->beresp,
 	};
 
-	if (VMOD_KVM_BACKEND_TIMINGS) {
-		kvmr->t_prev = bo->t_prev;
-		kvm_ts(ctx.vsl, "TenantStart", &kvmr->t_work, &kvmr->t_prev);
-	}
-
-	/* Reserving a VM means putting ourselves in a concurrent queue
-	   waiting for a free VM, and then getting exclusive access until
-	   the end of the request. */
-	struct vmod_kvm_slot *slot =
-		kvm_reserve_machine(&ctx, kvmr->tenant, kvmr->debug);
-	if (slot == NULL) {
-		VSLb(ctx.vsl, SLT_Error, "KVM: Unable to reserve machine");
-		return (-1);
-	}
-	if (VMOD_KVM_BACKEND_TIMINGS) {
-		kvm_ts(ctx.vsl, "TenantReserve", &kvmr->t_work, &kvmr->t_prev);
-	}
-
+	/* Request body first, then VM result */
 	struct backend_post *post = NULL;
-	kvmr->inputs.method = bo->bereq->hd[0].b;
-	/* Gather request body data if it exists. Check taken from stp_fetch.
-	   If the body is cached already, bereq_body will be non-null. */
-	const bool is_post = bo->initial_req_body_status != REQ_BODY_NONE || bo->bereq_body != NULL;
-	if (is_post)
+	const bool is_post =
+		(bo->initial_req_body_status != REQ_BODY_NONE || bo->bereq_body != NULL);
+	if (is_post || kvmr->chain.count > 0)
 	{
-		/* Retrieve body by copying directly into backend VM. */
+		/* Initialize POST. */
 		post = (struct backend_post *)WS_Alloc(bo->ws, sizeof(struct backend_post));
 		if (post == NULL) {
 			VSLb(ctx.vsl, SLT_Error, "KVM: Out of workspace for request body");
 			return (-1);
 		}
 		post->ctx = &ctx;
-		post->slot = slot;
-		post->address = kvm_allocate_memory(slot, POST_BUFFER); /* Buffer bytes */
-		post->capacity = POST_BUFFER;
-		post->length  = 0;
-		post->inputs = kvmr->inputs;
-		int ret = kvm_get_body(post, bo);
-		if (ret < 0) {
-			VSLb(ctx.vsl, SLT_Error, "KVM: Unable to aggregate request body data");
-			return (-1);
-		}
-		if (VMOD_KVM_BACKEND_TIMINGS) {
-			kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev);
-		}
 	}
 
 	/* The backend_result contains many iovec-like buffers needed for
@@ -214,56 +230,110 @@ kvmbe_gethdrs(const struct director *dir,
 	}
 	result->bufcount = VMBE_NUM_BUFFERS;
 
-	/* Make a backend VM call (with optional POST). */
-	kvm_backend_call(&ctx, slot, kvmr, post, result);
-
-	if (VMOD_KVM_BACKEND_TIMINGS) {
-		kvm_ts(ctx.vsl, "TenantProcess", &kvmr->t_work, &kvmr->t_prev);
-	}
-
-	/* Status code is sanitized in the backend call. */
-	http_PutResponse(bo->beresp, "HTTP/1.1", result->status, NULL);
-
-	/* Explicitly set content-type when known. */
-	if (result->tsize > 0)
+	/* Loop through each program in the chain */
+	for (int index = 0; index < kvmr->chain.count; index++)
 	{
-		http_PrintfHeader(bo->beresp, "Content-Type: %.*s",
-			(int) result->tsize, result->type);
+		/* The chain item contains the tenant program and all the inputs
+		   to the program. Everything needed to invoke the VM function. */
+		struct kvm_chain_item *invocation =
+			&kvmr->chain.chain[index];
+
+		if (VMOD_KVM_BACKEND_TIMINGS) {
+			kvmr->t_prev = bo->t_prev;
+			kvm_ts(ctx.vsl, "TenantStart", &kvmr->t_work, &kvmr->t_prev);
+		}
+
+		/* Reserving a VM means putting ourselves in a concurrent queue
+		waiting for a free VM, and then getting exclusive access until
+		the end of the request. */
+		struct vmod_kvm_slot *slot =
+			kvm_reserve_machine(&ctx, invocation->tenant, kvmr->debug);
+		if (slot == NULL) {
+			VSLb(ctx.vsl, SLT_Error, "KVM: Unable to reserve machine");
+			return (-1);
+		}
+		if (VMOD_KVM_BACKEND_TIMINGS) {
+			kvm_ts(ctx.vsl, "TenantReserve", &kvmr->t_work, &kvmr->t_prev);
+		}
+
+		/* HTTP method */
+		invocation->inputs.method = bo->bereq->hd[0].b;
+
+		/* Gather request body data if it exists. Check taken from stp_fetch.
+		If the body is cached already, bereq_body will be non-null.
+		NOTE: We only read the request body for index == 0. */
+		bool use_post = false;
+		if (is_post && index == 0)
+		{
+			/* Retrieve body by copying directly into backend VM. */
+			post->slot = slot;
+			post->address = kvm_allocate_memory(slot, POST_BUFFER); /* Buffer bytes */
+			post->capacity = POST_BUFFER;
+			post->length  = 0;
+			post->inputs = invocation->inputs;
+			int ret = kvm_get_body(post, bo);
+			if (ret < 0) {
+				VSLb(ctx.vsl, SLT_Error, "KVM: Unable to aggregate request body data");
+				return (-1);
+			}
+			if (VMOD_KVM_BACKEND_TIMINGS) {
+				kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev);
+			}
+			use_post = true;
+		}
+		else if (index > 0)
+		{
+			/* Allocate exact bytes from previous result in reserved VM */
+			post->slot = slot;
+			post->address = kvm_allocate_memory(slot, result->content_length);
+			post->capacity = result->content_length;
+			post->length  = 0;
+			post->inputs = invocation->inputs;
+
+			/* index > 0: Shuffle data between VMs */
+			for (size_t b = 0; b < result->bufcount; b++)
+			{
+				const struct VMBuffer *buffer = &result->buffers[b];
+				/* Streaming POST is essentially copying data into the VM.
+				   If streaming is enabled, a callback will be invoked on the
+				   *current* program with the data from the previous.
+				   Otherwise, it's just a straight copy into a sequential buffer. */
+				if (kvm_backend_streaming_post(post, buffer->data, buffer->size) < 0)
+				{
+					VSLb(ctx.vsl, SLT_Error,
+						"KVM: Unable to stream data (status=%u) to %s in chain",
+						result->status, kvm_tenant_name(invocation->tenant));
+					return (-1);
+				}
+			}
+			/* Reset total buffer count in order to make another VM call */
+			result->bufcount = VMBE_NUM_BUFFERS;
+
+			if (VMOD_KVM_BACKEND_TIMINGS) {
+				kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev);
+			}
+			use_post = true;
+		}
+
+		/* Make a backend VM call (with optional POST). */
+		kvm_backend_call(&ctx, slot, invocation, use_post ? post : NULL, result);
+
+		if (VMOD_KVM_BACKEND_TIMINGS) {
+			kvm_ts(ctx.vsl, "TenantProcess", &kvmr->t_work, &kvmr->t_prev);
+		}
 	}
-	/* Always set content-length, always known. */
-	http_PrintfHeader(bo->beresp,
-		"Content-Length: %zu", result->content_length);
 
-	/* TODO: Tie Last-Modified to content? */
-	char timestamp[VTIM_FORMAT_SIZE];
-	VTIM_format(VTIM_real(), timestamp);
-	http_PrintfHeader(bo->beresp, "Last-Modified: %s", timestamp);
-
-	/* HTTP connection of BusyObj on workspace. */
-	bo->htc = WS_Alloc(bo->ws, sizeof *bo->htc);
-	if (bo->htc == NULL) {
-		VSLb(ctx.vsl, SLT_Error, "KVM: Out of workspace for HTC");
-		return (-1);
-	}
-	INIT_OBJ(bo->htc, HTTP_CONN_MAGIC);
-
-	/* Store the result in workspace and free result. */
-	bo->htc->content_length = result->content_length;
-	bo->htc->priv = (void *)result;
-	bo->htc->body_status = BS_LENGTH;
-
-	/* Initialize fetch processor, which will retrieve the data from
-	   the VM, buffer by buffer, and send it to Varnish storage.
-	   It is a streamed response if the buffer-count is zero, but the
-	   content-length is non-zero. We also must have a callback function.
-	   See: kvmfp_pull, kvmfp_streaming_pull */
-	const bool streaming = result->content_length > 0 && result->bufcount == 0;
-	vfp_init(bo, streaming);
+	/* Finish the response.
+	   After the last function call, the result buffer is filled with
+	   the last result, etc. Send backend response to varnish storage. */
+	const int res = kvmbe_write_response(
+		dir, wrk, bo, &ctx, result);
 
 	if (VMOD_KVM_BACKEND_TIMINGS) {
 		kvm_ts(ctx.vsl, "TenantResponse", &kvmr->t_work, &kvmr->t_prev);
 	}
-	return (0);
+
+	return (res);
 }
 
 static void init_director(VRT_CTX, struct vmod_kvm_backend *kvmr)
@@ -283,16 +353,28 @@ static void init_director(VRT_CTX, struct vmod_kvm_backend *kvmr)
 	dir->finish  = kvmbe_finish;
 	dir->panic   = kvmbe_panic;
 }
-static void init_kvmr(struct vmod_kvm_backend *kvmr,
+static int init_chain(VRT_CTX, struct vmod_kvm_tenant *tenant,
 	const char *url, const char *arg)
+{
+	(void)ctx;
+
+	struct kvm_chain_item *item = &kqueue.chain[kqueue.count];
+	item->tenant = tenant;
+	item->inputs.method = "";
+	item->inputs.url = url ? url : "";
+	item->inputs.argument = arg ? arg : "";
+	kqueue.count++;
+	return (1);
+}
+static void init_kvmr(struct vmod_kvm_backend *kvmr)
 {
 	INIT_OBJ(kvmr, KVM_BACKEND_MAGIC);
 	if (VMOD_KVM_BACKEND_TIMINGS) {
 		kvmr->t_work = VTIM_real();
 	}
-	kvmr->inputs.method = "";
-	kvmr->inputs.url = url ? url : "";
-	kvmr->inputs.argument = arg ? arg : "";
+	kvmr->chain = kqueue;
+	/* XXX: Immediately reset it. It's a thread_local! */
+	kqueue.count = 0;
 }
 
 void vmod_kvm_set_kvmr_backend(struct director *dir, VCL_BACKEND backend)
@@ -302,7 +384,7 @@ void vmod_kvm_set_kvmr_backend(struct director *dir, VCL_BACKEND backend)
 }
 
 VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
-	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg)
+	VCL_STRING program, VCL_STRING url, VCL_STRING arg)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	if (ctx->method != VCL_MET_BACKEND_FETCH) {
@@ -316,25 +398,31 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	struct vmod_kvm_backend *kvmr =
 		WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_backend));
 	if (kvmr == NULL) {
-		VRT_fail(ctx, "KVM: Out of workspace");
+		VRT_fail(ctx, "KVM: Out of workspace (kvm_backend)");
 		return (NULL);
 	}
-
-	init_kvmr(kvmr, url, arg);
 
 	/* Lookup internal tenant using VCL task */
-	kvmr->tenant = kvm_tenant_find(task, tenant);
-	if (kvmr->tenant == NULL) {
-		VRT_fail(ctx, "KVM: Tenant not found: %s", tenant);
+	struct vmod_kvm_tenant *tenant =
+		kvm_tenant_find(task, program);
+	if (tenant == NULL) {
+		VRT_fail(ctx, "KVM: Tenant not found: %s", program);
 		return (NULL);
 	}
+
+	/* Cannot fail at this point, add to chain */
+	if (!init_chain(ctx, tenant, url, arg)) {
+		return (NULL);
+	}
+
+	init_kvmr(kvmr);
 
 	init_director(ctx, kvmr);
 	return (kvmr->dir);
 }
 
 VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
-	VCL_STRING tenant, VCL_STRING key, VCL_STRING url, VCL_STRING arg)
+	VCL_STRING program, VCL_STRING key, VCL_STRING url, VCL_STRING arg)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	if (ctx->method != VCL_MET_BACKEND_FETCH) {
@@ -348,24 +436,55 @@ VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
 	struct vmod_kvm_backend *kvmr =
 		WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_backend));
 	if (kvmr == NULL) {
-		VRT_fail(ctx, "KVM: Out of workspace");
+		VRT_fail(ctx, "KVM: Out of workspace (kvm_backend)");
 		return (NULL);
 	}
-
-	init_kvmr(kvmr, url, arg);
-	kvmr->debug = 1;
 
 	/* Lookup internal tenant using VCL task */
-	kvmr->tenant = kvm_tenant_find_key(task, tenant, key);
-	if (kvmr->tenant == NULL) {
-		VRT_fail(ctx, "KVM: Tenant not found: %s", tenant);
+	struct vmod_kvm_tenant *tenant =
+		kvm_tenant_find_key(task, program, key);
+	if (tenant == NULL) {
+		VRT_fail(ctx, "KVM: Tenant not found: %s", program);
 		return (NULL);
 	}
-	if (!kvm_tenant_debug_allowed(kvmr->tenant)) {
-		VRT_fail(ctx, "KVM: Tenant not allowed to live-debug: %s", tenant);
+	if (!kvm_tenant_debug_allowed(tenant)) {
+		VRT_fail(ctx, "KVM: Tenant not allowed to live-debug: %s", program);
 		return (NULL);
 	}
+
+	/* Cannot fail at this point, add to chain */
+	if (!init_chain(ctx, tenant, url, arg)) {
+		return (NULL);
+	}
+
+	init_kvmr(kvmr);
+	kvmr->debug = 1;
 
 	init_director(ctx, kvmr);
 	return (kvmr->dir);
+}
+
+VCL_BOOL vmod_chain(VRT_CTX, VCL_PRIV task,
+	VCL_STRING program, VCL_STRING url, VCL_STRING arg)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	if (ctx->method != VCL_MET_BACKEND_FETCH) {
+		VRT_fail(ctx, "compute: chain() should only be called from vcl_backend_fetch");
+		return (0);
+	}
+
+	/* Lookup internal tenant using VCL task */
+	struct vmod_kvm_tenant *tenant =
+		kvm_tenant_find(task, program);
+	if (tenant == NULL) {
+		VRT_fail(ctx, "KVM: Tenant not found: %s", program);
+		return (0);
+	}
+
+	/* Cannot fail at this point, add to chain */
+	if (!init_chain(ctx, tenant, url, arg)) {
+		return (0);
+	}
+
+	return (1);
 }

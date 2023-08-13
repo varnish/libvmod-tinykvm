@@ -180,10 +180,15 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 	// us to reserve the same machine during multiple VCL stages.
 	// The free callback is called at the end of a request
 	struct vmod_priv* priv_task;
-	if (ctx->req)
+	// For requests, we use ctx->req in order to always have one
+	// VM per tenant/program on the client-side.
+	if (ctx->req) {
 		priv_task = VRT_priv_task(ctx, ctx->req);
-	else
-		priv_task = VRT_priv_task(ctx, ctx->bo);
+	} else {
+		// For backend side, we use 'this' in order to allow many
+		// different kinds of programs, once.
+		priv_task = VRT_priv_task(ctx, this);
+	}
 	if (!priv_task->priv)
 	{
 	#ifdef ENABLE_TIMING
@@ -232,6 +237,12 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 		TIMING_LOCATION(t1);
 		timing_constr.add(t0, t1);
 	#endif
+	}
+	else
+	{
+		VSLb(ctx->vsl, SLT_Debug,
+			"VM '%s' is being reused (already reserved)", config.name.c_str());
+		//printf("KVM already reserved tenant %s\n", config.name.c_str());
 	}
 	return (VMPoolItem*) priv_task->priv;
 }

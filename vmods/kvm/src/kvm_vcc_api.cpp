@@ -47,6 +47,14 @@ int kvm_tenant_gucci(kvm::TenantInstance* tenant, int debug)
 }
 
 extern "C"
+const char * kvm_tenant_name(kvm::TenantInstance* tenant)
+{
+	assert(tenant);
+	return tenant->config.name.c_str();
+}
+
+
+extern "C"
 kvm::VMPoolItem* kvm_reserve_machine(const vrt_ctx *ctx, kvm::TenantInstance* tenant, bool debug)
 {
 	if (UNLIKELY(tenant == nullptr || ctx == nullptr))
@@ -75,10 +83,12 @@ kvm::VMPoolItem* kvm_reserve_machine(const vrt_ctx *ctx, kvm::TenantInstance* te
 	return nullptr;
 }
 
+/* Used to copy data into a reserved VM. */
 extern "C"
 int kvm_copy_to_machine(kvm::VMPoolItem* slot,
 	uint64_t dst, const void* src, size_t len)
 {
+	/* XXX: Logging missing here! */
 	try {
 		slot->mi->copy_to(dst, src, len);
 		return 0;
@@ -87,6 +97,7 @@ int kvm_copy_to_machine(kvm::VMPoolItem* slot,
 	}
 }
 
+/* Used to allocate memory range (in pages) in a reserved VM. */
 extern "C"
 uint64_t kvm_allocate_memory(kvm::VMPoolItem* slot, uint64_t bytes)
 {

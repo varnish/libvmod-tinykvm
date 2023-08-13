@@ -76,11 +76,18 @@ sub vcl_backend_fetch {
 	else if (bereq.url == "/minify") {
 		set bereq.backend = compute.program("minify", "");
 	}
-	else if (bereq.url ~ "/thumbnails") {
-		set bereq.backend = compute.program("thumbnails",
+	else if (bereq.url == "/image") {
+		set bereq.backend = compute.program("fetch", "https://${filebin}/kvmprograms/723-1200x1200.jpg",
+			"""{
+				"headers": ["Host: filebin.varnish-software.com"]
+			}""");
+	}
+	else if (bereq.url ~ "/chain")
+	{
+		compute.chain("thumbnails",
 			bereq.url,
 			"""{
-				"url": "https://${filebin}/kvmprograms/723-1200x1200.jpg",
+				"url": "/image",
 				"sizes": {
 					"tiny": 128,
 					"small": 256,
@@ -88,9 +95,10 @@ sub vcl_backend_fetch {
 				},
 				"headers": ["Host: filebin.varnish-software.com"]
 			}""");
+		set bereq.backend = compute.program("avif");
 	}
 	else if (bereq.url == "/none") {
-		set bereq.backend = compute.program("none", "");
+		set bereq.backend = compute.program("none");
 	}
 	else if (bereq.url == "/ftp") {
 		# Fetch something with cURL

@@ -146,7 +146,7 @@ static void fetch_result(kvm::VMPoolItem* slot,
    exception just happened during normal GET/POST. It gives tenant a
    chance to produce a proper error page, or deliver alternate content. */
 static void error_handling(kvm::VMPoolItem* slot,
-	const struct vmod_kvm_backend *vkb, struct backend_result *result, const char *exception)
+	const struct kvm_chain_item *invoc, struct backend_result *result, const char *exception)
 {
 	auto& machine = *slot->mi;
 	/* The machine should be reset (after request). */
@@ -169,7 +169,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 			if (UNLIKELY(vm_entry_addr == 0x0))
 				throw std::runtime_error("The ERROR callback has not been registered");
 			vm.timed_reentry(vm_entry_addr,
-				ERROR_HANDLING_TIMEOUT, vkb->inputs.url, vkb->inputs.argument, exception);
+				ERROR_HANDLING_TIMEOUT, invoc->inputs.url, invoc->inputs.argument, exception);
 
 			/* Make sure no SMP work is in-flight. */
 			vm.smp_wait();
@@ -215,7 +215,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 
 extern "C"
 void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
-	struct vmod_kvm_backend *vkb, struct backend_post *post, struct backend_result *result)
+	struct kvm_chain_item *invoc, struct backend_post *post, struct backend_result *result)
 {
 	double t_prev = 0.0;
 	double t_work = t_prev;
@@ -234,8 +234,8 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 		auto fut = slot->tp.enqueue(
 		[&] () -> long {
 			if constexpr (VERBOSE_BACKEND) {
-				printf("Begin backend %s %s (arg=%s)\n", vkb->inputs.method,
-					vkb->inputs.url, vkb->inputs.argument);
+				printf("Begin backend %s %s (arg=%s)\n", invoc->inputs.method,
+					invoc->inputs.url, invoc->inputs.argument);
 			}
 			kvm_ts(ctx->vsl, "ProgramCall", t_work, t_prev);
 
@@ -257,9 +257,9 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					uint64_t datalen;
 				} inputs {};
 				__u64 stack = vm.stack_address();
-				inputs.method   = vm.stack_push_cstr(stack, vkb->inputs.method);
-				inputs.url      = vm.stack_push_cstr(stack, vkb->inputs.url);
-				inputs.argument = vm.stack_push_cstr(stack, vkb->inputs.argument);
+				inputs.method   = vm.stack_push_cstr(stack, invoc->inputs.method);
+				inputs.url      = vm.stack_push_cstr(stack, invoc->inputs.url);
+				inputs.argument = vm.stack_push_cstr(stack, invoc->inputs.argument);
 				if (post != nullptr) {
 					/* Try to reduce POST mmap allocation */
 					vm.mmap_relax(post->address, post->capacity, post->length);
@@ -279,7 +279,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				if (UNLIKELY(on_get_addr == 0x0))
 					throw std::runtime_error("The GET callback has not been registered");
 				/* Call into VM doing a full pagetable/cache flush. */
-				vm.timed_vmcall(on_get_addr, timeout, vkb->inputs.url, vkb->inputs.argument);
+				vm.timed_vmcall(on_get_addr, timeout, invoc->inputs.url, invoc->inputs.argument);
 			} else {
 				/* Try to reduce POST mmap allocation */
 				vm.mmap_relax(post->address, post->capacity, post->length);
@@ -288,7 +288,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				if (UNLIKELY(vm_entry_addr == 0x0))
 					throw std::runtime_error("The POST callback has not been registered");
 				vm.timed_vmcall(vm_entry_addr,
-					timeout, vkb->inputs.url, vkb->inputs.argument,
+					timeout, invoc->inputs.url, invoc->inputs.argument,
 					(uint64_t)post->address, (uint64_t)post->length);
 			}
 			kvm_ts(ctx->vsl, "ProgramResponse", t_work, t_prev);
@@ -297,7 +297,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			vm.smp_wait();
 
 			if constexpr (VERBOSE_BACKEND) {
-				printf("Finish backend %s %s\n", vkb->inputs.method, vkb->inputs.url);
+				printf("Finish backend %s %s\n", invoc->inputs.method, invoc->inputs.url);
 			}
 			/* Verify response and fill out result struct. */
 			fetch_result(slot, machine, result);
@@ -317,11 +317,11 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			"%s: Backend VM timed out (%f seconds)",
 			machine.name().c_str(), mte.seconds());
 		/* Try again if on_error has been set, otherwise 500. */
-		error_handling(slot, vkb, result, mte.what());
+		error_handling(slot, invoc, result, mte.what());
 	} catch (const tinykvm::MemoryException& e) {
 		memory_error_handling(ctx->vsl, e);
 		/* Try again if on_error has been set, otherwise 500. */
-		error_handling(slot, vkb, result, e.what());
+		error_handling(slot, invoc, result, e.what());
 	} catch (const tinykvm::MachineException& e) {
 		fprintf(stderr, "%s: Backend VM exception: %s (data: 0x%lX)\n",
 			machine.name().c_str(), e.what(), e.data());
@@ -329,12 +329,12 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			"%s: Backend VM exception: %s (data: 0x%lX)",
 			machine.name().c_str(), e.what(), e.data());
 		/* Try again if on_error has been set, otherwise 500. */
-		error_handling(slot, vkb, result, e.what());
+		error_handling(slot, invoc, result, e.what());
 	} catch (const std::exception& e) {
 		fprintf(stderr, "Backend VM exception: %s\n", e.what());
 		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
 		/* Try again if on_error has been set, otherwise 500. */
-		error_handling(slot, vkb, result, e.what());
+		error_handling(slot, invoc, result, e.what());
 	}
 }
 
@@ -354,7 +354,7 @@ int kvm_backend_streaming_post(struct backend_post *post,
 		}
 
 		/* Copy the data segment into VM */
-		vm.copy_to_guest(post->address, data_ptr, data_len);
+		vm.copy_to_guest(post->address + post->length, data_ptr, data_len);
 
 		/* Call the backend streaming function, if set. */
 		const auto call_addr =

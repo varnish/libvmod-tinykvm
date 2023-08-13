@@ -85,8 +85,13 @@ $Function BOOL start(PRIV_VCL, STRING program, BOOL async = 1)
   Requests will wait until the program is fully initialized.
 - Must be called from vcl_init.
 
-$Function BACKEND program(PRIV_VCL, STRING program, STRING arg, STRING config = "")
+$Function BACKEND program(PRIV_VCL, STRING program, STRING arg = "", STRING config = "")
 
 - Returns a backend that will call the given program to produce a response.
 - Supports GET, POST and other HTTP requests.
+- Must be called from vcl_backend_fetch.
+
+$Function BOOL chain(PRIV_VCL, STRING program, STRING arg = "", STRING config = "")
+
+- Run requests through the backend *and then* each chained program.
 - Must be called from vcl_backend_fetch.
