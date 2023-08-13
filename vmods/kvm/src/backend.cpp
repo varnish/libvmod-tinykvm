@@ -45,8 +45,8 @@ extern "C" {
 #include "vtim.h"
 #include "kvm_backend.h"
 }
-static constexpr bool VERBOSE_BACKEND = VMOD_KVM_BACKEND_TIMINGS;
-static constexpr bool BACKEND_TIMINGS = false;
+static constexpr bool VERBOSE_BACKEND = false;
+static constexpr bool BACKEND_TIMINGS = VMOD_KVM_BACKEND_TIMINGS;
 
 static void memory_error_handling(struct vsl_log *vsl, const tinykvm::MemoryException& e)
 {
