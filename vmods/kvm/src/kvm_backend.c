@@ -336,8 +336,14 @@ kvmbe_gethdrs(const struct director *dir,
 		   and VCL can unset the content-type if needed. */
 		if (result->tsize > 0)
 		{
-			http_PrintfHeader(bo->beresp, "Content-Type: %.*s",
-				(int) result->tsize, result->type);
+			// If the Content-Type is different,
+			if (!http_HdrIs(bo->beresp, H_Content_Type, result->type))
+			{
+				// Unset old one, and set new one
+				http_Unset(bo->beresp, H_Content_Type);
+				http_PrintfHeader(bo->beresp,
+					"%s %.*s", H_Content_Type + 1, (int)result->tsize, result->type);
+			}
 		}
 	}
 

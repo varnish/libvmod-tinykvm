@@ -98,11 +98,12 @@ static void fetch_result(kvm::VMPoolItem* slot,
 	const uint16_t tlen   = regs.rdx;
 
 	/* Immediately copy out content-type because small. */
-	char *tbuf = (char *)WS_Alloc(mi.ctx()->ws, tlen);
+	char *tbuf = (char *)WS_Alloc(mi.ctx()->ws, tlen+1);
 	if (UNLIKELY(tbuf == nullptr)) {
 		throw std::runtime_error("Out of workspace for backend VM content-type");
 	}
 	mi.machine().copy_from_guest(tbuf, tvaddr, tlen);
+	tbuf[tlen] = 0; /* Explicitly make content-type zero-terminated. */
 
 	if (regular_response)
 	{
