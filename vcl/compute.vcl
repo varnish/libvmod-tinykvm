@@ -17,13 +17,13 @@ sub vcl_init {
 	# Add a local program directly (using default group)
 	compute.add_program("watermark", "file:///tmp/kvm_watermark");
 	# Start the AVIF transcoder, but don't delay Varnish startup.
-	#compute.start("avif");
+	compute.start("avif");
 	#compute.start("espeak");
-	#compute.start("fetch");
+	compute.start("fetch");
 	#compute.start("inflate");
 	#compute.start("minimal");
-	#compute.start("thumbnails");
-	#compute.start("zstd");
+	compute.start("thumbnails");
+	compute.start("zstd");
 }
 sub vcl_recv {
 	//return (pass);
@@ -154,7 +154,7 @@ sub vcl_backend_fetch {
 	}
 }
 sub vcl_backend_response {
-	if (bereq.url == "/http3") {
+	if (bereq.url == "/http3" || bereq.url == "/min") {
 		set beresp.uncacheable = true;
 	}
 }
