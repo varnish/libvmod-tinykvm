@@ -251,6 +251,7 @@ kvmbe_gethdrs(const struct director *dir,
 
 		/* HTTP method */
 		invocation->inputs.method = bo->bereq->hd[0].b;
+		invocation->inputs.content_type = "";
 
 		/* Gather request body data if it exists. Check taken from stp_fetch.
 		If the body is cached already, bereq_body will be non-null.
@@ -272,6 +273,9 @@ kvmbe_gethdrs(const struct director *dir,
 			if (VMOD_KVM_BACKEND_TIMINGS) {
 				kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev);
 			}
+			/* Get *initial* Content-Type from backend request. */
+			if (!http_GetHdr(ctx.http_bereq, H_Content_Type, &invocation->inputs.content_type))
+				invocation->inputs.content_type = "";
 			use_post = true;
 		}
 		else if (index > 0)
@@ -305,6 +309,10 @@ kvmbe_gethdrs(const struct director *dir,
 			if (VMOD_KVM_BACKEND_TIMINGS) {
 				kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev);
 			}
+
+			/* Forward the Content-Type as a direct argument to the next program. */
+			if ((invocation->inputs.content_type = result->type) == NULL)
+				invocation->inputs.content_type = "";
 			use_post = true;
 		}
 

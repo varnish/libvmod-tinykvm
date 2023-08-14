@@ -14,6 +14,7 @@ struct vmod_kvm_inputs
 	const char *method;
 	const char *url;
 	const char *argument;
+	const char *content_type;
 };
 
 struct kvm_chain_item

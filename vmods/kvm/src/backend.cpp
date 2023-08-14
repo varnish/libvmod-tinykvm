@@ -252,14 +252,15 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					uint64_t method;
 					uint64_t url;
 					uint64_t argument;
-					uint64_t resv;
-					uint64_t data; /* Can be NULL. */
+					uint64_t ctype; /* Content-Type: May be unused. */
+					uint64_t data; /* Content: Can be NULL. */
 					uint64_t datalen;
 				} inputs {};
 				__u64 stack = vm.stack_address();
 				inputs.method   = vm.stack_push_cstr(stack, invoc->inputs.method);
 				inputs.url      = vm.stack_push_cstr(stack, invoc->inputs.url);
 				inputs.argument = vm.stack_push_cstr(stack, invoc->inputs.argument);
+				inputs.ctype    = vm.stack_push_cstr(stack, invoc->inputs.content_type);
 				if (post != nullptr) {
 					/* Try to reduce POST mmap allocation */
 					vm.mmap_relax(post->address, post->capacity, post->length);
@@ -288,8 +289,11 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				if (UNLIKELY(vm_entry_addr == 0x0))
 					throw std::runtime_error("The POST callback has not been registered");
 				vm.timed_vmcall(vm_entry_addr,
-					timeout, invoc->inputs.url, invoc->inputs.argument,
-					(uint64_t)post->address, (uint64_t)post->length);
+					timeout,
+					invoc->inputs.url,
+					invoc->inputs.argument,
+					invoc->inputs.content_type,
+					uint64_t(post->address), uint64_t(post->length));
 			}
 			kvm_ts(ctx->vsl, "ProgramResponse", t_work, t_prev);
 
@@ -366,11 +370,13 @@ int kvm_backend_streaming_post(struct backend_post *post,
 				if (post->length == 0) {
 					vm.timed_vmcall(call_addr, timeout,
 						post->inputs.url, post->inputs.argument,
+						post->inputs.content_type,
 						(uint64_t)post->address, (uint64_t)data_len,
 						(uint64_t)post->length);
 				} else {
 					vm.timed_reentry(call_addr, timeout,
 						post->inputs.url, post->inputs.argument,
+						post->inputs.content_type,
 						(uint64_t)post->address, (uint64_t)data_len,
 						(uint64_t)post->length);
 				}

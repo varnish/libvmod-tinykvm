@@ -46,7 +46,7 @@ extern void register_func(int, ...);
  * Register callbacks for various modes of operation:
  **/
 static inline void set_backend_get(void(*f)(const char *url, const char *arg)) { register_func(1, f); }
-static inline void set_backend_post(void(*f)(const char *url, const char *arg, const uint8_t*, size_t)) { register_func(2, f); }
+static inline void set_backend_post(void(*f)(const char *url, const char *arg, const char *ctype, const uint8_t*, size_t)) { register_func(2, f); }
 
 struct backend_request {
 	const char *method;
@@ -63,7 +63,7 @@ static inline void set_backend_request(void(*f)(const struct backend_request*)) 
    right now Varnish will fill the VM with the whole POST data no matter what,
    but call the streaming POST callback on each segment. Instead, it should put
    each segment on stack and the callee may choose to build a complete buffer. */
-static inline void set_backend_stream_post(long(*f)(const char *url, const char *arg, const uint8_t *, size_t len, size_t off)) { register_func(4, f); }
+static inline void set_backend_stream_post(long(*f)(const char *url, const char *arg, const char *ctype, const uint8_t *, size_t len, size_t off)) { register_func(4, f); }
 
 /* When an exception happens that terminates the request it is possible to
    produce a custom response instead of a generic HTTP 500. There is very

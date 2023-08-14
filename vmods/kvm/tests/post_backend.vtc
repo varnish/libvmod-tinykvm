@@ -11,6 +11,7 @@ static void on_get(const char *url, const char *arg)
 	assert(0);
 }
 static void on_post(const char *url, const char *arg,
+	const char *content_type,
 	const unsigned char *data, size_t len)
 {
 	assert(strcmp(url, "/arg") == 0);
@@ -21,6 +22,7 @@ static void on_post(const char *url, const char *arg,
 		backend_response_str(401, "text/plain", "Not OK");
 }
 static long on_stream(const char *url, const char *arg,
+	const char *content_type,
 	const unsigned char *data, size_t len, size_t offset)
 {
 	assert(strcmp(url, "/arg") == 0);
