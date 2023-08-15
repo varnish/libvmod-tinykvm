@@ -311,8 +311,6 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			kvm_ts(ctx->vsl, "ProgramProcess", t_work, t_prev);
 			return 0L;
 		});
-		/* XXX: This competes with the VSL changes in the VM thread. */
-		//kvm_ts(ctx->vsl, "ProgramQueue", t_work, t_prev);
 		fut.get();
 		return;
 
