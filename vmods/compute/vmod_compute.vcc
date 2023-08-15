@@ -85,13 +85,21 @@ $Function BOOL start(PRIV_VCL, STRING program, BOOL async = 1)
   Requests will wait until the program is fully initialized.
 - Must be called from vcl_init.
 
+$Function BOOL chain(PRIV_VCL, STRING program, STRING arg = "", STRING config = "")
+
+- Queue this program up for execution later.
+- Returns true if the program was found.
+- Must be called from vcl_backend_fetch.
+
 $Function BACKEND program(PRIV_VCL, STRING program, STRING arg = "", STRING config = "")
 
 - Returns a backend that will call the given program to produce a response.
+- Execute each program in the chain, and then run *this* program to produce a final response.
 - Supports GET, POST and other HTTP requests.
 - Must be called from vcl_backend_fetch.
 
-$Function BOOL chain(PRIV_VCL, STRING program, STRING arg = "", STRING config = "")
+$Function STRING to_string(PRIV_VCL, STRING program, STRING arg = "", STRING config = "", STRING on_error = "")
 
-- Run requests through the backend *and then* each chained program.
-- Must be called from vcl_backend_fetch.
+- Returns a string of the response produced by the given program.
+- Supports GET, POST and other HTTP requests.
+- If the program fails, this function returns the on_error string instead.

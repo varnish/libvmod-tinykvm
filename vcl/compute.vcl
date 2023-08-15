@@ -133,9 +133,13 @@ sub vcl_backend_fetch {
 	else if (bereq.url == "/none") {
 		set bereq.backend = compute.program("none");
 	}
+	else if (bereq.url == "/string") {
+		set bereq.backend = compute.program("to_string", "text/plain", "Hello World!");
+	}
 	else if (bereq.url == "/ftp") {
-		# Fetch something with cURL
-		set bereq.backend = compute.program("fetch", "ftp://ftp.funet.fi/pub/standards/RFC/rfc959.txt");
+		# Fetch something with cURL, and store it in a string. Then pass it to a backend.
+		set bereq.backend = compute.program("to_string", "text/plain",
+			compute.to_string("fetch", "ftp://ftp.funet.fi/pub/standards/RFC/rfc959.txt"));
 	}
 	else if (bereq.url == "/watermark") {
 		set bereq.backend = compute.program("watermark", "");

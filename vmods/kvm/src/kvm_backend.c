@@ -29,7 +29,7 @@
 #include "vcc_if.h"
 extern uint64_t kvm_allocate_memory(KVM_SLOT, uint64_t bytes);
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
-	struct kvm_chain_item *, struct backend_post *, struct backend_result *);
+	const struct kvm_chain_item *, struct backend_post *, struct backend_result *);
 extern int kvm_get_body(struct backend_post *, struct busyobj *);
 extern int kvm_backend_streaming_post(struct backend_post *, const void*, ssize_t);
 __thread struct kvm_program_chain kqueue;

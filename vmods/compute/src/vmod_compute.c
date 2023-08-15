@@ -89,8 +89,10 @@ VCL_BOOL vmod_start(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_BOOL async)
 
 extern struct director *vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg);
+extern const char *kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
+	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg, VCL_STRING on_error);
 
-/* Create a response from a KVM backend. */
+/* Create a response through a KVM backend. */
 VCL_BACKEND vmod_program(VRT_CTX, VCL_PRIV task,
 	VCL_STRING program, VCL_STRING arg, VCL_STRING json_config)
 {
@@ -101,4 +103,17 @@ VCL_BACKEND vmod_program(VRT_CTX, VCL_PRIV task,
 	}
 
 	return (vmod_vm_backend(ctx, task, program, arg, json_config));
+}
+
+/* Create a string response from given program. */
+VCL_STRING vmod_to_string(VRT_CTX, VCL_PRIV task,
+	VCL_STRING program, VCL_STRING url, VCL_STRING argument, VCL_STRING on_error)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	if (ctx->method != VCL_MET_BACKEND_FETCH && ctx->method != VCL_MET_BACKEND_RESPONSE) {
+		VRT_fail(ctx, "compute: to_string() should only be called from vcl_backend_fetch or vcl_backend_response");
+		return (NULL);
+	}
+
+	return (kvm_vm_to_string(ctx, task, program, url, argument, on_error));
 }

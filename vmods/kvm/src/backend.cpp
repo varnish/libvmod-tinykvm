@@ -216,7 +216,8 @@ static void error_handling(kvm::VMPoolItem* slot,
 
 extern "C"
 void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
-	struct kvm_chain_item *invoc, struct backend_post *post, struct backend_result *result)
+	const struct kvm_chain_item *invoc,
+	struct backend_post *post, struct backend_result *result)
 {
 	double t_prev = 0.0;
 	double t_work = t_prev;
