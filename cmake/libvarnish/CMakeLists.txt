@@ -7,12 +7,14 @@ set(VMOD_DIR   "/opt/varnish/lib/varnish-plus/vmods" CACHE STRING "Default VMOD 
 set(VCL_DIR    "/opt/varnish/share/varnish-plus/vcl" CACHE STRING "Default VCL directory")
 
 # include/vcs_version.h include/vmod_abi.h
-execute_process(COMMAND git rev-parse HEAD
-				WORKING_DIRECTORY ${VARNISH_PATH}
-				OUTPUT_VARIABLE GIT_REPO_VERSION
-				OUTPUT_STRIP_TRAILING_WHITESPACE)
 if (OVERRIDE_VMOD_API)
 	set(GIT_REPO_VERSION "${OVERRIDE_VMOD_API}")
+else()
+	execute_process(COMMAND git rev-parse HEAD
+					WORKING_DIRECTORY ${VARNISH_PATH}
+					OUTPUT_VARIABLE GIT_REPO_VERSION
+					OUTPUT_STRIP_TRAILING_WHITESPACE)
+	set(GIT_REPO_VERSION "Varnish Plus ${VARNISH_VERSION} ${GIT_REPO_VERSION}")
 endif()
 configure_file("vcs_version.h.in" "${CMAKE_BINARY_DIR}/vcs_version.h")
 configure_file("vmod_abi.h.in" "${CMAKE_BINARY_DIR}/vmod_abi.h")

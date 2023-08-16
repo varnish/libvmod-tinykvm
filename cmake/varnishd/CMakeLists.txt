@@ -150,6 +150,11 @@ if (VARNISH_PLUS)
 		${VD_PATH}/vmod_util/waf_util.c
 		${VD_PATH}/vmod_util/xbody_util.c
 	)
+	if (false)
+		list (APPEND VARNISHD_SOURCES
+			${VD_PATH}/mgt/mgt_tenant.c
+		)
+	endif()
 else()
 	list (APPEND VARNISHD_SOURCES
 		${VD_PATH}/cache/cache_conn_pool.c

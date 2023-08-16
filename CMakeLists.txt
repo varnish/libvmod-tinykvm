@@ -23,6 +23,8 @@ option(USE_MOLD     "Always link with MOLD" OFF)
 option(SINGLE_PROCESS "Disable fork() and run in single-process mode" OFF)
 option(WORKSPACE_EMULATOR "Replace workspace with checked emulator" OFF)
 
+set(VARNISH_VERSION "6.0.11r5" CACHE STRING "Varnish Enterprise version string")
+
 # Enabling this forces usage of release binaries in /usr/lib/varnish-plus:
 option(VMOD_RELEASE_BUILD "Build with Varnish release packages" OFF)
 
