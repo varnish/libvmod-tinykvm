@@ -546,6 +546,25 @@ struct meminfo {
 };
 extern void get_meminfo(struct meminfo*);
 
+/* Logging */
+extern void sys_log(const char *, size_t);
+static inline void logf(const char *fmt, ...)
+{
+	char buffer[2048];
+	va_list va;
+	va_start(va, fmt);
+	/* NOTE: vsnprintf has an insane return value. */
+	const int len = __builtin_vsnprintf(buffer, sizeof(buffer), fmt, va);
+	va_end(va);
+	if (len >= 0 && (size_t)len < sizeof(buffer)) {
+		sys_log(buffer, len);
+	} else {
+		static const char error_string[] = "(ERROR: Log buffer overflowed)";
+		sys_log(error_string, sizeof(error_string)-1);
+	}
+}
+
+
 /* Returns true (1) if this program is uploaded through the live-debug
    VCL function, and is a debug program. Otherwise, false (0). */
 extern int sys_is_debug();
@@ -865,6 +884,13 @@ asm(".global sys_request\n"
 	".type sys_request, @function\n"
 	"sys_request:\n"
 	"	mov $0x20001, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
+
+asm(".global sys_log\n"
+	".type sys_log, @function\n"
+	"sys_log:\n"
+	"	mov $0x7F000, %eax\n"
 	"	out %eax, $0\n"
 	"   ret\n");
 

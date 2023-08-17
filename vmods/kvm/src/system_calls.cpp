@@ -71,6 +71,17 @@ static void syscall_unknown(vCPU& cpu, MachineInstance& inst, unsigned scall)
 	cpu.set_registers(regs);
 }
 
+static void syscall_log(vCPU& cpu, MachineInstance& inst)
+{
+	auto regs = cpu.registers();
+	const uint64_t g_buf = regs.rdi;
+	const uint16_t g_len = regs.rsi;
+	cpu.machine().foreach_memory(g_buf, g_len,
+		[&inst] (std::string_view buffer) {
+			inst.print(buffer);
+		});
+}
+
 void MachineInstance::setup_syscall_interface()
 {
 	Machine::install_unhandled_syscall_handler(
@@ -182,6 +193,9 @@ void MachineInstance::setup_syscall_interface()
 			case 0x20001: // SELF_REQUEST
 				syscall_request(cpu, inst);
 				return;
+			case 0x7F000: // LOG
+				syscall_log(cpu, inst);
+				return;
 			case 0x7FDEB: // IS_DEBUG
 				syscall_is_debug(cpu, inst);
 				return;
@@ -234,17 +248,20 @@ void MachineInstance::setup_syscall_interface()
 				cpu.set_registers(regs);
 				return;
 			}
-			// TODO: Use gather-buffers and writev instead
-			auto buffer = std::unique_ptr<char[]> (new char[bytes]);
-			cpu.machine().copy_from_guest(buffer.get(), regs.rsi, bytes);
-
 			if (fd != 1 && fd != 2) {
-				/* Ignore writes outside of stdout and stderr */
+				// TODO: Use gather-buffers and writev instead
+				auto buffer = std::unique_ptr<char[]> (new char[bytes]);
+				cpu.machine().copy_from_guest(buffer.get(), regs.rsi, bytes);
+
+				/* Complain about writes outside of existing FDs */
 				int fd = inst.m_fd.translate(regs.rdi);
 				regs.rax = write(fd, buffer.get(), bytes);
 			}
 			else {
-				cpu.machine().print(buffer.get(), bytes);
+				cpu.machine().foreach_memory(regs.rsi, bytes,
+					[&inst] (std::string_view buffer) {
+						inst.print(buffer);
+					});
 				regs.rax = bytes;
 			}
 			cpu.set_registers(regs);
