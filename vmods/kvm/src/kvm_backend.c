@@ -27,7 +27,6 @@
 #include <vtim.h>
 #include "vcl.h"
 #include "vcc_if.h"
-extern uint64_t kvm_allocate_memory(KVM_SLOT, uint64_t bytes);
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
 	const struct kvm_chain_item *, struct backend_post *, struct backend_result *);
 extern int kvm_get_body(struct backend_post *, struct busyobj *);
@@ -265,6 +264,7 @@ kvmbe_gethdrs(const struct director *dir,
 			post->capacity = POST_BUFFER;
 			post->length  = 0;
 			post->inputs = invocation->inputs;
+
 			int ret = kvm_get_body(post, bo);
 			if (ret < 0) {
 				VSLb(ctx.vsl, SLT_Error, "KVM: Unable to aggregate request body data");

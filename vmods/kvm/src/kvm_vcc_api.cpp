@@ -104,6 +104,14 @@ uint64_t kvm_allocate_memory(kvm::VMPoolItem* slot, uint64_t bytes)
 	return slot->mi->machine().mmap_allocate(bytes);
 }
 
+extern "C"
+int kvm_is_mmap_range(kvm::VMPoolItem* slot, uint64_t address)
+{
+	return /* Above MMAP-begin and the default stack. */
+		address >= slot->mi->machine().mmap_start()
+		&& address >= slot->mi->machine().stack_address();
+}
+
 struct vmod_kvm_synth
 {
 	struct vsb *vsb;

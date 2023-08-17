@@ -50,6 +50,8 @@ extern int kvm_callv(VRT_CTX, KVM_SLOT, const int, const char *arg);
 extern int kvm_synth(VRT_CTX, KVM_SLOT, struct vmod_kvm_synth *);
 extern uint64_t kvm_resolve_name(TEN_PTR, const char*);
 extern int kvm_copy_to_machine(KVM_SLOT, uint64_t dst, const void* src, size_t len);
+extern uint64_t kvm_allocate_memory(KVM_SLOT, uint64_t bytes);
+extern int      kvm_is_mmap_range(KVM_SLOT, uint64_t addr);
 
 /* Fetch something with cURL. Returns 0: success, <0: failure */
 struct MemoryStruct
