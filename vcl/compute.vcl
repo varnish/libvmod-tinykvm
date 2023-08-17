@@ -1,6 +1,6 @@
 vcl 4.1;
 import activedns;
-import compute;
+import compute from "/home/gonzo/github/varnish_autoperf/build_compute/libvmod_compute.so";
 
 backend default {
 	.host = "127.0.0.1";
@@ -17,16 +17,18 @@ sub vcl_init {
 	# Add a local program directly (using default group)
 	compute.add_program("watermark", "file:///tmp/kvm_watermark");
 	# Start the AVIF transcoder, but don't delay Varnish startup.
-	compute.start("avif");
+	#compute.start("avif");
 	#compute.start("espeak");
-	compute.start("fetch");
+	#compute.start("fetch");
 	#compute.start("inflate");
 	#compute.start("minimal");
-	compute.start("thumbnails");
-	compute.start("zstd");
+	#compute.start("thumbnails");
+	#compute.start("zstd");
 }
 sub vcl_recv {
-	//return (pass);
+	if (req.url == "/avif/bench") {
+		return (pass);
+	}
 }
 
 sub vcl_backend_fetch {
@@ -38,7 +40,7 @@ sub vcl_backend_fetch {
 			}""");
 	}
 	else if (bereq.url == "/avif/bench") {
-		set bereq.backend = compute.program("avif", "");
+		set bereq.backend = compute.program("avif");
 	}
 	else if (bereq.url == "/espeak") {
 		# espeak-ng text-to-speech
@@ -72,10 +74,14 @@ sub vcl_backend_fetch {
 			}""");
 	}
 	else if (bereq.url == "/min") {
-		set bereq.backend = compute.program("minimal", "");
+		set bereq.backend = compute.program("minimal");
 	}
 	else if (bereq.url == "/minify") {
-		set bereq.backend = compute.program("minify", "");
+		compute.chain("fetch", "/minify.json");
+		set bereq.backend = compute.program("minify");
+	}
+	else if (bereq.url == "/minify.json") {
+		set bereq.backend = compute.program("fetch", "https://${filebin}/kvmprograms/compute.json");
 	}
 	else if (bereq.url == "/image") {
 		set bereq.backend = compute.program("fetch", "https://${filebin}/kvmprograms/723-1200x1200.jpg",
@@ -142,7 +148,7 @@ sub vcl_backend_fetch {
 			compute.to_string("fetch", "ftp://ftp.funet.fi/pub/standards/RFC/rfc959.txt"));
 	}
 	else if (bereq.url == "/watermark") {
-		set bereq.backend = compute.program("watermark", "");
+		set bereq.backend = compute.program("watermark");
 	}
 	else if (bereq.url == "/http3") {
 		# Fetch HTTP/3 page with cURL. AltSvc cache enables future fetches to use HTTP/3.
@@ -158,7 +164,7 @@ sub vcl_backend_fetch {
 	}
 }
 sub vcl_backend_response {
-	if (bereq.url == "/http3" || bereq.url == "/min") {
+	if (bereq.url == "/http3" || bereq.url == "/min" || bereq.url == "/minify") {
 		set beresp.uncacheable = true;
 	}
 }
