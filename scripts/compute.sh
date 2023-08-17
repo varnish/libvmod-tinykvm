@@ -5,7 +5,7 @@ file=$dir/cmaketool.sh
 BWS="workspace_backend=256k"
 TPS="thread_pool_stack=256k"
 NTMP="/tmp/varnishd"
-VMOD_API="Varnish Plus 6.0.10r3 4f67b6ec0d63f04560913cc7e195a3919bdf0366"
+VMOD_API="Varnish Plus 6.0.11r5 b2e7494c5ca8813c071eb8824b7bb054f2cc9f96"
 mkdir -p $NTMP
 # fixes VMOD cache bugs
 rm -rf /tmp/varnishd/*
