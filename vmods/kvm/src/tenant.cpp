@@ -177,6 +177,10 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	{
 		group.hugepages = obj.value();
 	}
+	else if (obj.key() == "request_hugepages")
+	{
+		group.ephemeral_hugepages = obj.value();
+	}
 	else if (obj.key() == "allow_debug")
 	{
 		group.allow_debug = obj.value();

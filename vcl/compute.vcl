@@ -1,6 +1,6 @@
 vcl 4.1;
 import activedns;
-import compute from "/home/gonzo/github/varnish_autoperf/build_compute/libvmod_compute.so";
+import compute;
 
 backend default {
 	.host = "127.0.0.1";
@@ -14,16 +14,18 @@ sub vcl_init {
 	# Download and activate a Varnish-provided library of compute programs.
 	# A full list of programs and how they can be used would be on the docs site.
 	compute.library("https://filebin.varnish-software.com/kvmprograms/compute.json");
+
 	# Add a local program directly (using default group)
 	compute.add_program("watermark", "file:///tmp/kvm_watermark");
-	# Start the AVIF transcoder, but don't delay Varnish startup.
-	#compute.start("avif");
-	#compute.start("espeak");
-	#compute.start("fetch");
-	#compute.start("inflate");
-	#compute.start("minimal");
-	#compute.start("thumbnails");
-	#compute.start("zstd");
+
+	# Add hugepage support to important programs
+	compute.configure("avif",
+		"""{
+			"hugepages": true,
+			"request_hugepages": false
+		}""");
+	# Start the JPEG-to-AVIF transcoder, but don't delay Varnish startup.
+	compute.start("avif");
 }
 sub vcl_recv {
 	if (req.url == "/avif/bench") {
