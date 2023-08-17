@@ -3,18 +3,18 @@ $Module compute 3 "High-Performance Compute For Varnish Enterprise"
 DESCRIPTION
 ===========
 
-vmod_compute allows using libraries of sandboxed programs to safely
-communicate with other systems, as well as retrieve and transform data
-without having to worry about security and integrity issues.
-Programs are loaded on-demand and can also be individually configured to
-meet the specific needs of each Varnish Cache server.
+vmod_compute uses libraries of programs and facilitates reading and
+transforming data without having to worry about security and
+integrity issues. Programs are loaded on-demand and can also be
+individually configured to meet the specific needs of each Varnish
+Cache server.
 
-A library defines a group of ready-to-use programs. Varnish Enterprise has
-a list of officially supported programs, each of which solve a specific task.
-Libraries contain definitions of programs that do not consume any resources
-until a program is needed by a request. When a program is needed, it is
-fetched, then loaded and then requests may be processed. This means that the
-first requests to a program will be waiting.
+A library defines a group of ready-to-use native programs. Varnish Enterprise
+has a list of officially supported programs, each of which solve a specific task.
+A library will only contain definitions of programs, and they do not consume
+any resources until a program is needed by a request. When a program is needed,
+it is fetched, loaded and then it will process requests until shutdown. This
+means that the first request to any program will wait for it to load.
 
 Programs provided by a library are ready-to-use, and will often have one
 single purpose. Programs are documented on the Varnish Software docs website
