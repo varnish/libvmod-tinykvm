@@ -15,6 +15,9 @@ sub vcl_init {
 	# A full list of programs and how they can be used would be on the docs site.
 	compute.library("https://filebin.varnish-software.com/kvmprograms/compute.json");
 
+	# Tell VMOD compute how to contact Varnish (also Unix sockets)
+	compute.self_request("");
+
 	# Add a local program directly (using default group)
 	compute.add_program("watermark", "file:///tmp/kvm_watermark");
 
@@ -22,21 +25,24 @@ sub vcl_init {
 	compute.configure("avif",
 		"""{
 			"hugepages": true,
-			"request_hugepages": false
+			"request_hugepages": true
 		}""");
 	# Start the JPEG-to-AVIF transcoder, but don't delay Varnish startup.
 	compute.start("avif");
+	# JSON minification
+	compute.start("minify");
 }
 sub vcl_recv {
-	if (req.url == "/avif/bench") {
-		return (pass);
+	if (req.url == "/image") {
+		return (hash);
 	}
+	return (pass);
 }
 
 sub vcl_backend_fetch {
 	if (bereq.url == "/avif") {
 		# Transform a JPEG asset to AVIF, cache and deliver it. cURL can fetch using TLS and HTTP/2.
-		set bereq.backend = compute.program("avif", "https://${filebin}/kvmprograms/rose.jpg",
+		set bereq.backend = compute.program("avif", "https://${filebin}/kvmprograms/723-1200x1200.jpg",
 			"""{
 				"headers": ["Host: filebin.varnish-software.com"]
 			}""");
@@ -82,8 +88,15 @@ sub vcl_backend_fetch {
 		compute.chain("fetch", "/minify.json");
 		set bereq.backend = compute.program("minify");
 	}
+	else if (bereq.url == "/minify/bench") {
+		set bereq.backend = compute.program("minify",
+			"""{ "json": "value" }""");
+	}
 	else if (bereq.url == "/minify.json") {
-		set bereq.backend = compute.program("fetch", "https://${filebin}/kvmprograms/compute.json");
+		set bereq.backend = compute.program("fetch", "https://${filebin}/kvmprograms/compute.json",
+			"""{
+				"headers": ["Host: filebin.varnish-software.com"]
+			}""");
 	}
 	else if (bereq.url == "/image") {
 		set bereq.backend = compute.program("fetch", "https://${filebin}/kvmprograms/723-1200x1200.jpg",
@@ -101,8 +114,7 @@ sub vcl_backend_fetch {
 					"tiny": 128,
 					"small": 256,
 					"medium": 512
-				},
-				"headers": ["Host: filebin.varnish-software.com"]
+				}
 			}""");
 		compute.chain("zstd", bereq.url,
 			"""{
@@ -155,6 +167,15 @@ sub vcl_backend_fetch {
 	else if (bereq.url == "/http3") {
 		# Fetch HTTP/3 page with cURL. AltSvc cache enables future fetches to use HTTP/3.
 		set bereq.backend = compute.program("fetch", "https://quic.rocks:4433/");
+	}
+	else if (bereq.url == "/xml") {
+		#compute.chain("fetch", "http://www.w3schools.com/xml/plant_catalog.xml");
+		compute.chain("fetch", "https://${filebin}/kvmprograms/compute.json");
+		set bereq.backend = compute.program("xml", "", "{}");
+	}
+	else if (bereq.url == "/small_xml") {
+		# Pass a small valid XML as response
+		set bereq.backend = compute.program("xml", "<a/>", "{}");
 	}
 	else if (bereq.url ~ "^/x") {
 		# Gameboy emulator (used by demo page)

@@ -29,6 +29,17 @@ VCL_BOOL vmod_library(VRT_CTX, VCL_PRIV task, VCL_STRING uri)
 	return (kvm_init_tenants_uri(ctx, task, uri, NO_INIT_PROGRAMS));
 }
 
+VCL_BOOL vmod_self_request(VRT_CTX, VCL_PRIV task, VCL_STRING uri)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	if (ctx->method != VCL_MET_INIT) {
+		VRT_fail(ctx, "compute: library() should only be called from vcl_init");
+		return (0);
+	}
+
+	return (kvm_set_self_request(ctx, task, uri));
+}
+
 VCL_BOOL vmod_add_program(VRT_CTX, VCL_PRIV task,
 	VCL_STRING name, VCL_STRING uri)
 {

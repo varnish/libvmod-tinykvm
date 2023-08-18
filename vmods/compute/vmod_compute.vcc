@@ -66,6 +66,14 @@ $Function BOOL library(PRIV_VCL, STRING uri)
 - Libraries contain program definitions, but programs are only started on-demand.
 - Must be called from vcl_init.
 
+$Function BOOL self_request(PRIV_VCL, STRING unix_socket)
+
+- Used by all self-requests.
+- Set the location where Varnish (or another server) can be found.
+- By default self-requests are routed to http://127.0.0.1:8080.
+- Must be a Unix Domain Socket path accessible by Varnish.
+- Must be called from vcl_init.
+
 $Function BOOL add_program(PRIV_VCL, STRING name, STRING uri)
 
 - Name is used to be able to refer to the program later, using configure, etc.

@@ -1,4 +1,5 @@
 #include <curl/curl.h>
+#include <string>
 
 namespace kvm {
 extern std::string adns_interp(vcl *, std::string);
@@ -15,6 +16,9 @@ static constexpr size_t CURL_FIELDS_NUM = 12;
 /* We can over-allocate the buffer because we are immediately
 	relaxing it after finishing the fetch operation. */
 static constexpr uint64_t CURL_BUFFER_MAX = 256UL * 1024UL * 1024UL;
+/* The current self-request URI */
+static std::string self_request_uri = "";
+static const std::string self_request_prefix = "http://127.0.0.1:8080";
 
 struct writeop {
 	tinykvm::Machine& machine;
@@ -57,7 +61,8 @@ static void syscall_curl_fetch_helper(
 	const std::string& url,
 	const uint64_t op_buffer,
 	const uint64_t fields_buffer,
-	const uint64_t options_buffer)
+	const uint64_t options_buffer,
+	const std::string& unix_path)
 {
     auto& regs = vcpu.registers();
     const int CONN_TIMEOUT = 5;
@@ -96,8 +101,17 @@ static void syscall_curl_fetch_helper(
     const bool is_post = (opres.post_addr != 0x0 && opres.post_buflen != 0x0);
 
     if (VERBOSE_CURL) {
-    printf("Curl: %s (%s)\n", url.c_str(), is_post ? "POST" : "GET");
+		printf("Curl: %s (%s, %s)\n", url.c_str(),
+			unix_path.empty() ? "TCP" : "UNIX",
+			is_post ? "POST" : "GET");
     }
+	/* We need to read the first character for Unix Domain Sockets. */
+	if (UNLIKELY(url.empty()))
+	{
+		regs.rax = -CURLE_URL_MALFORMAT;
+		vcpu.set_registers(regs);
+		return;
+	}
 
     writeop op {
         .machine = vcpu.machine(),
@@ -121,14 +135,27 @@ static void syscall_curl_fetch_helper(
                 (long) CURLALTSVC_H1|CURLALTSVC_H2|CURLALTSVC_H3);
         }
 
-        if (int err = curl_easy_setopt(curl, CURLOPT_URL, url.c_str()) != CURLE_OK) {
-            if (VERBOSE_CURL) {
-                printf("cURL URL error %d for URL: %s\n", err, url.c_str());
-            }
-            regs.rax = -err;
-            vcpu.set_registers(regs);
-            return;
-        }
+		if (!unix_path.empty())
+		{
+			if (int err = curl_easy_setopt(curl, CURLOPT_UNIX_SOCKET_PATH, unix_path.c_str()) != CURLE_OK) {
+				if (VERBOSE_CURL) {
+					printf("cURL UDS path error %d for: %s\n", err, url.c_str());
+				}
+				regs.rax = -err;
+				vcpu.set_registers(regs);
+				return;
+			}
+		}
+
+		if (int err = curl_easy_setopt(curl, CURLOPT_URL, url.c_str()) != CURLE_OK) {
+			if (VERBOSE_CURL) {
+				printf("cURL URL error %d for URL: %s\n", err, url.c_str());
+			}
+			regs.rax = -err;
+			vcpu.set_registers(regs);
+			return;
+		}
+
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, CONN_TIMEOUT);
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, READ_TIMEOUT); /* Seconds */
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, (write_callback)
@@ -341,7 +368,8 @@ static void syscall_fetch(vCPU& vcpu, MachineInstance& inst)
 		url,
 		op_buffer,
 		fields_buffer,
-		options_buffer);
+		options_buffer,
+		"");
 }
 
 static void syscall_request(vCPU& vcpu, MachineInstance& inst)
@@ -359,7 +387,7 @@ static void syscall_request(vCPU& vcpu, MachineInstance& inst)
     const uint64_t options_buffer = regs.r8;
 
     /* Self-requesting URL */
-    const auto url = "http://localhost:8080" +
+    const auto url = kvm::self_request_prefix +
         vcpu.machine().buffer_to_string(regs.rdi, regs.rsi, CURL_REQ_URL_MAX_LENGTH);
 
     opresult opres;
@@ -370,7 +398,21 @@ static void syscall_request(vCPU& vcpu, MachineInstance& inst)
 		url,
 		op_buffer,
 		fields_buffer,
-		options_buffer);
+		options_buffer,
+		kvm::self_request_uri);
 }
 
 } // kvm
+
+extern "C"
+int kvm_set_self_request(VRT_CTX, VCL_PRIV, const char *uri)
+{
+	kvm::self_request_uri = uri;
+	if (kvm::self_request_uri.empty()) {
+		return (1);
+	}
+	/* Remove the last /, as self-requests are required to start with it. */
+	if (kvm::self_request_uri.back() == '/')
+		kvm::self_request_uri.pop_back();
+	return (1);
+}
