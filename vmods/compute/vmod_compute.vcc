@@ -69,7 +69,7 @@ $Function BOOL library(PRIV_VCL, STRING uri)
 - Libraries contain program definitions, but programs are only started on-demand.
 - Must be called from vcl_init.
 
-$Function BOOL self_request(PRIV_VCL, STRING unix_socket, STRING http_prefix = "http://127.0.0.1:6081")
+$Function BOOL init_self_requests(PRIV_VCL, STRING unix_socket, STRING http_prefix = "http://127.0.0.1:6081")
 
 - Used by all self-requests.
 - Set the location where Varnish (or another server) can be found.
@@ -120,3 +120,14 @@ $Function STRING to_string(PRIV_VCL, STRING program, STRING arg = "", STRING con
 - If the program fails, this function returns the on_error string instead.
 - Works with chaining, and calls to_string() for the final string after chained programs.
 - NOTE: Uses extra workspace for each call. See: man varnishd, workspace_backend.
+
+
+$Function BOOL steal(PRIV_VCL, STRING program)
+
+- WARNING: None of the below is currently implemented.
+- Takes over the current clients TCP connection and passes it to the given program.
+- The program must have an upgrade entry. The entry is specified in the API docs.
+- The program must wait for events in a (virtualized) epoll loop.
+- The program has access to the underlying file descriptor (virtualized).
+- Returns true if detaching the clients fd succeeded.
+- Must be called from vcl_recv.

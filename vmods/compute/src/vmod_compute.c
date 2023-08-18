@@ -30,7 +30,7 @@ VCL_BOOL vmod_library(VRT_CTX, VCL_PRIV task, VCL_STRING uri)
 	return (kvm_init_tenants_uri(ctx, task, uri, NO_INIT_PROGRAMS));
 }
 
-VCL_BOOL vmod_self_request(VRT_CTX, VCL_PRIV task, VCL_STRING unix_path, VCL_STRING uri)
+VCL_BOOL vmod_init_self_requests(VRT_CTX, VCL_PRIV task, VCL_STRING unix_path, VCL_STRING uri)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	if (ctx->method != VCL_MET_INIT) {
@@ -133,4 +133,19 @@ VCL_STRING vmod_to_string(VRT_CTX, VCL_PRIV task,
 	}
 
 	return (kvm_vm_to_string(ctx, task, program, url, argument, on_error));
+}
+
+/* Steal the current clients fd and pass it to the given program. */
+VCL_BOOL vmod_steal(VRT_CTX, VCL_PRIV task, VCL_STRING program)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	if (ctx->method != VCL_MET_RECV) {
+		VRT_fail(ctx, "compute: steal() should only be called from vcl_recv");
+		return (0);
+	}
+
+	(void)task;
+	(void)program;
+	//VRT_fail(ctx, "Not implemented yet");
+	return (0);
 }
