@@ -80,13 +80,15 @@ $Function BOOL self_request(PRIV_VCL, STRING unix_socket, STRING http_prefix = "
 $Function BOOL add_program(PRIV_VCL, STRING name, STRING uri)
 
 - Name is used to be able to refer to the program later, using configure, etc.
-- URI can also be a local filename.
-- Program is added to the default program. Use configure to override.
+- URI can be a local filename, eg. "file:///tmp/my_program".
+- Program is added to the default group. Use configure() to override.
 - Must be called from vcl_init.
 
 $Function BOOL configure(PRIV_VCL, STRING program, STRING json)
 
 - Provide a JSON configuration to override defaults to unstarted programs.
+- The JSON configuration is the same as when configuring a program normally,
+  but there are no mandatory fields.
 - Must be called from vcl_init.
 
 $Function BOOL start(PRIV_VCL, STRING program, BOOL async = 1)
@@ -98,15 +100,17 @@ $Function BOOL start(PRIV_VCL, STRING program, BOOL async = 1)
 
 $Function BOOL chain(PRIV_VCL, STRING program, STRING arg = "", STRING config = "")
 
-- Queue this program up for execution later.
+- Queue this program up for execution in the exact order given.
 - Returns true if the program was found.
+- A program chain always end with a call to program().
 - Must be called from vcl_backend_fetch.
 
 $Function BACKEND program(PRIV_VCL, STRING program, STRING arg = "", STRING config = "")
 
 - Returns a backend that will call the given program to produce a response.
-- Execute each program in the chain, and then run *this* program to produce a final response.
-- Supports GET, POST and other HTTP requests.
+- Execute each program in the chain, and *then* run this program to produce a final response.
+- Supports GET, POST and other HTTP requests, as well as streaming modes.
+- All computation happens in between vcl_backend_fetch and vcl_backend_response.
 - Must be called from vcl_backend_fetch.
 
 $Function STRING to_string(PRIV_VCL, STRING program, STRING arg = "", STRING config = "", STRING on_error = "")
@@ -114,3 +118,5 @@ $Function STRING to_string(PRIV_VCL, STRING program, STRING arg = "", STRING con
 - Returns a string of the response produced by the given program.
 - Supports GET, POST and other HTTP requests.
 - If the program fails, this function returns the on_error string instead.
+- Works with chaining, and calls to_string() for the final string after chained programs.
+- NOTE: Uses extra workspace for each call. See: man varnishd, workspace_backend.

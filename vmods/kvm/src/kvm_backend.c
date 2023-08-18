@@ -39,6 +39,11 @@ static inline void kvm_ts(struct vsl_log *vsl, const char *event,
 	VSLb_ts(vsl, event, *work, prev, VTIM_real());
 }
 
+struct kvm_program_chain* kvm_chain_get_queue()
+{
+	return &kqueue;
+}
+
 static void v_matchproto_(vdi_panic_f)
 kvmbe_panic(const struct director *dir, struct vsb *vsb)
 {
@@ -169,6 +174,35 @@ kvmbe_write_response(struct busyobj *bo,
 	return (0);
 }
 
+int kvm_handle_post_to_another(VRT_CTX, struct backend_post *post,
+	struct kvm_chain_item *invocation, struct backend_result *result)
+{
+	/* index > 0: Shuffle data between VMs */
+	for (size_t b = 0; b < result->bufcount; b++)
+	{
+		const struct VMBuffer *buffer = &result->buffers[b];
+		/* Streaming POST is essentially copying data into the VM.
+			If streaming is enabled, a callback will be invoked on the
+			*current* program with the data from the previous.
+			Otherwise, it's just a straight copy into a sequential buffer. */
+		if (kvm_backend_streaming_post(post, buffer->data, buffer->size) < 0)
+		{
+			VSLb(ctx->vsl, SLT_Error,
+				"KVM: Unable to stream data (status=%u) to %s in chain",
+				result->status, kvm_tenant_name(invocation->tenant));
+			return (-1);
+		}
+	}
+	/* Reset total buffer count in order to make another VM call */
+	result->bufcount = VMBE_NUM_BUFFERS;
+
+	/* Forward the Content-Type as a direct argument to the next program. */
+	if ((invocation->inputs.content_type = result->type) == NULL)
+		invocation->inputs.content_type = "";
+	invocation->inputs.method = "POST";
+	return (0);
+}
+
 static int v_matchproto_(vdi_gethdrs_f)
 kvmbe_gethdrs(const struct director *dir,
 	struct worker *wrk, struct busyobj *bo)
@@ -201,7 +235,7 @@ kvmbe_gethdrs(const struct director *dir,
 	struct backend_post *post = NULL;
 	const bool is_post =
 		(bo->initial_req_body_status != REQ_BODY_NONE || bo->bereq_body != NULL);
-	if (is_post || kvmr->chain.count > 0)
+	if (is_post || kvmr->chain.count > 1)
 	{
 		/* Initialize POST. */
 		post = (struct backend_post *)WS_Alloc(bo->ws, sizeof(struct backend_post));
@@ -248,10 +282,6 @@ kvmbe_gethdrs(const struct director *dir,
 			kvm_ts(ctx.vsl, "TenantReserve", &kvmr->t_work, &kvmr->t_prev);
 		}
 
-		/* HTTP method */
-		invocation->inputs.method = bo->bereq->hd[0].b;
-		invocation->inputs.content_type = "";
-
 		/* Gather request body data if it exists. Check taken from stp_fetch.
 		If the body is cached already, bereq_body will be non-null.
 		NOTE: We only read the request body for index == 0. */
@@ -264,6 +294,7 @@ kvmbe_gethdrs(const struct director *dir,
 			post->capacity = POST_BUFFER;
 			post->length  = 0;
 			post->inputs = invocation->inputs;
+			use_post = true;
 
 			int ret = kvm_get_body(post, bo);
 			if (ret < 0) {
@@ -273,10 +304,6 @@ kvmbe_gethdrs(const struct director *dir,
 			if (VMOD_KVM_BACKEND_TIMINGS) {
 				kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev);
 			}
-			/* Get *initial* Content-Type from backend request. */
-			if (!http_GetHdr(ctx.http_bereq, H_Content_Type, &invocation->inputs.content_type))
-				invocation->inputs.content_type = "";
-			use_post = true;
 		}
 		else if (index > 0)
 		{
@@ -287,32 +314,14 @@ kvmbe_gethdrs(const struct director *dir,
 			post->length  = 0;
 			post->inputs = invocation->inputs;
 
-			/* index > 0: Shuffle data between VMs */
-			for (size_t b = 0; b < result->bufcount; b++)
-			{
-				const struct VMBuffer *buffer = &result->buffers[b];
-				/* Streaming POST is essentially copying data into the VM.
-				   If streaming is enabled, a callback will be invoked on the
-				   *current* program with the data from the previous.
-				   Otherwise, it's just a straight copy into a sequential buffer. */
-				if (kvm_backend_streaming_post(post, buffer->data, buffer->size) < 0)
-				{
-					VSLb(ctx.vsl, SLT_Error,
-						"KVM: Unable to stream data (status=%u) to %s in chain",
-						result->status, kvm_tenant_name(invocation->tenant));
-					return (-1);
-				}
+			if (kvm_handle_post_to_another(&ctx, post, invocation, result) < 0) {
+				return (-1);
 			}
-			/* Reset total buffer count in order to make another VM call */
-			result->bufcount = VMBE_NUM_BUFFERS;
 
 			if (VMOD_KVM_BACKEND_TIMINGS) {
 				kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev);
 			}
 
-			/* Forward the Content-Type as a direct argument to the next program. */
-			if ((invocation->inputs.content_type = result->type) == NULL)
-				invocation->inputs.content_type = "";
 			use_post = true;
 		}
 
@@ -377,18 +386,31 @@ static void init_director(VRT_CTX, struct vmod_kvm_backend *kvmr)
 	dir->finish  = kvmbe_finish;
 	dir->panic   = kvmbe_panic;
 }
-static int init_chain(VRT_CTX, struct vmod_kvm_tenant *tenant,
-	const char *url, const char *arg)
+struct kvm_chain_item *
+kvm_init_chain(VRT_CTX, struct vmod_kvm_tenant *tenant, const char *url, const char *arg)
 {
 	(void)ctx;
+	struct kvm_program_chain *kqueue = kvm_chain_get_queue();
+	if (kqueue->count >= KVM_PROGRAM_CHAIN_ENTRIES)
+		return (NULL);
 
-	struct kvm_chain_item *item = &kqueue.chain[kqueue.count];
+	struct kvm_chain_item *item = &kqueue->chain[kqueue->count];
 	item->tenant = tenant;
-	item->inputs.method = "";
 	item->inputs.url = url ? url : "";
 	item->inputs.argument = arg ? arg : "";
-	kqueue.count++;
-	return (1);
+
+	if (kqueue->count == 0) {
+		CHECK_OBJ_NOTNULL(ctx->http_bereq, HTTP_MAGIC);
+		/* TODO: Support front-end? */
+		item->inputs.method = ctx->http_bereq->hd[0].b;
+		if (!http_GetHdr(ctx->http_bereq, H_Content_Type, &item->inputs.content_type))
+			item->inputs.content_type = "";
+	} else {
+		item->inputs.method = "";
+		item->inputs.content_type = "";
+	}
+	kqueue->count++;
+	return (item);
 }
 static void init_kvmr(struct vmod_kvm_backend *kvmr)
 {
@@ -435,7 +457,7 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	}
 
 	/* Cannot fail at this point, add to chain */
-	if (!init_chain(ctx, tenant, url, arg)) {
+	if (!kvm_init_chain(ctx, tenant, url, arg)) {
 		return (NULL);
 	}
 
@@ -477,7 +499,7 @@ VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
 	}
 
 	/* Cannot fail at this point, add to chain */
-	if (!init_chain(ctx, tenant, url, arg)) {
+	if (!kvm_init_chain(ctx, tenant, url, arg)) {
 		return (NULL);
 	}
 
@@ -506,7 +528,7 @@ VCL_BOOL vmod_chain(VRT_CTX, VCL_PRIV task,
 	}
 
 	/* Cannot fail at this point, add to chain */
-	if (!init_chain(ctx, tenant, url, arg)) {
+	if (!kvm_init_chain(ctx, tenant, url, arg)) {
 		return (0);
 	}
 

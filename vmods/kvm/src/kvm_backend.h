@@ -24,7 +24,8 @@ struct kvm_chain_item
 };
 struct kvm_program_chain
 {
-	struct kvm_chain_item chain[16];
+#define KVM_PROGRAM_CHAIN_ENTRIES   16
+	struct kvm_chain_item chain[KVM_PROGRAM_CHAIN_ENTRIES];
 	int count;
 };
 

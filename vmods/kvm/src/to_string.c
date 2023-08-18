@@ -30,6 +30,11 @@
 extern uint64_t kvm_allocate_memory(KVM_SLOT, uint64_t bytes);
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
 	const struct kvm_chain_item *, struct backend_post *, struct backend_result *);
+extern struct kvm_program_chain* kvm_chain_get_queue();
+extern struct kvm_chain_item *kvm_init_chain(VRT_CTX, struct vmod_kvm_tenant *tenant,
+	const char *url, const char *arg);
+extern int kvm_handle_post_to_another(VRT_CTX, struct backend_post *post,
+	struct kvm_chain_item *invocation, struct backend_result *result);
 
 struct kvm_http_response {
 	const char* ctype;
@@ -53,7 +58,7 @@ minimal_response(uint16_t status, const char *ctype, const char *content)
 }
 
 static struct kvm_http_response
-to_string(VRT_CTX, const struct kvm_chain_item *invocation)
+to_string(VRT_CTX, struct kvm_program_chain *chain)
 {
 	/* The backend_result contains many iovec-like buffers needed for
 	   extracting data from the VM without copying to a temporary buffer. */
@@ -65,26 +70,63 @@ to_string(VRT_CTX, const struct kvm_chain_item *invocation)
 	}
 	result->bufcount = VMBE_NUM_BUFFERS;
 
-	/* Reserving a VM means putting ourselves in a concurrent queue
-	waiting for a free VM, and then getting exclusive access until
-	the end of the request. */
-	struct vmod_kvm_slot *slot =
-		kvm_reserve_machine(ctx, invocation->tenant, false);
-	if (slot == NULL) {
-		VSLb(ctx->vsl, SLT_Error, "KVM: Unable to reserve machine");
-		return (minimal_response(500, NULL, NULL));
+	/* Post struct for chaining */
+	struct backend_post *post = NULL;
+	if (chain->count > 1) {
+		post = (struct backend_post *)WS_Alloc(ctx->ws, sizeof(struct backend_post));
+		if (post == NULL) {
+			VSLb(ctx->vsl, SLT_Error, "KVM: Out of workspace for POST structure");
+			return (minimal_response(500, NULL, NULL));
+		}
+		post->ctx = ctx;
 	}
 
-	/* Make a backend VM call (with optional POST). */
-	kvm_backend_call(ctx, slot, invocation, NULL, result);
+	for (int index = 0; index < chain->count; index++)
+	{
+		/* The chain item contains the tenant program and all the inputs
+		   to the program. Everything needed to invoke the VM function. */
+		struct kvm_chain_item *invocation =
+			&chain->chain[index];
 
-	if (result->status >= 500) {
-		VSLb(ctx->vsl, SLT_Error,
-			"KVM: Error status %u from call to %s",
-			result->status, kvm_tenant_name(invocation->tenant));
-		return (minimal_response(500, NULL, NULL));
+		/* Reserving a VM means putting ourselves in a concurrent queue
+		waiting for a free VM, and then getting exclusive access until
+		the end of the request. */
+		struct vmod_kvm_slot *slot =
+			kvm_reserve_machine(ctx, invocation->tenant, false);
+		if (slot == NULL) {
+			VSLb(ctx->vsl, SLT_Error, "KVM: Unable to reserve machine");
+			return (minimal_response(500, NULL, NULL));
+		}
+
+		bool use_post = false;
+		if (index > 0)
+		{
+			/* Allocate exact bytes from previous result in reserved VM */
+			post->slot = slot;
+			post->address = kvm_allocate_memory(slot, result->content_length);
+			post->capacity = result->content_length;
+			post->length  = 0;
+			post->inputs = invocation->inputs;
+
+			if (kvm_handle_post_to_another(ctx, post, invocation, result) < 0)
+			{
+				return (minimal_response(500, NULL, NULL));
+			}
+			use_post = true;
+		}
+
+		/* Make a backend VM call (with optional POST). */
+		kvm_backend_call(ctx, slot, invocation, use_post ? post : NULL, result);
+
+		if (result->status >= 500) {
+			VSLb(ctx->vsl, SLT_Error,
+				"KVM: Error status %u from call to %s",
+				result->status, kvm_tenant_name(invocation->tenant));
+			return (minimal_response(500, NULL, NULL));
+		}
 	}
 
+	/* Finalize result into a string. */
 	char *content = "";
 	if (result->bufcount > 1)
 	{
@@ -137,14 +179,21 @@ VCL_STRING kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
 		return (NULL);
 	}
 
-	struct kvm_chain_item invocation;
-	invocation.tenant = tenant;
-	invocation.inputs.method = "GET"; /* Convenience */
-	invocation.inputs.url = url;
-	invocation.inputs.argument = arg;
-	invocation.inputs.content_type = "";
+	/* Cannot fail at this point, add to chain */
+	struct kvm_chain_item *invocation =
+		kvm_init_chain(ctx, tenant, url, arg);
+	if (invocation == NULL) {
+		return (0);
+	}
 
-	struct kvm_http_response resp = to_string(ctx, &invocation);
+	invocation->inputs.method = "GET"; /* Convenience */
+	invocation->inputs.content_type = "";
+
+	/* XXX: Immediately reset it. It's a thread_local! */
+	struct kvm_program_chain chain = *kvm_chain_get_queue();
+	kvm_chain_get_queue()->count = 0;
+
+	struct kvm_http_response resp = to_string(ctx, &chain);
 	if (resp.status < 500 && resp.content != NULL)
 		return (resp.content);
 	else

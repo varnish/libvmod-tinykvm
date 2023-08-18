@@ -154,7 +154,17 @@ sub vcl_backend_fetch {
 		set bereq.backend = compute.program("none");
 	}
 	else if (bereq.url == "/string") {
-		set bereq.backend = compute.program("to_string", "text/plain", "Hello World!");
+		compute.chain("to_string", "text/plain", "Hello World!");
+		compute.chain("zstd", "",
+			"""{
+				"action": "compress"
+			}""");
+		set bereq.http.X-Result = compute.to_string("zstd", "",
+			"""{
+				"action": "decompress"
+			}""");
+		set bereq.backend =
+			compute.program("to_string", "text/plain", bereq.http.X-Result);
 	}
 	else if (bereq.url == "/ftp") {
 		# Fetch something with cURL, and store it in a string. Then pass it to a backend.
