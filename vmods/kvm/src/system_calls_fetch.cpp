@@ -18,7 +18,7 @@ static constexpr size_t CURL_FIELDS_NUM = 12;
 static constexpr uint64_t CURL_BUFFER_MAX = 256UL * 1024UL * 1024UL;
 /* The current self-request URI */
 static std::string self_request_uri = "";
-static std::string self_request_prefix = "http://127.0.0.1:8080";
+static std::string self_request_prefix = "http://127.0.0.1:6081";
 
 struct writeop {
 	tinykvm::Machine& machine;
