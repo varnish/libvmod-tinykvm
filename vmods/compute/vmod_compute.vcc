@@ -3,11 +3,10 @@ $Module compute 3 "High-Performance Compute For Varnish Enterprise"
 DESCRIPTION
 ===========
 
-vmod_compute uses libraries of programs and facilitates reading and
-transforming data without having to worry about security and
-integrity issues. Programs are loaded on-demand and can also be
-individually configured to meet the specific needs of each Varnish
-Cache server.
+vmod_compute uses sandboxed native programs in order to read and
+transform data without having to worry about security and integrity
+issues. Programs are loaded on-demand and can also be individually
+configured to meet the specific needs of each Varnish Cache server.
 
 A library defines a group of ready-to-use native programs. Varnish Enterprise
 has a list of officially supported programs, each of which solve a specific task.
@@ -18,8 +17,8 @@ means that the first request to any program will wait for it to load.
 
 Programs provided by a library are ready-to-use, and will often have one
 single purpose. Programs are documented on the Varnish Software docs website
-and comes with a simple explanation of what it does, and what JSON-
-configuration should be provided to make the program perform a given function.
+and comes with a simple explanation of what it does, and what configuration
+should be provided to make the program perform a given function.
 
 See http://compute.varnish-software.com for a list of official programs.
 
@@ -42,8 +41,8 @@ Example:
 
 The primary way to increase or decrease the resource consumption of a program
 is to control the concurrency level. If a program is not handling requests fast
-enough, increase the level. If the Varnish Cache is using too much CPU, try
-reducing the concurrency level.
+enough, increase the number of VMs for that program. If the Varnish Cache is
+using too much CPU, try reducing the concurrency level.
 
 Example:
 	sub vcl_init {
@@ -53,7 +52,11 @@ Example:
 		}""");
 	}
 
+Most programs should have a healthy amount of maximum memory available to them in
+order to complete their tasks. You can tweak this manually using the same configure
+function as needed.
 
+You can find each individual setting at http://compute.varnish-software.com.
 
 API
 ===

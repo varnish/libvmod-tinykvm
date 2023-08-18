@@ -34,7 +34,7 @@ sub vcl_init {
 	compute.start("minify");
 }
 sub vcl_recv {
-	if (req.url == "/image") {
+	if (req.url == "/chain") {
 		return (hash);
 	}
 	return (pass);
@@ -99,7 +99,7 @@ sub vcl_backend_fetch {
 				"headers": ["Host: filebin.varnish-software.com"]
 			}""");
 	}
-	else if (bereq.url == "/image") {
+	else if (bereq.url == "/chain") {
 		set bereq.backend = compute.program("fetch", "https://${filebin}/kvmprograms/723-1200x1200.jpg",
 			"""{
 				"headers": ["Host: filebin.varnish-software.com"]
@@ -110,7 +110,6 @@ sub vcl_backend_fetch {
 		compute.chain("thumbnails",
 			bereq.url,
 			"""{
-				"url": "/image",
 				"sizes": {
 					"tiny": 128,
 					"small": 256,
