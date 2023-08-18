@@ -15,8 +15,8 @@ sub vcl_init {
 	# A full list of programs and how they can be used would be on the docs site.
 	compute.library("https://filebin.varnish-software.com/kvmprograms/compute.json");
 
-	# Tell VMOD compute how to contact Varnish (also Unix sockets)
-	compute.self_request("");
+	# Tell VMOD compute how to contact Varnish (Unix Socket *ONLY*)
+	compute.self_request("/tmp/compute.sock/");
 
 	# Add a local program directly (using default group)
 	compute.add_program("watermark", "file:///tmp/kvm_watermark");
