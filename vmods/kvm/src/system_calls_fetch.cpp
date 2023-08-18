@@ -18,7 +18,7 @@ static constexpr size_t CURL_FIELDS_NUM = 12;
 static constexpr uint64_t CURL_BUFFER_MAX = 256UL * 1024UL * 1024UL;
 /* The current self-request URI */
 static std::string self_request_uri = "";
-static const std::string self_request_prefix = "http://127.0.0.1:8080";
+static std::string self_request_prefix = "http://127.0.0.1:8080";
 
 struct writeop {
 	tinykvm::Machine& machine;
@@ -405,9 +405,10 @@ static void syscall_request(vCPU& vcpu, MachineInstance& inst)
 } // kvm
 
 extern "C"
-int kvm_set_self_request(VRT_CTX, VCL_PRIV, const char *uri)
+int kvm_set_self_request(VRT_CTX, VCL_PRIV, const char *uri, const char *prefix)
 {
 	kvm::self_request_uri = uri;
+	kvm::self_request_prefix = prefix;
 	if (kvm::self_request_uri.empty()) {
 		return (1);
 	}

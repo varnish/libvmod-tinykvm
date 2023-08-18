@@ -17,6 +17,7 @@ sub vcl_init {
 
 	# Tell VMOD compute how to contact Varnish (Unix Socket *ONLY*)
 	compute.self_request("/tmp/compute.sock/");
+	#compute.self_request("", "http://127.0.0.1:8080");
 
 	# Add a local program directly (using default group)
 	compute.add_program("watermark", "file:///tmp/kvm_watermark");
