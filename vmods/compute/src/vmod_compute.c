@@ -14,6 +14,7 @@
 #include <vsb.h>
 #include <vcl.h>
 #include "vcc_if.h"
+#include <errno.h>
 #include <stdio.h>
 #define SEMPTY(s)			!((s) && *(s))
 
@@ -108,6 +109,7 @@ extern struct director *vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg);
 extern const char *kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg, VCL_STRING on_error);
+extern VCL_BOOL kvm_vm_begin_epoll(VRT_CTX, VCL_PRIV, VCL_STRING program, int fd);
 
 /* Create a response through a KVM backend. */
 VCL_BACKEND vmod_program(VRT_CTX, VCL_PRIV task,
@@ -144,8 +146,20 @@ VCL_BOOL vmod_steal(VRT_CTX, VCL_PRIV task, VCL_STRING program)
 		return (0);
 	}
 
-	(void)task;
-	(void)program;
-	//VRT_fail(ctx, "Not implemented yet");
+	const int fd = dup(ctx->req->sp->fd);
+	if (fd > 0) {
+		const int gucci = kvm_vm_begin_epoll(ctx, task, program, fd);
+
+		/* Only close() if successful. */
+		if (gucci) {
+			close(ctx->req->sp->fd);
+			ctx->req->sp->fd = -1;
+		}
+		return (gucci);
+	}
+	/* dup() failed. */
+	VSLb(ctx->vsl, SLT_Error,
+		 "%s: FD steal failed (%s)",
+		 program, strerror(errno));
 	return (0);
 }

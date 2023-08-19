@@ -25,15 +25,21 @@ sub vcl_init {
 	# Add hugepage support to important programs
 	compute.configure("avif",
 		"""{
-			"hugepages": true,
-			"request_hugepages": true
+			"hugepages": false,
+			"request_hugepages": false
 		}""");
 	# Start the JPEG-to-AVIF transcoder, but don't delay Varnish startup.
-	compute.start("avif");
+	#compute.start("avif");
 	# JSON minification
-	compute.start("minify");
+	#compute.start("minify");
 }
 sub vcl_recv {
+	if (req.url == "/steal") {
+		if (compute.steal("hey")) {
+			return (synth(200));
+		}
+		return (synth(404));
+	}
 	if (req.url == "/chain") {
 		return (hash);
 	}

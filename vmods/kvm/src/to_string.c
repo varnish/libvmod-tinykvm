@@ -1,21 +1,13 @@
 /**
- * @file kvm_backend.c
+ * @file to_string.c
  * @author Alf-André Walla (fwsgonzo@hotmail.com)
  * @brief
  * @version 0.1
- * @date 2022-10-10
+ * @date 2023-08-10
  *
- *
- * This file contains all the glue between Varnish backend functionality
- * and the VMOD KVM tenant VMs. Here we create a backend that can POST
- * data into a tenants VM and then extract data from and return that as
- * a HTTP response.
- *
- * The vmod_vm_backend function is the VCL function that selected VMOD KVM
- * as a backend for a specific URL, usually tied to a Host header field.
- * Once selected, Varnish will eventually switch over to the backend side,
- * by activating a backend worker thread, and then invoke the function
- * registered by the .gethdrs callback. That is, kvmbe_gethdrs.
+ * to_string() produces a string result after passing
+ * data through a chain of VMs.
+ * The strings are currently zero-terminated.
  *
  */
 #include "vmod_kvm.h"
