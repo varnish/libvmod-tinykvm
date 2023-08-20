@@ -1,6 +1,7 @@
 #pragma once
 #include "machine_instance.hpp"
 #include "instance_cache.hpp"
+#include "long_lived.hpp"
 #include "settings.hpp"
 #include "adns.hpp"
 #include "utils/cpptime.hpp"
@@ -45,6 +46,11 @@ enum class ProgramEntryIndex : uint8_t {
 	BACKEND_ERROR  = 5,
 	LIVEUPD_SERIALIZE = 6,
 	LIVEUPD_DESERIALIZE = 7,
+
+	SOCKET_CONNECTED = 8,
+	SOCKET_DATA = 9,
+	SOCKET_ERROR = 10,
+	SOCKED_DISCONNECTED = 11,
 	TOTAL_ENTRIES
 };
 
@@ -163,6 +169,10 @@ public:
 	   Initialized during storage initialization, read-only during request handling. */
 	std::array<AsyncDNS, ADNS_MAX> m_adns_tags;
 	int free_adns_tag() const { for (size_t i = 0; i < m_adns_tags.size(); i++)if (m_adns_tags[i].tag.empty()) return i; return -1; }
+
+	LongLived& epoll_system(std::shared_ptr<ProgramInstance>);
+	std::unique_ptr<LongLived> m_epoll_system = nullptr;
+	std::mutex long_lived_mtx;
 
 	/* Live debugging feature using the GDB RSP protocol.
 	   Debugging allows stepping through the tenants program line by line

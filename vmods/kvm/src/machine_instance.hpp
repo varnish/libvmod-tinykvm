@@ -30,7 +30,6 @@ public:
 
 	void print(std::string_view text) const;
 	void logf(const char*, ...) const;
-	void dynamic_call(uint32_t hash);
 
 	auto& regex() { return m_regex; }
 
@@ -74,6 +73,7 @@ public:
 	std::string symbol_name(gaddr_t address) const;
 	gaddr_t resolve_address(const char* name) const { return machine().address_of(name); }
 
+	auto& file_descriptors() { return this->m_fd; }
 	void set_sigaction(int sig, gaddr_t handler);
 	void print_backtrace();
 	void open_debugger(uint16_t, float timeout);

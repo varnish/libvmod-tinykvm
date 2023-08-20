@@ -196,28 +196,9 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 	#endif
 		try
 		{
-			std::shared_ptr<ProgramInstance> prog;
-			if (LIKELY(!debug))
-				prog = std::atomic_load(&this->program);
-			else
-				prog = std::atomic_load(&this->debug_program);
-			// First-time tenants could have no program loaded
-			if (UNLIKELY(prog == nullptr)) {
-				// Attempt to load the program (if it was never attempted)
-				// XXX: But not for debug programs (NOT IMPLEMENTED YET).
-				if (debug || this->wait_guarded_initialize(ctx, prog) == false) {
-					VRT_fail(ctx, "vmreserve: Missing program for %s. Not uploaded?",
-						config.name.c_str());
-					return nullptr;
-				}
-				// On success, prog is now loaded with the new program.
-				// XXX: Assert on prog
-			}
-			// Avoid reservation while still initializing. Wait for lock.
-			// Returns false if the main_vm failed to initialize.
-			if (UNLIKELY(!prog->wait_for_main_vm())) {
+			auto prog = this->ref(ctx, debug);
+			if (UNLIKELY(prog == nullptr))
 				return nullptr;
-			}
 
 			// Reserve a machine through blocking queue.
 			// May throw if dequeue from the queue times out.
@@ -249,6 +230,18 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 
 MachineInstance* TenantInstance::tlsreserve(const vrt_ctx* ctx, bool debug)
 {
+	auto prog = this->ref(ctx, debug);
+	if (UNLIKELY(prog == nullptr))
+		return nullptr;
+
+	// Reserve a machine through blocking queue.
+	// May throw if dequeue from the queue times out.
+	return prog->tls_reserve_vm(ctx, this, std::move(prog));
+	// prog is nullptr after this ^
+}
+
+std::shared_ptr<ProgramInstance> TenantInstance::ref(const vrt_ctx *ctx, bool debug)
+{
 	std::shared_ptr<ProgramInstance> prog;
 	if (LIKELY(!debug))
 		prog = std::atomic_load(&this->program);
@@ -275,10 +268,7 @@ MachineInstance* TenantInstance::tlsreserve(const vrt_ctx* ctx, bool debug)
 		return nullptr;
 	}
 
-	// Reserve a machine through blocking queue.
-	// May throw if dequeue from the queue times out.
-	return prog->tls_reserve_vm(ctx, this, std::move(prog));
-	// prog is nullptr after this ^
+	return prog;
 }
 
 uint64_t TenantInstance::lookup(const char* name) const {

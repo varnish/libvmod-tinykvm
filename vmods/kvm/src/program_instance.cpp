@@ -361,6 +361,7 @@ Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 MachineInstance* ProgramInstance::tls_reserve_vm(const vrt_ctx* ctx,
 	TenantInstance* ten, std::shared_ptr<ProgramInstance> prog)
 {
+	(void)ctx;
 	thread_local std::unique_ptr<MachineInstance> inst = nullptr;
 
 	if (inst == nullptr) {
