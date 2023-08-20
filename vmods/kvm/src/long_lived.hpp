@@ -10,7 +10,7 @@ namespace kvm
 		LongLived(std::shared_ptr<ProgramInstance>);
 		~LongLived();
 
-		bool manage(int fd);
+		bool manage(int fd, const char *argument);
 
 		const auto& program() const { return *m_prog_ref; }
 		auto& program() { return *m_prog_ref; }

@@ -109,7 +109,8 @@ extern struct director *vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg);
 extern const char *kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg, VCL_STRING on_error);
-extern VCL_BOOL kvm_vm_begin_epoll(VRT_CTX, VCL_PRIV, VCL_STRING program, int fd);
+extern VCL_BOOL kvm_vm_begin_epoll(VRT_CTX, VCL_PRIV, VCL_STRING program,
+	int fd, const char *arg);
 
 /* Create a response through a KVM backend. */
 VCL_BACKEND vmod_program(VRT_CTX, VCL_PRIV task,
@@ -138,7 +139,7 @@ VCL_STRING vmod_to_string(VRT_CTX, VCL_PRIV task,
 }
 
 /* Steal the current clients fd and pass it to the given program. */
-VCL_BOOL vmod_steal(VRT_CTX, VCL_PRIV task, VCL_STRING program)
+VCL_BOOL vmod_steal(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_STRING argument)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	if (ctx->method != VCL_MET_RECV) {
@@ -146,9 +147,13 @@ VCL_BOOL vmod_steal(VRT_CTX, VCL_PRIV task, VCL_STRING program)
 		return (0);
 	}
 
+	if (argument == NULL)
+		argument = "";
+
 	const int fd = dup(ctx->req->sp->fd);
 	if (fd > 0) {
-		const int gucci = kvm_vm_begin_epoll(ctx, task, program, fd);
+		const int gucci = kvm_vm_begin_epoll(ctx, task, program,
+			fd, argument);
 
 		/* Only unset if successful. */
 		if (gucci) {

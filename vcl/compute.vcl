@@ -34,8 +34,8 @@ sub vcl_init {
 	#compute.start("minify");
 }
 sub vcl_recv {
-	if (req.url == "/steal") {
-		if (compute.steal("hello")) {
+	if (req.url == "/tcp") {
+		if (compute.steal("hello", req.url)) {
 			return (synth(200));
 		}
 		return (synth(404));

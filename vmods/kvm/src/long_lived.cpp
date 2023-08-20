@@ -108,7 +108,7 @@ bool LongLived::epoll_add(const int fd)
 	return true;
 }
 
-bool LongLived::manage(const int fd)
+bool LongLived::manage(const int fd, const char *argument)
 {
 	/* Make non-blocking */
 	int r = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
@@ -127,7 +127,7 @@ bool LongLived::manage(const int fd)
 
 	/* Task queue with one reader thread. */
 	auto fut = program().m_storage_queue.enqueue(
-		[this, fd] () -> long
+		[this, fd, argument] () -> long
 		{
 			auto& storage = *this->program().storage_vm;
 			auto func = program().
@@ -150,7 +150,7 @@ bool LongLived::manage(const int fd)
 			/* Call the storage VM on_connected callback. */
 			storage.machine().timed_vmcall(
 				func, CALLBACK_TIMEOUT,
-				int(virtual_fd), peer);
+				int(virtual_fd), peer, argument);
 
 			/* Get answer from VM, and unmanage the fd if no. */
 			const bool answer = storage.machine().return_value();
@@ -165,7 +165,6 @@ bool LongLived::manage(const int fd)
 	if (ret) {
 		return this->epoll_add(fd);
 	}
-	close(fd);
 	return false;
 }
 long LongLived::fd_readable(int fd)
@@ -241,6 +240,7 @@ void LongLived::hangup(int fd, const char *reason)
 	/* Preemptively close and remove the fd. */
 	epoll_ctl(this->m_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
 	close(fd);
+	program().storage_vm->file_descriptors().free_byval(fd);
 
 	/* Don't call on_disconnect if the entry is 0x0. */
 	if (program().entry_at(ProgramEntryIndex::SOCKED_DISCONNECTED) == 0x0)

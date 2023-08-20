@@ -17,31 +17,10 @@
 #include <unistd.h>
 extern "C" kvm::TenantInstance* kvm_tenant_find(VCL_PRIV task, const char* name);
 
-namespace kvm {
-
-static void new_connection(VRT_CTX, kvm::TenantInstance* tenant, const int fd)
-{
-	/* Atomically reference the main program. */
-	auto prog = tenant->ref(ctx, false);
-
-	if (UNLIKELY(prog == nullptr)) {
-		close(fd);
-		return;
-	}
-
-	auto& epoll = prog->epoll_system(std::move(prog));
-	/* NOTE: prog is null after this ^ */
-
-	if (epoll.manage(fd) == false) {
-		close(fd);
-	}
-}
-
-} // kvm
-
+/* Entry-point for per-tenant epoll-controlled TCP sockets. */
 extern "C"
 int kvm_vm_begin_epoll(VRT_CTX, VCL_PRIV task,
-	const char *program, const int fd)
+	const char *program, const int fd, const char *argument)
 {
 	auto* tenant = kvm_tenant_find(task, program);
 	if (UNLIKELY(tenant == nullptr)) {
@@ -53,6 +32,25 @@ int kvm_vm_begin_epoll(VRT_CTX, VCL_PRIV task,
 	VSLb(ctx->vsl, SLT_VCL_Log, "Stealing fd=%d for program %s",
 		fd, program);
 
-	kvm::new_connection(ctx, tenant, fd);
-	return true;
+	/* Atomically reference the main program. */
+	auto prog = tenant->ref(ctx, false);
+
+	if (UNLIKELY(prog == nullptr || ctx->http_req == nullptr)) {
+		close(fd);
+		VSLb(ctx->vsl, SLT_Error,
+			"%s: FD steal failed (Program not loaded)", program);
+		return false;
+	}
+
+	/* Do *NOT* move the below line around: */
+	auto& epoll = prog->epoll_system(std::move(prog));
+	/* NOTE: prog is null after this ^ */
+
+	const bool managed = epoll.manage(fd, argument);
+	if (managed == false) {
+		VSLb(ctx->vsl, SLT_Error,
+			"%s: FD steal failed (Cancelled)", program);
+		close(fd);
+	}
+	return managed;
 }

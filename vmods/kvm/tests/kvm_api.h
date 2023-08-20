@@ -634,7 +634,7 @@ extern long sys_request(const char*, size_t, struct curl_op*, struct curl_fields
  * 
  * Register various TCP socket callbacks:
  **/
-static inline void set_socket_on_connect(int(*f)(int fd, const char *remote)) { register_func(8, f); }
+static inline void set_socket_on_connect(int(*f)(int fd, const char *remote, const char *arg)) { register_func(8, f); }
 static inline void set_socket_on_read(void(*f)(int fd, const uint8_t*, size_t)) { register_func(9, f); }
 static inline void set_socket_on_writable(void(*f)(int fd)) { register_func(10, f); }
 static inline void set_socket_on_disconnect(void(*f)(int fd, const char *reason)) { register_func(11, f); }
