@@ -35,7 +35,7 @@ sub vcl_init {
 }
 sub vcl_recv {
 	if (req.url == "/steal") {
-		if (compute.steal("hey")) {
+		if (compute.steal("hello")) {
 			return (synth(200));
 		}
 		return (synth(404));

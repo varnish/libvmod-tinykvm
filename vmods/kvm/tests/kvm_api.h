@@ -576,6 +576,10 @@ extern int sys_is_debug();
    up for remote GDB debugging. */
 extern void sys_breakpoint();
 
+/**
+ * cURL and HTTP request-related functions
+**/
+
 /* Fetch content from provided URL. Content will be allocated by Varnish
    when fetching. The fetcher will also fill out the input structure if the
    fetch succeeds. If a serious error is encountered, the function returns
@@ -617,6 +621,28 @@ extern long sys_fetch(const char*, size_t, struct curl_op*, struct curl_fields*,
 
 /* Varnish self-request */
 extern long sys_request(const char*, size_t, struct curl_op*, struct curl_fields*, struct curl_options*);
+
+/**
+ * TCP-related functions
+**/
+
+/**
+ * Receive and control a TCP socket file descriptor.
+ * This fd can be read from and written to using write().
+ * Reading happens automatically outside of the guest, and the read-buffer
+ * is presented through the on_read callback.
+ * 
+ * Register various TCP socket callbacks:
+ **/
+static inline void set_socket_on_connect(int(*f)(int fd, const char *remote)) { register_func(8, f); }
+static inline void set_socket_on_read(void(*f)(int fd, const uint8_t*, size_t)) { register_func(9, f); }
+static inline void set_socket_on_writable(void(*f)(int fd)) { register_func(10, f); }
+static inline void set_socket_on_disconnect(void(*f)(int fd, const char *reason)) { register_func(11, f); }
+
+
+/**
+ * Utility functions
+**/
 
 /* Embed binary data into executable. This data has no guaranteed alignment. */
 #define EMBED_BINARY(name, filename) \

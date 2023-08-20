@@ -49,7 +49,7 @@ enum class ProgramEntryIndex : uint8_t {
 
 	SOCKET_CONNECTED = 8,
 	SOCKET_DATA = 9,
-	SOCKET_ERROR = 10,
+	SOCKET_WRITABLE = 10,
 	SOCKED_DISCONNECTED = 11,
 	TOTAL_ENTRIES
 };

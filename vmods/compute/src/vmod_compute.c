@@ -150,9 +150,8 @@ VCL_BOOL vmod_steal(VRT_CTX, VCL_PRIV task, VCL_STRING program)
 	if (fd > 0) {
 		const int gucci = kvm_vm_begin_epoll(ctx, task, program, fd);
 
-		/* Only close() if successful. */
+		/* Only unset if successful. */
 		if (gucci) {
-			close(ctx->req->sp->fd);
 			ctx->req->sp->fd = -1;
 		}
 		return (gucci);

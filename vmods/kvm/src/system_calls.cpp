@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <sys/uio.h>
 #include <unistd.h>
 using namespace tinykvm;
 //#define VERBOSE_SYSCALLS
@@ -249,13 +250,15 @@ void MachineInstance::setup_syscall_interface()
 				return;
 			}
 			if (fd != 1 && fd != 2) {
-				// TODO: Use gather-buffers and writev instead
-				auto buffer = std::unique_ptr<char[]> (new char[bytes]);
-				cpu.machine().copy_from_guest(buffer.get(), regs.rsi, bytes);
+				/* Use gather-buffers and writev */
+				static constexpr size_t WRITEV_BUFFERS = 64;
+				tinykvm::Machine::Buffer buffers[WRITEV_BUFFERS];
+				const auto bufcount =
+					cpu.machine().gather_buffers_from_range(WRITEV_BUFFERS, buffers, regs.rsi, bytes);
 
 				/* Complain about writes outside of existing FDs */
-				int fd = inst.m_fd.translate(regs.rdi);
-				regs.rax = write(fd, buffer.get(), bytes);
+				const int fd = inst.m_fd.translate(regs.rdi);
+				regs.rax = writev(fd, (const struct iovec *)buffers, bufcount);
 			}
 			else {
 				cpu.machine().foreach_memory(regs.rsi, bytes,
@@ -270,16 +273,18 @@ void MachineInstance::setup_syscall_interface()
 		3, [] (vCPU& cpu) { // CLOSE
 			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
 			auto& regs = cpu.registers();
-			SYSPRINT("CLOSE to fd=%lld\n", regs.rdi);
 
 			int idx = inst.m_fd.find(regs.rdi);
 			if (idx >= 0) {
 				auto& entry = inst.m_fd.get(idx);
 				regs.rax = close(entry.item);
 				entry.free();
+				if (regs.rax < 0)
+					regs.rax = -errno;
 			} else {
-				regs.rax = -1;
+				regs.rax = -EBADF;
 			}
+			SYSPRINT("CLOSE(fd=%lld) = %lld\n", regs.rdi, regs.rax);
 			cpu.set_registers(regs);
 		});
 	Machine::install_syscall_handler(
@@ -320,8 +325,19 @@ void MachineInstance::setup_syscall_interface()
 		8, [] (vCPU& cpu) { // LSEEK
 			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
 			auto& regs = cpu.registers();
-			int fd = inst.m_fd.translate(regs.rdi);
+			const int fd = inst.m_fd.translate(regs.rdi);
 			regs.rax = lseek(fd, regs.rsi, regs.rdx);
+			cpu.set_registers(regs);
+		});
+	Machine::install_syscall_handler(
+		48, [] (vCPU& cpu) { // SHUTDOWN
+			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
+			auto& regs = cpu.registers();
+
+			const int fd = inst.m_fd.translate(regs.rdi);
+			regs.rax = shutdown(fd, regs.rsi);
+			SYSPRINT("SHUTDOWN(fd=%lld) = %lld\n",
+				regs.rdi, regs.rax);
 			cpu.set_registers(regs);
 		});
 	Machine::install_syscall_handler(

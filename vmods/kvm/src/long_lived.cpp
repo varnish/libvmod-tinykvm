@@ -1,10 +1,12 @@
 #include "program_instance.hpp"
+#include <arpa/inet.h>
 #include <sys/epoll.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <fcntl.h>
 #include <unistd.h>
+extern "C" int gettid();
 
 namespace kvm {
 
@@ -49,29 +51,64 @@ void LongLived::epoll_main_loop()
 		for (int i = 0; i < nfds; i++)
 		{
 			auto& ev = events[i];
-			if (ev.events & (EPOLLIN))
+			if (ev.events & EPOLLIN)
 			{
 				try {
-					this->data(ev.data.fd);
-				} catch (...) {
+					const auto len = this->fd_readable(ev.data.fd);
+					if (len <= 0) {
+						/* Some errors are not fatal */
+						const bool non_fatal = (len == -1 && errno == EWOULDBLOCK);
+						if (!non_fatal) {
+							// Close immediately (???)
+							this->hangup(ev.data.fd, (len == 0) ? "Disconnected" : "Error");
+
+							// Skip over the remaining events for this fd
+							continue;
+						}
+					}
+				} catch (const std::exception& e) {
 					/* XXX: Implement me. */
+					fprintf(stderr, "epoll read exception: %s\n", e.what());
 				}
 			}
-			if (ev.events & (EPOLLHUP))
+			if (ev.events & EPOLLOUT)
 			{
 				try {
-					this->hangup(ev.data.fd);
-				} catch (...) {
+					this->fd_writable(ev.data.fd);
+				} catch (const std::exception& e) {
 					/* XXX: Implement me. */
+					fprintf(stderr, "epoll write exception: %s\n", e.what());
 				}
-				epoll_ctl(this->m_epoll_fd, EPOLL_CTL_DEL, ev.data.fd, NULL);
-				close(ev.data.fd);
+			}
+			if (ev.events & EPOLLHUP)
+			{
+				try {
+					this->hangup(ev.data.fd, "Hangup");
+				} catch (const std::exception& e) {
+					/* XXX: Implement me. */
+					fprintf(stderr, "epoll hangup exception: %s\n", e.what());
+				}
 			}
 		}
 	}
 }
 
-bool LongLived::manage(int fd)
+bool LongLived::epoll_add(const int fd)
+{
+	/* Add to epoll, edge-triggered. */
+	struct epoll_event event;
+	event.events = EPOLLIN | EPOLLOUT | EPOLLET;
+	event.data.fd = fd;
+	if (epoll_ctl(this->m_epoll_fd, EPOLL_CTL_ADD, fd, &event) < 0)
+	{
+		/* XXX: Silently close when it can't be added. */
+		close(fd);
+		return false;
+	}
+	return true;
+}
+
+bool LongLived::manage(const int fd)
 {
 	/* Make non-blocking */
 	int r = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
@@ -82,13 +119,10 @@ bool LongLived::manage(int fd)
 	int val = 1;
 	setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val));
 
-	/* Add to epoll */
-	struct epoll_event event;
-	event.events = EPOLLIN; /* TODO: Edge-triggered? */
-	event.data.fd = fd;
-	if (epoll_ctl(this->m_epoll_fd, EPOLL_CTL_ADD, fd, &event) < 0)
+	/* Don't call on_connect if the entry is 0x0. */
+	if (program().entry_at(ProgramEntryIndex::SOCKET_CONNECTED) == 0x0)
 	{
-		return false;
+		return this->epoll_add(fd);
 	}
 
 	/* Task queue with one reader thread. */
@@ -98,18 +132,25 @@ bool LongLived::manage(int fd)
 			auto& storage = *this->program().storage_vm;
 			auto func = program().
 				entry_at(ProgramEntryIndex::SOCKET_CONNECTED);
-			if (func == 0x0) {
-				/* Silently skip on_connected callback. */
-				return true;
-			}
 
 			const int virtual_fd = 0x1000 + fd;
 			storage.file_descriptors().manage(fd, virtual_fd);
 
+			/* Translate peer sockaddr to string */
+			struct sockaddr_in sin;
+			socklen_t silen = sizeof(sin);
+			getsockname(fd, (struct sockaddr *)&sin, &silen);
+
+			char ip_buffer[INET_ADDRSTRLEN];
+			const char *peer =
+				inet_ntop(AF_INET, &sin.sin_addr, ip_buffer, sizeof(ip_buffer));
+			if (peer == nullptr)
+				peer = "(unknown)";
+
 			/* Call the storage VM on_connected callback. */
 			storage.machine().timed_vmcall(
 				func, CALLBACK_TIMEOUT,
-				virtual_fd);
+				int(virtual_fd), peer);
 
 			/* Get answer from VM, and unmanage the fd if no. */
 			const bool answer = storage.machine().return_value();
@@ -120,20 +161,28 @@ bool LongLived::manage(int fd)
 			return answer;
 		});
 	/* The virtual machine has final say, regarding managing the fd. */
-	return fut.get();
+	const long ret = fut.get();
+	if (ret) {
+		return this->epoll_add(fd);
+	}
+	close(fd);
+	return false;
 }
-void LongLived::data(int fd)
+long LongLived::fd_readable(int fd)
 {
+	/* Don't call on_data if the entry is 0x0. */
+	if (program().entry_at(ProgramEntryIndex::SOCKET_DATA) == 0x0) {
+		/* Let's not read anymore. */
+		shutdown(fd, SHUT_RD);
+		return 0;
+	}
+
 	auto fut = program().m_storage_queue.enqueue(
 		[this, fd] () -> long
 		{
 			auto& storage = *this->program().storage_vm;
 			auto func = program().
 				entry_at(ProgramEntryIndex::SOCKET_DATA);
-			if (func == 0x0) {
-				/* Silently skip on_data callback. */
-				return true;
-			}
 
 			if (this->m_read_vaddr == 0x0) {
 				this->m_read_vaddr = storage.machine().mmap_allocate(MAX_READ_BUFFER);
@@ -144,43 +193,72 @@ void LongLived::data(int fd)
 				storage.machine().writable_buffers_from_range(MAX_VM_WR_BUFFERS,
 					buffers, this->m_read_vaddr, MAX_READ_BUFFER);
 
-			while (true)
+			ssize_t len = MAX_READ_BUFFER;
+			while (len == MAX_READ_BUFFER)
 			{
-				ssize_t len =
-					readv(fd, (struct iovec *)&buffers[0], n_buffers);
-				if (len <= 0)
+				len = readv(fd, (struct iovec *)&buffers[0], n_buffers);
+				/* XXX: Possibly very stupid reason to break. But we can always come back. */
+				if (len < 0)
 					break;
 
 				/* Call the storage VM on_data callback. */
 				const int virtual_fd = 0x1000 + fd;
 				storage.machine().timed_vmcall(
 					func, CALLBACK_TIMEOUT,
-					virtual_fd,
-					m_read_vaddr, len);
+					int(virtual_fd),
+					m_read_vaddr, ssize_t(len));
 			}
-			return 0;
+			return len;
 		});
-	fut.get();
+	return fut.get();
 }
-void LongLived::hangup(int fd)
+void LongLived::fd_writable(int fd)
 {
+	/* Don't call on_data if the entry is 0x0. */
+	if (program().entry_at(ProgramEntryIndex::SOCKET_WRITABLE) == 0x0)
+		return;
+
 	auto fut = program().m_storage_queue.enqueue(
 		[this, fd] () -> long
 		{
 			auto& storage = *this->program().storage_vm;
 			auto func = program().
+				entry_at(ProgramEntryIndex::SOCKET_WRITABLE);
+
+			const int virtual_fd = 0x1000 + fd;
+
+			/* Call the storage VM on_writable callback. */
+			storage.machine().timed_vmcall(
+				func, CALLBACK_TIMEOUT,
+				int(virtual_fd));
+			return 0;
+		});
+	fut.get();
+}
+
+void LongLived::hangup(int fd, const char *reason)
+{
+	/* Preemptively close and remove the fd. */
+	epoll_ctl(this->m_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+	close(fd);
+
+	/* Don't call on_disconnect if the entry is 0x0. */
+	if (program().entry_at(ProgramEntryIndex::SOCKED_DISCONNECTED) == 0x0)
+		return;
+
+	auto fut = program().m_storage_queue.enqueue(
+		[this, fd, reason] () -> long
+		{
+			auto& storage = *this->program().storage_vm;
+			auto func = program().
 				entry_at(ProgramEntryIndex::SOCKED_DISCONNECTED);
-			if (func == 0x0) {
-				/* Silently skip on_disconnected callback. */
-				return 0;
-			}
 
 			const int virtual_fd = 0x1000 + fd;
 
 			/* Call the storage VM on_disconnected callback. */
 			storage.machine().timed_vmcall(
 				func, CALLBACK_TIMEOUT,
-				virtual_fd);
+				int(virtual_fd), (const char *)reason);
 
 			return 0;
 		});

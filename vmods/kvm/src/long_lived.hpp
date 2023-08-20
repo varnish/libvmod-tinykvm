@@ -17,8 +17,10 @@ namespace kvm
 
 	private:
 		void epoll_main_loop();
-		void data(int fd);
-		void hangup(int fd);
+		long fd_readable(int fd);
+		void fd_writable(int fd);
+		void hangup(int fd, const char *);
+		bool epoll_add(int fd);
 
 		int m_epoll_fd = -1;
 		bool m_running = true;
