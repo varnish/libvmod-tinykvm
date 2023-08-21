@@ -56,8 +56,8 @@ timespec time_now()
 }
 long nanodiff(timespec start_time, timespec end_time)
 {
-	assert(end_time.tv_sec == 0); /* We should never use seconds */
-	return end_time.tv_nsec - start_time.tv_nsec;
+	long nsec = (end_time.tv_sec - start_time.tv_sec) * 1000000000;
+	return nsec + end_time.tv_nsec - start_time.tv_nsec;
 }
 
 } // kvm
