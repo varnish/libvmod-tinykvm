@@ -82,8 +82,9 @@ void TenantInstance::begin_initialize(VRT_CTX)
 	{
 		/* Load the program from cURL fetch. */
 		try {
-			this->program = std::make_shared<ProgramInstance> (
+			auto prog = std::make_shared<ProgramInstance> (
 				config.uri, std::move(filename_mtime), ctx, this);
+			std::atomic_store(&this->program, std::move(prog));
 		} catch (const std::exception& e) {
 			/* TODO: Retry with file loader here from local filesyste, if
 			   the cURL fetch does not succeed. */
@@ -116,18 +117,21 @@ void TenantInstance::begin_initialize(VRT_CTX)
 	/* 4. Load the program from filesystem now. */
 	try {
 		auto elf = file_loader(config.request_program_filename());
+		std::shared_ptr<ProgramInstance> prog;
 		/* Check for a storage program */
 		if (access(config.storage_program_filename().c_str(), R_OK) == 0)
 		{
 			auto storage_elf = file_loader(config.storage_program_filename());
-			this->program =
+			prog =
 				std::make_shared<ProgramInstance> (std::move(elf), std::move(storage_elf), ctx, this);
 		}
 		else
 		{
-			this->program =
+			prog =
 				std::make_shared<ProgramInstance> (elf, elf, ctx, this);
 		}
+		std::atomic_store(&this->program, std::move(prog));
+
 	} catch (const std::exception& e) {
 		this->handle_exception(config, e);
 	}

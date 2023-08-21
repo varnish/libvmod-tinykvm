@@ -43,15 +43,12 @@ VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
 	TenantInstance* ten, ProgramInstance* prog)
 {
 	// Spawn forked VM on dedicated thread, blocking.
+	// XXX: We are deliberately not catching exceptions here.
 	tp.enqueue(
 	[&] () -> long {
-		try {
-			this->mi = std::make_unique<MachineInstance> (
-				main_vm, ten, prog);
-			return 0;
-		} catch (...) {
-			return -1;
-		}
+		this->mi = std::make_unique<MachineInstance> (
+			main_vm, ten, prog);
+		return 0;
 	}).get();
 }
 
@@ -241,6 +238,8 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 		// to the queue.
 
 		// Instantiate first forked VM
+		// XXX: This can fail and throw an exception,
+		// think *long and hard* about the consequences!
 		m_vms.emplace_back(*main_vm, ten, this);
 		m_vmqueue.enqueue(&m_vms.back());
 
