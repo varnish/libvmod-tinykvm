@@ -546,9 +546,9 @@ struct meminfo {
 };
 extern void get_meminfo(struct meminfo*);
 
-/* Logging */
+/* Logging to Varnish Log */
 extern void sys_log(const char *, size_t);
-static inline void logf(const char *fmt, ...)
+static inline void vlogf(const char *fmt, ...)
 {
 	char buffer[2048];
 	va_list va;
