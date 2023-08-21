@@ -213,19 +213,19 @@ void MachineInstance::setup_syscall_interface()
 			auto regs = cpu.registers();
 			SYSPRINT("READ to fd=%lld, data=0x%llX, size=%llu\n",
 				regs.rdi, regs.rsi, regs.rdx);
+			int fd = inst.m_fd.translate(regs.rdi);
+
 			// TODO: Make proper tenant setting for file sizes
-			if (regs.rdx > 4*1024*1024) {
-				regs.rax = -1; /* Buffer too big */
-			} else {
-				int fd = inst.m_fd.translate(regs.rdi);
-				auto buffer = std::unique_ptr<char[]> (new char[regs.rdx]);
-				/* TODO: Use fragmented readv buffer */
-				ssize_t res = read(fd, buffer.get(), regs.rdx);
-				if (res > 0) {
-					cpu.machine().copy_to_guest(regs.rsi, buffer.get(), res);
-				}
-				regs.rax = res;
-			}
+			// However, this should be large enough for most reads.
+			static constexpr size_t MAX_READ_BUFFERS = 128;
+			tinykvm::Machine::WrBuffer buffers[MAX_READ_BUFFERS];
+
+			/* Writable readv buffers */
+			auto bufcount = cpu.machine().writable_buffers_from_range(
+				MAX_READ_BUFFERS, buffers,
+				regs.rsi, regs.rdx);
+
+			regs.rax = readv(fd, (struct iovec *)&buffers[0], bufcount);
 			cpu.set_registers(regs);
 		});
 	Machine::install_syscall_handler(
