@@ -383,6 +383,10 @@ struct virtbuffer {
 };
 typedef void (*storage_func) (size_t n, struct virtbuffer[n], size_t res);
 
+/* Returns true (1) on the storage VM. */
+extern int
+sys_is_storage();
+
 /* Transfer an array to storage, transfer output into @dst. */
 extern long
 storage_call(storage_func, const void *src, size_t, void *dst, size_t);
@@ -563,7 +567,6 @@ static inline void vlogf(const char *fmt, ...)
 		sys_log(error_string, sizeof(error_string)-1);
 	}
 }
-
 
 /* Returns true (1) if this program is uploaded through the live-debug
    VCL function, and is a debug program. Otherwise, false (0). */
@@ -818,6 +821,13 @@ asm(".global make_ephemeral\n"
 	".type make_ephemeral, @function\n"
 	"make_ephemeral:\n"
 	"	mov $0x10703, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
+
+asm(".global sys_is_storage\n"
+	".type sys_is_storage, @function\n"
+	"sys_is_storage:\n"
+	"	mov $0x10706, %eax\n"
 	"	out %eax, $0\n"
 	"   ret\n");
 

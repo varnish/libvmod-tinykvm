@@ -18,7 +18,7 @@ static void storage_test4(void *arg) {
 	async_storage_task(storage_test4, NULL);
 }
 
-static void my_backend(const char *url)
+static void my_backend(const char *url, const char *arg)
 {
 	if (strcmp(url, "/1") == 0)
 		storage_call(storage_test1, NULL, 0, NULL, 0);

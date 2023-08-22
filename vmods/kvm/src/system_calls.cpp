@@ -161,6 +161,9 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10703: // MAKE_EPHEMERAL
 				syscall_make_ephemeral(cpu, inst);
 				return;
+			case 0x10706: // IS_STORAGE
+				syscall_is_storage(cpu, inst);
+				return;
 			case 0x10707: // STORAGE CALL BUFFER
 				syscall_storage_callb(cpu, inst);
 				return;

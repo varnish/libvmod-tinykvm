@@ -9,9 +9,10 @@ cat >${tmpdir}/${testname}.c <<-EOF
 int main(int argc, char **argv)
 {
 	assert(argc == 3);
-	assert(strcmp(argv[0], "vmod_kvm") == 0);
-	assert(strcmp(argv[1], "xpizza.com") == 0);
-	assert(strlen(argv[2]) > 0);
+	assert(strcmp(argv[0], "xpizza.com") == 0);
+	assert(strlen(argv[1]) > 0);
+	assert(strcmp(argv[2], "request") == 0
+		|| strcmp(argv[2], "storage") == 0);
 	// We need to give the gucci signal
 	wait_for_requests();
 }

@@ -82,7 +82,7 @@ void MachineInstance::initialize()
 		//printf("Stack: 0x%lX -> 0x%lX\n", stack, stack + MAIN_STACK_SIZE);
 		// Build stack, auxvec, envp and program arguments
 		machine().setup_linux(
-			{"vmod_kvm", name(), TenantConfig::guest_state_file},
+			{name(), TenantConfig::guest_state_file, is_storage() ? "storage" : "request"},
 			tenant().config.environ());
 		// Run through main()
 		machine().run( tenant().config.max_boot_time() );

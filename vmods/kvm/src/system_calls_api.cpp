@@ -108,6 +108,12 @@ static void syscall_make_ephemeral(vCPU& cpu, MachineInstance& inst)
 	}
 }
 
+static void syscall_is_storage(vCPU& cpu, MachineInstance& inst)
+{
+	auto& regs = cpu.registers();
+	regs.rax = inst.is_storage();
+	cpu.set_registers(regs);
+}
 static void syscall_storage_callb(vCPU& cpu, MachineInstance& inst)
 {
 	auto& regs = cpu.registers();
