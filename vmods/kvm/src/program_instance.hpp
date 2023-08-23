@@ -54,6 +54,26 @@ enum class ProgramEntryIndex : uint8_t {
 	TOTAL_ENTRIES
 };
 
+class Storage {
+public:
+	Storage(std::vector<uint8_t> storage_elf);
+
+	/* Ready-made *storage* VM that provides a shared mutable storage */
+	std::unique_ptr<MachineInstance> storage_vm;
+	/* Extra vCPU used for async storage tasks */
+	std::unique_ptr<tinykvm::vCPU> storage_vm_extra_cpu = nullptr;
+	uint64_t storage_vm_extra_cpu_stack = 0x0;
+
+	std::vector<uint8_t> storage_binary;
+
+	/* Tasks executed in storage outside an active request. */
+	std::deque<std::future<long>> m_async_tasks;
+	std::mutex m_async_mtx;
+
+	/* Separate queue for async calls into main VM. */
+	tinykvm::ThreadTask m_storage_async_queue;
+};
+
 /**
  * ProgramInstance is a collection of machines, thread pools
  * and state that will be replaced each time a new program
@@ -128,28 +148,22 @@ public:
 		gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc);
 
 	std::vector<uint8_t> request_binary;
-	std::vector<uint8_t> storage_binary;
 	/* Ready-made *request* VM that can be forked into many small VMs */
 	std::unique_ptr<MachineInstance> main_vm;
-	/* Ready-made *storage* VM that provides a shared mutable storage */
-	std::unique_ptr<MachineInstance> storage_vm;
-	/* Extra vCPU used for async storage tasks */
-	std::unique_ptr<tinykvm::vCPU> storage_vm_extra_cpu = nullptr;
-	uint64_t storage_vm_extra_cpu_stack = 0x0;
 
 	/* Ticket-machine that gives access rights to VMs. */
 	moodycamel::BlockingConcurrentQueue<VMPoolItem*> m_vmqueue;
 	/* Simple container for VMs. */
 	std::deque<VMPoolItem> m_vms;
 
-	/* Tasks executed in storage outside an active request. */
-	std::deque<std::future<long>> m_async_tasks;
-	std::mutex m_async_mtx;
-
+	std::unique_ptr<Storage> m_storage = nullptr;
+	bool has_storage() const noexcept { return m_storage != nullptr; }
+	inline Storage& storage() {
+		if (m_storage) return *m_storage;
+		throw std::runtime_error("Storage not initialized");
+	}
 	/* Queue of work to happen on storage VM. Serialized access. */
 	tinykvm::ThreadTask m_storage_queue;
-	/* Separate queue for async calls into main VM. */
-	tinykvm::ThreadTask m_storage_async_queue;
 
 	/* Entry points in the tenants program. Handlers for all types of
 	   requests, serialization mechanisms and related functionality.

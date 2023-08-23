@@ -56,7 +56,8 @@ vcl 4.1;
 				"xpizza.com": {
 					"filename": "${tmpdir}/${testname}",
 					"key": "",
-					"group": "diefast"
+					"group": "diefast",
+					"storage": true
 				}
 			}
 		""");

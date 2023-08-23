@@ -63,7 +63,8 @@ vcl 4.1;
 		kvm.embed_tenants("""{
 			"xpizza.com": {
 				"filename": "${tmpdir}/${testname}",
-				"group": "test"
+				"group": "test",
+				"storage": true
 			}
 		}""");
 	}

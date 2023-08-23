@@ -129,7 +129,7 @@ bool LongLived::manage(const int fd, const char *argument)
 	auto fut = program().m_storage_queue.enqueue(
 		[this, fd, argument] () -> long
 		{
-			auto& storage = *this->program().storage_vm;
+			auto& storage = *this->program().storage().storage_vm;
 			auto func = program().
 				entry_at(ProgramEntryIndex::SOCKET_CONNECTED);
 
@@ -179,7 +179,7 @@ long LongLived::fd_readable(int fd)
 	auto fut = program().m_storage_queue.enqueue(
 		[this, fd] () -> long
 		{
-			auto& storage = *this->program().storage_vm;
+			auto& storage = *this->program().storage().storage_vm;
 			auto func = program().
 				entry_at(ProgramEntryIndex::SOCKET_DATA);
 
@@ -220,7 +220,7 @@ void LongLived::fd_writable(int fd)
 	auto fut = program().m_storage_queue.enqueue(
 		[this, fd] () -> long
 		{
-			auto& storage = *this->program().storage_vm;
+			auto& storage = *this->program().storage().storage_vm;
 			auto func = program().
 				entry_at(ProgramEntryIndex::SOCKET_WRITABLE);
 
@@ -240,7 +240,7 @@ void LongLived::hangup(int fd, const char *reason)
 	/* Preemptively close and remove the fd. */
 	epoll_ctl(this->m_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
 	close(fd);
-	program().storage_vm->file_descriptors().free_byval(fd);
+	program().storage().storage_vm->file_descriptors().free_byval(fd);
 
 	/* Don't call on_disconnect if the entry is 0x0. */
 	if (program().entry_at(ProgramEntryIndex::SOCKED_DISCONNECTED) == 0x0)
@@ -249,7 +249,7 @@ void LongLived::hangup(int fd, const char *reason)
 	auto fut = program().m_storage_queue.enqueue(
 		[this, fd, reason] () -> long
 		{
-			auto& storage = *this->program().storage_vm;
+			auto& storage = *this->program().storage().storage_vm;
 			auto func = program().
 				entry_at(ProgramEntryIndex::SOCKED_DISCONNECTED);
 

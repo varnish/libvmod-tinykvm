@@ -52,18 +52,26 @@ VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
 	}).get();
 }
 
+Storage::Storage(std::vector<uint8_t> storage_elf)
+	: storage_binary{std::move(storage_elf)},
+	  m_storage_async_queue {ASYNC_STORAGE_NICE, ASYNC_STORAGE_LOWPRIO}
+{
+
+}
+
 ProgramInstance::ProgramInstance(
 	std::vector<uint8_t> request_elf,
 	std::vector<uint8_t> storage_elf,
 	const vrt_ctx* ctx, TenantInstance* ten,
 	bool debug)
 	: request_binary{std::move(request_elf)},
-	  storage_binary{std::move(storage_elf)},
 	  m_storage_queue {STORAGE_VM_NICE, false},
-	  m_storage_async_queue {ASYNC_STORAGE_NICE, ASYNC_STORAGE_LOWPRIO},
 	  m_vcl {ctx->vcl},
 	  rspclient{nullptr}
 {
+	if (ten->config.has_storage()) {
+		m_storage.reset(new Storage(std::move(storage_elf)));
+	}
 	mtx_future_init.lock();
 
 	this->m_binary_was_local = true;
@@ -78,12 +86,14 @@ ProgramInstance::ProgramInstance(
 	const std::string& uri, std::string ifmodsince,
 	const vrt_ctx* ctx, TenantInstance* ten,
 	bool debug)
-	: request_binary{}, storage_binary{},
+	: request_binary{},
 	  m_storage_queue {STORAGE_VM_NICE, false},
-	  m_storage_async_queue {ASYNC_STORAGE_NICE, ASYNC_STORAGE_LOWPRIO},
 	  m_vcl {ctx->vcl},
 	  rspclient{nullptr}
 {
+	if (ten->config.has_storage()) {
+		m_storage.reset(new Storage({}));
+	}
 	mtx_future_init.lock();
 
 	this->m_binary_was_local = false;
@@ -116,14 +126,19 @@ ProgramInstance::ProgramInstance(
 						printf("Loading '%s' from local disk\n", data->ten->config.name.c_str());
 					}
 					data->prog->request_binary = file_loader(data->ten->config.request_program_filename());
-					// If the storage binary exists, use it
-					if (access(data->ten->config.storage_program_filename().c_str(), R_OK) == 0)
+					if (data->prog->has_storage())
 					{
-						data->prog->storage_binary = file_loader(data->ten->config.storage_program_filename());
-					}
-					else // Otherwise, use the request program
-					{
-						data->prog->storage_binary = data->prog->request_binary;
+						// If the storage binary exists, use it
+						if (access(data->ten->config.storage_program_filename().c_str(), R_OK) == 0)
+						{
+							data->prog->storage().storage_binary =
+								file_loader(data->ten->config.storage_program_filename());
+						}
+						else // Otherwise, use the request program
+						{
+							data->prog->storage().storage_binary =
+								data->prog->request_binary;
+						}
 					}
 
 				} else if (status == 200) {
@@ -143,9 +158,8 @@ ProgramInstance::ProgramInstance(
 			if (res != 0) {
 				// XXX: Reset binary when it fails.
 				this->request_binary = {};
-				this->storage_binary = {};
 				this->main_vm = nullptr;
-				this->storage_vm = nullptr;
+				this->m_storage = nullptr;
 				this->unlock_and_initialized(false);
 				return -1;
 			}
@@ -162,8 +176,11 @@ ProgramInstance::ProgramInstance(
 					We *DO NOT* care if the write failed. Only a cached binary. */
 				file_writer(ten->config.request_program_filename(), this->request_binary);
 				/* Also, write storage binary, if it exists. */
-				if (!this->storage_binary.empty())
-					file_writer(ten->config.storage_program_filename(), this->storage_binary);
+				if (has_storage()) {
+					if (!this->storage().storage_binary.empty())
+						file_writer(ten->config.storage_program_filename(),
+							this->storage().storage_binary);
+				}
 			}
 
 			return 0;
@@ -179,9 +196,8 @@ ProgramInstance::ProgramInstance(
 					ten->config.name.c_str(), e.what());
 			// XXX: Reset binary when it fails.
 			this->request_binary = {};
-			this->storage_binary = {};
 			this->main_vm = nullptr;
-			this->storage_vm = nullptr;
+			this->m_storage = nullptr;
 			this->unlock_and_initialized(false);
 			return -1;
 		}
@@ -196,18 +212,21 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 
 		TIMING_LOCATION(t0);
 
-		// 1. Create the storage VM, used for shared mutable storage.
-		storage_vm = std::make_unique<MachineInstance>
-			(this->storage_binary, ctx, ten, this, true, debug);
+		if (this->has_storage())
+		{
+			// 1. Create the storage VM, used for shared mutable storage.
+			storage().storage_vm = std::make_unique<MachineInstance>
+				(storage().storage_binary, ctx, ten, this, true, debug);
 
-		// The extra vCPU is used for async storage access.
-		storage_vm_extra_cpu_stack = EXTRA_CPU_STACK_SIZE +
-			storage_vm->machine().mmap_allocate(EXTRA_CPU_STACK_SIZE);
+			// The extra vCPU is used for async storage access.
+			storage().storage_vm_extra_cpu_stack = EXTRA_CPU_STACK_SIZE +
+				storage().storage_vm->machine().mmap_allocate(EXTRA_CPU_STACK_SIZE);
 
-		// Run through main, verify wait_for_requests() etc.
-		storage_vm->initialize();
-		// We do not need a VRT CTX after initialization.
-		storage_vm->set_ctx(nullptr);
+			// Run through main, verify wait_for_requests() etc.
+			storage().storage_vm->initialize();
+			// We do not need a VRT CTX after initialization.
+			storage().storage_vm->set_ctx(nullptr);
+		}
 
 		// 2. Create the master VM, forked later for request concurrency.
 		// NOTE: The request VM can make calls into the storage VM, so
@@ -215,13 +234,18 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 		main_vm = std::make_unique<MachineInstance>
 			(this->request_binary, ctx, ten, this, false, debug);
 
-		// Automatic remote connection with storage VM is done by calculating the
-		// gigapage of the start address, and if non-zero do a remote connection.
-		// Figure out the starting address for storage VM stuff
-		auto storage_base_gigapage = storage_vm->machine().start_address() >> 30U;
-		if (storage_base_gigapage > 0)
+
+		if (this->has_storage())
 		{
-			main_vm->machine().remote_connect(storage_vm->machine());
+			// Automatic remote connection with storage VM is done by calculating the
+			// gigapage of the start address, and if non-zero do a remote connection.
+			// Figure out the starting address for storage VM stuff
+			auto storage_base_gigapage =
+				storage().storage_vm->machine().start_address() >> 30U;
+			if (storage_base_gigapage > 0)
+			{
+				main_vm->machine().remote_connect(storage().storage_vm->machine());
+			}
 		}
 
 		// Run through main, verify wait_for_requests() etc.
@@ -266,7 +290,7 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 		// Make sure we signal that there is no program, if the
 		// program fails to intialize.
 		main_vm = nullptr;
-		storage_vm = nullptr;
+		m_storage = nullptr;
 		this->unlock_and_initialized(false);
 		throw;
 	}
@@ -274,13 +298,16 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 ProgramInstance::~ProgramInstance()
 {
 	// NOTE: Thread pools need to wait on jobs here
-	m_storage_async_queue.wait_until_nothing_in_flight();
 	m_storage_queue.wait_until_nothing_in_flight();
 
-	if (storage_vm_extra_cpu) {
-		// XXX: This might be deleted too early
-		storage_vm_extra_cpu->deinit();
+	if (has_storage()) {
+		storage().m_storage_async_queue.wait_until_nothing_in_flight();
+		if (storage().storage_vm_extra_cpu) {
+			// XXX: This might be deleted too early
+			storage().storage_vm_extra_cpu->deinit();
+		}
 	}
+
 	for (const auto& adns : m_adns_tags) {
 		if (!adns.tag.empty())
 			libadns_untag(adns.tag, this->m_vcl);
@@ -385,7 +412,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 		if constexpr (VERBOSE_STORAGE_TASK) {
 			printf("-> Storage task on main queue ENTERED\n");
 		}
-		auto& stm = storage_vm->machine();
+		auto& stm = storage().storage_vm->machine();
 		uint64_t vaddr = stm.stack_address();
 
 		for (size_t i = 0; i < n; i++) {
@@ -406,8 +433,8 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 				printf("Storage task calling 0x%lX with stack 0x%lX\n",
 					func, new_stack);
 			}
-			const float timeout = storage_vm->tenant().config.max_storage_time();
-			storage_vm->begin_call();
+			const float timeout = storage().storage_vm->tenant().config.max_storage_time();
+			storage().storage_vm->begin_call();
 
 			/* Build call manually. */
 			tinykvm::tinykvm_x86regs regs;
@@ -417,14 +444,14 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			stm.set_registers(regs);
 
 			/* Check if this is a debug program. */
-			if (storage_vm->is_debug()) {
-				storage_vm->storage_debugger(timeout);
+			if (storage().storage_vm->is_debug()) {
+				storage().storage_vm->storage_debugger(timeout);
 			} else {
 				stm.run(timeout);
 			}
 
 			/* The machine must be stopped, and it must have called storage_return. */
-			if (!stm.stopped() || !storage_vm->response_called(2)) {
+			if (!stm.stopped() || !storage().storage_vm->response_called(2)) {
 				throw std::runtime_error("Storage did not respond properly");
 			}
 
@@ -462,23 +489,23 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 
 long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 {
-	std::scoped_lock lock(m_async_mtx);
+	std::scoped_lock lock(storage().m_async_mtx);
 	// Avoid the last task in case it is still active
-	while (m_async_tasks.size() > 1)
+	while (storage().m_async_tasks.size() > 1)
 		// TODO: Read the return value of the tasks to detect errors
-		m_async_tasks.pop_front();
+		storage().m_async_tasks.pop_front();
 
 	// Block and finish previous async tasks
 	if (async == false)
 	{
-		m_async_tasks.push_back(
+		storage().m_async_tasks.push_back(
 			m_storage_queue.enqueue(
 		[=] () -> long
 		{
 			if constexpr (VERBOSE_STORAGE_TASK) {
 				printf("-> Async task on main queue\n");
 			}
-			auto& stm = storage_vm->machine();
+			auto& stm = storage().storage_vm->machine();
 
 			try {
 				if constexpr (VERBOSE_STORAGE_TASK) {
@@ -502,35 +529,35 @@ long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 		}));
 	} else {
 		/* Use separate queue: m_storage_async_queue. */
-		m_async_tasks.push_back(
-			m_storage_async_queue.enqueue(
+		storage().m_async_tasks.push_back(
+			storage().m_storage_async_queue.enqueue(
 		[=] () -> long
 		{
 			if constexpr (VERBOSE_STORAGE_TASK) {
 				printf("-> Async task on async queue\n");
 			}
-			auto& stm = storage_vm->machine();
+			auto& stm = storage().storage_vm->machine();
 
 			try {
 				if constexpr (VERBOSE_STORAGE_TASK) {
 					printf("Calling 0x%lX with stack 0x%lX\n",
-						func, storage_vm_extra_cpu_stack);
+						func, storage().storage_vm_extra_cpu_stack);
 				}
 				/* Avoid async storage while still initializing. */
 				this->try_wait_for_startup_and_initialization();
 
-				if (!storage_vm_extra_cpu) {
-					storage_vm_extra_cpu.reset(new tinykvm::vCPU);
-					storage_vm_extra_cpu->smp_init(EXTRA_CPU_ID, stm);
+				if (!storage().storage_vm_extra_cpu) {
+					storage().storage_vm_extra_cpu.reset(new tinykvm::vCPU);
+					storage().storage_vm_extra_cpu->smp_init(EXTRA_CPU_ID, stm);
 				}
 				/* For the love of GOD don't try to change this to
 				   a timed_reentry_stack call *again*. This function
 				   specfically uses *storage_vm_extra_cpu*. */
 				tinykvm::tinykvm_x86regs regs;
-				stm.setup_call(regs, func, storage_vm_extra_cpu_stack, (uint64_t)arg);
+				stm.setup_call(regs, func, storage().storage_vm_extra_cpu_stack, (uint64_t)arg);
 				//regs.rip = stm.reentry_address();
-				storage_vm_extra_cpu->set_registers(regs);
-				storage_vm_extra_cpu->run(tinykvm::to_ticks(ASYNC_STORAGE_TIMEOUT));
+				storage().storage_vm_extra_cpu->set_registers(regs);
+				storage().storage_vm_extra_cpu->run(tinykvm::to_ticks(ASYNC_STORAGE_TIMEOUT));
 				if constexpr (VERBOSE_STORAGE_TASK) {
 					printf("<- Async task finished 0x%lX\n", func);
 				}
@@ -562,15 +589,15 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 		uint64_t data;
 		uint64_t len;
 	};
-	const float timeout = storage_vm->tenant().config.max_storage_time();
+	const float timeout = storage().storage_vm->tenant().config.max_storage_time();
 
 	auto future = m_storage_queue.enqueue(
 	[&] () -> long
 	{
 		try {
 			/* Serialize data in the old machine */
-			storage_vm->set_ctx(ctx);
-			auto& old_machine = storage_vm->machine();
+			storage().storage_vm->set_ctx(ctx);
+			auto& old_machine = storage().storage_vm->machine();
 			old_machine.timed_vmcall(func, timeout);
 			return 0;
 		} catch (...) {
@@ -582,7 +609,7 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 
 	SerializeResult from {};
 	if (result == 0) {
-		auto& old_machine = storage_vm->machine();
+		auto& old_machine = storage().storage_vm->machine();
 		/* Get serialized data */
 		auto regs = old_machine.registers();
 		auto data_addr = regs.rdi;
@@ -599,9 +626,9 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 	[&] () -> long
 	{
 		try {
-			auto &new_machine = new_prog.storage_vm->machine();
+			auto &new_machine = new_prog.storage().storage_vm->machine();
 			/* Begin resume procedure */
-			new_prog.storage_vm->set_ctx(ctx);
+			new_prog.storage().storage_vm->set_ctx(ctx);
 
 			new_machine.timed_vmcall(newfunc, timeout, (uint64_t)from.len);
 
@@ -611,7 +638,7 @@ long ProgramInstance::live_update_call(const vrt_ctx* ctx,
 			auto res_size = std::min((uint64_t)regs.rsi, from.len);
 			if (res_data != 0x0)
 			{ // Just a courtesy, we *do* check permissions.
-				auto& old_machine = storage_vm->machine();
+				auto& old_machine = storage().storage_vm->machine();
 				new_machine.copy_from_machine(
 					res_data, old_machine, from.data, res_size);
 				/* Resume the new machine, allowing it to deserialize data */

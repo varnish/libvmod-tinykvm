@@ -173,6 +173,10 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	{
 		group.max_concurrency = obj.value();
 	}
+	else if (obj.key() == "storage")
+	{
+		group.has_storage = obj.value();
+	}
 	else if (obj.key() == "hugepages")
 	{
 		group.hugepages = obj.value();

@@ -39,7 +39,9 @@ namespace kvm
 		{
 			// If it's a single binary, use the same binary for both request and storage
 			program.request_binary = std::vector<uint8_t>(chunk, chunk + chunk_size);
-			program.storage_binary = program.request_binary;
+			if (program.has_storage()) {
+				program.storage().storage_binary = program.request_binary;
+			}
 			return;
 		}
 
@@ -75,10 +77,17 @@ namespace kvm
 				const std::string name {archive_entry_pathname(entry)};
 				if (endsWith(name, "storage"))
 				{
-					program.storage_binary = to_vector(a, entry);
-					if constexpr (VERBOSE_ARCHIVE) {
-						printf("Found '%s' size=%zu, used as storage program\n",
-							name.c_str(), program.storage_binary.size());
+					if (program.has_storage()) {
+						program.storage().storage_binary = to_vector(a, entry);
+						if constexpr (VERBOSE_ARCHIVE) {
+							printf("Found '%s' size=%zu, used as storage program\n",
+								name.c_str(), program.storage().storage_binary.size());
+						}
+					} else {
+						if constexpr (VERBOSE_ARCHIVE) {
+							printf("Found '%s' but *skipped* as no configured storage\n",
+								name.c_str());
+						}
 					}
 				}
 				else
@@ -97,8 +106,10 @@ namespace kvm
 			archive_read_free(a);
 			throw;
 		}
-		// Use the same program for both request and storage, as a fallback
-		if (program.storage_binary.empty())
-			program.storage_binary = program.request_binary;
+		if (program.has_storage()) {
+			// Use the same program for both request and storage, as a fallback
+			if (program.storage().storage_binary.empty())
+				program.storage().storage_binary = program.request_binary;
+		}
 	}
 } // kvm

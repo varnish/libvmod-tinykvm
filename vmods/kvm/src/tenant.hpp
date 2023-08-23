@@ -22,8 +22,8 @@ struct TenantGroup {
 	uint32_t shared_memory; /* Megabytes */
 	size_t   max_concurrency = 4;
 	size_t   max_fd       = 32;
-	size_t   max_backends = 8;
 	size_t   max_regex    = 32;
+	bool     has_storage  = false;
 	bool     hugepages    = false;
 	bool     ephemeral_hugepages = false;
 	bool     allow_debug = false;
@@ -77,7 +77,7 @@ struct TenantConfig
 	uint32_t shared_memory() const noexcept { return group.shared_memory; }
 	size_t   max_fd() const noexcept { return group.max_fd; }
 	size_t   max_regex() const noexcept { return group.max_regex; }
-	size_t   max_backends() const noexcept { return group.max_backends; }
+	bool     has_storage() const noexcept { return group.has_storage; }
 	bool     hugepages() const noexcept { return group.hugepages; }
 	bool     ephemeral_hugepages() const noexcept { return group.ephemeral_hugepages; }
 	bool     allow_debug() const noexcept { return group.allow_debug; }

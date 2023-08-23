@@ -46,7 +46,8 @@ vcl 4.1;
 			"xpizza.com": {
 				"filename": "${tmpdir}/${testname}",
 				"key": "",
-				"group": "test"
+				"group": "test",
+				"storage": true
 			}
 		}""");
 	}
