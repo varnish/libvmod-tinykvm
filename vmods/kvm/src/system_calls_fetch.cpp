@@ -357,8 +357,16 @@ static void syscall_fetch(vCPU& vcpu, MachineInstance& inst)
     const uint64_t options_buffer = regs.r8;
 
     /* URL */
-    const auto url = adns_interp(inst.program().get_adns_key(),
+    std::string url = adns_interp(inst.program().get_adns_key(),
         vcpu.machine().buffer_to_string(regs.rdi, regs.rsi, CURL_REQ_URL_MAX_LENGTH));
+
+	/* Automatically turn into self-request if URL starts with slash */
+	bool is_self_request = false;
+	if (!url.empty() && url[0] == '/') {
+		is_self_request = true;
+		/* Self-requests have a prefix attached, usually http://127.0.0.1. */
+		url = kvm::self_request_prefix + url;
+	}
 
     opresult opres;
     vcpu.machine().copy_from_guest(&opres, op_buffer, sizeof(opresult));
@@ -369,7 +377,7 @@ static void syscall_fetch(vCPU& vcpu, MachineInstance& inst)
 		op_buffer,
 		fields_buffer,
 		options_buffer,
-		"");
+		is_self_request ? kvm::self_request_uri : "");
 }
 
 static void syscall_request(vCPU& vcpu, MachineInstance& inst)
@@ -407,6 +415,8 @@ static void syscall_request(vCPU& vcpu, MachineInstance& inst)
 extern "C"
 int kvm_set_self_request(VRT_CTX, VCL_PRIV, const char *uri, const char *prefix)
 {
+	(void)ctx;
+
 	kvm::self_request_uri = uri;
 	kvm::self_request_prefix = prefix;
 	if (kvm::self_request_uri.empty()) {

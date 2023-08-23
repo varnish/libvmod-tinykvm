@@ -19,9 +19,6 @@ sub vcl_init {
 	compute.init_self_requests("/tmp/compute.sock/");
 	#compute.init_self_requests("", "http://127.0.0.1:8080");
 
-	# Add a local program directly (using default group)
-	compute.add_program("watermark", "file:///tmp/kvm_watermark");
-
 	# Add hugepage support to important programs
 	compute.configure("avif",
 		"""{
@@ -180,6 +177,12 @@ sub vcl_backend_fetch {
 	else if (bereq.url == "/watermark") {
 		set bereq.backend = compute.program("watermark");
 	}
+	else if (bereq.url == "/hello") {
+		# Example from documentation
+		set bereq.backend = 
+			compute.program("to_string", "text/plain", "Hello Compute World!");
+		return (fetch);
+	}
 	else if (bereq.url == "/http3") {
 		# Fetch HTTP/3 page with cURL. AltSvc cache enables future fetches to use HTTP/3.
 		set bereq.backend = compute.program("fetch", "https://quic.rocks:4433/");
@@ -192,6 +195,10 @@ sub vcl_backend_fetch {
 	else if (bereq.url == "/small_xml") {
 		# Pass a small valid XML as response
 		set bereq.backend = compute.program("xml", "<a/>", "{}");
+	}
+	else if (bereq.url == "/sd") {
+		set bereq.backend = compute.program("stable_diffusion",
+			"A lovely cat, high quality", "blurry, ugly, jpeg compression, artifacts, unsharp");
 	}
 	else if (bereq.url ~ "^/x") {
 		# Gameboy emulator (used by demo page)
