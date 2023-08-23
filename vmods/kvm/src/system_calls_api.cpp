@@ -167,8 +167,13 @@ static void syscall_storage_task(vCPU& cpu, MachineInstance& inst)
 				std::chrono::milliseconds(start),
 				[=](auto)
 				{
-					prog->async_storage_call(
-						async, function, argument);
+					try {
+						prog->async_storage_call(
+							async, function, argument);
+					} catch (const std::exception& e) {
+						/* XXX: We have nowhere to post this error */
+						//fprintf(stderr, "");
+					}
 				},
 				std::chrono::milliseconds(period));
 		} else {

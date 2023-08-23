@@ -34,6 +34,7 @@ add_vmod_tests(vmod_kvm kvm
 	tests/infinite_storage.vtc
 	tests/live_update.vtc
 	tests/main_arguments.vtc
+	tests/missing_storage.vtc
 	tests/not_found.vtc
 	tests/cached_post_backend.vtc
 	tests/post_backend.vtc
