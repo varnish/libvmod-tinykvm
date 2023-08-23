@@ -37,7 +37,7 @@ sub vcl_recv {
 		}
 		return (synth(404));
 	}
-	if (req.url == "/chain") {
+	if (req.url == "/chain" || req.url == "/avif/image") {
 		return (hash);
 	}
 	return (pass);
@@ -46,7 +46,10 @@ sub vcl_recv {
 sub vcl_backend_fetch {
 	if (bereq.url == "/avif") {
 		# Transform a JPEG asset to AVIF, cache and deliver it. cURL can fetch using TLS and HTTP/2.
-		set bereq.backend = compute.program("avif", "https://${filebin}/kvmprograms/723-1200x1200.jpg",
+		set bereq.backend = compute.program("avif", "/avif/image", "{}");
+	}
+	else if (bereq.url == "/avif/image") {
+		set bereq.backend = compute.program("fetch", "https://${filebin}/kvmprograms/723-1200x1200.jpg",
 			"""{
 				"headers": ["Host: filebin.varnish-software.com"]
 			}""");
@@ -210,7 +213,7 @@ sub vcl_backend_fetch {
 	}
 }
 sub vcl_backend_response {
-	if (bereq.url == "/http3" || bereq.url == "/min" || bereq.url == "/minify") {
+	if (bereq.url == "/http3" || bereq.url == "/avif" || bereq.url == "/min" || bereq.url == "/minify") {
 		set beresp.uncacheable = true;
 	}
 }

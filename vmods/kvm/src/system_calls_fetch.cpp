@@ -1,4 +1,6 @@
 #include <curl/curl.h>
+
+#include <atomic>
 #include <string>
 
 namespace kvm {
@@ -19,6 +21,8 @@ static constexpr uint64_t CURL_BUFFER_MAX = 256UL * 1024UL * 1024UL;
 /* The current self-request URI */
 static std::string self_request_uri = "";
 static std::string self_request_prefix = "http://127.0.0.1:6081";
+static int self_request_max_concurrency = 50;
+static std::atomic_int self_request_concurrency {0};
 
 struct writeop {
 	tinykvm::Machine& machine;
@@ -67,6 +71,7 @@ static void syscall_curl_fetch_helper(
     auto& regs = vcpu.registers();
     const int CONN_TIMEOUT = 5;
     const int READ_TIMEOUT = 8;
+	bool is_self_request = false;
 
     opresult opres;
     vcpu.machine().copy_from_guest(&opres, op_buffer, sizeof(opresult));
@@ -137,6 +142,14 @@ static void syscall_curl_fetch_helper(
 
 		if (!unix_path.empty())
 		{
+			is_self_request = true;
+
+			if (kvm::self_request_concurrency++ >= kvm::self_request_max_concurrency)
+			{
+				kvm::self_request_concurrency--;
+				throw std::runtime_error("Max self-request concurrency reached");
+			}
+
 			if (int err = curl_easy_setopt(curl, CURLOPT_UNIX_SOCKET_PATH, unix_path.c_str()) != CURLE_OK) {
 				if (VERBOSE_CURL) {
 					printf("cURL UDS path error %d for: %s\n", err, url.c_str());
@@ -336,6 +349,11 @@ static void syscall_curl_fetch_helper(
         }
         regs.rax = -1;
     }
+
+	if (is_self_request) {
+		kvm::self_request_concurrency--;
+	}
+
     curl_slist_free_all(req_list);
     curl_slist_free_all(post_list);
     curl_easy_cleanup(curl);
@@ -413,12 +431,15 @@ static void syscall_request(vCPU& vcpu, MachineInstance& inst)
 } // kvm
 
 extern "C"
-int kvm_set_self_request(VRT_CTX, VCL_PRIV, const char *uri, const char *prefix)
+int kvm_set_self_request(VRT_CTX, VCL_PRIV, const char *uri, const char *prefix,
+	long max_concurrent_requests)
 {
 	(void)ctx;
 
 	kvm::self_request_uri = uri;
 	kvm::self_request_prefix = prefix;
+	kvm::self_request_max_concurrency = max_concurrent_requests;
+
 	if (kvm::self_request_uri.empty()) {
 		return (1);
 	}

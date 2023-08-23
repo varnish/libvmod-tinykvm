@@ -31,7 +31,8 @@ VCL_BOOL vmod_library(VRT_CTX, VCL_PRIV task, VCL_STRING uri)
 	return (kvm_init_tenants_uri(ctx, task, uri, NO_INIT_PROGRAMS));
 }
 
-VCL_BOOL vmod_init_self_requests(VRT_CTX, VCL_PRIV task, VCL_STRING unix_path, VCL_STRING uri)
+VCL_BOOL vmod_init_self_requests(VRT_CTX, VCL_PRIV task,
+	VCL_STRING unix_path, VCL_STRING uri, VCL_INT max_concurrency)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	if (ctx->method != VCL_MET_INIT) {
@@ -39,12 +40,22 @@ VCL_BOOL vmod_init_self_requests(VRT_CTX, VCL_PRIV task, VCL_STRING unix_path, V
 		return (0);
 	}
 
-	if (SEMPTY(uri)) {
-		VRT_fail(ctx, "compute: self_request() uri cannot be empty");
+	if (SEMPTY(unix_path)) {
+		VRT_fail(ctx, "compute: self_request() Unix path cannot be empty");
 		return (0);
 	}
 
-	return (kvm_set_self_request(ctx, task, unix_path, uri));
+	if (SEMPTY(uri)) {
+		VRT_fail(ctx, "compute: self_request() URI cannot be empty");
+		return (0);
+	}
+
+	if (max_concurrency < 1) {
+		VRT_fail(ctx, "compute: self_request() max concurrency cannot be < 1");
+		return (0);
+	}
+
+	return (kvm_set_self_request(ctx, task, unix_path, uri, max_concurrency));
 }
 
 VCL_BOOL vmod_add_program(VRT_CTX, VCL_PRIV task,

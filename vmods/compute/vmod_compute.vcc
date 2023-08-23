@@ -69,12 +69,15 @@ $Function BOOL library(PRIV_VCL, STRING uri)
 - Libraries contain program definitions, but programs are only started on-demand.
 - Must be called from vcl_init.
 
-$Function BOOL init_self_requests(PRIV_VCL, STRING unix_socket, STRING http_prefix = "http://127.0.0.1:6081")
+$Function BOOL init_self_requests(PRIV_VCL, STRING unix_socket,
+	STRING http_prefix = "http://127.0.0.1:6081",
+	INT max_concurrent_requests = 50)
 
 - Used by all self-requests.
 - Set the location where Varnish (or another server) can be found.
 - If unix_path is specified, it must be a Unix Domain Socket path accessible by Varnish.
 - If unix_path is not specified, the http_prefix must be accessible by Varnish.
+- The max concurrent self-requests parameter is a last resort to avoid loops.
 - Must be called from vcl_init.
 
 $Function BOOL add_program(PRIV_VCL, STRING name, STRING uri)
