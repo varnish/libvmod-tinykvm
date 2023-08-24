@@ -53,7 +53,6 @@ public:
 	bool is_ephemeral() const noexcept { return m_is_ephemeral; }
 	gaddr_t shared_memory_boundary() const noexcept;
 	gaddr_t shared_memory_size() const noexcept;
-	void set_global_memory_shared(bool v) noexcept { m_global_shared_memory = v; }
 	void set_ephemeral(bool e) noexcept { m_is_ephemeral = e; }
 
 	void wait_for_requests() { m_waiting_for_requests = true; }
@@ -105,7 +104,6 @@ private:
 	bool        m_waiting_for_requests = false;
 	uint8_t     m_response_called = 0;
 	bool        m_reset_needed = false;
-	bool        m_global_shared_memory = false;
 	mutable bool m_last_newline = true;
 	gaddr_t     m_sighandler = 0;
 

@@ -516,16 +516,6 @@ static inline void * internal_shm_alloc(size_t size, size_t align) {
 		return NULL;
 }
 
-/* If called during main() routine, it will cause
-   global memory to be fully shared among everyone,
-   not including the main stacks, which are separate.
-   Effectively, memory will behave as if you are
-   running a normal Linux program, and all requests
-   were threads sharing the same memory. It is no
-   longer necessary to call into storage, however it
-   may still be useful to invoke async storage calls. */
-extern void make_all_memory_shared();
-
 /* From the point of calling this function, any new
    pages written to in the mutable storage will
    be globally visible immediately, shared with
@@ -807,13 +797,6 @@ asm(".global make_storage_memory_shared\n"
 	".type make_storage_memory_shared, @function\n"
 	"make_storage_memory_shared:\n"
 	"	mov $0x10701, %eax\n"
-	"	out %eax, $0\n"
-	"   ret\n");
-
-asm(".global make_all_memory_shared\n"
-	".type make_all_memory_shared, @function\n"
-	"make_all_memory_shared:\n"
-	"	mov $0x10702, %eax\n"
 	"	out %eax, $0\n"
 	"   ret\n");
 

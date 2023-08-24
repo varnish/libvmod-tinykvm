@@ -75,13 +75,6 @@ static void syscall_storage_mem_shared(vCPU& cpu, MachineInstance& inst)
 	regs.rax = 0;
 	cpu.set_registers(regs);
 }
-static void syscall_all_mem_shared(vCPU& cpu, MachineInstance& inst)
-{
-	auto& regs = cpu.registers();
-	inst.set_global_memory_shared(true);
-	regs.rax = 0;
-	cpu.set_registers(regs);
-}
 static void syscall_make_ephemeral(vCPU& cpu, MachineInstance& inst)
 {
 	auto& regs = cpu.registers();
