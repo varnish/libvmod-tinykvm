@@ -42,15 +42,22 @@ int kvm_vm_begin_epoll(VRT_CTX, VCL_PRIV task,
 		return false;
 	}
 
-	/* Do *NOT* move the below line around: */
-	auto& epoll = prog->epoll_system(std::move(prog));
-	/* NOTE: prog is null after this ^ */
+	try {
+		/* Do *NOT* move the below line around: */
+		auto& epoll = prog->epoll_system(std::move(prog));
+		/* NOTE: prog is null after this ^ */
 
-	const bool managed = epoll.manage(fd, argument);
-	if (managed == false) {
+		const bool managed = epoll.manage(fd, argument);
+		if (managed == false) {
+			VSLb(ctx->vsl, SLT_Error,
+				"%s: FD steal failed (Cancelled)", program);
+			close(fd);
+		}
+		return managed;
+	} catch (const std::exception& e) {
 		VSLb(ctx->vsl, SLT_Error,
-			"%s: FD steal failed (Cancelled)", program);
-		close(fd);
+			"%s: FD steal failed (Exception: %s)",
+			program, e.what());
+		return false;
 	}
-	return managed;
 }

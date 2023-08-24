@@ -2,8 +2,8 @@
  * @file kvm_api.h
  * @author Alf-André Walla (fwsgonzo@hotmail.com)
  * @brief 
- * @version 0.1
- * @date 2022-10-10
+ * @version 1.0
+ * @date 2023-08-23
  * 
  * Single-source-of-truth API header for the KVM and Compute VMODs.
  * Languages can use the C API directly, or indirectly through
