@@ -148,7 +148,7 @@ bool LongLived::manage(const int fd, const char *argument)
 				peer = "(unknown)";
 
 			/* Call the storage VM on_connected callback. */
-			storage.machine().timed_vmcall(
+			storage.machine().timed_reentry(
 				func, CALLBACK_TIMEOUT,
 				int(virtual_fd), peer, argument);
 
@@ -202,7 +202,7 @@ long LongLived::fd_readable(int fd)
 
 				/* Call the storage VM on_data callback. */
 				const int virtual_fd = 0x1000 + fd;
-				storage.machine().timed_vmcall(
+				storage.machine().timed_reentry(
 					func, CALLBACK_TIMEOUT,
 					int(virtual_fd),
 					m_read_vaddr, ssize_t(len));
@@ -227,7 +227,7 @@ void LongLived::fd_writable(int fd)
 			const int virtual_fd = 0x1000 + fd;
 
 			/* Call the storage VM on_writable callback. */
-			storage.machine().timed_vmcall(
+			storage.machine().timed_reentry(
 				func, CALLBACK_TIMEOUT,
 				int(virtual_fd));
 			return 0;
@@ -256,7 +256,7 @@ void LongLived::hangup(int fd, const char *reason)
 			const int virtual_fd = 0x1000 + fd;
 
 			/* Call the storage VM on_disconnected callback. */
-			storage.machine().timed_vmcall(
+			storage.machine().timed_reentry(
 				func, CALLBACK_TIMEOUT,
 				int(virtual_fd), (const char *)reason);
 

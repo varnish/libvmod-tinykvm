@@ -182,6 +182,7 @@ VCL_BOOL vmod_steal(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_STRING argum
 		/* Only unset if successful. */
 		if (gucci) {
 			ctx->req->sp->fd = -1;
+			//VRT_handling(ctx, VCL_RET_SYNTH);
 		}
 		return (gucci);
 	}
