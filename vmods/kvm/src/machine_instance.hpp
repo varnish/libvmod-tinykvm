@@ -104,6 +104,7 @@ private:
 	bool        m_waiting_for_requests = false;
 	uint8_t     m_response_called = 0;
 	bool        m_reset_needed = false;
+	bool        m_print_stdout = false;
 	mutable bool m_last_newline = true;
 	gaddr_t     m_sighandler = 0;
 

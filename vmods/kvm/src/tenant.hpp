@@ -29,6 +29,7 @@ struct TenantGroup {
 	bool     allow_debug = false;
 	bool     control_ephemeral = false;
 	bool     ephemeral = true;
+	bool     print_stdout = false; /* Print directly to stdout */
 
 	std::vector<std::string> environ {
 		"LC_TYPE=C", "LC_ALL=C", "USER=root"
@@ -77,6 +78,7 @@ struct TenantConfig
 	uint32_t shared_memory() const noexcept { return group.shared_memory; }
 	size_t   max_fd() const noexcept { return group.max_fd; }
 	size_t   max_regex() const noexcept { return group.max_regex; }
+	bool     print_stdout() const noexcept { return group.print_stdout; }
 	bool     has_storage() const noexcept { return group.has_storage; }
 	bool     hugepages() const noexcept { return group.hugepages; }
 	bool     ephemeral_hugepages() const noexcept { return group.ephemeral_hugepages; }

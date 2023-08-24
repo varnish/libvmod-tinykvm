@@ -59,6 +59,7 @@ MachineInstance::MachineInstance(
 	  m_tenant(ten), m_inst(inst),
 	  m_is_debug(debug),
 	  m_is_storage(storage),
+	  m_print_stdout(ten->config.print_stdout()),
 	  m_fd        {ten->config.max_fd(), "File descriptors"},
 	  m_regex     {ten->config.max_regex(), "Regex handles"}
 {
@@ -274,7 +275,9 @@ tinykvm::Machine::printer_func MachineInstance::get_vsl_printer() const
 				return;
 			}
 		}
-		this->print({buffer, len});
+		if (this->m_print_stdout) {
+			this->print({buffer, len});
+		}
 	};
 }
 

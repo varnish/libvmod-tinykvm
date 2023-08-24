@@ -502,7 +502,7 @@ extern struct shared_memory_info shared_memory_area();
 
 /* Allocate pointers to shared memory with given size and alignment. */
 #define SHM_ALLOC_BYTES(x) internal_shm_alloc(x, 8)
-#define SHM_ALLOC_TYPE(x) internal_shm_alloc(sizeof(x), _Alignof(x))
+#define SHM_ALLOC_TYPE(x) (typeof(x) *)internal_shm_alloc(sizeof(x), _Alignof(x))
 static inline void * internal_shm_alloc(size_t size, size_t align) {
 	static struct shared_memory_info info;
 	if (info.ptr == 0x0) {
