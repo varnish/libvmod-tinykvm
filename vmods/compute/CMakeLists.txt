@@ -17,4 +17,5 @@ endif()
 
 # VCL import name is "compute"
 add_vmod_tests(vmod_compute compute
+	tests/remote_archive.vtc
 )

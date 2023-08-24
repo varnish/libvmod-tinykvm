@@ -1,0 +1,78 @@
+varnishtest "KVM Backend: Basic Hello World test"
+
+shell {
+cat >${tmpdir}/${testname}.json <<-EOF
+{
+	"test1": {
+		"filename": "${tmpdir}/${testname}",
+		"group": "test"
+	},
+	"test2": {
+		"uri": "file://${tmpdir}/${testname}.tar.xz",
+		"group": "test"
+	}
+}
+EOF
+cat >${tmpdir}/${testname}.c <<-EOF
+#include "kvm_api.h"
+
+static void on_get(const char *url, const char *arg)
+{
+	backend_response_str(200, "text/plain", "Hello World");
+}
+
+int main(int argc, char **argv)
+{
+	set_backend_get(on_get);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+tar -cJf ${tmpdir}/${testname}.tar.xz ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import compute;
+	backend default none;
+
+	sub vcl_init {
+		compute.library("file://${tmpdir}/${testname}.json");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		if (bereq.url == "/1") {
+			set bereq.backend = compute.program("test1",
+				bereq.url, "");
+		} else if (bereq.url == "/2") {
+			set bereq.backend = compute.program("test2",
+				bereq.url, "");
+		}
+	}
+} -start
+
+client c1 {
+	txreq -url "/1" -hdr "Host: test"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+
+	txreq -url "/1" -hdr "Host: test"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+
+	txreq -url "/2" -hdr "Host: test"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+
+	txreq -url "/2" -hdr "Host: test"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+} -run
