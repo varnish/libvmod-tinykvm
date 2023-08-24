@@ -174,7 +174,12 @@ VCL_BOOL vmod_steal(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_STRING argum
 	if (argument == NULL)
 		argument = "";
 
-	const int fd = dup(ctx->req->sp->fd);
+	if (ctx->req->http0->protover > 11) {
+		VRT_fail(ctx, "compute: steal() only works with HTTP 1.x");
+		return (0);
+	}
+
+	const int fd = ctx->req->sp->fd;
 	if (fd > 0) {
 		const int gucci = kvm_vm_begin_epoll(ctx, task, program,
 			fd, argument);
