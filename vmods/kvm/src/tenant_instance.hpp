@@ -25,6 +25,9 @@ public:
 	void commit_program_live(const vrt_ctx *,
 		std::shared_ptr<ProgramInstance>& new_prog) const;
 
+	/* Unloads the current program. */
+	void unload_program_live(const vrt_ctx *);
+
 	/* If the tenants program employ serialization callbacks, we can
 	   serialize the important bits of the current program and then
 	   pass these bits to a new incoming live updated program, allowing

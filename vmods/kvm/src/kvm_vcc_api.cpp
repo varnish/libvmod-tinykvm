@@ -53,6 +53,13 @@ const char * kvm_tenant_name(kvm::TenantInstance* tenant)
 	return tenant->config.name.c_str();
 }
 
+extern "C"
+int kvm_tenant_unload(VRT_CTX, kvm::TenantInstance* tenant)
+{
+	assert(tenant);
+	tenant->unload_program_live(ctx);
+	return true;
+}
 
 extern "C"
 kvm::VMPoolItem* kvm_reserve_machine(const vrt_ctx *ctx, kvm::TenantInstance* tenant, bool debug)

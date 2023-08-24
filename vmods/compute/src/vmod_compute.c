@@ -58,6 +58,19 @@ VCL_BOOL vmod_init_self_requests(VRT_CTX, VCL_PRIV task,
 	return (kvm_set_self_request(ctx, task, unix_path, uri, max_concurrency));
 }
 
+VCL_BOOL vmod_invalidate_program(VRT_CTX, VCL_PRIV task, VCL_STRING program)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	struct vmod_kvm_tenant *tenant = kvm_tenant_find(task, program);
+	if (tenant != NULL) {
+		return (kvm_tenant_unload(ctx, tenant));
+	} else {
+		VRT_fail(ctx, "No such program '%s' for configure", program);
+		return (0);
+	}
+}
+
 VCL_BOOL vmod_add_program(VRT_CTX, VCL_PRIV task,
 	VCL_STRING name, VCL_STRING uri)
 {

@@ -46,6 +46,7 @@ extern int     kvm_tenant_debug_allowed(TEN_PTR);
 extern int     kvm_tenant_gucci(TEN_PTR, int debug);
 extern int     kvm_tenant_configure(VRT_CTX, TEN_PTR, const char *json);
 extern int     kvm_tenant_async_start(VRT_CTX, TEN_PTR);
+extern int     kvm_tenant_unload(VRT_CTX, TEN_PTR);
 extern KVM_SLOT kvm_reserve_machine(VRT_CTX, TEN_PTR, int);
 extern int kvm_callv(VRT_CTX, KVM_SLOT, const int, const char *arg);
 extern int kvm_synth(VRT_CTX, KVM_SLOT, struct vmod_kvm_synth *);

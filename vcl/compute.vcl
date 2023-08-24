@@ -37,6 +37,10 @@ sub vcl_recv {
 		}
 		return (synth(404));
 	}
+	if (req.url == "/invalidate") {
+		compute.invalidate_program("counter");
+		return (synth(200));
+	}
 	if (req.url == "/chain" || req.url == "/avif/image") {
 		return (hash);
 	}
@@ -56,6 +60,9 @@ sub vcl_backend_fetch {
 	}
 	else if (bereq.url == "/avif/bench") {
 		set bereq.backend = compute.program("avif");
+	}
+	else if (bereq.url == "/counter") {
+		set bereq.backend = compute.program("counter");
 	}
 	else if (bereq.url == "/espeak") {
 		# espeak-ng text-to-speech

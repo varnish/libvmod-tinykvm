@@ -356,4 +356,14 @@ void TenantInstance::commit_program_live(VRT_CTX,
 	}
 }
 
+void TenantInstance::unload_program_live(const vrt_ctx *)
+{
+	std::shared_ptr<ProgramInstance> new_prog = nullptr;
+
+	std::atomic_exchange(&this->program, new_prog);
+
+	/* XXX: There will be a few instances of denied requests. */
+	this->m_started_init = false;
+}
+
 } // kvm
