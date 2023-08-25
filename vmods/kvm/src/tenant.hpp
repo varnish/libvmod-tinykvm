@@ -42,6 +42,10 @@ struct TenantGroup {
 	void set_limit_workmem_after_req(uint64_t newmax_mb) { this->limit_req_mem = newmax_mb * 1048576ul; }
 	void set_shared_mem(uint64_t newmax_mb) { this->shared_memory = newmax_mb * 1048576ul; }
 
+	/* Check that each value has meaning and is not impossibly high or low.
+	   Throws an exception with a message explaining the problem. */
+	void validation() const;
+
 	TenantGroup(std::string n)
 		: name{n}, // From settings.hpp:
 		  max_boot_time(STARTUP_TIMEOUT),

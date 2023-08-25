@@ -52,7 +52,7 @@ struct backend_request {
 	const char *method;
 	const char *url;
 	const char *argument;
-	const void *resv;
+	const void *content_type;
 	const uint8_t *data; /* Can be NULL. */
 	const size_t   datalen;
 };

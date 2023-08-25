@@ -7,8 +7,22 @@ cat >${tmpdir}/${testname}.c <<-EOF
 
 static void on_request(const struct backend_request *req)
 {
-	if (strcmp(req->method, "TEST") == 0 && strcmp(req->url, "/1") == 0)
-		backend_response_str(200, "text/plain", "Hello World");
+	if (strcmp(req->url, "/1") == 0)
+	{
+		if (strcmp(req->method, "TEST") == 0
+			&& strcmp(req->content_type, "") == 0)
+			backend_response_str(200, "text/plain", "Hello World");
+	}
+	else if (strcmp(req->url, "/2") == 0)
+	{
+		if (strcmp(req->method, "TEST") == 0
+			&& strcmp(req->content_type, "text/plain") == 0
+			&& memcmp(req->data, "Hello World!", req->datalen) == 0
+		)
+			backend_response_str(200, "text/plain", "Hello World");
+	}
+
+	backend_response_str(500, "text/plain", "Failed");
 }
 
 int main(int argc, char **argv)
@@ -46,8 +60,21 @@ vcl 4.1;
 } -start
 
 client c1 {
-	txreq -req TEST -url "/1" -hdr "Host: test.com"
+	txreq -req TEST -url "/1" -hdr "Host: test.com" -hdr "Content-Type: text/plain"
 	rxresp
 	expect resp.body == "Hello World"
 	expect resp.status == 200
+
+	txreq -req TEST -url "/2" -hdr "Host: test.com" -hdr "Content-Type: text/plain" -body "Hello World!"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+
+	txreq -req TEST -url "/2" -hdr "Host: test.com" -hdr "Content-Type: text/plain2" -body "Hello World!"
+	rxresp
+	expect resp.status == 500
+
+	txreq -req TEST -url "/2" -hdr "Host: test.com" -hdr "Content-Type: text/plain" -body "Hello World!2"
+	rxresp
+	expect resp.status == 500
 } -run

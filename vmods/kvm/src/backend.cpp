@@ -262,13 +262,21 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				inputs.method   = vm.stack_push_cstr(stack, invoc->inputs.method);
 				inputs.url      = vm.stack_push_cstr(stack, invoc->inputs.url);
 				inputs.argument = vm.stack_push_cstr(stack, invoc->inputs.argument);
-				inputs.ctype    = vm.stack_push_cstr(stack, invoc->inputs.content_type);
 				if (post != nullptr) {
-					/* Try to reduce POST mmap allocation */
+					/* Try to reduce POST mmap allocation. */
 					vm.mmap_relax(post->address, post->capacity, post->length);
-
-					inputs.data = post->address;
+					/* POST data information. */
+					inputs.ctype = vm.stack_push_cstr(stack, invoc->inputs.content_type);
+					inputs.data  = post->address;
 					inputs.datalen = post->length;
+				}
+				else
+				{
+					/* Guarantee readable strings. */
+					inputs.ctype = vm.stack_push_cstr(stack, "");
+					/* Buffers with known length can be NULL. */
+					inputs.data  = 0;
+					inputs.datalen = 0;
 				}
 				auto struct_addr = vm.stack_push(stack, inputs);
 
@@ -364,6 +372,10 @@ int kvm_backend_streaming_post(struct backend_post *post,
 		const auto call_addr =
 			mi.program().entry_at(ProgramEntryIndex::BACKEND_STREAM);
 		if (call_addr != 0x0) {
+			/* Copy the data segment into VM at the right offset,
+			   building a sequential, complete buffer. */
+			vm.copy_to_guest(post->address, data_ptr, data_len);
+
 			auto fut = slot.tp.enqueue(
 			[&] () -> long {
 				const auto timeout = mi.max_req_time();
@@ -389,6 +401,12 @@ int kvm_backend_streaming_post(struct backend_post *post,
 
 			/* Verify that the VM consumed all the bytes. */
 			return ((ssize_t)vm.return_value() == data_len) ? 0 : -1;
+		}
+		else
+		{
+			/* Copy the data segment into VM at the right offset,
+			   building a sequential, complete buffer. */
+			vm.copy_to_guest(post->address + post->length, data_ptr, data_len);
 		}
 
 		/* Increment POST length, no VM call. */
