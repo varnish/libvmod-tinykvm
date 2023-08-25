@@ -27,10 +27,12 @@ struct VMPoolItem {
 	VMPoolItem(const MachineInstance&, TenantInstance*, ProgramInstance*);
 	// VM instance
 	std::unique_ptr<MachineInstance> mi;
-	// Communicate with this VM using single thread pool
-	tinykvm::ThreadTask tp {REQUEST_VM_NICE, false};
 	// Reference that keeps active program alive
 	std::shared_ptr<ProgramInstance> prog_ref = nullptr;
+	// Communicate with this VM using single thread pool
+	tinykvm::ThreadTask tp;
+	// We can use this to avoid having to start in a serialized manner
+	std::future<long> task_future;
 };
 struct Reservation {
 	VMPoolItem* slot;
@@ -208,6 +210,7 @@ private:
 	}
 
 	std::future<long> m_future;
+	std::future<long> m_async_start_future;
 	std::mutex mtx_future_init;
 	int8_t m_initialization_complete = 0;
 	bool m_binary_was_local = false;
@@ -216,6 +219,7 @@ private:
 
 inline bool ProgramInstance::wait_for_main_vm()
 {
+	/* Fast-path after initialization. */
 	if (this->m_initialization_complete)
 		return this->m_initialization_complete > 0;
 

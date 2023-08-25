@@ -32,6 +32,7 @@ add_vmod_tests(vmod_kvm kvm
 	tests/infinite_init.vtc
 	tests/infinite_loop.vtc
 	tests/infinite_storage.vtc
+	tests/insane_settings.vtc
 	tests/live_update.vtc
 	tests/main_arguments.vtc
 	tests/missing_storage.vtc

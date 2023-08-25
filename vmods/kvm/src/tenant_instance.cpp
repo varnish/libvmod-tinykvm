@@ -152,9 +152,7 @@ bool TenantInstance::wait_guarded_initialize(const vrt_ctx *ctx, std::shared_ptr
 	/* This may take some time, as it is blocking, but this will allow the
 		request to proceed.
 		XXX: Verify that there are no forever-waiting events here. */
-	this->wait_for_initialization();
-
-	prog = std::atomic_load(&this->program);
+	prog = this->wait_for_initialization();
 	return prog != nullptr;
 }
 
@@ -169,12 +167,12 @@ void TenantInstance::handle_exception(const TenantConfig& conf, const std::excep
 	this->program = nullptr;
 }
 
-long TenantInstance::wait_for_initialization()
+std::shared_ptr<ProgramInstance> TenantInstance::wait_for_initialization()
 {
-	auto prog = this->program;
+	std::shared_ptr<ProgramInstance> prog = std::atomic_load(&this->program);
 	if (prog != nullptr)
-		return prog->wait_for_initialization();
-	return 0;
+		prog->wait_for_initialization();
+	return prog;
 }
 
 VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
@@ -359,6 +357,7 @@ void TenantInstance::commit_program_live(VRT_CTX,
 void TenantInstance::unload_program_live(const vrt_ctx *)
 {
 	std::shared_ptr<ProgramInstance> new_prog = nullptr;
+	std::shared_ptr<ProgramInstance> old_prog = std::atomic_load(&this->program);
 
 	std::atomic_exchange(&this->program, new_prog);
 

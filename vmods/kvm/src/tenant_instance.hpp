@@ -43,7 +43,7 @@ public:
 
 	void begin_initialize(const vrt_ctx *);
 	void begin_async_initialize(const vrt_ctx *);
-	long wait_for_initialization();
+	std::shared_ptr<ProgramInstance> wait_for_initialization();
 
 	/* Initialized during vcl_init */
 	const uint64_t magic = 0xb385716f486938e6;

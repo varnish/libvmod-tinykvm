@@ -41,15 +41,17 @@ static constexpr bool VERBOSE_PROGRAM_STARTUP = true;
 
 VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
 	TenantInstance* ten, ProgramInstance* prog)
+	: mi {nullptr},
+	  tp {REQUEST_VM_NICE, false}
 {
 	// Spawn forked VM on dedicated thread, blocking.
 	// XXX: We are deliberately not catching exceptions here.
-	tp.enqueue(
-	[&] () -> long {
+	this->task_future = tp.enqueue(
+	[=, &main_vm] () -> long {
 		this->mi = std::make_unique<MachineInstance> (
 			main_vm, ten, prog);
 		return 0;
-	}).get();
+	});
 }
 
 Storage::Storage(std::vector<uint8_t> storage_elf)
@@ -265,7 +267,10 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 		// XXX: This can fail and throw an exception,
 		// think *long and hard* about the consequences!
 		m_vms.emplace_back(*main_vm, ten, this);
-		m_vmqueue.enqueue(&m_vms.back());
+
+		// Make sure the first VM is up and running before queueing
+		m_vms.front().task_future.get();
+		m_vmqueue.enqueue(&m_vms.front());
 
 		// Start accepting incoming requests on thread pool.
 		this->unlock_and_initialized(true);
@@ -275,7 +280,22 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 		// Instantiate remaining concurrency
 		for (size_t i = 1; i < max_vms; i++) {
 			m_vms.emplace_back(*main_vm, ten, this);
-			m_vmqueue.enqueue(&m_vms.back());
+		}
+
+		size_t initialized = 1;
+		// Wait for all the VMs to start running
+		for (size_t i = 1; i < m_vms.size(); i++) {
+			try {
+				auto& vm = m_vms[i];
+				vm.task_future.get();
+				m_vmqueue.enqueue(&vm);
+				initialized ++;
+			} catch (const std::exception& e) {
+				if (ctx->vsl != nullptr)
+				VSLb(ctx->vsl, SLT_VCL_Error,
+					"%s: Failed to create all request machines, init=%zu",
+					ten->config.name.c_str(), initialized);
+			}
 		}
 
 		(void) t1;
@@ -283,7 +303,7 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 			main_vm->name().c_str(),
 			this->binary_was_local() ? "local" : "remote",
 			this->binary_was_cached() ? "cached" : "not cached",
-			max_vms, ten->config.hugepages(), ten->config.ephemeral_hugepages(),
+			initialized, ten->config.hugepages(), ten->config.ephemeral_hugepages(),
 			nanodiff(t0, t2) / 1e6);
 
 	} catch (const std::exception& e) {
@@ -297,7 +317,18 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 }
 ProgramInstance::~ProgramInstance()
 {
+	/* Finish starting any request VMs and ignore exceptions. */
+	for (size_t i = 1; i < m_vms.size(); i++) {
+		auto& vm = m_vms[i];
+		if (vm.task_future.valid()) {
+			try {
+				vm.task_future.get();
+			} catch (...) {}
+		}
+	}
+
 	// NOTE: Thread pools need to wait on jobs here
+	m_storage_queue.wait_until_empty();
 	m_storage_queue.wait_until_nothing_in_flight();
 
 	if (has_storage()) {
