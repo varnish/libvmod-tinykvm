@@ -21,7 +21,7 @@
  *			"group": "test",
  *			"filename": "/tmp/test",
  *
- *			"concurrency": 32,
+ *			"concurrency": 4,
  *			"max_boot_time": 16.0,
  *			"max_memory": 512,
  *			"max_request_time": 4.0,

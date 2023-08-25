@@ -20,9 +20,9 @@ struct TenantGroup {
 	uint32_t max_req_mem; /* Megabytes */
 	uint32_t limit_req_mem; /* Megabytes of memory banks to keep after request completion */
 	uint32_t shared_memory; /* Megabytes */
-	size_t   max_concurrency = 4;
+	size_t   max_concurrency = 2;
 	size_t   max_fd       = 32;
-	size_t   max_regex    = 32;
+	size_t   max_regex    = 64;
 	bool     has_storage  = false;
 	bool     hugepages    = false;
 	bool     ephemeral_hugepages = false;
