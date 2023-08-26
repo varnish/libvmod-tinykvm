@@ -358,12 +358,6 @@ int adns_get_count(int idx, int entry) {
  * storage at a time. Because of this, one should try to keep the number and
  * the duration of the calls low, preferrably calculating as much as possible
  * before making any storage accesses.
- * It is also possible to access storage only to make persistent changes, while
- * accessing global variables in the request VMs as needed afterwards. To
- * enable this mode call make_storage_memory_shared() from main. Be cautious
- * of race conditions, as always. Alternatively, store things in the dedicated
- * shared memory area. This area is always present and can be queried using the
- * calls related to shared memory below here.
  *
  * When calling into the storage program the data you provide will be copied into
  * the VM, and the response you give back will be copied back into the request-
@@ -435,6 +429,10 @@ storage_return(const void* data, size_t len);
 
 static inline void
 storage_return_nothing(void) { storage_return(NULL, 0); }
+
+/* Allow a certain function to be called from a request VM.
+   If this function is never called, all functions are allowed. */
+extern long sys_storage_allow(void(*)());
 
 /* Start multi-processing using @n vCPUs on given function,
    forwarding up to 4 integral/pointer arguments.
@@ -516,20 +514,13 @@ static inline void * internal_shm_alloc(size_t size, size_t align) {
 		return NULL;
 }
 
-/* From the point of calling this function, any new
-   pages written to in the mutable storage will
-   be globally visible immediately, shared with
-   all request VMs in a one-sided way. Due to this
-   one-sidedness, it has to be used with caution. */
-extern void make_storage_memory_shared();
-
 /* Setting this during initialization will determine whether
    or not request VMs will be reset after each request.
    When they are ephemeral, they will be reset.
    This setting is ENABLED by default for security reasons and
    cannot be disabled, except by allowing it through a tenant
    configuration setting. */
-extern int make_ephemeral(int);
+extern int sys_make_ephemeral(int);
 
 /* Retrieve information about memory limits. */
 struct meminfo {
@@ -793,16 +784,9 @@ asm(".global shared_memory_area\n"
 	"	out %eax, $0\n"
 	"   ret\n");
 
-asm(".global make_storage_memory_shared\n"
-	".type make_storage_memory_shared, @function\n"
-	"make_storage_memory_shared:\n"
-	"	mov $0x10701, %eax\n"
-	"	out %eax, $0\n"
-	"   ret\n");
-
-asm(".global make_ephemeral\n"
-	".type make_ephemeral, @function\n"
-	"make_ephemeral:\n"
+asm(".global sys_make_ephemeral\n"
+	".type sys_make_ephemeral, @function\n"
+	"sys_make_ephemeral:\n"
 	"	mov $0x10703, %eax\n"
 	"	out %eax, $0\n"
 	"   ret\n");
@@ -839,6 +823,13 @@ asm(".global stop_storage_task\n"
 	".type stop_storage_task, @function\n"
 	"stop_storage_task:\n"
 	"	mov $0x1070A, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
+
+asm(".global sys_storage_allow\n"
+	".type sys_storage_allow, @function\n"
+	"sys_storage_allow:\n"
+	"	mov $0x1070B, %eax\n"
 	"	out %eax, $0\n"
 	"   ret\n");
 

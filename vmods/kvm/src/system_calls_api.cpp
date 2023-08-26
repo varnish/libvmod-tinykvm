@@ -68,13 +68,6 @@ static void syscall_shared_memory(vCPU& cpu, MachineInstance& inst)
 	cpu.set_registers(regs);
 }
 
-static void syscall_storage_mem_shared(vCPU& cpu, MachineInstance& inst)
-{
-	auto& regs = cpu.registers();
-	inst.machine().set_main_memory_writable(true);
-	regs.rax = 0;
-	cpu.set_registers(regs);
-}
 static void syscall_make_ephemeral(vCPU& cpu, MachineInstance& inst)
 {
 	auto& regs = cpu.registers();
@@ -107,6 +100,19 @@ static void syscall_is_storage(vCPU& cpu, MachineInstance& inst)
 	regs.rax = inst.is_storage();
 	cpu.set_registers(regs);
 }
+static void syscall_storage_allow(vCPU& cpu, MachineInstance& inst)
+{
+	auto& regs = cpu.registers();
+	// Only from storage, and only during initialization
+	if (inst.is_storage() && inst.is_waiting_for_requests() == false) {
+		inst.program().storage().allow_list.insert(regs.rdi);
+		regs.rax = 0;
+	} else {
+		regs.rax = -1;
+	}
+	cpu.set_registers(regs);
+}
+
 static void syscall_storage_callb(vCPU& cpu, MachineInstance& inst)
 {
 	auto& regs = cpu.registers();

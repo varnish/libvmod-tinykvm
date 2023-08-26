@@ -152,9 +152,6 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10700: // SHARED_MEMORY_AREA
 				syscall_shared_memory(cpu, inst);
 				return;
-			case 0x10701: // STORAGE_MEMORY_SHARED
-				syscall_storage_mem_shared(cpu, inst);
-				return;
 			case 0x10703: // MAKE_EPHEMERAL
 				syscall_make_ephemeral(cpu, inst);
 				return;
@@ -172,6 +169,9 @@ void MachineInstance::setup_syscall_interface()
 				return;
 			case 0x1070A: // STOP_STORAGE TASK
 				syscall_stop_storage_task(cpu, inst);
+				return;
+			case 0x1070B: // STORAGE_ALLOW
+				syscall_storage_allow(cpu, inst);
 				return;
 			case 0x10710: // MULTIPROCESS
 				syscall_multiprocess(cpu, inst);

@@ -8,6 +8,7 @@
 #include <blockingconcurrentqueue.h>
 #include <tinykvm/util/threadpool.h>
 #include <tinykvm/util/threadtask.hpp>
+#include <unordered_set>
 struct vcl;
 
 namespace kvm {
@@ -74,6 +75,12 @@ public:
 
 	/* Separate queue for async calls into main VM. */
 	tinykvm::ThreadTask m_storage_async_queue;
+
+	std::unordered_set<uint64_t> allow_list;
+
+	bool is_allowed(uint64_t address) const noexcept {
+		return allow_list.empty() || (allow_list.count(address) != 0);
+	}
 };
 
 /**
@@ -103,6 +110,7 @@ public:
 		const vrt_ctx*, TenantInstance*, bool debug = false);
 	~ProgramInstance();
 	long wait_for_initialization();
+	bool is_initialized() const noexcept { return this->m_initialization_complete > 0; }
 
 	bool binary_was_local() const noexcept { return m_binary_was_local; }
 	bool binary_was_cached() const noexcept { return m_binary_was_cached; }

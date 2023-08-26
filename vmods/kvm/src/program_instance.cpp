@@ -433,6 +433,9 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 	/* Detect wrap-around */
 	if (UNLIKELY(res_addr + res_size < res_addr))
 		return -1;
+	/* Check allow-list for what storage functions are allowed. */
+	if (!storage().is_allowed(func))
+		throw std::runtime_error("Not allowed to call storage function");
 
 	if constexpr (VERBOSE_STORAGE_TASK) {
 		printf("Storage task on main queue\n");
@@ -520,6 +523,10 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 
 long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 {
+	/* Check allow-list for what storage functions are allowed. */
+	if (!storage().is_allowed(func))
+		throw std::runtime_error("Not allowed to call storage function");
+
 	std::scoped_lock lock(storage().m_async_mtx);
 	// Avoid the last task in case it is still active
 	while (storage().m_async_tasks.size() > 1)

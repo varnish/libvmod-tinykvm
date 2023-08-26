@@ -11,8 +11,14 @@ void my_storage_task(void *arg)
 	__sync_fetch_and_add(&storage_counter, 1);
 }
 
+void my_disallowed_storage_task(void *arg)
+{
+}
+
 int main()
 {
+	sys_storage_allow(my_storage_task);
+
 	wait_for_requests();
 }
 EOF
@@ -22,6 +28,7 @@ cat >${tmpdir}/${testname}.c <<-EOF
 #include "kvm_api.h"
 extern int storage_counter;
 extern void my_storage_task(void *arg);
+extern void my_disallowed_storage_task(void *arg);
 
 static void on_get(const char *url, const char* arg)
 {
@@ -31,6 +38,12 @@ static void on_get(const char *url, const char* arg)
 		async_storage_task(my_storage_task, NULL);
 		backend_response(200, ctype, sizeof(ctype)-1, "OK", 2);
 	}
+
+	if (strcmp(url, "/task2") == 0) {
+		async_storage_task(my_disallowed_storage_task, NULL);
+		backend_response(200, ctype, sizeof(ctype)-1, "OK", 2);
+	}
+
 	char buffer[24];
 	snprintf(buffer, sizeof(buffer),
 		"Count: %d", storage_counter);
@@ -40,10 +53,6 @@ static void on_get(const char *url, const char* arg)
 
 int main()
 {
-	// With this enabled we can see the global memory of
-	// the storage VM without copying data out.
-	make_storage_memory_shared();
-
 	set_backend_get(on_get);
 	wait_for_requests();
 }
@@ -121,4 +130,9 @@ client c1 {
 	rxresp
 	expect resp.body == "Count: 2"
 	expect resp.status == 200
+
+	txreq -url "/task2" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 500
+
 } -run
