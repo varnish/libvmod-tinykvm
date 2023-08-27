@@ -87,11 +87,11 @@ $Function BOOL add_program(PRIV_VCL, STRING name, STRING uri)
 - Program is added to the default group. Use configure() to override.
 - Must be called from vcl_init.
 
-$Function BOOL invalidate_program(PRIV_VCL, STRING program)
+$Function INT invalidate_program(PRIV_VCL, STRING regex)
 
-- Unloads a program.
-- The next request to it will cause the program to be reloaded.
-- If program is "*" then all programs are unloaded.
+- Unloads programs matching regular expression.
+- The next request to an unloaded program will cause the program to be reloaded.
+- Returns the number of programs unloaded.
 
 $Function BOOL configure(PRIV_VCL, STRING program, STRING json)
 

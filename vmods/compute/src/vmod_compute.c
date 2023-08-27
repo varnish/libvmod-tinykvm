@@ -58,30 +58,55 @@ VCL_BOOL vmod_init_self_requests(VRT_CTX, VCL_PRIV task,
 	return (kvm_set_self_request(ctx, task, unix_path, uri, max_concurrency));
 }
 
-static void unloader(VRT_CTX, const char *program, struct vmod_kvm_tenant *tenant)
+struct unloader_state {
+	VRT_CTX;
+	vre_t *regex;
+};
+static int unloader(const char *program, struct vmod_kvm_tenant *tenant, void *vstate)
 {
 	(void)program;
-	kvm_tenant_unload(ctx, tenant);
+	const struct unloader_state *state = (const struct unloader_state *)vstate;
+
+	const int matches =
+        VRE_exec(state->regex, program, strlen(program), 0,
+            0, NULL, 0, NULL);
+	if (matches > 0) {
+		return kvm_tenant_unload(state->ctx, tenant);
+	}
+	return (0);
 }
-VCL_BOOL vmod_invalidate_program(VRT_CTX, VCL_PRIV task, VCL_STRING program)
+VCL_INT vmod_invalidate_program(VRT_CTX, VCL_PRIV task, VCL_STRING pattern)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-
-	if (SEMPTY(program))
+	if (SEMPTY(pattern))
 		return (0);
-	if (strcmp(program, "*") == 0)
-	{
-		kvm_tenant_foreach(ctx, task, unloader);
-		return (1);
+
+	/* Compile regex pattern (NOTE: uses a lot of stack). */
+	const char* error = "";
+	int         error_offset = 0;
+	vre_t *re = VRE_compile(pattern, 0, &error, &error_offset);
+
+	if (re == NULL) {
+		/* TODO: Nice regex error explanation. */
+		(void)error;
+		(void)error_offset;
+		VSLb(ctx->vsl, SLT_VCL_Error,
+			"compute: Regex '%s' compilation failed", pattern);
+		return (0);
 	}
 
-	struct vmod_kvm_tenant *tenant = kvm_tenant_find(task, program);
-	if (tenant != NULL) {
-		return (kvm_tenant_unload(ctx, tenant));
-	} else {
-		VRT_fail(ctx, "No such program '%s' for configure", program);
-		return (0);
-	}
+	/* Unload programs matching the pattern. */
+	struct unloader_state state = {
+		.ctx = ctx,
+		.regex = re,
+	};
+	int count = kvm_tenant_foreach(task, unloader, &state);
+	VSLb(ctx->vsl, SLT_VCL_Log,
+		"compute: Unloaded %d programs matching '%s'", count, pattern);
+
+	VRE_free(&re);
+
+	return (count);
 }
 
 VCL_BOOL vmod_add_program(VRT_CTX, VCL_PRIV task,
@@ -110,7 +135,8 @@ VCL_BOOL vmod_configure(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_STRING j
 	}
 
 	if (json == NULL || json[0] == 0) {
-		VRT_fail(ctx, "No configuration provided for '%s'", program);
+		VRT_fail(ctx,
+			"compute: No configuration provided for '%s'", program);
 		return (0);
 	}
 
@@ -118,7 +144,8 @@ VCL_BOOL vmod_configure(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_STRING j
 	if (tenant != NULL) {
 		return (kvm_tenant_configure(ctx, tenant, json));
 	} else {
-		VRT_fail(ctx, "No such program '%s' for configure", program);
+		VRT_fail(ctx,
+			"compute: No such program '%s' for configure", program);
 		return (0);
 	}
 }
@@ -137,7 +164,8 @@ VCL_BOOL vmod_start(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_BOOL async)
 		/* TODO: If async == false use kvm_reserve_vm() to synchronize init. */
 		return (kvm_tenant_async_start(ctx, tenant));
 	} else {
-		VRT_fail(ctx, "No such program '%s' for async start", program);
+		VRT_fail(ctx,
+			"compute: No such program '%s' for async start", program);
 		return (0);
 	}
 }
@@ -155,7 +183,8 @@ VCL_BACKEND vmod_program(VRT_CTX, VCL_PRIV task,
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	if (ctx->method != VCL_MET_BACKEND_FETCH) {
-		VRT_fail(ctx, "compute: program() should only be called from vcl_backend_fetch");
+		VRT_fail(ctx,
+			"compute: program() should only be called from vcl_backend_fetch");
 		return (NULL);
 	}
 
@@ -168,7 +197,8 @@ VCL_STRING vmod_to_string(VRT_CTX, VCL_PRIV task,
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	if (ctx->method != VCL_MET_BACKEND_FETCH && ctx->method != VCL_MET_BACKEND_RESPONSE) {
-		VRT_fail(ctx, "compute: to_string() should only be called from vcl_backend_fetch or vcl_backend_response");
+		VRT_fail(ctx,
+			"compute: to_string() should only be called from vcl_backend_fetch or vcl_backend_response");
 		return (NULL);
 	}
 
