@@ -34,6 +34,7 @@ struct vmod_kvm_synth
 
 typedef struct vmod_kvm_tenant * TEN_PTR;
 typedef struct vmod_kvm_slot * KVM_SLOT;
+typedef void (*vmod_kvm_foreach_t) (VRT_CTX, const char *, TEN_PTR);
 
 extern int  kvm_init_tenants_str(VRT_CTX, VCL_PRIV, const char *source, const char *, size_t, int init);
 extern int  kvm_init_tenants_file(VRT_CTX, VCL_PRIV, const char *, int init);
@@ -42,6 +43,7 @@ extern int  kvm_set_self_request(VRT_CTX, VCL_PRIV, const char *unix_path, const
 extern const char * kvm_tenant_name(TEN_PTR tenant);
 extern TEN_PTR kvm_tenant_find(VCL_PRIV, const char *name);
 extern TEN_PTR kvm_tenant_find_key(VCL_PRIV, const char *name, const char *key);
+extern void    kvm_tenant_foreach(VRT_CTX, VCL_PRIV, vmod_kvm_foreach_t func);
 extern int     kvm_tenant_debug_allowed(TEN_PTR);
 extern int     kvm_tenant_gucci(TEN_PTR, int debug);
 extern int     kvm_tenant_configure(VRT_CTX, TEN_PTR, const char *json);

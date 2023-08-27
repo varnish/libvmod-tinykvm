@@ -363,6 +363,18 @@ kvm::TenantInstance* kvm_tenant_find(VCL_PRIV task, const char* name)
 	return nullptr;
 }
 
+using foreach_function_t = void(*)(VRT_CTX, const char *, kvm::TenantInstance*);
+extern "C"
+void kvm_tenant_foreach(VRT_CTX, VCL_PRIV task, foreach_function_t func)
+{
+	auto& t = kvm::tenancy(task);
+	if (UNLIKELY(func == nullptr))
+		return;
+	for (auto& it : t.tenants) {
+		func(ctx, it.second.config.name.c_str(), &it.second);
+	}
+}
+
 extern "C"
 kvm::TenantInstance* kvm_tenant_find_key(VCL_PRIV task, const char* name, const char* key)
 {

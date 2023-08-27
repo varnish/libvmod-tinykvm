@@ -58,9 +58,22 @@ VCL_BOOL vmod_init_self_requests(VRT_CTX, VCL_PRIV task,
 	return (kvm_set_self_request(ctx, task, unix_path, uri, max_concurrency));
 }
 
+static void unloader(VRT_CTX, const char *program, struct vmod_kvm_tenant *tenant)
+{
+	(void)program;
+	kvm_tenant_unload(ctx, tenant);
+}
 VCL_BOOL vmod_invalidate_program(VRT_CTX, VCL_PRIV task, VCL_STRING program)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	if (SEMPTY(program))
+		return (0);
+	if (strcmp(program, "*") == 0)
+	{
+		kvm_tenant_foreach(ctx, task, unloader);
+		return (1);
+	}
 
 	struct vmod_kvm_tenant *tenant = kvm_tenant_find(task, program);
 	if (tenant != NULL) {
