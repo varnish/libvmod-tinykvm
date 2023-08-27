@@ -77,9 +77,20 @@ static void syscall_log(vCPU& cpu, MachineInstance& inst)
 	auto regs = cpu.registers();
 	const uint64_t g_buf = regs.rdi;
 	const uint16_t g_len = regs.rsi;
+	/* Log to VSL if VRT ctx and VSL is accessible. */
 	cpu.machine().foreach_memory(g_buf, g_len,
-		[&inst] (std::string_view buffer) {
-			inst.print(buffer);
+		[&inst] (std::string_view buffer)
+		{
+			if (inst.ctx() && inst.ctx()->vsl) {
+				auto* vsl = inst.ctx()->vsl;
+				/* Simultaneous logging is not possible with VSL.
+				   TODO: Use locking here instead. */
+				const bool smp = inst.machine().smp_active();
+				if (smp) return;
+
+				VSLb(vsl, SLT_VCL_Log, "%s says: %.*s",
+					inst.name().c_str(), (int)buffer.size(), buffer.begin());
+			}
 		});
 }
 
