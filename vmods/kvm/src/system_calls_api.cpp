@@ -11,22 +11,28 @@ static void syscall_register_func(vCPU& cpu, MachineInstance& inst)
 {
 	// Register callback function for tenant
 	const auto& regs = cpu.registers();
-	const uint64_t KERNEL_END = cpu.machine().kernel_end_address();
-	if (UNLIKELY(regs.rsi < KERNEL_END)) {
-		fprintf(stderr, "register_func: Function %lld is now 0x%llX\n",
-				regs.rdi, regs.rsi);
-		throw std::runtime_error("Invalid address for register_func provided");
+	if (inst.is_waiting_for_requests() == false)
+	{
+		const uint64_t KERNEL_END = cpu.machine().kernel_end_address();
+		const uint64_t MEMORY_END = cpu.machine().max_address();
+		if (UNLIKELY(regs.rsi < KERNEL_END || regs.rsi >= MEMORY_END)) {
+			fprintf(stderr, "register_func: Function %lld is now 0x%llX\n",
+					regs.rdi, regs.rsi);
+			throw std::runtime_error("Invalid address for register_func provided");
+		}
+		inst.program().set_entry_at(regs.rdi, regs.rsi);
+	} else {
+		throw std::runtime_error("register_func(): Cannot be called after initialization");
 	}
-	inst.program().set_entry_at(regs.rdi, regs.rsi);
 }
 static void syscall_wait_for_requests(vCPU& cpu, MachineInstance& inst)
 {
-	if (!cpu.machine().is_forked()) {
+	if (inst.is_waiting_for_requests() == false) {
 		// Wait for events (stop machine)
 		inst.wait_for_requests();
 		cpu.stop();
 	} else {
-		throw std::runtime_error("wait_for_requests(): Cannot be called from ephemeral VM");
+		throw std::runtime_error("wait_for_requests(): Cannot be called after initialization");
 	}
 }
 
@@ -71,7 +77,7 @@ static void syscall_shared_memory(vCPU& cpu, MachineInstance& inst)
 static void syscall_make_ephemeral(vCPU& cpu, MachineInstance& inst)
 {
 	auto& regs = cpu.registers();
-	if (inst.is_storage()) {
+	if (inst.is_waiting_for_requests() == false) {
 		if (inst.tenant().config.control_ephemeral()) {
 			inst.set_ephemeral(regs.rdi != 0);
 			regs.rax = 0;

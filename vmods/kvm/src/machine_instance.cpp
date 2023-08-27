@@ -133,6 +133,7 @@ MachineInstance::MachineInstance(
 	  m_is_debug(source.is_debug()),
 	  m_is_storage(false),
 	  m_is_ephemeral(source.is_ephemeral()),
+	  m_waiting_for_requests(true), // If we got this far, we are waiting...
 	  m_sighandler{source.m_sighandler},
 	  m_fd        {ten->config.max_fd(), "File descriptors"},
 	  m_regex     {ten->config.max_regex(), "Regex handles"}
