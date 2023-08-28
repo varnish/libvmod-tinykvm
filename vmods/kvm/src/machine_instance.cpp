@@ -259,16 +259,18 @@ void MachineInstance::print(std::string_view text) const
 	}
 	this->m_last_newline = (text.back() == '\n');
 }
-void MachineInstance::logprint(std::string_view text) const
+void MachineInstance::logprint(std::string_view text, bool says) const
 {
-	if (this->ctx()) {
-		/* Simultaneous logging is not possible with SMP. */
-		const bool smp = machine().smp_active();
+	/* Simultaneous logging is not possible with SMP. */
+	const bool smp = machine().smp_active();
+	if (!smp && this->ctx() && this->ctx()->vsl) {
 		auto* vsl = this->ctx()->vsl;
-		if (vsl != nullptr && !smp) {
+		if (says) {
 			VSLb(vsl, SLT_VCL_Log,
 				"%s says: %.*s", name().c_str(), (int)text.size(), text.begin());
-			return;
+		} else {
+			VSLb(vsl, SLT_VCL_Log,
+				"%.*s", (int)text.size(), text.begin());
 		}
 	}
 }
@@ -279,8 +281,8 @@ tinykvm::Machine::printer_func MachineInstance::get_vsl_printer() const
 		/* Avoid wrap-around and empty log */
 		if (buffer + len < buffer || len == 0)
 			return;
-
-		this->logprint(std::string_view(buffer, len));
+		/* Logging with $PROGRAM says: ... */
+		this->logprint(std::string_view(buffer, len), true);
 
 		if (this->m_print_stdout) {
 			this->print({buffer, len});

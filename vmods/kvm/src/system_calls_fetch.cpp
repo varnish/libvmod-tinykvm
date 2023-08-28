@@ -144,7 +144,7 @@ static void syscall_curl_fetch_helper(
 			}
 
 			if (int err = curl_easy_setopt(curl, CURLOPT_UNIX_SOCKET_PATH, unix_path.c_str()) != CURLE_OK) {
-				inst.logf("fetch UDS path error %d for: %s", err, url.c_str());
+				inst.logf("Fetch: UDS path error %d for: %s", err, url.c_str());
 				regs.rax = -err;
 				vcpu.set_registers(regs);
 				return;
@@ -152,7 +152,7 @@ static void syscall_curl_fetch_helper(
 		}
 
 		if (int err = curl_easy_setopt(curl, CURLOPT_URL, url.c_str()) != CURLE_OK) {
-			inst.logf("fetch URL error %d for URL: %s", err, url.c_str());
+			inst.logf("Fetch: URL error %d for URL: %s", err, url.c_str());
 			regs.rax = -err;
 			vcpu.set_registers(regs);
 			return;
@@ -315,10 +315,10 @@ static void syscall_curl_fetch_helper(
 			// OP result back to guest
 			vcpu.machine().copy_to_guest(op_buffer, &opres, sizeof(opres));
 
-			inst.logf("fetch transfer complete, %u bytes", opres.content_length);
+			inst.logf("Fetch: transfer complete, %u bytes", opres.content_length);
 			regs.rax = 0;
 		} else {
-			inst.logf("fetch error: %s (%d)", curl_easy_strerror(res), res);
+			inst.logf("Fetch error: %s (%d)", curl_easy_strerror(res), res);
 
 			/* Free the over-allocated fetch buffer. */
 			if (managed_content_addr) {

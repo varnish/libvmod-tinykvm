@@ -51,16 +51,10 @@ static constexpr bool BACKEND_TIMINGS = VMOD_KVM_BACKEND_TIMINGS;
 static void memory_error_handling(struct vsl_log *vsl, const tinykvm::MemoryException& e)
 {
 	if (e.addr() > 0x500) { /* Null-pointer speculation */
-		fprintf(stderr,
-			"Backend VM memory exception: %s (addr: 0x%lX, size: 0x%lX)\n",
-			e.what(), e.addr(), e.size());
 		VSLb(vsl, SLT_Error,
 			"Backend VM memory exception: %s (addr: 0x%lX, size: 0x%lX)",
 			e.what(), e.addr(), e.size());
 	} else {
-		fprintf(stderr,
-			"Backend VM memory exception: Null-pointer access (%s, addr: 0x%lX, size: 0x%lX)\n",
-			e.what(), e.addr(), e.size());
 		VSLb(vsl, SLT_Error,
 			"Backend VM memory exception: Null-pointer access (%s, addr: 0x%lX, size: 0x%lX)",
 			e.what(), e.addr(), e.size());
@@ -182,21 +176,16 @@ static void error_handling(kvm::VMPoolItem* slot,
 		return;
 
 	} catch (const tinykvm::MachineTimeoutException& mte) {
-		fprintf(stderr, "%s: Backend VM timed out (%f seconds)\n",
-			machine.name().c_str(), mte.seconds());
 		VSLb(ctx->vsl, SLT_Error,
 			"%s: Backend VM timed out (%f seconds)",
 			machine.name().c_str(), mte.seconds());
 	} catch (const tinykvm::MemoryException& e) {
 		memory_error_handling(ctx->vsl, e);
 	} catch (const tinykvm::MachineException& e) {
-		fprintf(stderr, "%s: Backend VM exception: %s (data: 0x%lX)\n",
-			machine.name().c_str(), e.what(), e.data());
 		VSLb(ctx->vsl, SLT_Error,
 			"%s: Backend VM exception: %s (data: 0x%lX)",
 			machine.name().c_str(), e.what(), e.data());
 	} catch (const std::exception& e) {
-		fprintf(stderr, "Backend VM exception: %s\n", e.what());
 		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
 	}
 	}
@@ -280,6 +269,10 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				}
 				auto struct_addr = vm.stack_push(stack, inputs);
 
+				VSLb(ctx->vsl, SLT_VCL_Log,
+					"%s: Calling on_method() at 0x%lX",
+					machine.name().c_str(), on_method_addr);
+
 				/* Call into VM doing a full pagetable/cache flush. */
 				vm.timed_vmcall_stack(on_method_addr,
 					stack, timeout, (uint64_t)struct_addr);
@@ -289,16 +282,26 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				auto on_get_addr = prog.entry_at(ProgramEntryIndex::BACKEND_GET);
 				if (UNLIKELY(on_get_addr == 0x0))
 					throw std::runtime_error("The GET callback has not been registered");
+
+				VSLb(ctx->vsl, SLT_VCL_Log,
+					"%s: Calling on_get() at 0x%lX",
+					machine.name().c_str(), on_get_addr);
+
 				/* Call into VM doing a full pagetable/cache flush. */
 				vm.timed_vmcall(on_get_addr, timeout, invoc->inputs.url, invoc->inputs.argument);
 			} else {
 				/* Try to reduce POST mmap allocation */
 				vm.mmap_relax(post->address, post->capacity, post->length);
 				/* Call the backend POST function */
-				auto vm_entry_addr = prog.entry_at(ProgramEntryIndex::BACKEND_POST);
-				if (UNLIKELY(vm_entry_addr == 0x0))
+				auto on_post_addr = prog.entry_at(ProgramEntryIndex::BACKEND_POST);
+				if (UNLIKELY(on_post_addr == 0x0))
 					throw std::runtime_error("The POST callback has not been registered");
-				vm.timed_vmcall(vm_entry_addr,
+
+				VSLb(ctx->vsl, SLT_VCL_Log,
+					"%s: Calling on_post() at 0x%lX",
+					machine.name().c_str(), on_post_addr);
+
+				vm.timed_vmcall(on_post_addr,
 					timeout,
 					invoc->inputs.url,
 					invoc->inputs.argument,
@@ -323,8 +326,6 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 		return;
 
 	} catch (const tinykvm::MachineTimeoutException& mte) {
-		fprintf(stderr, "%s: Backend VM timed out (%f seconds)\n",
-			machine.name().c_str(), mte.seconds());
 		VSLb(ctx->vsl, SLT_Error,
 			"%s: Backend VM timed out (%f seconds)",
 			machine.name().c_str(), mte.seconds());
@@ -335,15 +336,12 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 		/* Try again if on_error has been set, otherwise 500. */
 		error_handling(slot, invoc, result, e.what());
 	} catch (const tinykvm::MachineException& e) {
-		fprintf(stderr, "%s: Backend VM exception: %s (data: 0x%lX)\n",
-			machine.name().c_str(), e.what(), e.data());
 		VSLb(ctx->vsl, SLT_Error,
 			"%s: Backend VM exception: %s (data: 0x%lX)",
 			machine.name().c_str(), e.what(), e.data());
 		/* Try again if on_error has been set, otherwise 500. */
 		error_handling(slot, invoc, result, e.what());
 	} catch (const std::exception& e) {
-		fprintf(stderr, "Backend VM exception: %s\n", e.what());
 		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
 		/* Try again if on_error has been set, otherwise 500. */
 		error_handling(slot, invoc, result, e.what());
@@ -416,13 +414,10 @@ int kvm_backend_streaming_post(struct backend_post *post,
 	} catch (const tinykvm::MemoryException& e) {
 		memory_error_handling(post->ctx->vsl, e);
 	} catch (const tinykvm::MachineException& e) {
-		fprintf(stderr, "Backend VM exception: %s (data: 0x%lX)\n",
-			e.what(), e.data());
 		VSLb(post->ctx->vsl, SLT_Error,
 			"Backend VM exception: %s (data: 0x%lX)",
 			e.what(), e.data());
 	} catch (const std::exception& e) {
-		fprintf(stderr, "Backend VM exception: %s\n", e.what());
 		VSLb(post->ctx->vsl, SLT_Error,
 			"VM call exception: %s", e.what());
 	}
@@ -465,13 +460,10 @@ ssize_t kvm_backend_streaming_delivery(
 	} catch (const tinykvm::MemoryException& e) {
 		memory_error_handling(result->stream_vsl, e);
 	} catch (const tinykvm::MachineException& e) {
-		fprintf(stderr, "Backend VM exception: %s (data: 0x%lX)\n",
-			e.what(), e.data());
 		VSLb(result->stream_vsl, SLT_Error,
 			"Backend VM exception: %s (data: 0x%lX)",
 			e.what(), e.data());
 	} catch (const std::exception& e) {
-		fprintf(stderr, "Backend VM exception: %s\n", e.what());
 		VSLb(result->stream_vsl, SLT_Error,
 			"VM call exception: %s", e.what());
 	}
