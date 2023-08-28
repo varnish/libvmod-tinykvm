@@ -23,22 +23,28 @@ sub vcl_init {
 	compute.configure("avif",
 		"""{
 			"hugepages": false,
-			"request_hugepages": false
+			"request_hugepages": false,
+			"concurrency": 32,
+			"ephemeral": true
+		}""");
+	compute.configure("thumbnails",
+		"""{
+			"concurrency": 32
+		}""");
+	compute.configure("zstd",
+		"""{
+			"concurrency": 32
 		}""");
 	# Start the JPEG-to-AVIF transcoder, but don't delay Varnish startup.
-	#compute.start("avif");
-	# JSON minification
-	#compute.start("minify");
+	compute.start("avif");
 }
 sub vcl_recv {
 	if (req.url == "/tcp") {
-		if (compute.steal("hello", req.url)) {
-			return (synth(200));
-		}
+		compute.steal("hello", req.url);
 		return (synth(404));
 	}
 	if (req.url == "/invalidate") {
-		compute.invalidate_program("counter");
+		compute.invalidate_program("*");
 		return (synth(200));
 	}
 	if (req.url == "/chain" || req.url == "/avif/image") {
@@ -60,6 +66,10 @@ sub vcl_backend_fetch {
 	}
 	else if (bereq.url == "/avif/bench") {
 		set bereq.backend = compute.program("avif");
+	}
+	else if (bereq.url == "/webp/bench") {
+		//compute.invalidate_program("webp");
+		set bereq.backend = compute.program("webp");
 	}
 	else if (bereq.url == "/counter") {
 		set bereq.backend = compute.program("counter");
@@ -184,8 +194,13 @@ sub vcl_backend_fetch {
 		set bereq.backend = compute.program("to_string", "text/plain",
 			compute.to_string("fetch", "ftp://ftp.funet.fi/pub/standards/RFC/rfc959.txt"));
 	}
-	else if (bereq.url == "/watermark") {
-		set bereq.backend = compute.program("watermark");
+	else if (bereq.url ~ "^/js") {
+		//compute.invalidate_program("jsapp");
+		set bereq.backend = compute.program("jsapp", regsub(bereq.url, "^/js", ""));
+	}
+	else if (bereq.url == "/nim") {
+		//compute.invalidate_program("nim_storage");
+		set bereq.backend = compute.program("nim_storage");
 	}
 	else if (bereq.url == "/hello") {
 		# Example from documentation
@@ -202,6 +217,10 @@ sub vcl_backend_fetch {
 		compute.chain("fetch", "https://${filebin}/kvmprograms/compute.json");
 		set bereq.backend = compute.program("xml", "", "{}");
 	}
+	else if (bereq.url == "/rust") {
+		//compute.invalidate_program("rust");
+		set bereq.backend = compute.program("rust", bereq.url);
+	}
 	else if (bereq.url == "/small_xml") {
 		# Pass a small valid XML as response
 		set bereq.backend = compute.program("xml", "<a/>", "{}");
@@ -209,6 +228,10 @@ sub vcl_backend_fetch {
 	else if (bereq.url == "/sd") {
 		set bereq.backend = compute.program("stable_diffusion",
 			"A lovely cat, high quality", "blurry, ugly, jpeg compression, artifacts, unsharp");
+	}
+	else if (bereq.url == "/watermark") {
+		compute.invalidate_program("watermark");
+		set bereq.backend = compute.program("watermark");
 	}
 	else if (bereq.url ~ "^/x") {
 		# Gameboy emulator (used by demo page)
