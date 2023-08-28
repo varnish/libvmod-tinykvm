@@ -12,13 +12,13 @@ namespace kvm
 
     static constexpr uint32_t RESV_QUEUE_TIMEOUT = 60; /* Seconds */
     static constexpr size_t REQUEST_MEMORY_SIZE = 64; /* 64MB */
-    static constexpr int    REQUEST_VM_NICE = 0;
+    static constexpr int    REQUEST_VM_NICE = 10;
     static constexpr float  REQUEST_VM_TIMEOUT = 8.0f;
     static constexpr float  STREAM_HANDLING_TIMEOUT = 2.0f;
     static constexpr float  ERROR_HANDLING_TIMEOUT = 1.0f;
 
     /* Serialized storage VM access */
-    static constexpr int   STORAGE_VM_NICE = 0;
+    static constexpr int   STORAGE_VM_NICE = 10;
     static constexpr float STORAGE_TIMEOUT = 10.0f;
     static constexpr float STORAGE_CLEANUP_TIMEOUT = 1.0f;
     static constexpr float STORAGE_DESERIALIZE_TIMEOUT = 2.0f;

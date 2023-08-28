@@ -29,6 +29,7 @@ public:
 	static constexpr size_t REGEX_MAX = 64;
 
 	void print(std::string_view text) const;
+	void logprint(std::string_view text) const;
 	void logf(const char*, ...) const;
 
 	auto& regex() { return m_regex; }
@@ -121,7 +122,7 @@ inline void MachineInstance::logf(const char *fmt, ...) const
 	const int len = vsnprintf(buffer, sizeof(buffer), fmt, va);
 	va_end(va);
 	if (len >= 0 && (size_t)len < sizeof(buffer)) {
-		this->print(std::string_view{buffer, (size_t)len});
+		this->logprint(std::string_view{buffer, (size_t)len});
 	} else {
 		throw std::runtime_error("Printf buffer exceeded");
 	}
