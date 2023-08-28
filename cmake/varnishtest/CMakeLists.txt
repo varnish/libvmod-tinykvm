@@ -43,6 +43,7 @@ set(SOURCES
 		${PATH}/vtc_main.c
 		${PATH}/vtc_proxy.c
 		${PATH}/vtc_syslog.c
+		${PATH}/vtc_tunnel.c
 	)
 if (NOT VARNISH_PLUS)
 	set(SOURCES ${SOURCES}

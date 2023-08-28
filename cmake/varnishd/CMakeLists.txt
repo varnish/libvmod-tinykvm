@@ -122,6 +122,9 @@ if (VARNISH_PLUS)
 		${VD_PATH}/common/common_vtls_sni.c
 		${VD_PATH}/mgt/mgt_pool.c
 		${VD_PATH}/mgt/mgt_tls_client_cert.c
+		${VD_PATH}/mgt/mgt_tls_conf.c
+		${VD_PATH}/mgt/vtls_cfg/vtls_cfg_lexer.c
+		${VD_PATH}/mgt/vtls_cfg/vtls_cfg_parser.c
 		${VD_PATH}/storage/storage_ykey_mem.c
 		${VD_PATH}/storage/mse_book.c
 		${VD_PATH}/storage/mse_cache.c
@@ -280,6 +283,7 @@ target_link_libraries(varnishd config pthread ssl crypto dl)
 if (VARNISH_PLUS)
 	target_link_libraries(varnishd mse numa lmdb sslhelper jemalloc)
 endif()
+target_compile_definitions(varnishd PRIVATE BUILD_CLIENT_TLS=1)
 # build varnishd into the top binary folder
 set_target_properties(varnishd
 	PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
@@ -288,6 +292,7 @@ set_target_properties(varnishd
 if (SANITIZE)
 	target_compile_options(vcc      PRIVATE "${SANITIZE_FLAGS}")
 	target_compile_options(varnishd PUBLIC  "${SANITIZE_FLAGS}")
+	target_link_libraries(varnishd ubsan)
 	set(SANITIZER_FRIENDLY_MODE TRUE)
 endif()
 if (SANITIZER_FRIENDLY_MODE)
