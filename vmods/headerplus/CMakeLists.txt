@@ -29,4 +29,29 @@ add_vmod_tests(vmod_headerplus headerplus
 	tests/test09.vtc
 	tests/test10.vtc
 	tests/test11.vtc
+	tests/test12.vtc
+	tests/test13.vtc
+	tests/test14.vtc
+	tests/test15.vtc
+	tests/test16.vtc
+	tests/test17.vtc
+	tests/test18.vtc
+	tests/test19.vtc
+	tests/test20.vtc
+	tests/test21.vtc
+	tests/test22.vtc
+	tests/test23.vtc
+	tests/test24.vtc
+	tests/test25.vtc
+	tests/test26.vtc
+	tests/test27.vtc
+	tests/test28.vtc
+	tests/test29.vtc
+	tests/test30.vtc
+	tests/test31.vtc
+	tests/test32.vtc
+	tests/test33.vtc
+	tests/test34.vtc
+	tests/test35.vtc
+	tests/test36.vtc
 )
