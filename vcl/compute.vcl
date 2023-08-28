@@ -222,7 +222,7 @@ sub vcl_backend_fetch {
 			"A lovely cat, high quality", "blurry, ugly, jpeg compression, artifacts, unsharp");
 	}
 	else if (bereq.url == "/watermark") {
-		compute.invalidate_program("watermark");
+		//compute.invalidate_program("watermark");
 		set bereq.backend = compute.program("watermark");
 	}
 	else if (bereq.url ~ "^/x") {
