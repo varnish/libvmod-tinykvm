@@ -66,28 +66,28 @@ kvm::VMPoolItem* kvm_reserve_machine(const vrt_ctx *ctx, kvm::TenantInstance* te
 {
 	if (UNLIKELY(tenant == nullptr || ctx == nullptr))
 		return nullptr;
-	const auto& name = tenant->config.name;
-	try {
-		/* Can block for a while until program is fetched and initialized. */
-		return tenant->vmreserve(ctx, debug);
-	} catch (const tinykvm::MachineTimeoutException& mte) {
-		fprintf(stderr, "%s: VM reserve timed out (%f seconds)\n",
-			name.c_str(), mte.seconds());
-		VSLb(ctx->vsl, SLT_Error,
-			"%s: VM reserve timed out (%f seconds)",
-			name.c_str(), mte.seconds());
-	} catch (const tinykvm::MachineException& e) {
-		fprintf(stderr, "%s: VM reserve exception: %s (data: 0x%lX)\n",
-			name.c_str(), e.what(), e.data());
-		VSLb(ctx->vsl, SLT_Error,
-			"%s: VM reserve exception: %s (data: 0x%lX)",
-			name.c_str(), e.what(), e.data());
-	} catch (const std::exception& e) {
-		fprintf(stderr, "KVM VM exception: %s\n", e.what());
-		VSLb(ctx->vsl, SLT_Error, "VM reserve exception: %s", e.what());
-	}
-	/* We could not reserve a VM. Eg. it failed initialization. */
-	return nullptr;
+
+	/* Can block for a while until program is fetched and initialized. */
+	return tenant->vmreserve(ctx, debug);
+}
+
+extern "C"
+kvm::VMPoolItem* kvm_temporarily_reserve_machine(const vrt_ctx *ctx, kvm::TenantInstance* tenant, bool debug)
+{
+	if (UNLIKELY(tenant == nullptr || ctx == nullptr))
+		return nullptr;
+
+	/* Can block for a while until program is fetched and initialized. */
+	return tenant->temporary_vmreserve(ctx, debug);
+}
+extern "C"
+void kvm_free_reserved_machine(const vrt_ctx *ctx, void* slot)
+{
+	if (UNLIKELY(slot == nullptr || ctx == nullptr))
+		return;
+
+	/* Frees up the temporarily reserved program. */
+	TenantInstance::temporary_vmreserve_free(ctx, slot);
 }
 
 /* Used to copy data into a reserved VM. */

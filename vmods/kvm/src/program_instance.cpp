@@ -397,22 +397,24 @@ Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 	slot->prog_ref = std::move(prog);
 
 	/* What happens when the transaction is done */
-	return {slot, [] (void* slotv) {
-		auto* slot = (VMPoolItem *)slotv;
-		auto& mi = *slot->mi;
-		// Free regexes, file descriptors etc.
-		mi.tail_reset();
+	return {slot, vm_free_function};
+}
+void ProgramInstance::vm_free_function(void* slotv)
+{
+	auto* slot = (VMPoolItem *)slotv;
+	auto& mi = *slot->mi;
+	// Free regexes, file descriptors etc.
+	mi.tail_reset();
 
-		// Reset to the current program (even though it might die before next req).
-		mi.reset_to(nullptr, *mi.program().main_vm);
+	// Reset to the current program (even though it might die before next req).
+	mi.reset_to(nullptr, *mi.program().main_vm);
 
-		// XXX: Is this racy? We want to enq the slot with the ref.
-		// We are the sole owner of the slot, so no need for atomics here.
-		auto ref = std::move(slot->prog_ref);
-		// Signal waiters that slot is ready again
-		// If there any waiters, they keep the program referenced (atomically)
-		ref->m_vmqueue.enqueue(slot);
-	}};
+	// XXX: Is this racy? We want to enq the slot with the ref.
+	// We are the sole owner of the slot, so no need for atomics here.
+	auto ref = std::move(slot->prog_ref);
+	// Signal waiters that slot is ready again
+	// If there any waiters, they keep the program referenced (atomically)
+	ref->m_vmqueue.enqueue(slot);
 }
 
 MachineInstance* ProgramInstance::tls_reserve_vm(const vrt_ctx* ctx,

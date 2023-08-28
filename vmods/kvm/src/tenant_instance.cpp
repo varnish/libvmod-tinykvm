@@ -230,6 +230,35 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 	return (VMPoolItem*) priv_task->priv;
 }
 
+VMPoolItem* TenantInstance::temporary_vmreserve(const vrt_ctx* ctx, bool debug)
+{
+	try
+	{
+		auto prog = this->ref(ctx, debug);
+		if (UNLIKELY(prog == nullptr || ctx->ws == nullptr))
+			return nullptr;
+
+		// Reserve a machine through blocking queue.
+		// May throw if dequeue from the queue times out.
+		auto resv = prog->reserve_vm(ctx, this, std::move(prog));
+		// prog is nullptr after this ^
+
+		return resv.slot;
+
+	} catch (std::exception& e) {
+		// It makes no sense to reserve a VM without a request w/VSL
+		VSLb(ctx->vsl, SLT_Error,
+			"VM '%s' exception: %s", config.name.c_str(), e.what());
+		return nullptr;
+	}
+}
+void TenantInstance::temporary_vmreserve_free(const vrt_ctx*, void* slotv)
+{
+	VMPoolItem *slot = (VMPoolItem *)slotv;
+
+	ProgramInstance::vm_free_function(slot);
+}
+
 MachineInstance* TenantInstance::tlsreserve(const vrt_ctx* ctx, bool debug)
 {
 	auto prog = this->ref(ctx, debug);

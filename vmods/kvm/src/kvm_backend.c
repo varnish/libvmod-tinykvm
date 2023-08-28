@@ -256,9 +256,15 @@ kvmbe_gethdrs(const struct director *dir,
 	}
 	result->bufcount = VMBE_NUM_BUFFERS;
 
+	/* Temporary VM reservation that can be re-used. */
+	struct vmod_kvm_slot *last_slot = NULL;
+	TEN_PTR last_tenant = NULL;
+
 	/* Loop through each program in the chain */
 	for (int index = 0; index < kvmr->chain.count; index++)
 	{
+		const bool is_temporary = (index+1 < kvmr->chain.count);
+
 		/* The chain item contains the tenant program and all the inputs
 		   to the program. Everything needed to invoke the VM function. */
 		struct kvm_chain_item *invocation =
@@ -272,9 +278,23 @@ kvmbe_gethdrs(const struct director *dir,
 		/* Reserving a VM means putting ourselves in a concurrent queue
 		waiting for a free VM, and then getting exclusive access until
 		the end of the request. */
-		struct vmod_kvm_slot *slot =
-			kvm_reserve_machine(&ctx, invocation->tenant, kvmr->debug);
+		struct vmod_kvm_slot *slot;
+		if (last_slot != NULL && last_tenant == invocation->tenant) {
+			/* Re-use the last reservation if same program. */
+			slot = last_slot;
+			last_slot = NULL;
+		} else if (is_temporary) {
+			/* This is in the middle of a chain, temporary reservation. */
+			slot = kvm_temporarily_reserve_machine(&ctx, invocation->tenant, kvmr->debug);
+		} else {
+			/* The last in the chain is a full reservation. */
+			slot = kvm_reserve_machine(&ctx, invocation->tenant, kvmr->debug);
+		}
 		if (slot == NULL) {
+			/* Let go of any previous program in the chain. */
+			if (last_slot != NULL)
+				kvm_free_reserved_machine(&ctx, last_slot);
+
 			VSLb(ctx.vsl, SLT_Error, "KVM: Unable to reserve machine");
 			return (-1);
 		}
@@ -299,6 +319,9 @@ kvmbe_gethdrs(const struct director *dir,
 			int ret = kvm_get_body(post, bo);
 			if (ret < 0) {
 				VSLb(ctx.vsl, SLT_Error, "KVM: Unable to aggregate request body data");
+				// There is no previous in the chain to free
+				if (is_temporary)
+					kvm_free_reserved_machine(&ctx, slot);
 				return (-1);
 			}
 			if (VMOD_KVM_BACKEND_TIMINGS) {
@@ -314,9 +337,17 @@ kvmbe_gethdrs(const struct director *dir,
 			post->length  = 0;
 			post->inputs = invocation->inputs;
 
+			/* This marks the end of the previous request (in the chain). */
 			if (kvm_handle_post_to_another(&ctx, post, invocation, result) < 0) {
+				// There is a previous in the chain to free, if not the same program
+				if (last_slot != NULL)
+					kvm_free_reserved_machine(&ctx, last_slot);
+				if (is_temporary)
+					kvm_free_reserved_machine(&ctx, slot);
 				return (-1);
 			}
+
+			kvm_free_reserved_machine(&ctx, last_slot);
 
 			if (VMOD_KVM_BACKEND_TIMINGS) {
 				kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev);
@@ -324,6 +355,9 @@ kvmbe_gethdrs(const struct director *dir,
 
 			use_post = true;
 		}
+		/* At this point any previously reserved VM has been freed.
+		   We are only reserving the current VM in the chain. */
+		last_slot = NULL;
 
 		/* Make a backend VM call (with optional POST). */
 		kvm_backend_call(&ctx, slot, invocation, use_post ? post : NULL, result);
@@ -336,6 +370,8 @@ kvmbe_gethdrs(const struct director *dir,
 			VSLb(ctx.vsl, SLT_Error,
 				"KVM: Error status %u from call to %s at index %d in chain",
 				result->status, kvm_tenant_name(invocation->tenant), index);
+			if (is_temporary)
+				kvm_free_reserved_machine(&ctx, slot);
 			break;
 		}
 
@@ -354,6 +390,9 @@ kvmbe_gethdrs(const struct director *dir,
 					"%s %.*s", H_Content_Type + 1, (int)result->tsize, result->type);
 			}
 		}
+
+		last_tenant = invocation->tenant;
+		last_slot = slot;
 	}
 
 	/* Finish the response.

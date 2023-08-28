@@ -140,6 +140,8 @@ public:
 	/* Reserve VM from blocking queue. */
 	Reservation reserve_vm(const vrt_ctx*,
 		TenantInstance*, std::shared_ptr<ProgramInstance>);
+	/* Free a reserved VM. This can potentially finish a program. */
+	static void vm_free_function(void*);
 
 	/* Reserve VM from blocking queue. */
 	MachineInstance* tls_reserve_vm(const vrt_ctx*,
