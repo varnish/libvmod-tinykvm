@@ -24,16 +24,8 @@ sub vcl_init {
 		"""{
 			"hugepages": false,
 			"request_hugepages": false,
-			"concurrency": 32,
+			"concurrency": 2,
 			"ephemeral": true
-		}""");
-	compute.configure("thumbnails",
-		"""{
-			"concurrency": 32
-		}""");
-	compute.configure("zstd",
-		"""{
-			"concurrency": 32
 		}""");
 	# Start the JPEG-to-AVIF transcoder, but don't delay Varnish startup.
 	compute.start("avif");
@@ -44,7 +36,7 @@ sub vcl_recv {
 		return (synth(404));
 	}
 	if (req.url == "/invalidate") {
-		compute.invalidate_program("*");
+		compute.invalidate_program("*.");
 		return (synth(200));
 	}
 	if (req.url == "/chain" || req.url == "/avif/image") {
