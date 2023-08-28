@@ -67,30 +67,21 @@ static void syscall_unknown(vCPU& cpu, MachineInstance& inst, unsigned scall)
 {
 	printf("%s: Unhandled system call %u\n",
 		inst.name().c_str(), scall);
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	regs.rax = -ENOSYS;
 	cpu.set_registers(regs);
 }
 
-static void syscall_log(vCPU& cpu, MachineInstance& inst)
+static void syscall_log(vCPU& cpu, MachineInstance&)
 {
-	auto regs = cpu.registers();
+	auto& regs = cpu.registers();
 	const uint64_t g_buf = regs.rdi;
 	const uint16_t g_len = regs.rsi;
 	/* Log to VSL if VRT ctx and VSL is accessible. */
 	cpu.machine().foreach_memory(g_buf, g_len,
-		[&inst] (std::string_view buffer)
+		[&cpu] (std::string_view buffer)
 		{
-			if (inst.ctx() && inst.ctx()->vsl) {
-				auto* vsl = inst.ctx()->vsl;
-				/* Simultaneous logging is not possible with VSL.
-				   TODO: Use locking here instead. */
-				const bool smp = inst.machine().smp_active();
-				if (smp) return;
-
-				VSLb(vsl, SLT_VCL_Log, "%s says: %.*s",
-					inst.name().c_str(), (int)buffer.size(), buffer.begin());
-			}
+			cpu.machine().print(buffer.begin(), buffer.size());
 		});
 }
 
@@ -221,7 +212,7 @@ void MachineInstance::setup_syscall_interface()
 	Machine::install_syscall_handler(
 		0, [] (vCPU& cpu) { // READ
 			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
-			auto regs = cpu.registers();
+			auto& regs = cpu.registers();
 			SYSPRINT("READ to fd=%lld, data=0x%llX, size=%llu\n",
 				regs.rdi, regs.rsi, regs.rdx);
 			int fd = inst.m_fd.translate(regs.rdi);
@@ -272,9 +263,11 @@ void MachineInstance::setup_syscall_interface()
 				regs.rax = writev(fd, (const struct iovec *)buffers, bufcount);
 			}
 			else {
-				cpu.machine().foreach_memory(regs.rsi, bytes,
-					[&inst] (std::string_view buffer) {
-						inst.print(buffer);
+				const auto g_buf = regs.rsi;
+				cpu.machine().foreach_memory(g_buf, bytes,
+					[&cpu] (std::string_view buffer)
+					{
+						cpu.machine().print(buffer.begin(), buffer.size());
 					});
 				regs.rax = bytes;
 			}
@@ -367,7 +360,7 @@ void MachineInstance::setup_syscall_interface()
 	Machine::install_syscall_handler(
 		217, [](vCPU& cpu) { // GETDENTS64
 			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
-			auto regs = cpu.registers();
+			auto& regs = cpu.registers();
 
 			int fd = inst.m_fd.translate(regs.rdi);
 

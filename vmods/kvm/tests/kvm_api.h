@@ -433,6 +433,7 @@ storage_return_nothing(void) { storage_return(NULL, 0); }
 /* Allow a certain function to be called from a request VM.
    If this function is never called, all functions are allowed. */
 extern long sys_storage_allow(void(*)());
+#define STORAGE_ALLOW(x) sys_storage_allow((void(*)())x)
 
 /* Start multi-processing using @n vCPUs on given function,
    forwarding up to 4 integral/pointer arguments.
