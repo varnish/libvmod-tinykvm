@@ -36,7 +36,7 @@ sub vcl_recv {
 		return (synth(404));
 	}
 	if (req.url == "/invalidate") {
-		compute.invalidate_program("*.");
+		compute.invalidate_programs("");
 		return (synth(200));
 	}
 	if (req.url == "/chain" || req.url == "/avif/image") {

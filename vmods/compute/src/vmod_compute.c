@@ -64,22 +64,26 @@ struct unloader_state {
 };
 static int unloader(const char *program, struct vmod_kvm_tenant *tenant, void *vstate)
 {
-	(void)program;
 	const struct unloader_state *state = (const struct unloader_state *)vstate;
 
 	const int matches =
         VRE_exec(state->regex, program, strlen(program), 0,
             0, NULL, 0, NULL);
 	if (matches > 0) {
+		VSLb(state->ctx->vsl, SLT_VCL_Log,
+			"compute: Unloading '%s'", program);
 		return kvm_tenant_unload(state->ctx, tenant);
 	}
 	return (0);
 }
-VCL_INT vmod_invalidate_program(VRT_CTX, VCL_PRIV task, VCL_STRING pattern)
+VCL_INT vmod_invalidate_programs(VRT_CTX, VCL_PRIV task, VCL_STRING pattern)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	if (SEMPTY(pattern))
+	if (pattern == NULL) {
+		VSLb(ctx->vsl, SLT_VCL_Error,
+			"compute: Regex pattern was null");
 		return (0);
+	}
 
 	/* Compile regex pattern (NOTE: uses a lot of stack). */
 	const char* error = "";
