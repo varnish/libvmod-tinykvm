@@ -228,8 +228,10 @@ static void syscall_curl_fetch_helper(
 		/* Request header fields. */
 		if (!fields.empty()) {
 			for (const auto& field : fields) {
-				if (!field.empty())
+				if (!field.empty()) {
+					inst.logf("Fetch: ReqHdr  %s", field.c_str());
 					req_list = curl_slist_append(req_list, field.c_str());
+				}
 				else break;
 			}
 			/* Optional Content-Type override for POSTs. */
@@ -241,6 +243,7 @@ static void syscall_curl_fetch_helper(
 				ct.resize(ct.size() + opres.ct_length);
 				std::memcpy(&ct[14], opres.ctype, opres.ct_length);
 
+				inst.logf("Fetch: ReqHdr  %s", ct.c_str());
 				req_list = curl_slist_append(req_list, ct.c_str());
 			}
 			curl_easy_setopt(curl, CURLOPT_HTTPHEADER, req_list);
@@ -315,7 +318,8 @@ static void syscall_curl_fetch_helper(
 			// OP result back to guest
 			vcpu.machine().copy_to_guest(op_buffer, &opres, sizeof(opres));
 
-			inst.logf("Fetch: transfer complete, %u bytes", opres.content_length);
+			inst.logf("Fetch: transfer complete, status=%ld (%s) %u bytes",
+				status, ctype, opres.content_length);
 			regs.rax = 0;
 		} else {
 			inst.logf("Fetch error: %s (%d)", curl_easy_strerror(res), res);

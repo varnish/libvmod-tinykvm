@@ -159,10 +159,15 @@ static void error_handling(kvm::VMPoolItem* slot,
 			machine.begin_call();
 
 			/* Call the on_error callback with exception reason. */
-			auto vm_entry_addr = prog.entry_at(ProgramEntryIndex::BACKEND_ERROR);
-			if (UNLIKELY(vm_entry_addr == 0x0))
+			auto on_error_addr = prog.entry_at(ProgramEntryIndex::BACKEND_ERROR);
+			if (UNLIKELY(on_error_addr == 0x0))
 				throw std::runtime_error("The ERROR callback has not been registered");
-			vm.timed_reentry(vm_entry_addr,
+
+			VSLb(ctx->vsl, SLT_VCL_Log,
+				"%s: Calling on_error() at 0x%lX",
+				machine.name().c_str(), on_error_addr);
+
+			vm.timed_reentry(on_error_addr,
 				ERROR_HANDLING_TIMEOUT, invoc->inputs.url, invoc->inputs.argument, exception);
 
 			/* Make sure no SMP work is in-flight. */
