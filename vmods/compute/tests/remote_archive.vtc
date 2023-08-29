@@ -1,4 +1,4 @@
-varnishtest "KVM Backend: Basic Hello World test"
+varnishtest "Compute: Program from remote archive"
 
 shell {
 cat >${tmpdir}/${testname}.json <<-EOF
@@ -41,6 +41,10 @@ vcl 4.1;
 	}
 
 	sub vcl_recv {
+		if (req.url == "/invalidate") {
+			compute.invalidate_programs("");
+			return (synth(200));
+		}
 		return (pass);
 	}
 
@@ -61,6 +65,10 @@ client c1 {
 	expect resp.body == "Hello World"
 	expect resp.status == 200
 
+	txreq -url "/invalidate" -hdr "Host: test"
+	rxresp
+	expect resp.status == 200
+
 	txreq -url "/1" -hdr "Host: test"
 	rxresp
 	expect resp.body == "Hello World"
@@ -69,6 +77,10 @@ client c1 {
 	txreq -url "/2" -hdr "Host: test"
 	rxresp
 	expect resp.body == "Hello World"
+	expect resp.status == 200
+
+	txreq -url "/invalidate" -hdr "Host: test"
+	rxresp
 	expect resp.status == 200
 
 	txreq -url "/2" -hdr "Host: test"
