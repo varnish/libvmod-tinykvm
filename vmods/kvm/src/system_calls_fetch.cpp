@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <string>
+#include "kvm_settings.h"
 
 namespace kvm {
 extern std::string adns_interp(vcl *, std::string);
@@ -20,7 +21,6 @@ static constexpr uint64_t CURL_BUFFER_MAX = 256UL * 1024UL * 1024UL;
 /* The current self-request URI */
 static std::string self_request_uri = "";
 static std::string self_request_prefix = "http://127.0.0.1:6081";
-static int self_request_max_concurrency = 50;
 static std::atomic_int self_request_concurrency {0};
 
 struct writeop {
@@ -137,7 +137,7 @@ static void syscall_curl_fetch_helper(
 		{
 			is_self_request = true;
 
-			if (kvm::self_request_concurrency++ >= kvm::self_request_max_concurrency)
+			if (kvm::self_request_concurrency++ >= kvm_settings.self_request_max_concurrency)
 			{
 				kvm::self_request_concurrency--;
 				throw std::runtime_error("Max self-request concurrency reached");
@@ -428,7 +428,7 @@ int kvm_set_self_request(VRT_CTX, VCL_PRIV, const char *uri, const char *prefix,
 
 	kvm::self_request_uri = uri;
 	kvm::self_request_prefix = prefix;
-	kvm::self_request_max_concurrency = max_concurrent_requests;
+	kvm_settings.self_request_max_concurrency = max_concurrent_requests;
 
 	if (kvm::self_request_uri.empty()) {
 		return (1);

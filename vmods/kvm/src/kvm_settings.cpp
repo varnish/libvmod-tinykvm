@@ -5,5 +5,6 @@
 /* The current live settings. */
 struct kvm_settings kvm_settings
 {
-	.backend_timings = 0,
+	.backend_timings = false,
+	.self_request_max_concurrency = 50,
 };
