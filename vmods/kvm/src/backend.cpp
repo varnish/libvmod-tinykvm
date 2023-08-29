@@ -46,7 +46,6 @@ extern "C" {
 #include "kvm_backend.h"
 }
 static constexpr bool VERBOSE_BACKEND = false;
-static constexpr bool BACKEND_TIMINGS = VMOD_KVM_BACKEND_TIMINGS;
 
 static void memory_error_handling(struct vsl_log *vsl, const tinykvm::MemoryException& e)
 {
@@ -71,7 +70,7 @@ static int16_t sanitize_status_code(int16_t code)
 
 static inline void kvm_ts(struct vsl_log *vsl, const char *event, double work, double& prev)
 {
-	if constexpr (BACKEND_TIMINGS) {
+	if (kvm_settings.backend_timings) {
 		VSLb_ts(vsl, event, work, &prev, VTIM_real());
 	}
 }
@@ -210,7 +209,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 {
 	double t_prev = 0.0;
 	double t_work = t_prev;
-	if constexpr (BACKEND_TIMINGS) t_prev = VTIM_real();
+	if (kvm_settings.backend_timings) t_prev = VTIM_real();
 
 	auto& machine = *slot->mi;
 	/* Setting the VRT_CTX allows access to HTTP and VSL, etc. */

@@ -270,7 +270,7 @@ kvmbe_gethdrs(const struct director *dir,
 		struct kvm_chain_item *invocation =
 			&kvmr->chain.chain[index];
 
-		if (VMOD_KVM_BACKEND_TIMINGS) {
+		if (kvm_settings.backend_timings) {
 			kvmr->t_prev = bo->t_prev;
 			kvm_ts(ctx.vsl, "TenantStart", &kvmr->t_work, &kvmr->t_prev);
 		}
@@ -298,7 +298,7 @@ kvmbe_gethdrs(const struct director *dir,
 			VSLb(ctx.vsl, SLT_Error, "KVM: Unable to reserve machine");
 			return (-1);
 		}
-		if (VMOD_KVM_BACKEND_TIMINGS) {
+		if (kvm_settings.backend_timings) {
 			kvm_ts(ctx.vsl, "TenantReserve", &kvmr->t_work, &kvmr->t_prev);
 		}
 
@@ -324,7 +324,7 @@ kvmbe_gethdrs(const struct director *dir,
 					kvm_free_reserved_machine(&ctx, slot);
 				return (-1);
 			}
-			if (VMOD_KVM_BACKEND_TIMINGS) {
+			if (kvm_settings.backend_timings) {
 				kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev);
 			}
 		}
@@ -349,7 +349,7 @@ kvmbe_gethdrs(const struct director *dir,
 
 			kvm_free_reserved_machine(&ctx, last_slot);
 
-			if (VMOD_KVM_BACKEND_TIMINGS) {
+			if (kvm_settings.backend_timings) {
 				kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev);
 			}
 
@@ -362,7 +362,7 @@ kvmbe_gethdrs(const struct director *dir,
 		/* Make a backend VM call (with optional POST). */
 		kvm_backend_call(&ctx, slot, invocation, use_post ? post : NULL, result);
 
-		if (VMOD_KVM_BACKEND_TIMINGS) {
+		if (kvm_settings.backend_timings) {
 			kvm_ts(ctx.vsl, "TenantProcess", &kvmr->t_work, &kvmr->t_prev);
 		}
 
@@ -401,7 +401,7 @@ kvmbe_gethdrs(const struct director *dir,
 	const int res = kvmbe_write_response(
 		bo, &ctx, result);
 
-	if (VMOD_KVM_BACKEND_TIMINGS) {
+	if (kvm_settings.backend_timings) {
 		kvm_ts(ctx.vsl, "TenantResponse", &kvmr->t_work, &kvmr->t_prev);
 	}
 
@@ -454,7 +454,7 @@ kvm_init_chain(VRT_CTX, struct vmod_kvm_tenant *tenant, const char *url, const c
 static void init_kvmr(struct vmod_kvm_backend *kvmr)
 {
 	INIT_OBJ(kvmr, KVM_BACKEND_MAGIC);
-	if (VMOD_KVM_BACKEND_TIMINGS) {
+	if (kvm_settings.backend_timings) {
 		kvmr->t_work = VTIM_real();
 	}
 	kvmr->chain = kqueue;
