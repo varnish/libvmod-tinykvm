@@ -1,6 +1,7 @@
 vcl 4.1;
 import activedns;
 import compute;
+import utils;
 
 backend default {
 	.host = "127.0.0.1";
@@ -16,7 +17,7 @@ sub vcl_init {
 	compute.library("https://filebin.varnish-software.com/kvmprograms/compute.json");
 
 	# Tell VMOD compute how to contact Varnish (Unix Socket *ONLY*)
-	compute.init_self_requests("/tmp/compute.sock/");
+	compute.init_self_requests("/tmp/compute.sock");
 	#compute.init_self_requests("", "http://127.0.0.1:8080");
 
 	# Add hugepage support to important programs
@@ -29,6 +30,7 @@ sub vcl_init {
 		}""");
 	# Start the JPEG-to-AVIF transcoder, but don't delay Varnish startup.
 	compute.start("avif");
+	compute.start("minimal");
 }
 sub vcl_recv {
 	if (req.url == "/tcp") {
@@ -51,7 +53,7 @@ sub vcl_backend_fetch {
 		set bereq.backend = compute.program("avif", "/avif/image", "{}");
 	}
 	else if (bereq.url == "/avif/image") {
-		set bereq.backend = compute.program("fetch", "https://${filebin}/kvmprograms/723-1200x1200.jpg",
+		set bereq.backend = compute.program("fetch", "https://${filebin}/kvmprograms/rose.jpg",
 			"""{
 				"headers": ["Host: filebin.varnish-software.com"]
 			}""");
@@ -79,22 +81,20 @@ sub vcl_backend_fetch {
 		set bereq.backend = compute.program("inflate", "http://httpbin.org/gzip");
 	}
 	else if (bereq.url == "/zstd") {
-		# Decompress a zstd-compressed asset into a PNG (without content-type)
-		set bereq.backend = compute.program("zstd", "http://127.0.0.1:8080/zstd/compress",
-			"""{
-				"action": "decompress",
-				"resp_headers": [
-					"Content-Disposition: inline; filename=waterfall.png"
-				]
-			}""");
-	}
-	else if (bereq.url == "/zstd/compress") {
 		# Compress data using zstandard
-		set bereq.backend = compute.program("zstd", "https://${filebin}/kvmprograms/waterfall.png",
+		compute.chain("zstd", "https://${filebin}/kvmprograms/waterfall.avif",
 			"""{
 				"action": "compress",
 				"level": 6,
 				"headers": ["Host: filebin.varnish-software.com"]
+			}""");
+		# Decompress a zstd-compressed asset into AVIF (without content-type)
+		set bereq.backend = compute.program("zstd", "",
+			"""{
+				"action": "decompress",
+				"resp_headers": [
+					"Content-Disposition: inline; filename=waterfall.avif"
+				]
 			}""");
 	}
 	else if (bereq.url == "/min") {
@@ -206,7 +206,11 @@ sub vcl_backend_fetch {
 	}
 	else if (bereq.url == "/xml") {
 		#compute.chain("fetch", "http://www.w3schools.com/xml/plant_catalog.xml");
-		compute.chain("fetch", "https://${filebin}/kvmprograms/compute.json");
+		compute.chain("fetch", "https://${filebin}/kvmprograms/compute.json",
+			"""{
+				"headers": ["Host: filebin.varnish-software.com"]
+			}""");
+
 		set bereq.backend = compute.program("xml", "", "{}");
 	}
 	else if (bereq.url == "/rust") {
@@ -219,7 +223,7 @@ sub vcl_backend_fetch {
 	}
 	else if (bereq.url == "/sd") {
 		set bereq.backend = compute.program("stable_diffusion",
-			"A lovely cat, high quality", "blurry, ugly, jpeg compression, artifacts, unsharp");
+			"A lovely waterfall, high quality", "blurry, ugly, jpeg compression, artifacts, unsharp");
 	}
 	else if (bereq.url == "/watermark") {
 		//compute.invalidate_program("watermark");
