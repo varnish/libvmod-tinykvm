@@ -189,6 +189,10 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	{
 		group.print_stdout = obj.value();
 	}
+	else if (obj.key() == "smp")
+	{
+		group.max_smp = obj.value();
+	}
 	else if (obj.key() == "allow_debug")
 	{
 		group.allow_debug = obj.value();

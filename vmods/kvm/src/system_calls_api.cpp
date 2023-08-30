@@ -204,12 +204,10 @@ static void syscall_multiprocess(vCPU& cpu, MachineInstance& inst)
 			printf("SMP active count: %d\n", cpu.machine().smp_active_count());
 			throw std::runtime_error("Multiprocessing: Already active");
 		} else if (UNLIKELY(regs.rdi < 2)) {
-			throw std::runtime_error("Multiprocessing: Must request at least one vCPU");
-		} else if (UNLIKELY(regs.rdi > 16)) {
+			throw std::runtime_error("Multiprocessing: Must request at least 2 vCPUs");
+		} else if (UNLIKELY(regs.rdi > inst.tenant().config.max_smp())) {
 			/* TODO: Tenant-property */
 			throw std::runtime_error("Multiprocessing: Too many vCPUs requested");
-		} else if (UNLIKELY(!inst.tenant().config.allow_smp())) {
-			throw std::runtime_error("Multiprocessing: Not allowed");
 		}
 		const size_t num_cpus = regs.rdi - 1;
 		const size_t stack_size = 512 * 1024ul;
@@ -217,7 +215,7 @@ static void syscall_multiprocess(vCPU& cpu, MachineInstance& inst)
 			cpu.machine().mmap_allocate(num_cpus * stack_size),
 			stack_size,
 			(uint64_t) regs.rsi, /* func */
-			2.0f, /* TODO: Tenant-property */
+			8.0f, /* TODO: Tenant-property */
 			(uint64_t) regs.rdx, /* arg1 */
 			(uint64_t) regs.rcx, /* arg2 */
 			(uint64_t) regs.r8,  /* arg3 */
@@ -239,11 +237,9 @@ static void syscall_multiprocess_array(vCPU& cpu, MachineInstance& inst)
 			throw std::runtime_error("Multiprocessing: Already active");
 		} else if (UNLIKELY(regs.rdi < 2)) {
 			throw std::runtime_error("Multiprocessing: Must request at least one vCPU");
-		} else if (UNLIKELY(regs.rdi > 16)) {
+		} else if (UNLIKELY(regs.rdi > inst.tenant().config.max_smp())) {
 			/* TODO: Tenant-property */
 			throw std::runtime_error("Multiprocessing: Too many vCPUs requested");
-		} else if (UNLIKELY(!inst.tenant().config.allow_smp())) {
-			throw std::runtime_error("Multiprocessing: Not allowed");
 		}
 		const size_t num_cpus = regs.rdi - 1;
 		const size_t stack_size = 512 * 1024ul;
@@ -251,7 +247,7 @@ static void syscall_multiprocess_array(vCPU& cpu, MachineInstance& inst)
 			cpu.machine().mmap_allocate(num_cpus * stack_size),
 			stack_size,
 			(uint64_t) regs.rsi,  /* func */
-			2.0f, /* TODO: Tenant-property */
+			8.0f, /* TODO: Tenant-property */
 			(uint64_t) regs.rdx,  /* array */
 			(uint32_t) regs.rcx); /* array_size */
 		regs.rax = 0;
@@ -270,18 +266,16 @@ static void syscall_multiprocess_clone(vCPU& cpu, MachineInstance& inst)
 			printf("SMP active count: %d\n", cpu.machine().smp_active_count());
 			throw std::runtime_error("Multiprocessing: Already active");
 		} else if (UNLIKELY(regs.rdi < 2)) {
-			throw std::runtime_error("Multiprocessing: Must request at least one vCPU");
-		} else if (UNLIKELY(regs.rdi > 16)) {
+			throw std::runtime_error("Multiprocessing: Must request at least 2 vCPUs");
+		} else if (UNLIKELY(regs.rdi > inst.tenant().config.max_smp())) {
 			/* TODO: Tenant-property */
 			throw std::runtime_error("Multiprocessing: Too many vCPUs requested");
-		} else if (UNLIKELY(!inst.tenant().config.allow_smp())) {
-			throw std::runtime_error("Multiprocessing: Not allowed");
 		}
 		const size_t num_cpus = regs.rdi - 1;
 		cpu.machine().smp().timed_smpcall_clone(num_cpus,
 			regs.rsi,
 			regs.rdx,
-			2.0f, /* TODO: Tenant-property */
+			8.0f, /* TODO: Tenant-property */
 			regs);
 		regs.rax = 0;
 	} catch (const std::exception& e) {

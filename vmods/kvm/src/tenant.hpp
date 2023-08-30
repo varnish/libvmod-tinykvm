@@ -20,7 +20,8 @@ struct TenantGroup {
 	uint32_t max_req_mem; /* Megabytes */
 	uint32_t limit_req_mem; /* Megabytes of memory banks to keep after request completion */
 	uint32_t shared_memory; /* Megabytes */
-	size_t   max_concurrency = 2;
+	size_t   max_concurrency = 2; /* Request VMs */
+	size_t   max_smp         = 0; /* Multi-processing per VM */
 	size_t   max_fd       = 32;
 	size_t   max_regex    = 64;
 	bool     has_storage  = false;
@@ -87,7 +88,7 @@ struct TenantConfig
 	bool     hugepages() const noexcept { return group.hugepages; }
 	bool     ephemeral_hugepages() const noexcept { return group.ephemeral_hugepages; }
 	bool     allow_debug() const noexcept { return group.allow_debug; }
-	bool     allow_smp() const noexcept { return false; }
+	size_t   max_smp() const noexcept { return group.max_smp; }
 	bool     control_ephemeral() const noexcept { return group.control_ephemeral; }
 	auto&    environ() const noexcept { return group.environ; }
 
