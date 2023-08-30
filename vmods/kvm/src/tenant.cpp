@@ -192,6 +192,8 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	else if (obj.key() == "smp")
 	{
 		group.max_smp = obj.value();
+		// TinyKVM does not support more than 16 extra vCPUs (for now)
+		group.max_smp = std::min(size_t(16), group.max_smp);
 	}
 	else if (obj.key() == "allow_debug")
 	{
