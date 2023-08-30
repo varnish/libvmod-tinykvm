@@ -295,7 +295,9 @@ kvmbe_gethdrs(const struct director *dir,
 			if (last_slot != NULL)
 				kvm_free_reserved_machine(&ctx, last_slot);
 
-			VSLb(ctx.vsl, SLT_Error, "KVM: Unable to reserve machine");
+			VSLb(ctx.vsl, SLT_Error,
+				"KVM: Unable to reserve VM for index %d, program %s",
+				index, kvm_tenant_name(invocation->tenant));
 			return (-1);
 		}
 		if (kvm_settings.backend_timings) {
@@ -318,7 +320,9 @@ kvmbe_gethdrs(const struct director *dir,
 
 			int ret = kvm_get_body(post, bo);
 			if (ret < 0) {
-				VSLb(ctx.vsl, SLT_Error, "KVM: Unable to aggregate request body data");
+				VSLb(ctx.vsl, SLT_Error,
+					"KVM: Unable to aggregate request body data for index %d, program %s",
+					index, kvm_tenant_name(invocation->tenant));
 				// There is no previous in the chain to free
 				if (is_temporary)
 					kvm_free_reserved_machine(&ctx, slot);
@@ -344,6 +348,9 @@ kvmbe_gethdrs(const struct director *dir,
 					kvm_free_reserved_machine(&ctx, last_slot);
 				if (is_temporary)
 					kvm_free_reserved_machine(&ctx, slot);
+				VSLb(ctx.vsl, SLT_Error,
+					"KVM: Unable to transfer POST data for index %d, program %s",
+					index, kvm_tenant_name(invocation->tenant));
 				return (-1);
 			}
 
@@ -412,7 +419,7 @@ static void init_director(VRT_CTX, struct vmod_kvm_backend *kvmr)
 {
 	kvmr->dir = WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_backend));
 	if (kvmr->dir == NULL) {
-		VRT_fail(ctx, "KVM: Out of workspace");
+		VRT_fail(ctx, "KVM: Out of workspace for director");
 		return;
 	}
 
@@ -483,7 +490,7 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	struct vmod_kvm_backend *kvmr =
 		WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_backend));
 	if (kvmr == NULL) {
-		VRT_fail(ctx, "KVM: Out of workspace (kvm_backend)");
+		VRT_fail(ctx, "KVM: Out of workspace for kvm_backend");
 		return (NULL);
 	}
 
@@ -491,7 +498,7 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	struct vmod_kvm_tenant *tenant =
 		kvm_tenant_find(task, program);
 	if (tenant == NULL) {
-		VRT_fail(ctx, "KVM: Tenant not found: %s", program);
+		VRT_fail(ctx, "KVM: Program not found: %s", program);
 		return (NULL);
 	}
 
@@ -529,11 +536,11 @@ VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
 	struct vmod_kvm_tenant *tenant =
 		kvm_tenant_find_key(task, program, key);
 	if (tenant == NULL) {
-		VRT_fail(ctx, "KVM: Tenant not found: %s", program);
+		VRT_fail(ctx, "KVM: Program not found: %s", program);
 		return (NULL);
 	}
 	if (!kvm_tenant_debug_allowed(tenant)) {
-		VRT_fail(ctx, "KVM: Tenant not allowed to live-debug: %s", program);
+		VRT_fail(ctx, "KVM: Program not allowed to live-debug: %s", program);
 		return (NULL);
 	}
 
@@ -562,7 +569,7 @@ VCL_BOOL vmod_chain(VRT_CTX, VCL_PRIV task,
 	struct vmod_kvm_tenant *tenant =
 		kvm_tenant_find(task, program);
 	if (tenant == NULL) {
-		VRT_fail(ctx, "KVM: Tenant not found: %s", program);
+		VRT_fail(ctx, "KVM: Program not found: %s", program);
 		return (0);
 	}
 
