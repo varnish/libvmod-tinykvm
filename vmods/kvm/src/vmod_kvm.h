@@ -39,7 +39,6 @@ typedef int (*vmod_kvm_foreach_t) (const char *, TEN_PTR, void *);
 extern int  kvm_init_tenants_str(VRT_CTX, VCL_PRIV, const char *source, const char *, size_t, int init);
 extern int  kvm_init_tenants_file(VRT_CTX, VCL_PRIV, const char *, int init);
 extern int  kvm_init_tenants_uri(VRT_CTX, VCL_PRIV, const char *uri, int init);
-extern int  kvm_set_self_request(VRT_CTX, VCL_PRIV, const char *unix_path, const char *uri, long max);
 extern const char * kvm_tenant_name(TEN_PTR tenant);
 extern TEN_PTR kvm_tenant_find(VCL_PRIV, const char *name);
 extern TEN_PTR kvm_tenant_find_key(VCL_PRIV, const char *name, const char *key);
@@ -58,6 +57,10 @@ extern uint64_t kvm_resolve_name(TEN_PTR, const char*);
 extern int kvm_copy_to_machine(KVM_SLOT, uint64_t dst, const void* src, size_t len);
 extern uint64_t kvm_allocate_memory(KVM_SLOT, uint64_t bytes);
 extern int      kvm_is_mmap_range(KVM_SLOT, uint64_t addr);
+
+struct backend_result;
+extern int kvm_set_self_request(VRT_CTX, VCL_PRIV, const char *unix_path, const char *uri, long max);
+extern int kvm_self_request(VRT_CTX, const char *path, struct backend_result *result);
 
 /* Fetch something with cURL. Returns 0: success, <0: failure */
 struct MemoryStruct

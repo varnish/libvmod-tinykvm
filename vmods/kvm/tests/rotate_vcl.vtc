@@ -8,7 +8,7 @@ shell {
 cat >${tmpdir}/program.c <<-EOF
 #include "kvm_api.h"
 
-static void my_backend(const char *url)
+static void my_backend(const char *url, const char *arg)
 {
 	set_cacheable(0, 1.0f, 0.0f, 0.0f);
 	backend_response_str(200, "text/plain", url);
@@ -68,6 +68,7 @@ loop 25 {
 	varnish v1 -cliok "vcl.state vcl2 cold"
 	varnish v1 -cliok "vcl.state vcl2 auto"
 	varnish v1 -cliok "vcl.use vcl2"
+	varnish v1 -cliok "vcl.state vcl1 auto"
 	varnish v1 -cliok "vcl.state vcl1 cold"
 	varnish v1 -cliok "vcl.state vcl1 auto"
 }

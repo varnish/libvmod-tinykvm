@@ -420,21 +420,4 @@ static void syscall_request(vCPU& vcpu, MachineInstance& inst)
 
 } // kvm
 
-extern "C"
-int kvm_set_self_request(VRT_CTX, VCL_PRIV, const char *uri, const char *prefix,
-	long max_concurrent_requests)
-{
-	(void)ctx;
-
-	kvm::self_request_uri = uri;
-	kvm::self_request_prefix = prefix;
-	kvm_settings.self_request_max_concurrency = max_concurrent_requests;
-
-	if (kvm::self_request_uri.empty()) {
-		return (1);
-	}
-	/* Remove the last /, as self-requests are required to start with it. */
-	if (kvm::self_request_uri.back() == '/')
-		kvm::self_request_uri.pop_back();
-	return (1);
-}
+#include "self_request.cpp"

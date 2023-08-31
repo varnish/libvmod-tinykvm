@@ -197,8 +197,19 @@ int kvm_handle_post_to_another(VRT_CTX, struct backend_post *post,
 	result->bufcount = VMBE_NUM_BUFFERS;
 
 	/* Forward the Content-Type as a direct argument to the next program. */
-	if ((invocation->inputs.content_type = result->type) == NULL)
+	if (result->tsize == 0) {
 		invocation->inputs.content_type = "";
+	} else {
+		/* Duplicate the Content-Type string. */
+		char *ctype = (char*)WS_Alloc(ctx->ws, result->tsize + 1);
+		if (ctype != NULL) {
+			memcpy(ctype, result->type, result->tsize);
+			ctype[result->tsize] = 0;
+			invocation->inputs.content_type = ctype;
+		} else {
+			invocation->inputs.content_type = "";
+		}
+	}
 	invocation->inputs.method = "POST";
 	return (0);
 }
@@ -259,6 +270,14 @@ kvmbe_gethdrs(const struct director *dir,
 	/* Temporary VM reservation that can be re-used. */
 	struct vmod_kvm_slot *last_slot = NULL;
 	TEN_PTR last_tenant = NULL;
+	void* must_free_chunk = NULL;
+
+	#define LOOP_EXIT_ACTIONS() \
+		free(must_free_chunk);  \
+		must_free_chunk = NULL; \
+		if (last_slot != NULL)  \
+			kvm_free_reserved_machine(&ctx, last_slot);
+
 
 	/* Loop through each program in the chain */
 	for (int index = 0; index < kvmr->chain.count; index++)
@@ -269,6 +288,17 @@ kvmbe_gethdrs(const struct director *dir,
 		   to the program. Everything needed to invoke the VM function. */
 		struct kvm_chain_item *invocation =
 			&kvmr->chain.chain[index];
+
+		if (invocation->special_function != NULL)
+		{
+			/* Only self-request fetches for now. */
+			if (kvm_self_request(&ctx, invocation->inputs.url, result) == 0)
+			{
+				/* Only used to free the chunk after usage. */
+				must_free_chunk = TRUST_ME(result->buffers[0].data);
+			}
+			continue;
+		}
 
 		if (kvm_settings.backend_timings) {
 			kvmr->t_prev = bo->t_prev;
@@ -292,8 +322,7 @@ kvmbe_gethdrs(const struct director *dir,
 		}
 		if (slot == NULL) {
 			/* Let go of any previous program in the chain. */
-			if (last_slot != NULL)
-				kvm_free_reserved_machine(&ctx, last_slot);
+			LOOP_EXIT_ACTIONS();
 
 			VSLb(ctx.vsl, SLT_Error,
 				"KVM: Unable to reserve VM for index %d, program %s",
@@ -344,8 +373,7 @@ kvmbe_gethdrs(const struct director *dir,
 			/* This marks the end of the previous request (in the chain). */
 			if (kvm_handle_post_to_another(&ctx, post, invocation, result) < 0) {
 				// There is a previous in the chain to free, if not the same program
-				if (last_slot != NULL)
-					kvm_free_reserved_machine(&ctx, last_slot);
+				LOOP_EXIT_ACTIONS();
 				if (is_temporary)
 					kvm_free_reserved_machine(&ctx, slot);
 				VSLb(ctx.vsl, SLT_Error,
@@ -412,6 +440,7 @@ kvmbe_gethdrs(const struct director *dir,
 		kvm_ts(ctx.vsl, "TenantResponse", &kvmr->t_work, &kvmr->t_prev);
 	}
 
+	free(must_free_chunk);
 	return (res);
 }
 
@@ -442,6 +471,7 @@ kvm_init_chain(VRT_CTX, struct vmod_kvm_tenant *tenant, const char *url, const c
 
 	struct kvm_chain_item *item = &kqueue->chain[kqueue->count];
 	item->tenant = tenant;
+	item->special_function = NULL;
 	item->inputs.url = url ? url : "";
 	item->inputs.argument = arg ? arg : "";
 
@@ -455,6 +485,25 @@ kvm_init_chain(VRT_CTX, struct vmod_kvm_tenant *tenant, const char *url, const c
 		item->inputs.method = "";
 		item->inputs.content_type = "";
 	}
+	kqueue->count++;
+	return (item);
+}
+struct kvm_chain_item *
+kvm_init_fetch(VRT_CTX, const char *url, const char *arg)
+{
+	(void)ctx;
+	struct kvm_program_chain *kqueue = kvm_chain_get_queue();
+	if (kqueue->count != 0 || url == NULL)
+		return (NULL);
+
+	struct kvm_chain_item *item = &kqueue->chain[kqueue->count];
+	item->tenant = NULL;
+	item->special_function = "fetch";
+	item->inputs.url = url ? url : "";
+	item->inputs.argument = arg ? arg : "";
+	item->inputs.method = "";
+	item->inputs.content_type = "";
+
 	kqueue->count++;
 	return (item);
 }
@@ -563,6 +612,11 @@ VCL_BOOL vmod_chain(VRT_CTX, VCL_PRIV task,
 	if (ctx->method != VCL_MET_BACKEND_FETCH) {
 		VRT_fail(ctx, "compute: chain() should only be called from vcl_backend_fetch");
 		return (0);
+	}
+
+	/* Self-request */
+	if (strcmp(program, "fetch") == 0) {
+		return (kvm_init_fetch(ctx, url, arg) != NULL);
 	}
 
 	/* Lookup internal tenant using VCL task */

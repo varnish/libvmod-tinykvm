@@ -21,6 +21,7 @@ struct vmod_kvm_inputs
 struct kvm_chain_item
 {
 	struct vmod_kvm_tenant *tenant;
+	const char *special_function;
 	struct vmod_kvm_inputs inputs;
 };
 struct kvm_program_chain
