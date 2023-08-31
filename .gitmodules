@@ -1,3 +1,6 @@
-[submodule "lib/libkvm/tinykvm"]
-	path = lib/libkvm/tinykvm
+[submodule "lib/libkvm/ext/tinykvm"]
+	path = lib/libkvm/ext/tinykvm
 	url = git@github.com:varnish/tinykvm.git
+[submodule "lib/libkvm/ext/json"]
+	path = lib/libkvm/ext/json
+	url = https://github.com/nlohmann/json.git

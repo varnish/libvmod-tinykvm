@@ -47,8 +47,8 @@ libvmod_compute_la_SOURCES = \
 nodist_libvmod_compute_la_SOURCES = \
 	vcc_compute_if.c \
 	vcc_compute_if.h
-	#VSC_compute.c \
-	#VSC_compute.h
+#	VSC_compute.c \
+#	VSC_compute.h
 
 @BUILD_VMOD_COMPUTE@
 #@BUILD_VSC_COMPUTE@

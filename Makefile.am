@@ -6,7 +6,7 @@ EXTRA_DIST = \
 	get_version \
 	vcp.version \
 	LICENSE
-	#src/ratelimit.vsc
+#	src/vmod_compute.vsc
 
 SUBDIRS = .
 SUBDIRS += src
