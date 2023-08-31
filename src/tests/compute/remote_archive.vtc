@@ -27,7 +27,7 @@ int main(int argc, char **argv)
 	wait_for_requests();
 }
 EOF
-gcc -static -O2 test.c -DKVM_ADNS=1 -I${testdir} -o test
+gcc -static -O2 test.c -I${testdir} -o test
 tar -cJf test.tar.xz test
 }
 
