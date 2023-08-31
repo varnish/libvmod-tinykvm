@@ -19,9 +19,7 @@ using namespace tinykvm;
 
 #include "system_calls_http.cpp"
 #include "system_calls_regex.cpp"
-#ifdef KVM_ADNS
 #include "system_calls_dns.cpp"
-#endif
 #include "system_calls_fetch.cpp"
 #include "system_calls_api.cpp"
 
@@ -141,7 +139,6 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10100:
 				//syscall_set_backend(cpu, inst);
 				return;
-#ifdef KVM_ADNS
 			case 0x10200: // ADNS_NEW
 				syscall_adns_new(cpu, inst);
 				return;
@@ -154,7 +151,6 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10203: // ADNS_GET
 				syscall_adns_get(cpu, inst);
 				return;
-#endif
 			case 0x10700: // SHARED_MEMORY_AREA
 				syscall_shared_memory(cpu, inst);
 				return;
@@ -285,10 +281,12 @@ void MachineInstance::setup_syscall_interface()
 			int idx = inst.m_fd.find(regs.rdi);
 			if (idx >= 0) {
 				auto& entry = inst.m_fd.get(idx);
-				regs.rax = close(entry.item);
+				int ret = close(entry.item);
 				entry.free();
-				if (regs.rax < 0)
+				if (ret < 0)
 					regs.rax = -errno;
+				else
+					regs.rax = 0;
 			} else {
 				regs.rax = -EBADF;
 			}
