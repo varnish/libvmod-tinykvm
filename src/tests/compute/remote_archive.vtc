@@ -1,19 +1,19 @@
 varnishtest "Compute: Program from remote archive"
 
 shell {
-cat >${tmpdir}/${testname}.json <<-EOF
+cat >test.json <<-EOF
 {
 	"test1": {
-		"filename": "${tmpdir}/${testname}",
+		"filename": "test",
 		"group": "test"
 	},
 	"test2": {
-		"uri": "file://${tmpdir}/${testname}.tar.xz",
+		"uri": "file://test.tar.xz",
 		"group": "test"
 	}
 }
 EOF
-cat >${tmpdir}/${testname}.c <<-EOF
+cat >test.c <<-EOF
 #include "kvm_api.h"
 
 static void on_get(const char *url, const char *arg)
@@ -27,8 +27,8 @@ int main(int argc, char **argv)
 	wait_for_requests();
 }
 EOF
-gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
-tar -cJf ${tmpdir}/${testname}.tar.xz ${tmpdir}/${testname}
+gcc -static -O2 test.c -DKVM_ADNS=1 -I${testdir} -o test
+tar -cJf test.tar.xz test
 }
 
 varnish v1 -vcl+backend {
@@ -37,7 +37,7 @@ vcl 4.1;
 	backend default none;
 
 	sub vcl_init {
-		compute.library("file://${tmpdir}/${testname}.json");
+		compute.library("file://test.json");
 	}
 
 	sub vcl_recv {
