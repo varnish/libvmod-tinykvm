@@ -4,7 +4,7 @@
 #include <malloc.h>
 #include <stdio.h>
 #include "vcl.h"
-#include "vcc_if.h"
+#include "vcc_compute_if.h"
 
 extern struct update_result kvm_live_update(VRT_CTX, struct vmod_kvm_tenant*, const struct update_params*);
 

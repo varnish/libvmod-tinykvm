@@ -2,7 +2,7 @@ AC_PREREQ([2.68])
 AC_INIT([libvmod-compute], [1.0])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([build-aux])
-AC_CONFIG_SRCDIR([vmod_compute.vcc])
+AC_CONFIG_SRCDIR([src/vmod_compute.vcc])
 AC_CONFIG_HEADERS([config.h])
 
 AC_CHECK_FUNCS([clock_gettime])
@@ -25,7 +25,7 @@ VARNISH_PREREQ([6.0.0])
 VARNISH_VMODS([compute])
 VARNISH_COUNTERS([compute])
 
-VTC_TESTS="$(cd $srcdir/tests && echo *.vtc)"
+VTC_TESTS="$(cd $srcdir/src/ && echo tests/compute/*.vtc)"
 AC_SUBST(VTC_TESTS)
 AM_SUBST_NOTMAKE(VTC_TESTS)
 
