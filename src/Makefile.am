@@ -1,24 +1,4 @@
-AM_CFLAGS = $(VARNISHAPI_CFLAGS) \
-	-Wall \
-	-Werror \
-	-Wall \
-	-Wno-format-y2k \
-	-Wstrict-prototypes \
-	-Wmissing-prototypes \
-	-Werror=missing-field-initializers \
-	-Wpointer-arith \
-	-Wreturn-type \
-	-Wwrite-strings \
-	-Wcast-qual \
-	-Wswitch \
-	-Wshadow \
-	-Wunused-parameter \
-	-Wcast-align \
-	-Wchar-subscripts \
-	-Wnested-externs \
-	-Wextra \
-	-Wno-sign-compare
-
+AM_CFLAGS = $(VARNISHAPI_CFLAGS)
 AM_CPPFLAGS = -I$(top_srcdir)/lib/libkvm
 
 # Modules
@@ -31,24 +11,20 @@ libvmod_compute_la_LDFLAGS = $(VMOD_LDFLAGS)  \
 	-l:libkvm.a
 
 libvmod_compute_la_SOURCES = \
+	vmod_compute.c \
+	vmod_compute.h \
 	kvm_backend.c \
 	kvm_backend.h \
 	kvm_live_update.c \
 	kvm_live_update.h \
 	kvm_post.c \
 	kvm_settings .h \
-	kvm_streaming_backend.c \
 	to_string.c \
-	vmod_compute.c \
-	vmod_compute_event.c \
-	vmod_compute.h \
-	vmod_kvm.adns.c
+	vmod_compute_event.c
 
 nodist_libvmod_compute_la_SOURCES = \
 	vcc_compute_if.c \
-	vcc_compute_if.h \
-	VSC_compute.c \
-	VSC_compute.h
+	vcc_compute_if.h
 
 @BUILD_VMOD_COMPUTE@
 @BUILD_VSC_COMPUTE@
@@ -62,7 +38,7 @@ TEST_EXTENSIONS = .vtc
 VTC_LOG_COMPILER = varnishtest -v
 AM_VTC_LOG_FLAGS = \
 	-p vcl_path="$(abs_top_srcdir)/vcl:$(VARNISHAPI_VCLDIR)" \
-	-p vmod_path="$(abs_builddir)/.libs:$(vmoddir):$(VARNISHAPI_VMODDIR)"
+	-p vmod_path="$(abs_builddir)/.libs:$(vmoddir):$(VARNISHAPI_VMODDIR)" 
 
 TESTS = @VTC_TESTS@
 

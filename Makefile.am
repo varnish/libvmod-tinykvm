@@ -6,7 +6,6 @@ EXTRA_DIST = \
 	get_version \
 	vcp.version \
 	LICENSE
-#	src/vmod_compute.vsc
 
 SUBDIRS = .
 SUBDIRS += src

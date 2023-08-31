@@ -18,7 +18,8 @@
 #include <stdlib.h>
 #include <vtim.h>
 #include "vcl.h"
-#include "vcc_if.h"
+#include "vcc_compute_if.h"
+
 extern uint64_t kvm_allocate_memory(KVM_SLOT, uint64_t bytes);
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
 	const struct kvm_chain_item *, struct backend_post *, struct backend_result *);

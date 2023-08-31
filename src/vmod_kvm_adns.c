@@ -6,7 +6,7 @@
 #include "vas.h"
 #include "miniobj.h"
 
-#include "vcc_if.h"
+#include "vcc_compute_if.h"
 extern void handle_vmod_event(struct vcl *vcl, enum vcl_event_e e);
 
 int v_matchproto_(vmod_event_f)

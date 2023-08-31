@@ -16,7 +16,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include "vcl.h"
-#include "vcc_if.h"
+#include "vcc_compute_if.h"
 
 extern int kvm_backend_streaming_post(struct backend_post *, const void*, ssize_t);
 

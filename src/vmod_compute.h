@@ -1,4 +1,4 @@
 #pragma once
 #include <stdint.h>
 
-#include "../../kvm/src/vmod_kvm.h"
+#include "vmod_kvm.h"
