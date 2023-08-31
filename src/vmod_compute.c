@@ -13,7 +13,7 @@
 
 #include <vsb.h>
 #include <vcl.h>
-#include "vcc_if.h"
+#include "vcc_compute_if.h"
 #include <errno.h>
 #include <stdio.h>
 #define SEMPTY(s)			!((s) && *(s))

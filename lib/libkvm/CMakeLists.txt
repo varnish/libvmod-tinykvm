@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.5)
 project (kvm_sandbox C CXX)
 
 option(SHARED_KVM "Build the KVM sandbox PIC" ON)
-option(KVM_ADNS "" ON)
+option(KVM_ADNS "" OFF)
 
 # WARNING: everything!
 set(CMAKE_C_FLAGS "-Wall -Wextra -std=c11 -O2 -g")
@@ -47,8 +47,8 @@ add_subdirectory(ext/tinykvm/lib  tinykvm)
 add_subdirectory(ext/json         json)
 
 add_library(kvm STATIC ${KVM_SOURCES})
-target_include_directories(kvm PRIVATE ${VARNISH_PATH}/include)
-target_include_directories(kvm PRIVATE ${VARNISH_PATH}/bin/varnishd)
+target_include_directories(kvm PRIVATE /usr/include/varnish-plus)
+target_include_directories(kvm PRIVATE ../../src)
 target_link_libraries(kvm PRIVATE tinykvm curl concurrentqueue nlohmann_json archive stdc++)
 
 if (SHARED_KVM)

@@ -26,7 +26,7 @@
 #include <stdlib.h>
 #include <vtim.h>
 #include "vcl.h"
-#include "vcc_if.h"
+#include "vcc_compute_if.h"
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
 	const struct kvm_chain_item *, struct backend_post *, struct backend_result *);
 extern int kvm_get_body(struct backend_post *, struct busyobj *);

@@ -28,7 +28,7 @@ vmod_LTLIBRARIES = \
 
 libvmod_compute_la_LDFLAGS = $(VMOD_LDFLAGS)  \
 	-L$(top_builddir)/lib/.build \
-	-l:libnats_static.a
+	-l:libkvm.a
 
 libvmod_compute_la_SOURCES = \
 	kvm_backend.c \
@@ -46,12 +46,12 @@ libvmod_compute_la_SOURCES = \
 
 nodist_libvmod_compute_la_SOURCES = \
 	vcc_compute_if.c \
-	vcc_compute_if.h
-#	VSC_compute.c \
-#	VSC_compute.h
+	vcc_compute_if.h \
+	VSC_compute.c \
+	VSC_compute.h
 
 @BUILD_VMOD_COMPUTE@
-#@BUILD_VSC_COMPUTE@
+@BUILD_VSC_COMPUTE@
 
 # Test suite
 

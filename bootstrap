@@ -14,7 +14,7 @@ then
 	alias libtoolize=glibtoolize
 fi
 
-git submodule update --init --recursive
+git submodule update --init
 mkdir -p m4
 aclocal
 libtoolize --copy --force
@@ -23,4 +23,4 @@ automake --add-missing --copy --foreign
 autoconf
 
 cd "$WORK_DIR"
-"$ROOT_DIR"/configure "$@"
+"$ROOT_DIR"/configure "$@" --disable-dependency-tracking
