@@ -1,14 +1,14 @@
 varnishtest "Compute: Program from remote archive"
 
 shell {
-cat >test.json <<-EOF
+cat >${tmpdir}/test.json <<-EOF
 {
 	"test1": {
-		"filename": "test",
+		"filename": "${tmpdir}/test",
 		"group": "test"
 	},
 	"test2": {
-		"uri": "file://test.tar.xz",
+		"uri": "file://${tmpdir}/test.tar.xz",
 		"group": "test"
 	}
 }
@@ -37,7 +37,7 @@ vcl 4.1;
 	backend default none;
 
 	sub vcl_init {
-		compute.library("file://test.json");
+		compute.library("file://${tmpdir}/test.json");
 	}
 
 	sub vcl_recv {

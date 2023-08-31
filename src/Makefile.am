@@ -12,7 +12,10 @@ libvmod_compute_la_LDFLAGS = $(VMOD_LDFLAGS)  \
 	-l:tinykvm/libtinykvm.a \
 	-lstdc++  \
 	-larchive \
-	-lcurl
+	-lcurl \
+	-L/usr/lib/varnish-plus \
+	-ladns \
+	-Wl,-rpath,/usr/lib/varnish-plus
 
 libvmod_compute_la_SOURCES = \
 	vmod_compute.c \
