@@ -1,1 +1,0 @@
-#define VMOD_ABI_Version "${GIT_REPO_VERSION}"

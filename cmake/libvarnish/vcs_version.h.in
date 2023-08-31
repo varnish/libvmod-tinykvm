@@ -1,1 +1,0 @@
-#define VCS_Version "${GIT_REPO_VERSION}"
