@@ -23,4 +23,4 @@ automake --add-missing --copy --foreign
 autoconf
 
 cd "$WORK_DIR"
-"$ROOT_DIR"/configure "$@" --disable-dependency-tracking
+"$ROOT_DIR"/configure "$@" #--disable-dependency-tracking

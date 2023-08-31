@@ -7,8 +7,12 @@ vmod_LTLIBRARIES = \
 	libvmod_compute.la
 
 libvmod_compute_la_LDFLAGS = $(VMOD_LDFLAGS)  \
-	-L$(top_builddir)/lib/.build \
-	-l:libkvm.a
+	-L$(abs_top_srcdir)/lib/.build \
+	-l:libkvm.a \
+	-l:tinykvm/libtinykvm.a \
+	-lstdc++  \
+	-larchive \
+	-lcurl
 
 libvmod_compute_la_SOURCES = \
 	vmod_compute.c \

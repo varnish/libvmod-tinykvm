@@ -5,5 +5,12 @@ aclocal.m4
 build-aux/
 config.*
 configure*
+.deps/
+.libs/
+libtool
 m4/
 stamp-*
+*.la
+*.lo
+vcc*if.c
+vcc*if.h
