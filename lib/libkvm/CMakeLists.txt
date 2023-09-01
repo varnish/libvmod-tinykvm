@@ -29,16 +29,9 @@ set(KVM_SOURCES
 	curl_fetch.cpp
 )
 
-include(FetchContent)
-FetchContent_Declare(
-  concurrentqueue
-  GIT_REPOSITORY    https://github.com/cameron314/concurrentqueue
-  GIT_TAG           master
-)
-FetchContent_MakeAvailable(concurrentqueue)
-
-add_subdirectory(ext/tinykvm/lib  tinykvm)
-add_subdirectory(ext/json         json)
+add_subdirectory(ext/tinykvm/lib     tinykvm)
+add_subdirectory(ext/json            json)
+add_subdirectory(ext/concurrentqueue concurrentqueue)
 
 add_library(kvm STATIC ${KVM_SOURCES})
 target_include_directories(kvm PRIVATE ../../src)
