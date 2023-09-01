@@ -383,15 +383,38 @@ void TenantInstance::commit_program_live(VRT_CTX,
 	}
 }
 
-void TenantInstance::unload_program_live(const vrt_ctx *)
+void TenantInstance::reload_program_live(VRT_CTX, bool debug)
 {
-	std::shared_ptr<ProgramInstance> new_prog = nullptr;
-	std::shared_ptr<ProgramInstance> old_prog = std::atomic_load(&this->program);
+	std::shared_ptr<ProgramInstance> null_prog = nullptr;
+	std::shared_ptr<ProgramInstance> old_prog;
 
-	std::atomic_exchange(&this->program, new_prog);
+	/* This will unload the current program. */
+	if (!debug) {
+		old_prog = std::atomic_load(&this->program);
+		std::atomic_exchange(&this->program, null_prog);
+	} else {
+		old_prog = std::atomic_load(&this->debug_program);
+		std::atomic_exchange(&this->debug_program, null_prog);
+	}
 
-	/* XXX: There will be a few instances of denied requests. */
+	/* XXX: There will be a few instances of denied requests.
+	   This will cause the current program to be reinitialized
+	   upon taking a reference. */
 	this->m_started_init = false;
+
+	/* No point in reloading the program if there's nothing to
+	   serialize from the old storage to the new. It will be
+	   loaded by the first request to it. */
+	if (old_prog == nullptr || old_prog->has_storage() == false)
+		return;
+
+	/* Take a reference to new program (forcing it to reload). */
+	if (auto new_prog = this->ref(ctx, debug))
+	{
+		/* Transfer storage state from old to new program. */
+		TenantInstance::serialize_storage_state(
+			ctx, old_prog, new_prog);
+	}
 }
 
 } // kvm

@@ -57,7 +57,7 @@ extern "C"
 int kvm_tenant_unload(VRT_CTX, kvm::TenantInstance* tenant)
 {
 	assert(tenant);
-	tenant->unload_program_live(ctx);
+	tenant->reload_program_live(ctx, false);
 	return true;
 }
 
