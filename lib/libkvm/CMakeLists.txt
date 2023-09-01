@@ -51,9 +51,10 @@ endif()
 
 # Varnish VMOD stuff
 find_package(PkgConfig)
-pkg_check_modules(Varnish REQUIRED varnishapi)
-target_link_libraries(kvm PRIVATE ${VARNISH_LIBRARIES})
-target_include_directories(kvm PUBLIC ${VARNISH_INCLUDE_DIRS})
+pkg_check_modules(VAPI REQUIRED varnishapi)
+target_link_libraries(kvm PRIVATE ${VAPI_LIBRARIES})
+target_include_directories(kvm PUBLIC ${VAPI_INCLUDE_DIRS})
+target_compile_options(kvm PUBLIC ${VAPI_CFLAGS_OTHER})
 target_include_directories(kvm PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
 # ActiveDNS
