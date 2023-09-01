@@ -39,14 +39,6 @@ abs_srcdir=$(cd "$srcdir" && pwd)
 mkdir -p lib/.build ||
 AC_MSG_ERROR([Could not make libkvm build directory])
 
-(
-	cd lib/.build &&
-        $CMAKE \
-                -DCMAKE_C_COMPILER="${CC%% *}" \
-                -DCMAKE_C_FLAGS="$EXTCFLAGS -fPIC" \
-                ../libkvm
-)
-
 AC_CONFIG_FILES([
 	Makefile
 	src/Makefile

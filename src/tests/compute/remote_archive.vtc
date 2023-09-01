@@ -1,5 +1,7 @@
 varnishtest "Compute: Program from remote archive"
 
+feature cmd "ls /dev/kvm"
+
 shell {
 cat >${tmpdir}/test.json <<-EOF
 {
