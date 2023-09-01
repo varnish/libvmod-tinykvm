@@ -126,12 +126,14 @@ static void syscall_curl_fetch_helper(
 	std::string headers;
 	try
 	{
+#ifdef CURLOPT_ALTSVC
 		if constexpr (GLOBAL_CURL_ALTSVC_CACHE) {
 			/* The cache file ends up in the Varnish state folder, which is fine. */
 			curl_easy_setopt(curl, CURLOPT_ALTSVC, "altsvc-cache.txt");
 			curl_easy_setopt(curl, CURLOPT_ALTSVC_CTRL,
 				(long) CURLALTSVC_H1|CURLALTSVC_H2|CURLALTSVC_H3);
 		}
+#endif
 
 		if (!unix_path.empty())
 		{
