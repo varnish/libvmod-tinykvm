@@ -1,0 +1,183 @@
+version: 2.1
+
+orbs:
+  main: varnish/orb@0.0.7
+
+parameters:
+  install_from:
+    type: string
+    default: "production"
+  src-commit:
+    type: string
+    default: "HEAD"
+  pkg-commit:
+    type: string
+    default: "libvmod_compute"
+  pkg-revision:
+    type: string
+    default: ""
+  vcp-version:
+    type: string
+    default: ""
+
+commands:
+  container_checkout:
+    description: "Repo cloning and configuration"
+    steps:
+      - checkout
+      - run:
+          name: Update ssh config for github.com
+          command: |
+            mkdir -p ~/.ssh
+            echo  'Host github.com' >  ~/.ssh/config
+            echo  '    IdentitiesOnly no' >>  ~/.ssh/config
+            git config --global url."ssh://git@github.com".insteadOf "https://github.com" || true
+            git config --global gc.auto 0 || true
+      - add_ssh_keys:
+          fingerprints:
+            - "1d:e6:5e:18:4a:4b:8d:4c:b5:5e:4e:f5:f8:75:4b:a0"
+            # tinykvm
+            - "7d:b6:c5:5f:65:d2:63:31:72:7f:8f:bf:67:37:60:26"
+
+  install_vc:
+    parameters:
+      install:
+        type: string
+        default: ""
+      pkgdir:
+        type: string
+      install_from:
+        type: string
+    steps:
+      - run:
+          name: Install varnish-dev
+          command: |
+            if [ "<< parameters.install_from >>" = "production" ]; then
+                curl https://docs.varnish-software.com/scripts/setup.sh | DIST= TOKEN=$PC_PROD_60_TOKEN INSTALL=<< parameters.install >> bash
+            elif [ "<< parameters.install_from >>" = "staging" ]; then
+                curl https://docs.varnish-software.com/scripts/setup.sh | DIST= TOKEN=$PC_PROD_60WAF_TOKEN INSTALL=<< parameters.install >> REPO=60-staging bash
+            else
+                if command -v apt-get > /dev/null; then
+                    apt-get update && apt-get -qy install jq cmake
+                else
+                    yum -qy install jq
+                fi
+                package_url=$(curl -u ${VCP_ARTIFACT_TOKEN}: 'https://circleci.com/api/v1.1/project/gh/varnish/varnish-cache-plus/<< parameters.install_from >>/artifacts' | \
+                    jq '.[] | select(.path == "packages.tar.gz") | .url' -r)
+                curl -L "$package_url?circle-token=${VCP_ARTIFACT_TOKEN}" | tar xavz
+                if command -v apt-get > /dev/null; then
+                    apt-get -qy install $(readlink -f packages/<< parameters.pkgdir >>/*.deb)
+                else
+                    yum -qy install packages/<< parameters.pkgdir >>/*.rpm
+                fi
+            fi
+            rm -rf packages
+jobs:
+  distcheck:
+    docker:
+      - image: varnish/dist-vcp-ubuntu-jammy
+    working_directory: /workspace
+    steps:
+      - attach_workspace:
+          at: ~/project
+      - install_vc:
+          install: varnish-plus-dev
+          pkgdir: ubuntu
+          install_from: << pipeline.parameters.install_from >>
+      - run:
+          name: Build app
+          command: |
+            id -u varnish &>/dev/null || useradd varnish
+            ./bootstrap
+            ./configure
+            make -j12 --quiet
+      - run:
+          name: Unit tests
+          command: |
+            chown -R varnish:varnish /workspace
+            sudo -u varnish make check -j 16 -k VERBOSE=1
+      - run:
+          name: Junitizer
+          command: |
+            mkdir -p testresults/varnishtest
+            sudo python3 ~/project/tools/junitizer.py ./src testresults/varnishtest/results.xml
+            mv src/test-suite.log testresults/varnishtest
+          when: always
+      - store_test_results:
+          path: testresults
+      - store_artifacts:
+          path: testresults/varnishtest
+          destination: .
+
+pkg_req: &pkg_req
+  requires:
+    - dist_ubuntu
+    - tar_pkg_tools
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - main/dist:
+          context: packagecloud
+          docker-img: varnish/dist-vcp-ubuntu-jammy
+          src-commit: << pipeline.parameters.src-commit >>
+          pre-steps:
+            - container_checkout
+            - install_vc:
+                install: varnish-dev
+                pkgdir: ubuntu
+                install_from: << pipeline.parameters.install_from >>
+          tarball-cmd: |
+            if [ -n "<< pipeline.parameters.vcp-version >>" ]; then
+               echo << pipeline.parameters.vcp-version >> > vcp.version
+            fi
+            ./bootstrap
+            ./configure
+            make -j 16
+            make dist --quiet -j 16
+      - main/tar-pkg-tools:
+          fprint: "1d:e6:5e:18:4a:4b:8d:4c:b5:5e:4e:f5:f8:75:4b:a0"
+          repo: pkg-varnish-plus
+          dir: libvmod-compute
+          pkg-commit: << pipeline.parameters.pkg-commit >>
+      - distcheck:
+          pre-steps:
+            - container_checkout
+          context: packagecloud
+          requires:
+            - main/tar-pkg-tools
+      - main/package:
+          context: packagecloud
+          name: package-<< matrix.platform >>
+          src-name: libvmod-compute
+          pkg-revision: << pipeline.parameters.pkg-revision >>
+          pre-steps:
+            - install_vc:
+                pkgdir: << matrix.platform >>
+                install_from: << pipeline.parameters.install_from >>
+          matrix: &matrix
+            parameters:
+              platform:
+                - ubuntu-focal
+                - ubuntu-jammy
+                - debian-bullseye
+                - almalinux-8
+                - almalinux-9
+                - rockylinux-8
+          requires:
+            - main/dist
+            - main/tar-pkg-tools
+      - main/sign:
+          name: sign-<< matrix.platform >>
+          pkg-revision: << pipeline.parameters.pkg-revision >>
+          matrix: *matrix
+          context:
+            - pkgsign
+          requires:
+            - package-<< matrix.platform >>
+      - main/collect-packages:
+          context:
+            - pkgsign
+          requires:
+            - main/sign
