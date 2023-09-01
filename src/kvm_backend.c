@@ -476,10 +476,17 @@ kvm_init_chain(VRT_CTX, struct vmod_kvm_tenant *tenant, const char *url, const c
 	item->inputs.argument = arg ? arg : "";
 
 	if (kqueue->count == 0) {
-		CHECK_OBJ_NOTNULL(ctx->http_bereq, HTTP_MAGIC);
-		/* TODO: Support front-end? */
-		item->inputs.method = ctx->http_bereq->hd[0].b;
-		if (!http_GetHdr(ctx->http_bereq, H_Content_Type, &item->inputs.content_type))
+		struct http *hp;
+		if (ctx->http_bereq)
+			hp = ctx->http_bereq;
+		else
+			hp = ctx->http_req;
+		if (hp == NULL)
+			return (NULL);
+		CHECK_OBJ_NOTNULL(hp, HTTP_MAGIC);
+
+		item->inputs.method = hp->hd[0].b;
+		if (!http_GetHdr(hp, H_Content_Type, &item->inputs.content_type))
 			item->inputs.content_type = "";
 	} else {
 		item->inputs.method = "";

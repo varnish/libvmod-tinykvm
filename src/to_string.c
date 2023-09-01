@@ -158,11 +158,6 @@ VCL_STRING kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
 	VCL_STRING program, VCL_STRING url, VCL_STRING arg, VCL_STRING on_error)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	if (ctx->method != VCL_MET_BACKEND_FETCH && ctx->method != VCL_MET_BACKEND_RESPONSE) {
-		VRT_fail(ctx, "vmod_kvm: vm_backend() should only"
-		    "be called from vcl_backend_fetch or vcl_backend_response");
-		return (NULL);
-	}
 
 	/* Lookup internal tenant using VCL task */
 	struct vmod_kvm_tenant *tenant =
