@@ -25,7 +25,7 @@ libvmod_compute_la_SOURCES = \
 	kvm_live_update.c \
 	kvm_live_update.h \
 	kvm_post.c \
-	kvm_settings .h \
+	kvm_settings.h \
 	to_string.c \
 	vmod_compute_event.c
 
