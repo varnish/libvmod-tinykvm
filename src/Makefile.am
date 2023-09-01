@@ -33,6 +33,19 @@ nodist_libvmod_compute_la_SOURCES = \
 	vcc_compute_if.c \
 	vcc_compute_if.h
 
+EXTRA_DIST = \
+	kvm_streaming_backend.c \
+	vmod_kvm.h
+
+kvm_backend.c \
+	kvm_backend.h \
+	kvm_live_update.c \
+	kvm_live_update.h \
+	kvm_post.c \
+	kvm_settings.h \
+	to_string.c \
+	vmod_compute_event.c: vcc_compute_if.h
+
 @BUILD_VMOD_COMPUTE@
 @BUILD_VSC_COMPUTE@
 
@@ -45,7 +58,7 @@ TEST_EXTENSIONS = .vtc
 VTC_LOG_COMPILER = varnishtest -v
 AM_VTC_LOG_FLAGS = \
 	-p vcl_path="$(abs_top_srcdir)/vcl:$(VARNISHAPI_VCLDIR)" \
-	-p vmod_path="$(abs_builddir)/.libs:$(vmoddir):$(VARNISHAPI_VMODDIR)" 
+	-p vmod_path="$(abs_builddir)/.libs:$(vmoddir):$(VARNISHAPI_VMODDIR)"
 
 TESTS = @VTC_TESTS@
 

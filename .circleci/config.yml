@@ -22,7 +22,7 @@ parameters:
 
 commands:
   container_checkout:
-    description: "Repo cloning and configuration"
+    description: "github configuration"
     steps:
       - checkout
       - run:
@@ -87,6 +87,9 @@ jobs:
       - run:
           name: Build app
           command: |
+            # This should possible live in the docker file?
+            apt update; apt install -y libarchive-dev
+
             id -u varnish &>/dev/null || useradd varnish
             ./bootstrap
             ./configure
@@ -129,6 +132,8 @@ workflows:
                 pkgdir: ubuntu
                 install_from: << pipeline.parameters.install_from >>
           tarball-cmd: |
+            apt update; apt install -y libarchive-dev
+
             if [ -n "<< pipeline.parameters.vcp-version >>" ]; then
                echo << pipeline.parameters.vcp-version >> > vcp.version
             fi

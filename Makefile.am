@@ -5,7 +5,8 @@ DISTCHECK_CONFIGURE_FLAGS = RST2MAN=:
 EXTRA_DIST = \
 	get_version \
 	vcp.version \
-	LICENSE
+	LICENSE \
+	lib/libkvm
 
 SUBDIRS = .
 SUBDIRS += src
