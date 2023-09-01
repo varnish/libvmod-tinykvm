@@ -13,9 +13,9 @@ libvmod_compute_la_LDFLAGS = $(VMOD_LDFLAGS)  \
 	-lstdc++  \
 	-larchive \
 	-lcurl \
-	-L/usr/lib/varnish-plus \
+	-L$(VARNISHAPI_VMODDIR)/../ \
 	-ladns \
-	-Wl,-rpath,/usr/lib/varnish-plus
+	-Wl,-rpath,$(VARNISHAPI_VMODDIR)/../
 
 libvmod_compute_la_SOURCES = \
 	vmod_compute.c \
