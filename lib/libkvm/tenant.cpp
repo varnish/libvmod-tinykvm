@@ -119,9 +119,9 @@ static inline bool load_tenant(VRT_CTX, VCL_PRIV task,
 
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
-			"Exception when creating tenant '%s': %s",
+			"kvm: Exception when creating tenant '%s': %s",
 			config.name.c_str(), e.what());
-		VRT_fail(ctx, "Exception when creating tenant '%s': %s",
+		VRT_fail(ctx, "kvm: Exception when creating tenant '%s': %s",
 			config.name.c_str(), e.what());
 		return false;
 	}
@@ -209,6 +209,12 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		// Set the default ephemeralness for this group/tenant
 		group.ephemeral = obj.value();
 	}
+	else if (obj.key() == "environment")
+	{
+		// Append environment variables (NOTE: unable to overwrite defaults)
+		auto vec = obj.value().template get<std::vector<std::string>>();
+		group.environ.insert(group.environ.end(), vec.begin(), vec.end());
+	}
 	else if (obj.key() == "allowed_paths")
 	{
 		group.allowed_paths = obj.value().template get<std::vector<std::string>>();
@@ -220,10 +226,10 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	else
 	{
 		VSL(SLT_Error, 0,
-			"vmod_kvm: Unknown configuration key for '%s': %s",
+			"kvm: Unknown configuration key for '%s': %s",
 			name.c_str(), obj.key().c_str());
 		fprintf(stderr,
-			"vmod_kvm: Unknown configuration key for '%s': %s\n",
+			"kvm: Unknown configuration key for '%s': %s\n",
 			name.c_str(), obj.key().c_str());
 	}
 }
@@ -307,7 +313,7 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			if (obj.contains("uri")) uri = obj["uri"];
 			/* Verify: No filename and no key is an unreachable program. */
 			if (filename.empty() && uri.empty() && lvu_key.empty())
-				throw std::runtime_error("vmod_kvm: Unreachable program " + it.key() + " has no filename and no way to update");
+				throw std::runtime_error("kvm: Unreachable program " + it.key() + " has no filename and no way to update");
 
 			/* Use the group data except filename */
 			kvm::load_tenant(ctx, task, kvm::TenantConfig{
@@ -404,10 +410,10 @@ int kvm_init_tenants_str(VRT_CTX, VCL_PRIV task, const char* filename,
 		return 1;
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
-			"vmod_kvm: Exception when loading tenants from string '%s': %s",
+			"kvm: Exception when loading tenants from string '%s': %s",
 			filename, e.what());
 		fprintf(stderr,
-			"vmod_kvm: Exception when loading tenants from string '%s': %s\n",
+			"kvm: Exception when loading tenants from string '%s': %s\n",
 			filename, e.what());
 		return 0;
 	}
@@ -424,10 +430,10 @@ int kvm_init_tenants_file(VRT_CTX, VCL_PRIV task, const char* filename, int init
 		return 1;
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
-			"vmod_kvm: Exception when loading tenants from file '%s': %s",
+			"kvm: Exception when loading tenants from file '%s': %s",
 			filename, e.what());
 		fprintf(stderr,
-			"vmod_kvm: Exception when loading tenants from file '%s': %s\n",
+			"kvm: Exception when loading tenants from file '%s': %s\n",
 			filename, e.what());
 		return 0;
 	}
@@ -451,10 +457,10 @@ int kvm_init_tenants_uri(VRT_CTX, VCL_PRIV task, const char* uri, int init)
 			kvm::init_tenants(ftd->ctx, ftd->task, json, ftd->url, ftd->init);
 		} catch (const std::exception& e) {
 			VSL(SLT_Error, 0,
-				"vmod_kvm: Exception when loading tenants from URI '%s': %s",
+				"kvm: Exception when loading tenants from URI '%s': %s",
 				ftd->url, e.what());
 			fprintf(stderr,
-				"vmod_kvm: Exception when loading tenants from URI '%s': %s\n",
+				"kvm: Exception when loading tenants from URI '%s': %s\n",
 				ftd->url, e.what());
 		}
 	}, &ftd);
@@ -476,11 +482,11 @@ void kvm_tenant_configure(VRT_CTX, kvm::TenantInstance* ten, const char* str)
 		}
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
-			"vmod_kvm: Exception when overriding program configuration '%s': %s",
+			"kvm: Exception when overriding program configuration '%s': %s",
 			ten->config.name.c_str(), e.what());
 		VSL(SLT_Error, 0, "JSON: %s\n", str);
 		fprintf(stderr,
-			"vmod_kvm: Exception when overriding program configuration '%s': %s\n",
+			"kvm: Exception when overriding program configuration '%s': %s\n",
 			ten->config.name.c_str(), e.what());
 		fprintf(stderr, "JSON: %s\n", str);
 	}
