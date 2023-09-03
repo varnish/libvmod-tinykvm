@@ -130,6 +130,14 @@ $Function STRING to_string(PRIV_VCL, STRING program, STRING arg = "", STRING con
 - Works with chaining, and calls to_string() for the final string after chained programs.
 - NOTE: Uses extra workspace for each call. See: man varnishd, workspace_backend.
 
+$Function VOID async_invocation(PRIV_VCL, STRING program, STRING arg = "", STRING config = "")
+
+- Highly EXPERIMENTAL! Do not use!
+- Invokes a program with the given arguments and executes asynchronously.
+- Program has no access to HTTP headers or logging, and cannot be observable until the end
+  of the request.
+- Typically used by analytics and data gathering programs in vcl_recv or vcl_deliver.
+
 
 $Function BOOL steal(PRIV_VCL, STRING program, STRING arg = "")
 

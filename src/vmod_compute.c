@@ -178,6 +178,8 @@ extern struct director *vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg);
 extern const char *kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg, VCL_STRING on_error);
+extern VCL_VOID kvm_vm_async_invoke(VRT_CTX, VCL_PRIV task,
+	VCL_STRING program, VCL_STRING url, VCL_STRING arg);
 extern VCL_BOOL kvm_vm_begin_epoll(VRT_CTX, VCL_PRIV, VCL_STRING program,
 	int fd, const char *arg);
 
@@ -202,6 +204,15 @@ VCL_STRING vmod_to_string(VRT_CTX, VCL_PRIV task,
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 
 	return (kvm_vm_to_string(ctx, task, program, url, argument, on_error));
+}
+
+/* Execute given program asynchronously, avoiding serialization. */
+VCL_VOID vmod_async_invocation(VRT_CTX, VCL_PRIV task,
+	VCL_STRING program, VCL_STRING url, VCL_STRING argument)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+
+	kvm_vm_async_invoke(ctx, task, program, url, argument);
 }
 
 /* Steal the current clients fd and pass it to the given program. */
