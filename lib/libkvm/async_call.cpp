@@ -27,6 +27,15 @@ void kvm_async_invocation(VRT_CTX, kvm::VMPoolItem* slot,
 		if (UNLIKELY(slot->task_future.valid())) {
 			throw std::runtime_error("Program is already running asynchronously");
 		}
+
+		/* Temporary CTX for async call (with most access disabled). */
+		vrt_ctx *async_ctx = (vrt_ctx *)WS_Alloc(ctx->ws, sizeof(vrt_ctx));
+		if (UNLIKELY(async_ctx == nullptr)) {
+			throw std::runtime_error("Not enough room for async VRT CTX");
+		}
+		__builtin_memset(async_ctx, 0, sizeof(*async_ctx));
+		async_ctx->magic = VRT_CTX_MAGIC;
+
 		VSLb(ctx->vsl, SLT_VCL_Log,
 			"%s: Calling on_get() asynchronously", machine.name().c_str());
 
@@ -36,7 +45,10 @@ void kvm_async_invocation(VRT_CTX, kvm::VMPoolItem* slot,
 		   We can safely pass invoc because it is workspace-allocated. */
 		slot->task_vsl = ctx->vsl;
 		slot->task_future = slot->tp.enqueue(
-		[&machine, invoc] () -> long {
+		[&machine, async_ctx, invoc] () -> long {
+
+			/* Deliberately set CTX inside task function (acting as serializer). */
+			machine.set_ctx(async_ctx);
 
 			const auto timeout = machine.max_req_time();
 			const auto& prog = machine.program();

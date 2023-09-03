@@ -217,8 +217,6 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 	if (kvm_settings.backend_timings) t_prev = VTIM_real();
 
 	auto& machine = *slot->mi;
-	/* Setting the VRT_CTX allows access to HTTP and VSL, etc. */
-	machine.set_ctx(ctx);
 
 	if constexpr (VERBOSE_BACKEND) {
 		VSLb(ctx->vsl, SLT_VCL_Log, "Tenant: %s", machine.name().c_str());
@@ -233,6 +231,9 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					invoc->inputs.url, invoc->inputs.argument);
 			}
 			kvm_ts(ctx->vsl, "ProgramCall", t_work, t_prev);
+
+			/* Setting the VRT_CTX allows access to HTTP and VSL, etc. */
+			machine.set_ctx(ctx);
 
 			/* Enforce that guest program calls the backend_response system call. */
 			machine.begin_call();
