@@ -35,7 +35,6 @@ struct VMPoolItem {
 	tinykvm::ThreadTask tp;
 	// We can use this to avoid having to start in a serialized manner
 	std::future<long> task_future;
-	struct vsl_log* task_vsl = nullptr;
 };
 struct Reservation {
 	VMPoolItem* slot;

@@ -23,7 +23,7 @@
 extern uint64_t kvm_allocate_memory(KVM_SLOT, uint64_t bytes);
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
 	const struct kvm_chain_item *, struct backend_post *, struct backend_result *);
-extern void kvm_async_invocation(VRT_CTX, KVM_SLOT, const struct kvm_chain_item *);
+extern int kvm_async_invocation(VRT_CTX, const struct kvm_chain_item *);
 extern struct kvm_program_chain* kvm_chain_get_queue();
 extern struct kvm_chain_item *kvm_init_chain(VRT_CTX, struct vmod_kvm_tenant *tenant,
 	const char *url, const char *arg);
@@ -217,13 +217,6 @@ VCL_VOID kvm_vm_async_invoke(VRT_CTX, VCL_PRIV task,
 	invocation->inputs.method = "GET"; /* Convenience */
 	invocation->inputs.content_type = "";
 
-	struct vmod_kvm_slot *slot =
-		kvm_reserve_machine(ctx, invocation->tenant, false);
-	if (slot == NULL) {
-		VSLb(ctx->vsl, SLT_Error, "KVM: Unable to reserve '%s'", program);
-		return;
-	}
-
 	/* NOTE: Passing VRT_CTX, but we *cannot* use it asynchronously. */
-	kvm_async_invocation(ctx, slot, invocation);
+	kvm_async_invocation(ctx, invocation);
 }

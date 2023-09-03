@@ -17,60 +17,69 @@ extern "C" {
 }
 
 extern "C"
-void kvm_async_invocation(VRT_CTX, kvm::VMPoolItem* slot,
-	const struct kvm_chain_item *invoc)
+int kvm_async_invocation(VRT_CTX, const struct kvm_chain_item *invoc)
 {
-	auto& machine = *slot->mi;
-	machine.set_ctx(nullptr);
+	/* Always reserve a new VM, regardless of priv task. */
+	auto* tenant = (kvm::TenantInstance *)invoc->tenant;
+	const bool debug = false;
 
-	try {
-		if (UNLIKELY(slot->task_future.valid())) {
-			throw std::runtime_error("Program is already running asynchronously");
-		}
+	VSLb(ctx->vsl, SLT_VCL_Log,
+		"%s: Calling on_get() asynchronously", tenant->config.name.c_str());
 
-		/* Temporary CTX for async call (with most access disabled). */
-		vrt_ctx *async_ctx = (vrt_ctx *)WS_Alloc(ctx->ws, sizeof(vrt_ctx));
-		if (UNLIKELY(async_ctx == nullptr)) {
-			throw std::runtime_error("Not enough room for async VRT CTX");
-		}
-		__builtin_memset(async_ctx, 0, sizeof(*async_ctx));
-		async_ctx->magic = VRT_CTX_MAGIC;
+	try
+	{
+		auto prog = tenant->ref(ctx, debug);
+		if (UNLIKELY(prog == nullptr))
+			return false;
 
-		VSLb(ctx->vsl, SLT_VCL_Log,
-			"%s: Calling on_get() asynchronously", machine.name().c_str());
+		// Reserve a machine through blocking queue.
+		// May throw if dequeue from the queue times out.
+		auto resv = prog->reserve_vm(ctx, tenant, std::move(prog));
+		// prog is nullptr after this ^
 
 		/* During startup the task_future is used to wait for initialization.
 		   We are safely re-using it here to asynchronously wait for request to finish.
 
 		   We can safely pass invoc because it is workspace-allocated. */
-		slot->task_vsl = ctx->vsl;
+		auto* slot = resv.slot;
 		slot->task_future = slot->tp.enqueue(
-		[&machine, async_ctx, invoc] () -> long {
+		[slot, invoc] () -> long {
 
-			/* Deliberately set CTX inside task function (acting as serializer). */
-			machine.set_ctx(async_ctx);
+			auto& machine = *slot->mi;
+			try {
 
-			const auto timeout = machine.max_req_time();
-			const auto& prog = machine.program();
-			auto& vm = machine.machine();
+				/* Deliberately set CTX inside task function (acting as serializer). */
+				machine.set_ctx(nullptr);
 
-			/* Call the backend GET function */
-			auto on_get_addr = prog.entry_at(kvm::ProgramEntryIndex::BACKEND_GET);
-			if (UNLIKELY(on_get_addr == 0x0))
-				throw std::runtime_error("The GET callback has not been registered");
+				const auto timeout = machine.max_req_time();
+				const auto& prog = machine.program();
+				auto& vm = machine.machine();
 
-			/* Call into VM doing a full pagetable/cache flush. */
-			vm.timed_vmcall(on_get_addr, timeout, invoc->inputs.url, invoc->inputs.argument);
+				/* Call the backend GET function */
+				auto on_get_addr = prog.entry_at(kvm::ProgramEntryIndex::BACKEND_GET);
+				if (UNLIKELY(on_get_addr == 0x0))
+					throw std::runtime_error("The GET callback has not been registered");
 
-			/* Make sure no SMP work is in-flight. */
-			vm.smp_wait();
+				/* Call into VM doing a full pagetable/cache flush. */
+				vm.timed_vmcall(on_get_addr, timeout, invoc->inputs.url, invoc->inputs.argument);
 
+				/* Make sure no SMP work is in-flight. */
+				vm.smp_wait();
+
+			} catch (const std::exception& e) {
+				/* XXX: Where does this go? */
+				(void)e;
+			}
+
+			machine.program().vm_free_function(slot);
 			return 0L;
 		});
-		return;
+		return true;
 
-	} catch (const std::exception& e) {
+	} catch (std::exception& e) {
+		// It makes no sense to reserve a VM without a request w/VSL
 		VSLb(ctx->vsl, SLT_Error,
-			"%s: VM async call exception: %s", machine.name().c_str(), e.what());
+			"VM '%s' exception: %s", tenant->config.name.c_str(), e.what());
+		return false;
 	}
 }

@@ -404,17 +404,6 @@ void ProgramInstance::vm_free_function(void* slotv)
 	auto* slot = (VMPoolItem *)slotv;
 	auto& mi = *slot->mi;
 
-	if (UNLIKELY(slot->task_future.valid())) {
-		try {
-			slot->task_future.get();
-		} catch (const std::exception& e) {
-			/* NOTE: Using vsl from original async call-site! */
-			VSLb(slot->task_vsl, SLT_VCL_Error,
-				"%s: Async call exception: %s",
-				mi.name().c_str(), e.what());
-		}
-	}
-
 	// Free regexes, file descriptors etc.
 	mi.tail_reset();
 
