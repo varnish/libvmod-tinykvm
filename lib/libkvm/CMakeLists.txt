@@ -9,7 +9,6 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++17 -O2 -g")
 
 set(KVM_SOURCES
 	adns.cpp
-	async_call.cpp
 	archive.cpp
 	backend.cpp
 	epoll_vm.cpp

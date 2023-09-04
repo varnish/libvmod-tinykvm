@@ -23,7 +23,6 @@
 extern uint64_t kvm_allocate_memory(KVM_SLOT, uint64_t bytes);
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
 	const struct kvm_chain_item *, struct backend_post *, struct backend_result *);
-extern int kvm_async_invocation(VRT_CTX, const struct kvm_chain_item *);
 extern struct kvm_program_chain* kvm_chain_get_queue();
 extern struct kvm_chain_item *kvm_init_chain(VRT_CTX, struct vmod_kvm_tenant *tenant,
 	const char *url, const char *arg);
@@ -204,36 +203,4 @@ VCL_STRING kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
 		return (resp.content);
 	else
 		return (on_error);
-}
-
-VCL_VOID kvm_vm_async_invoke(VRT_CTX, VCL_PRIV task,
-	VCL_STRING program, VCL_STRING url, VCL_STRING arg)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-
-	/* Lookup internal tenant using VCL task */
-	struct vmod_kvm_tenant *tenant =
-		kvm_tenant_find(task, program);
-	if (tenant == NULL) {
-		VRT_fail(ctx, "KVM: Tenant not found: %s", program);
-		return;
-	}
-
-	/* Cannot fail at this point, add to chain */
-	struct kvm_chain_item *invocation =
-		(struct kvm_chain_item *)WS_Alloc(ctx->ws, sizeof(struct kvm_chain_item));
-	if (invocation == NULL) {
-		VRT_fail(ctx, "KVM: Out of workspace for async invocation to '%s'", program);
-		return;
-	}
-
-	invocation->tenant = tenant;
-	invocation->special_function = NULL;
-	invocation->inputs.url = url ? url : "";
-	invocation->inputs.argument = arg ? arg : "";
-	invocation->inputs.method = "GET"; /* Convenience */
-	invocation->inputs.content_type = "";
-
-	/* NOTE: Passing VRT_CTX, but we *cannot* use it asynchronously. */
-	kvm_async_invocation(ctx, invocation);
 }
