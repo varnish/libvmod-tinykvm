@@ -56,9 +56,6 @@ inline bool is_valid_index(const http* hp, unsigned idx) {
 inline http*
 get_http(VRT_CTX, int where)
 {
-	if (UNLIKELY(ctx == nullptr)) {
-		throw std::runtime_error("VRT ctx not available. Not in a request?");
-	}
 	struct http* hp = nullptr;
 	switch (where) {
 	case HDR_REQ:

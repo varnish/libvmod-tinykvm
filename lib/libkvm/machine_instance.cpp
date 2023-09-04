@@ -250,6 +250,13 @@ void MachineInstance::print_backtrace()
 	}
 }
 
+const vrt_ctx* MachineInstance::ctx() const
+{
+	if (UNLIKELY(m_ctx == nullptr))
+		throw std::runtime_error("CTX was null");
+	return m_ctx;
+}
+
 void MachineInstance::print(std::string_view text) const
 {
 	if (this->m_last_newline) {
@@ -263,7 +270,7 @@ void MachineInstance::logprint(std::string_view text, bool says) const
 {
 	/* Simultaneous logging is not possible with SMP. */
 	const bool smp = machine().smp_active();
-	if (!smp && this->ctx() && this->ctx()->vsl) {
+	if (!smp && this->has_ctx() && this->ctx()->vsl) {
 		auto* vsl = this->ctx()->vsl;
 		if (says) {
 			VSLb(vsl, SLT_VCL_Log,

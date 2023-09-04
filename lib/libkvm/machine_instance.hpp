@@ -39,7 +39,8 @@ public:
 
 	void copy_to(uint64_t addr, const void*, size_t, bool zeroes = false);
 
-	const auto* ctx() const noexcept { return m_ctx; }
+	const vrt_ctx* ctx() const;
+	bool has_ctx() const noexcept { return m_ctx != nullptr; }
 	void set_ctx(const vrt_ctx* ctx) { m_ctx = ctx; }
 	const auto& tenant() const noexcept { return *m_tenant; }
 	auto& program() { return *m_inst; }
