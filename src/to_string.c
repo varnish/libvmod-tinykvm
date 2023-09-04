@@ -75,6 +75,8 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 		post->ctx = ctx;
 	}
 
+	struct vmod_kvm_slot *last_slot = NULL;
+
 	for (int index = 0; index < chain->count; index++)
 	{
 		/* The chain item contains the tenant program and all the inputs
@@ -86,9 +88,13 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 		waiting for a free VM, and then getting exclusive access until
 		the end of the request. */
 		struct vmod_kvm_slot *slot =
-			kvm_reserve_machine(ctx, invocation->tenant, false);
+			kvm_temporarily_reserve_machine(ctx, invocation->tenant, false);
 		if (slot == NULL) {
-			VSLb(ctx->vsl, SLT_Error, "KVM: Unable to reserve machine");
+			if (last_slot != NULL) {
+				kvm_free_reserved_machine(ctx, last_slot);
+			}
+			VSLb(ctx->vsl, SLT_Error,
+				"KVM: Unable to reserve '%s'", kvm_tenant_name(invocation->tenant));
 			return (minimal_response(500, NULL, NULL));
 		}
 
@@ -104,8 +110,13 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 
 			if (kvm_handle_post_to_another(ctx, post, invocation, result) < 0)
 			{
+				kvm_free_reserved_machine(ctx, slot);
+				kvm_free_reserved_machine(ctx, last_slot);
 				return (minimal_response(500, NULL, NULL));
 			}
+
+			kvm_free_reserved_machine(ctx, last_slot);
+
 			use_post = true;
 		}
 
@@ -113,21 +124,28 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 		kvm_backend_call(ctx, slot, invocation, use_post ? post : NULL, result);
 
 		if (result->status >= 500) {
+			kvm_free_reserved_machine(ctx, slot);
+			if (last_slot != NULL) {
+				kvm_free_reserved_machine(ctx, last_slot);
+			}
 			VSLb(ctx->vsl, SLT_Error,
 				"KVM: Error status %u from call to %s",
 				result->status, kvm_tenant_name(invocation->tenant));
 			return (minimal_response(500, NULL, NULL));
 		}
+
+		last_slot = slot;
 	}
 
 	/* Finalize result into a string. */
 	char *content = "";
-	if (result->bufcount > 1)
+	if (result->bufcount > 0)
 	{
 		/* Allocate room for zero-terminated content */
 		content = (char *)WS_Alloc(ctx->ws, result->content_length + 1);
 		if (content == NULL) {
-			VSLb(ctx->vsl, SLT_Error, "KVM: Out of workspace for content");
+			VSLb(ctx->vsl, SLT_Error,
+				"KVM: Out of workspace for final content (size=%zu bytes)", result->content_length);
 			return (minimal_response(500, NULL, NULL));
 		}
 		/* Extract content from VM */
@@ -140,11 +158,6 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 		assert(coff == &content[result->content_length]);
 		*coff = 0;
 	}
-	else if (result->bufcount == 1)
-	{
-		/* Use the VM memory directly, avoiding the copy */
-		content = TRUST_ME(result->buffers[0].data);
-	}
 
 	struct kvm_http_response res;
 	res.status     = result->status;
@@ -152,6 +165,10 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 	res.ctype_size = result->tsize;
 	res.content    = content;
 	res.content_size = result->content_length;
+
+	if (last_slot != NULL) {
+		kvm_free_reserved_machine(ctx, last_slot);
+	}
 	return (res);
 }
 
