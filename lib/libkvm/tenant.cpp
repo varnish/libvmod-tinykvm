@@ -234,6 +234,15 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	}
 }
 
+/* This function is not strictly necessary - we are just trying to find the intention of
+   the user. If any of these are present, we believe the intention of the user is to
+   create a program definition. However, if group is missing, it is ultimately incomplete. */
+template <typename T>
+static inline bool is_tenant(const T& obj)
+{
+	return obj.contains("group") || obj.contains("filename") || obj.contains("uri");
+}
+
 static void init_tenants(VRT_CTX, VCL_PRIV task,
 	const std::string_view json_strview, const char* source, bool initialize)
 {
@@ -264,7 +273,7 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 	for (const auto& it : j.items())
 	{
 		const auto& obj = it.value();
-		if (obj.contains("group")) continue;
+		if (is_tenant(obj)) continue;
 
 		const auto& grname = it.key();
 		auto grit = groups.find(grname);
@@ -287,8 +296,11 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 	{
 		const auto& obj = it.value();
 		// Tenant configuration
-		if (obj.contains("group"))
+		if (is_tenant(obj))
 		{
+			if (UNLIKELY(!obj.contains("group"))) {
+				throw std::runtime_error("kvm: Program without group: " + it.key());
+			}
 			const std::string& grname = obj["group"];
 			auto grit = groups.find(grname);
 			if (UNLIKELY(grit == groups.end())) {
@@ -468,7 +480,7 @@ int kvm_init_tenants_uri(VRT_CTX, VCL_PRIV task, const char* uri, int init)
 }
 
 extern "C"
-void kvm_tenant_configure(VRT_CTX, kvm::TenantInstance* ten, const char* str)
+int kvm_tenant_configure(VRT_CTX, kvm::TenantInstance* ten, const char* str)
 {
 	(void)ctx;
 	/* Override program configuration from a JSON string. */
@@ -480,6 +492,7 @@ void kvm_tenant_configure(VRT_CTX, kvm::TenantInstance* ten, const char* str)
 		for (auto it = j.begin(); it != j.end(); ++it) {
 			kvm::configure_group(ten->config.name, ten->config.group, it);
 		}
+		return 1;
 	} catch (const std::exception& e) {
 		VSL(SLT_Error, 0,
 			"kvm: Exception when overriding program configuration '%s': %s",
@@ -489,5 +502,6 @@ void kvm_tenant_configure(VRT_CTX, kvm::TenantInstance* ten, const char* str)
 			"kvm: Exception when overriding program configuration '%s': %s\n",
 			ten->config.name.c_str(), e.what());
 		fprintf(stderr, "JSON: %s\n", str);
+		return 0;
 	}
 }

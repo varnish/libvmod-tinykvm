@@ -113,23 +113,6 @@ VCL_INT vmod_invalidate_programs(VRT_CTX, VCL_PRIV task, VCL_STRING pattern)
 	return (count);
 }
 
-VCL_BOOL vmod_add_program(VRT_CTX, VCL_PRIV task,
-	VCL_STRING name, VCL_STRING uri)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	if (ctx->method != VCL_MET_INIT) {
-		VRT_fail(ctx, "compute: add_program() should only be called from vcl_init");
-		return (0);
-	}
-
-	char json[1024];
-	const int json_len = snprintf(json, sizeof(json),
-		"{\"%s\": {\"group\": \"%s\", \"uri\": \"%s\"}}",
-		name, "test", uri);
-
-	return (kvm_init_tenants_str(ctx, task, "VCL::add_program()", json, json_len, NO_INIT_PROGRAMS));
-}
-
 VCL_BOOL vmod_configure(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_STRING json)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
@@ -148,9 +131,12 @@ VCL_BOOL vmod_configure(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_STRING j
 	if (tenant != NULL) {
 		return (kvm_tenant_configure(ctx, tenant, json));
 	} else {
-		VRT_fail(ctx,
-			"compute: No such program '%s' for configure", program);
-		return (0);
+		char pjson[1024];
+		const int pjson_len = snprintf(pjson, sizeof(pjson),
+			"{\"%s\": %s}",
+			program, json);
+		return (kvm_init_tenants_str(ctx, task,
+			"compute::configure()", pjson, pjson_len, NO_INIT_PROGRAMS));
 	}
 }
 

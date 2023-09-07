@@ -37,7 +37,7 @@ extern bool file_writer(const std::string& file, const std::vector<uint8_t>&);
 extern void libadns_untag(const std::string&, struct vcl*);
 extern void extract_programs_to(kvm::ProgramInstance&, const char *, size_t);
 static constexpr bool VERBOSE_STORAGE_TASK = false;
-static constexpr bool VERBOSE_PROGRAM_STARTUP = true;
+static constexpr bool VERBOSE_PROGRAM_STARTUP = false;
 
 VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
 	TenantInstance* ten, ProgramInstance* prog)
@@ -102,6 +102,11 @@ ProgramInstance::ProgramInstance(
 	this->m_future = m_storage_queue.enqueue(
 	[=] () -> long {
 		try {
+			/* Avoid invalid URI, we need to check protocols */
+			if (UNLIKELY(uri.size() < 5)) {
+				throw std::runtime_error("Invalid URI (too short)");
+			}
+
 			/* Helper structure for cURL fetch. */
 			struct CurlData {
 				TenantInstance*  ten;
@@ -166,14 +171,15 @@ ProgramInstance::ProgramInstance(
 				return -1;
 			}
 
+			const bool was_file = (__builtin_memcmp(uri.c_str(), "file", 4) == 0);
 			this->m_binary_was_cached = (data.status == 304);
-			this->m_binary_was_local = this->m_binary_was_cached;
+			this->m_binary_was_local = this->m_binary_was_cached || was_file;
 
 			/* Initialization phase and request VM forking. */
 			begin_initialization(ctx, ten, debug);
 
-			/* Store binary to disk when cURL reports 200 OK. */
-			if (data.status == 200 && !ten->config.filename.empty()) {
+			/* Store binary to disk when file was remote and cURL reports 200 OK. */
+			if (!this->binary_was_local() && data.status == 200 && !ten->config.filename.empty()) {
 				/* Cannot throw, but reports true/false on write success.
 					We *DO NOT* care if the write failed. Only a cached binary. */
 				file_writer(ten->config.request_program_filename(), this->request_binary);

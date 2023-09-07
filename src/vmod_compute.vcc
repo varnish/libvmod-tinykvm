@@ -80,13 +80,6 @@ $Function BOOL init_self_requests(PRIV_VCL, STRING unix_socket,
 - The max concurrent self-requests parameter is a last resort to avoid loops.
 - Must be called from vcl_init.
 
-$Function BOOL add_program(PRIV_VCL, STRING name, STRING uri)
-
-- Name is used to be able to refer to the program later, using configure, etc.
-- URI can be a local filename, eg. "file:///tmp/my_program".
-- Program is added to the default group. Use configure() to override.
-- Must be called from vcl_init.
-
 $Function INT invalidate_programs(PRIV_VCL, STRING regex = "")
 
 - Unloads programs matching regular expression.
@@ -98,6 +91,7 @@ $Function BOOL configure(PRIV_VCL, STRING program, STRING json)
 - Provide a JSON configuration to override defaults to unstarted programs.
 - The JSON configuration is the same as when configuring a program normally,
   but there are no mandatory fields.
+- Can also be used to create a new program inline in VCL.
 - Must be called from vcl_init.
 
 $Function BOOL start(PRIV_VCL, STRING program, BOOL async = 1)
