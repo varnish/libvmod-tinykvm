@@ -469,6 +469,29 @@ kvmbe_gethdrs(const struct director *dir,
 		last_slot = slot;
 	}
 
+	/**
+	 * It is possible to release the VM early if we can store the
+	 * result on the workspace directly. Only for short responses.
+	*/
+	if (result->content_length < kvm_settings.backend_early_release_size)
+	{
+		char *cnt = (char *)WS_Alloc(ctx.ws, result->content_length);
+		if (cnt != NULL)
+		{
+			size_t len = 0;
+			for (size_t i = 0; i < result->bufcount; i++) {
+				memcpy(&cnt[len], result->buffers[i].data, result->buffers[i].size);
+				len += result->buffers[i].size;
+			}
+			result->bufcount = 1;
+			result->buffers[0].data = cnt;
+			result->buffers[0].size = len;
+			/* We don't need to hold the VM reservation anymore.
+			NOTE: result is already on the workspace */
+			kvm_early_slot_release(&ctx, last_slot);
+		}
+	}
+
 	/* Finish the response.
 	   After the last function call, the result buffer is filled with
 	   the last result, etc. Send backend response to varnish storage. */
