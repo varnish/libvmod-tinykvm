@@ -51,6 +51,7 @@ extern int     kvm_tenant_unload(VRT_CTX, TEN_PTR);
 extern KVM_SLOT kvm_reserve_machine(VRT_CTX, TEN_PTR, int debug);
 extern KVM_SLOT kvm_temporarily_reserve_machine(VRT_CTX, TEN_PTR, int debug);
 extern void     kvm_free_reserved_machine(VRT_CTX, void* slot);
+extern vmod_priv_free_f *kvm_get_free_function();
 extern int kvm_callv(VRT_CTX, KVM_SLOT, const int, const char *arg);
 extern int kvm_synth(VRT_CTX, KVM_SLOT, struct vmod_kvm_synth *);
 extern uint64_t kvm_resolve_name(TEN_PTR, const char*);

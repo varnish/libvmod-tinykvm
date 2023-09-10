@@ -44,6 +44,37 @@ struct kvm_program_chain* kvm_chain_get_queue()
 	return &kqueue;
 }
 
+static int
+kvm_release_after_request(VRT_CTX, KVM_SLOT slot)
+{
+	struct vmod_priv* priv_task;
+	if (ctx->req) {
+		priv_task = VRT_priv_task(ctx, ctx->req);
+	} else {
+		priv_task = VRT_priv_task(ctx, ctx->bo);
+	}
+	priv_task->priv = slot;
+	priv_task->len  = 0;
+	priv_task->free = kvm_get_free_function();
+	return (1);
+}
+static int
+kvm_early_slot_release(VRT_CTX, KVM_SLOT slot)
+{
+	struct vmod_priv* priv_task;
+	if (ctx->req) {
+		priv_task = VRT_priv_task(ctx, ctx->req);
+	} else {
+		priv_task = VRT_priv_task(ctx, ctx->bo);
+	}
+	priv_task->priv = NULL;
+	priv_task->len  = 0;
+	if (priv_task->free)
+		priv_task->free(slot);
+	priv_task->free = NULL;
+	return (1);
+}
+
 static void v_matchproto_(vdi_panic_f)
 kvmbe_panic(const struct director *dir, struct vsb *vsb)
 {
@@ -313,6 +344,14 @@ kvmbe_gethdrs(const struct director *dir,
 			/* Re-use the last reservation if same program. */
 			slot = last_slot;
 			last_slot = NULL;
+			/* Work-around for when the last two programs are the same,
+			   avoiding a situation where we never give back the VM reservation. */
+			if (!is_temporary) {
+				if (!kvm_release_after_request(&ctx, slot)) {
+					kvm_free_reserved_machine(&ctx, slot);
+					slot = NULL;
+				}
+			}
 		} else if (is_temporary) {
 			/* This is in the middle of a chain, temporary reservation. */
 			slot = kvm_temporarily_reserve_machine(&ctx, invocation->tenant, kvmr->debug);

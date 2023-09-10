@@ -89,6 +89,11 @@ void kvm_free_reserved_machine(const vrt_ctx *ctx, void* slot)
 	/* Frees up the temporarily reserved program. */
 	TenantInstance::temporary_vmreserve_free(ctx, slot);
 }
+extern "C"
+vmod_priv_free_f *kvm_get_free_function()
+{
+	return ProgramInstance::vm_free_function;
+}
 
 /* Used to copy data into a reserved VM. */
 extern "C"
