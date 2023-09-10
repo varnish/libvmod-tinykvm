@@ -246,31 +246,40 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			if (on_method_addr != 0x0) {
 				struct backend_inputs {
 					uint64_t method;
+					uint64_t method_len;
 					uint64_t url;
-					uint64_t argument;
-					uint64_t ctype; /* Content-Type: May be unused. */
+					uint64_t url_len;
+					uint64_t arg;
+					uint64_t arg_len;
+					uint64_t ctype;
+					uint64_t ctype_len;
 					uint64_t data; /* Content: Can be NULL. */
-					uint64_t datalen;
+					uint64_t data_len;
 				} inputs {};
 				__u64 stack = vm.stack_address();
-				inputs.method   = vm.stack_push_cstr(stack, invoc->inputs.method);
-				inputs.url      = vm.stack_push_cstr(stack, invoc->inputs.url);
-				inputs.argument = vm.stack_push_cstr(stack, invoc->inputs.argument);
+				inputs.method_len = __builtin_strlen(invoc->inputs.method);
+				inputs.method     = vm.stack_push(stack, invoc->inputs.method, inputs.method_len + 1);
+				inputs.url_len = __builtin_strlen(invoc->inputs.url);
+				inputs.url     = vm.stack_push(stack, invoc->inputs.url, inputs.url_len + 1);
+				inputs.arg_len = __builtin_strlen(invoc->inputs.argument);
+				inputs.arg     = vm.stack_push(stack, invoc->inputs.argument, inputs.arg_len + 1);
 				if (post != nullptr) {
 					/* Try to reduce POST mmap allocation. */
 					vm.mmap_relax(post->address, post->capacity, post->length);
 					/* POST data information. */
-					inputs.ctype = vm.stack_push_cstr(stack, invoc->inputs.content_type);
+					inputs.ctype_len = __builtin_strlen(invoc->inputs.content_type);
+					inputs.ctype = vm.stack_push(stack, invoc->inputs.content_type, inputs.ctype_len + 1);
 					inputs.data  = post->address;
-					inputs.datalen = post->length;
+					inputs.data_len = post->length;
 				}
 				else
 				{
 					/* Guarantee readable strings. */
 					inputs.ctype = vm.stack_push_cstr(stack, "");
+					inputs.ctype_len = 0;
 					/* Buffers with known length can be NULL. */
 					inputs.data  = 0;
-					inputs.datalen = 0;
+					inputs.data_len = 0;
 				}
 				auto struct_addr = vm.stack_push(stack, inputs);
 
