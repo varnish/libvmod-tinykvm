@@ -119,24 +119,6 @@ static void syscall_storage_allow(vCPU& cpu, MachineInstance& inst)
 	cpu.set_registers(regs);
 }
 
-static void syscall_storage_callb(vCPU& cpu, MachineInstance& inst)
-{
-	auto& regs = cpu.registers();
-	if (!inst.is_storage()) {
-		VirtBuffer buffers[1];
-		buffers[0] = {
-			.addr = (uint64_t)regs.rsi,  // src
-			.len  = (uint64_t)regs.rdx   // len
-		};
-		regs.rax = inst.program().storage_call(cpu.machine(),
-		/*  func      buf vector    dst     dstsize */
-			regs.rdi, 1, buffers, regs.rcx, regs.r8);
-	} else {
-		/* Prevent deadlock waiting for storage, while in storage. */
-		regs.rax = -1;
-	}
-	cpu.set_registers(regs);
-}
 static void syscall_storage_callv(vCPU& cpu, MachineInstance& inst)
 {
 	auto& regs = cpu.registers();

@@ -160,8 +160,8 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10706: // IS_STORAGE
 				syscall_is_storage(cpu, inst);
 				return;
-			case 0x10707: // STORAGE CALL BUFFER
-				syscall_storage_callb(cpu, inst);
+			case 0x10707: // STORAGE_ALLOW
+				syscall_storage_allow(cpu, inst);
 				return;
 			case 0x10708: // STORAGE CALL VECTOR
 				syscall_storage_callv(cpu, inst);
@@ -171,9 +171,6 @@ void MachineInstance::setup_syscall_interface()
 				return;
 			case 0x1070A: // STOP_STORAGE TASK
 				syscall_stop_storage_task(cpu, inst);
-				return;
-			case 0x1070B: // STORAGE_ALLOW
-				syscall_storage_allow(cpu, inst);
 				return;
 			case 0x10710: // MULTIPROCESS
 				syscall_multiprocess(cpu, inst);

@@ -17,6 +17,9 @@ static void storage_test3(void *arg) {
 static void storage_test4(void *arg) {
 	async_storage_task(storage_test4, NULL);
 }
+static void storage_test5(void *arg) {
+	storage_return("OK", 2);
+}
 
 static void my_backend(const char *url, const char *arg)
 {
@@ -28,6 +31,9 @@ static void my_backend(const char *url, const char *arg)
 		async_storage_task(storage_test3, NULL);
 	else if (strcmp(url, "/4") == 0)
 		async_storage_task(storage_test4, NULL);
+	else if (strcmp(url, "/5") == 0)
+		// This function is not allowed, results in a failed request
+		storage_call(storage_test5, NULL, 0, NULL, 0);
 	else
 		asm("ud2");
 
@@ -37,6 +43,12 @@ static void my_backend(const char *url, const char *arg)
 
 int main()
 {
+	STORAGE_ALLOW(storage_test1);
+	STORAGE_ALLOW(storage_test2);
+	STORAGE_ALLOW(storage_test3);
+	STORAGE_ALLOW(storage_test4);
+	//STORAGE_ALLOW(storage_test5);
+
 	set_backend_get(my_backend);
 	wait_for_requests();
 }
@@ -89,4 +101,8 @@ client c1 {
 	txreq -url "/4" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.status == 200
+
+	txreq -url "/5" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 500
 } -run

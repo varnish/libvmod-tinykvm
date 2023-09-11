@@ -241,9 +241,11 @@ static inline const char * http_alloc_method() {
  * Regular Expressions
  *
  **/
+/* Compile a new regex with the given pattern. */
 extern int sys_regex_compile(const char *, size_t);
+/* Free a compiled regex pattern. */
 extern void sys_regex_free(int rgx);
-/* Returns where the regex matches the buffer, or negative. */
+/* Returns where the regex matches the input string, or negative. */
 extern int sys_regex_match(int rgx, const char *, size_t);
 /* Regex substitution on buffer with another into dst. Flags: ALL=0x1 */
 extern long sys_regex_subst(int rgx, const char *buf, const char *subst, char *dst, size_t dstlen, int flags);
@@ -254,16 +256,17 @@ extern int sys_regex_copyto(int rgx, int srchp, int dsthp);
  * Varnish caching configuration
  *
  **/
+/* Set cacheable, ttl, grace and keep. All durations are in milliseconds. */
 extern long
-syscall_set_cacheable(int cached, long ttl_millis, long grace_ms, long keep_ms);
+sys_set_cacheable(int cached, long ttl_ms, long grace_ms, long keep_ms);
 
 static inline long set_cacheable(int cached, float ttl, float grace, float keep)
 {
-	return syscall_set_cacheable(cached, ttl * 1000, grace * 1000, keep * 1000);
+	return sys_set_cacheable(cached, ttl * 1000, grace * 1000, keep * 1000);
 }
 
 /**
- * Varnish Asynchronous DNS
+ * Varnish ActiveDNS
  *
  **/
 enum adns_ipv_rule {
@@ -358,47 +361,124 @@ int adns_get_count(int idx, int entry) {
 /**
  * Storage program
  *
- * Every tenant has storage. Storage is the program itself as it was
- * initialized at the start. If your tenant has 1GB memory, then storage is
- * 1GB of memory too. Request VMs are based off of the state of
- * storage, even as it changes. Storage is just like a normal Linux program
- * in that any changes you make are never unmade. This program has a ton
- * of memory and is always available.
+ * Every tenant or program can have storage. If storage is enabled, then
+ * it is usually the same program as the request program, as it was
+ * initialized at the start. If your program has 1GB memory, then storage is
+ * 1GB of memory too. Storage is just like a normal Linux program
+ * in that any changes you make are never unmade. In other words, the storage
+ * program has a ton of memory and is always available.
+ * 
  * To access storage you can use any of the API calls below when handling a
  * request. The access is serialized, meaning only one request can access the
  * storage at a time. Because of this, one should try to keep the number and
  * the duration of the calls low, preferrably calculating as much as possible
  * before making any storage accesses.
  *
+ * Storage access can be limited to certain functions by using the
+ * sys_storage_allow system call, or the STORAGE_ALLOW(function) macro. If zero
+ * functions are allowed, then all functions are allowed in storage. If one or
+ * more functions are allowed, then only those functions can be called in
+ * storage, effectively making it an allow list.
+ *
  * When calling into the storage program the data you provide will be copied into
- * the VM, and the response you give back will be copied back into the request-
- * handling VM. This is extra overhead, but safe.
- * The purpose of the storage VM is to enable mutable state. That is, you are
+ * the storage program, and the response you give back will be copied back into
+ * the request-handling program. This is extra overhead, but very safe. It is
+ * very important to make transactions into the long-lived storage safe and
+ * reliable.
+ *
+ * The purpose of storage is to enable mutable state. That is, you are
  * able to make live changes to your storage, which persists across time and
  * requests. You can also serialize the state across live updates so that it
  * can be persisted through program updates. And finally, it can be
  * saved to a file (with a very specific name) on the servers disk, so that
  * it can be persisted across normal server updates and reboots.
+ *
+ * This file is called 'state' and it is the only writable file a program can
+ * have. It is always available to read and write. But can only be written to
+ * from storage.
  **/
 
-/* Vector-based serialized call into storage VM */
+/* A vector-based buffer used by calls into storage. */
 struct virtbuffer {
-	void  *data;
-	size_t len;
+	const void *data;
+	size_t      len;
 };
+/**
+ * A callable storage function that takes a vector of buffers.
+ * 'res' is the size of the return buffer where the return result can be written.
+ * Inside a storage function call, the result buffer that will be returned back
+ * to the request program is chosen with storage_return(). Please note that every
+ * storage function must use storage_return() or storage_return_nothing().
+ * 
+ * Example:
+ * static char ctype[] = "text/plain";
+ * static char *cont = NULL;
+ * static size_t cont_len = 0;
+ *
+ * static void
+ * modify_content(size_t n, struct virtbuffer buffers[n], size_t res)
+ * {
+ *     // Allocate a new zero-terminated buffer from input
+ *     char *new_buf = malloc(buffers[0].len + 1);
+ *     memcpy(new_buf, buffers[0].data, buffers[0].len);
+ *     new_buf[buffers[0].len + 1] = 0;
+ *
+ *     free(cont);
+ *
+ *     // Set as new content
+ *     cont = new_buf;
+ *     cont_len = buffers[0].len;
+ *
+ *     storage_return_nothing();
+ * }
+ * static void
+ * get_content(size_t n, struct virtbuffer buffers[n], size_t res)
+ * {
+ *     storage_return(cont, cont_len);
+ * }
+ * 
+ * Using the functions modify_content and get_content, we can retrieve
+ * the data in storage like this:
+ *
+ * char buffer[65536];
+ * const long len =
+ *     storage_call(get_content, 0, 0, buffer, sizeof(buffer));
+ *
+ * Inside the storage function, the res argument will be 65536, indicating
+ * how big the return buffer is.
+ *
+ * And we can modify the content like this:
+ *
+ * storage_call(modify_content, data, len, NULL, 0);
+ *
+ * As written before, every storage function must use storage_return() or
+ * storage_return_nothing() in order to indicate the return result to the
+ * request program that called the function.
+ * Many programming languages require a function to run all the way to the
+ * end in order to free temporary objects and allocations. Because of this,
+ * the storage function does not end after the call to storage_return(),
+ * instead the function is resumed afterwards in order to fully return
+ * from the function. This allows the system to copy the data back to the
+ * request program before the function has returned and deallocated the data.
+**/
 typedef void (*storage_func) (size_t n, struct virtbuffer[n], size_t res);
 
-/* Returns true (1) on the storage VM. */
+/* Returns true (1) if called from storage. */
 extern int
 sys_is_storage();
-
-/* Transfer an array to storage, transfer output into @dst. */
-extern long
-storage_call(storage_func, const void *src, size_t, void *dst, size_t);
 
 /* Transfer an array of buffers to storage, transfer output into @dst. */
 extern long
 storage_callv(storage_func, size_t n, const struct virtbuffer[n], void* dst, size_t);
+
+/* Transfer an array to storage, transfer output into @dst. */
+static inline long
+storage_call(storage_func func, const void *src, size_t len, void *res, size_t reslen) {
+	const struct virtbuffer buf[1] = {
+		{ .data = src, .len = len }
+	};
+	return storage_callv(func, 1, buf, res, reslen);
+}
 
 /* Create a task in storage that is scheduled to run next. The new
    task waits until other tasks are done before starting a new one,
@@ -675,9 +755,9 @@ asm(".global wait_for_requests\n"
 	"	mov $0x10001, %eax\n"
 	"	out %eax, $0\n");
 
-asm(".global syscall_set_cacheable\n"
-	".type syscall_set_cacheable, @function\n"
-	"syscall_set_cacheable:\n"
+asm(".global sys_set_cacheable\n"
+	".type sys_set_cacheable, @function\n"
+	"sys_set_cacheable:\n"
 	"	mov $0x10005, %eax\n"
 	"	out %eax, $0\n"
 	"	ret\n");
@@ -810,9 +890,9 @@ asm(".global sys_is_storage\n"
 	"	out %eax, $0\n"
 	"   ret\n");
 
-asm(".global storage_call\n"
-	".type storage_call, @function\n"
-	"storage_call:\n"
+asm(".global sys_storage_allow\n"
+	".type sys_storage_allow, @function\n"
+	"sys_storage_allow:\n"
 	"	mov $0x10707, %eax\n"
 	"	out %eax, $0\n"
 	"   ret\n");
@@ -835,13 +915,6 @@ asm(".global stop_storage_task\n"
 	".type stop_storage_task, @function\n"
 	"stop_storage_task:\n"
 	"	mov $0x1070A, %eax\n"
-	"	out %eax, $0\n"
-	"   ret\n");
-
-asm(".global sys_storage_allow\n"
-	".type sys_storage_allow, @function\n"
-	"sys_storage_allow:\n"
-	"	mov $0x1070B, %eax\n"
 	"	out %eax, $0\n"
 	"   ret\n");
 
