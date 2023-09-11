@@ -568,7 +568,7 @@ kvm_init_fetch(VRT_CTX, const char *url, const char *arg)
 	struct kvm_chain_item *item = &kqueue->chain[kqueue->count];
 	item->tenant = NULL;
 	item->special_function = "fetch";
-	item->inputs.url = url ? url : "";
+	item->inputs.url = url; /* Cannot be NULL. */
 	item->inputs.argument = arg ? arg : "";
 	item->inputs.method = "";
 	item->inputs.content_type = "";
@@ -597,6 +597,8 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	VCL_STRING program, VCL_STRING url, VCL_STRING arg)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	AN(task);
+
 	if (ctx->method != VCL_MET_BACKEND_FETCH) {
 		VRT_fail(ctx, "vmod_kvm: vm_backend() should only"
 		    "be called from vcl_backend_fetch");
@@ -635,6 +637,8 @@ VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
 	VCL_STRING program, VCL_STRING key, VCL_STRING url, VCL_STRING arg)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	AN(task);
+
 	if (ctx->method != VCL_MET_BACKEND_FETCH) {
 		VRT_fail(ctx, "vmod_kvm: vm_debug_backend() should only"
 		    "be called from vcl_backend_fetch");
@@ -678,6 +682,8 @@ VCL_BOOL vmod_chain(VRT_CTX, VCL_PRIV task,
 	VCL_STRING program, VCL_STRING url, VCL_STRING arg)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	AN(task);
+
 	if (ctx->method != VCL_MET_BACKEND_FETCH) {
 		VRT_fail(ctx, "compute: chain() should only be called from vcl_backend_fetch");
 		return (0);
