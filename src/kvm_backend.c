@@ -683,9 +683,18 @@ VCL_BOOL vmod_chain(VRT_CTX, VCL_PRIV task,
 		return (0);
 	}
 
-	/* Self-request */
-	if (strcmp(program, "fetch") == 0) {
-		return (kvm_init_fetch(ctx, url, arg) != NULL);
+	/**
+	 * Use automatic non-VM self-request when:
+	 * 1. Program is 'fetch'
+	 * 2. URL is path-only
+	 * NOTE: This is a hidden optimization.
+	**/
+	if (strcmp(program, "fetch") == 0 && url != NULL && url[0] == '/') {
+		if (kvm_init_fetch(ctx, url, arg) == NULL) {
+			VRT_fail(ctx,
+				"KVM: 'fetch' must be first program, and '%s' should be a self-request", url);
+			return (0);
+		}
 	}
 
 	/* Lookup internal tenant using VCL task */
