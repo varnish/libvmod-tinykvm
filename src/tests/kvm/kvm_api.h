@@ -21,6 +21,13 @@ extern "C" {
 extern void register_func(int, ...);
 
 /**
+ * Detecting KVM from main(). Note that we could check CPUID, but we prefer
+ * a simple check for / in argv[0].
+**/
+#define IS_SANDBOXED_MAIN()  (__builtin_strchr(argv[0], '/') == (void*)0)
+#define IS_LINUX_MAIN()      !IS_SANDBOXED_MAIN()
+
+/**
  * During the start of the program, one should register callback functions
  * that will handle different types of requests, like GET, POST etc.
  *
@@ -51,10 +58,14 @@ static inline void set_backend_post(void(*f)(const char *url, const char *arg, c
 struct backend_request {
 	const char *method;
 	const char *url;
-	const char *argument;
-	const void *content_type;
-	const uint8_t *data; /* Can be NULL. */
-	const size_t   datalen;
+	const char *arg;
+	const char *content_type;
+	uint16_t    method_len;
+	uint16_t    url_len;
+	uint16_t    arg_len;
+	uint16_t    content_type_len;
+	const uint8_t *content; /* Can be NULL. */
+	const size_t   content_len;
 };
 static inline void set_backend_request(void(*f)(const struct backend_request*)) { register_func(3, f); }
 

@@ -246,13 +246,13 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			if (on_method_addr != 0x0) {
 				struct backend_inputs {
 					uint64_t method;
-					uint64_t method_len;
 					uint64_t url;
-					uint64_t url_len;
 					uint64_t arg;
-					uint64_t arg_len;
 					uint64_t ctype;
-					uint64_t ctype_len;
+					uint16_t method_len;
+					uint16_t url_len;
+					uint16_t arg_len;
+					uint16_t ctype_len;
 					uint64_t data; /* Content: Can be NULL. */
 					uint64_t data_len;
 				} inputs {};
