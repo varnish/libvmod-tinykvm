@@ -11,45 +11,50 @@ configured to meet the specific needs of each Varnish Cache server.
 A library defines a group of ready-to-use native programs. Varnish Enterprise
 has a list of officially supported programs, each of which solve a specific task.
 A library will only contain definitions of programs, and they do not consume
-any resources until a program is needed by a request. When a program is needed,
-it is fetched, loaded and then it will process requests until shutdown. This
-means that the first request to any program will wait for it to load.
+any resources until a program is needed by a request, by being explicitly
+referenced from VCL. When a program is needed, it is fetched, loaded and then
+it will process requests until shutdown. This means that the first request to
+any program will wait for it to load.
 
 Programs provided by a library are ready-to-use, and will often have one
-single purpose. Programs are documented on the Varnish Software docs website
-and comes with a simple explanation of what it does, and what configuration
-should be provided to make the program perform a given function.
+single purpose and a few configuration options. Programs are documented on
+the Varnish Software docs website and comes with a simple explanation of what
+they do, and what configuration should be provided to make a program perform a
+given function.
 
 See http://compute.varnish-software.com for a list of official programs.
 
 Example:
 	sub vcl_init {
-		new compvs = activedns.dns_group();
-		compvs.set_host("compute.varnish-software.com");
-
 		compute.library("https://.../compute.json");
 	}
 
 	sub vcl_backend_fetch {
-		set bereq.backend = compute.backend("myprogram",
-			"https://${compvs}/images/" + bereq.url);
+		set bereq.backend = compute.backend("webp",
+			"/images/" + bereq.url);
 	}
 
-	This will employ 'myprogram' as a backend. DNS configuration can be
-	handled using ActiveDNS, and uses the ${name} string-interpolation method.
+	This will employ 'webp' as a backend. The webp program converts JPEG and
+	PNG images to the WebP image format on-the-fly.
 
 
 The primary way to increase or decrease the resource consumption of a program
-is to control the concurrency level. If a program is not handling requests fast
-enough, increase the number of VMs for that program. If the Varnish Cache is
-using too much CPU, try reducing the concurrency level.
+is to control the concurrency level. If a program starts to build a queue of
+waiting requests, try increasing the concurrency level for that program. If even
+that is not enough, see if it is possible to increase the processing speed of a
+program at the cost of larger output. Image transcoders typically has this option.
 
 Example:
 	sub vcl_init {
 		compute.library("https://.../compute.json");
-		compute.configure("myprogram", """{
-			"concurrency": 32
+
+		# Override the default settings of the 'webp' program.
+		compute.configure("webp", """{
+			"concurrency": 4
 		}""");
+
+		# Immediately start the 'webp' program.
+		compute.start("webp");
 	}
 
 Most programs should have a healthy amount of maximum memory available to them in
@@ -65,8 +70,9 @@ $Event vmod_event
 
 $Function BOOL library(PRIV_VCL, STRING uri)
 
-- Fetch library of programs that is pre-installed with Varnish Enterprise.
-- Libraries contain program definitions, but programs are only started on-demand.
+- Read library of program definitions that is pre-installed with Varnish Enterprise.
+- Libraries only contain program definitions, and programs are not started unless
+  and until explicitly referenced by a request from VCL.
 - Must be called from vcl_init.
 
 $Function BOOL init_self_requests(PRIV_VCL, STRING unix_socket,
@@ -80,41 +86,77 @@ $Function BOOL init_self_requests(PRIV_VCL, STRING unix_socket,
 - The max concurrent self-requests parameter is a last resort to avoid loops.
 - Must be called from vcl_init.
 
-$Function INT invalidate_programs(PRIV_VCL, STRING regex = "")
+	Example:
+	1. Start varnishd with an additional listener:
+	varnishd -a :8080 -a /tmp/compute.sock ...
 
-- Unloads programs matching regular expression.
-- The next request to an unloaded program will cause the program to be reloaded.
-- Returns the number of programs unloaded.
+	2. Tell Compute VMOD where to send self-requests:
+	sub vcl_init {
+		compute.library("https://.../compute.json");
+
+		# Tell VMOD compute how to contact Varnish (Unix Socket *ONLY*)
+		compute.init_self_requests("/tmp/compute.sock");
+	}
+
+	Please note that the listener must be accessible to the varnish user in order
+	for it to work.
 
 $Function BOOL configure(PRIV_VCL, STRING program, STRING json)
 
 - Provide a JSON configuration to override defaults to unstarted programs.
 - The JSON configuration is the same as when configuring a program normally,
   but there are no mandatory fields.
-- Can also be used to create a new program inline in VCL.
+- Can also be used to define a new program inline in VCL.
 - Must be called from vcl_init.
+
+$Function INT invalidate_programs(PRIV_VCL, STRING regex = "")
+
+- Unloads programs matching the regular expression pattern.
+- An empty pattern unloads all programs.
+- Future requests to an unloaded program will cause the program to be reloaded.
+- Returns the number of programs unloaded.
 
 $Function BOOL start(PRIV_VCL, STRING program, BOOL async = 1)
 
 - Start program during early Varnish startup.
 - When async, program intialization will not delay Varnish from starting up.
-  Requests will wait until the program is fully initialized.
+  Requests will always wait until the program is fully initialized.
 - Must be called from vcl_init.
 
 $Function BOOL chain(PRIV_VCL, STRING program, STRING arg = "", STRING config = "")
 
 - Queue this program up for execution in the exact order given.
 - Returns true if the program was found.
-- A program chain always end with a call to program().
+- A program chain always end with a call to program() or to_string().
 - Must be called from vcl_backend_fetch.
 
 $Function BACKEND program(PRIV_VCL, STRING program, STRING arg = "", STRING config = "")
 
-- Returns a backend that will call the given program to produce a response.
-- Execute each program in the chain, and *then* run this program to produce a final response.
+- Create a backend that will call the given program to produce a response, in place of a
+  regular Varnish backend. Most programs make self-requests into Varnish in order to fetch
+  content to be processed, which enables the usual observability and customizability in
+  how assets are retrieved.
+
+- If a program chain is used, each program in the chain will be executed first and *then*
+  finally, this program will produce a final response.
+
 - Supports GET, POST and other HTTP requests, as well as streaming modes.
 - All computation happens in between vcl_backend_fetch and vcl_backend_response.
 - Must be called from vcl_backend_fetch.
+
+Example:
+	sub vcl_backend_fetch {
+		if (bereq.url == "/avif") {
+			# The 'avif' program transcodes a JPEG image to AVIF.
+			# Get the image from a self-request to Varnish at '/avif/image':
+			set bereq.backend = compute.program("avif", "/avif/image");
+		}
+		else if (bereq.url == "/avif/image") {
+			# Use a normal backend to fetch the original image.
+			set bereq.backend = ...
+		}
+	}
+
 
 $Function STRING to_string(PRIV_VCL, STRING program, STRING arg = "", STRING config = "", STRING on_error = "")
 
@@ -122,7 +164,7 @@ $Function STRING to_string(PRIV_VCL, STRING program, STRING arg = "", STRING con
 - Supports GET, POST and other HTTP requests.
 - If the program fails, this function returns the on_error string instead.
 - Works with chaining, and calls to_string() for the final string after chained programs.
-- NOTE: Uses extra workspace for each call. See: man varnishd, workspace_backend.
+- NOTE: Uses extra workspace for each call. See: man varnishd.
 
 
 $Function BOOL steal(PRIV_VCL, STRING program, STRING arg = "")
