@@ -12,6 +12,7 @@
 **/
 #pragma once
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -258,9 +259,9 @@ extern int sys_regex_copyto(int rgx, int srchp, int dsthp);
  **/
 /* Set cacheable, ttl, grace and keep. All durations are in milliseconds. */
 extern long
-sys_set_cacheable(int cached, long ttl_ms, long grace_ms, long keep_ms);
+sys_set_cacheable(bool cached, long ttl_ms, long grace_ms, long keep_ms);
 
-static inline long set_cacheable(int cached, float ttl, float grace, float keep)
+static inline long set_cacheable(bool cached, float ttl, float grace, float keep)
 {
 	return sys_set_cacheable(cached, ttl * 1000, grace * 1000, keep * 1000);
 }
