@@ -6,7 +6,8 @@ EXTRA_DIST = \
 	get_version \
 	vcp.version \
 	LICENSE \
-	lib/libkvm
+	lib/libkvm \
+	src/VSC_vmod_kvm.vsc
 
 SUBDIRS = .
 SUBDIRS += src

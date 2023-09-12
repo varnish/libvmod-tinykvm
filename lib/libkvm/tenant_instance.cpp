@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 extern "C" void VTIM_format(double, char[32]);
+extern "C" void kvm_varnishstat_referenced_program();
 
 namespace kvm {
 	extern std::vector<uint8_t> file_loader(const std::string&);
@@ -299,6 +300,7 @@ std::shared_ptr<ProgramInstance> TenantInstance::ref(const vrt_ctx *ctx, bool de
 		return nullptr;
 	}
 
+	kvm_varnishstat_referenced_program();
 	return prog;
 }
 

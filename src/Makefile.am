@@ -31,11 +31,15 @@ libvmod_compute_la_SOURCES = \
 
 nodist_libvmod_compute_la_SOURCES = \
 	vcc_compute_if.c \
-	vcc_compute_if.h
+	vcc_compute_if.h \
+	VSC_vmod_kvm.c \
+	VSC_vmod_kvm.h
 
 EXTRA_DIST = \
 	kvm_streaming_backend.c \
-	vmod_kvm.h
+	vmod_kvm.h \
+	compute.vsc \
+	VSC_vmod_kvm.vsc
 
 kvm_backend.c \
 	kvm_backend.h \
@@ -44,7 +48,10 @@ kvm_backend.c \
 	kvm_post.c \
 	kvm_settings.h \
 	to_string.c \
-	vmod_compute_event.c: vcc_compute_if.h
+	vmod_compute_event.c: vcc_compute_if.h VSC_vmod_kvm.h
+
+VSC_vmod_kvm.c \
+	VSC_vmod_kvm.h: VSC_compute.c VSC_compute.h
 
 @BUILD_VMOD_COMPUTE@
 @BUILD_VSC_COMPUTE@

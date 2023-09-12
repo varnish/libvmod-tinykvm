@@ -13,4 +13,6 @@ stamp-*
 *.lo
 vcc*if.c
 vcc*if.h
+VSC_*.c
+VSC_*.h
 *.log

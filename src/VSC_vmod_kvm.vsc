@@ -1,0 +1,21 @@
+# Counters for KVM
+
+.. varnish_vsc_begin::	vmod_kvm
+	:oneliner:	Counters for KVM
+	:order:		70
+
+	Information counters for KVM.
+
+.. varnish_vsc::	program_notfound
+	:level:		info
+	:oneliner:	Programs not found
+
+	Total number of programs not found.
+
+.. varnish_vsc::	program_referenced
+	:level:		info
+	:oneliner:	Programs referenced
+
+	Total number of programs referenced.
+
+.. varnish_vsc_end::	vmod_kvm
