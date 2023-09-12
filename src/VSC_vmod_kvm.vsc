@@ -7,15 +7,18 @@
 	Information counters for KVM.
 
 .. varnish_vsc::	program_notfound
+	:type:		counter
 	:level:		info
 	:oneliner:	Programs not found
 
 	Total number of programs not found.
 
-.. varnish_vsc::	program_referenced
+.. varnish_vsc::	cpu_time
+	:type:		counter
 	:level:		info
-	:oneliner:	Programs referenced
+	:format:	duration
+	:oneliner:	Cumulative CPU-time of programs
 
-	Total number of programs referenced.
+	Total time spent executing programs.
 
 .. varnish_vsc_end::	vmod_kvm

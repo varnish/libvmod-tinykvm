@@ -30,6 +30,7 @@
 #include "vcc_compute_if.h"
 #include "VSC_vmod_kvm.h"
 
+extern void kvm_varnishstat_program_cpu_time(vtim_real);
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
 	const struct kvm_chain_item *, struct backend_post *, struct backend_result *);
 extern int kvm_get_body(struct backend_post *, struct busyobj *);
@@ -258,6 +259,9 @@ kvmbe_gethdrs(const struct director *dir,
 	CHECK_OBJ_NOTNULL(bo->bereq, HTTP_MAGIC);
 	CHECK_OBJ_NOTNULL(bo->beresp, HTTP_MAGIC);
 	AZ(bo->htc);
+
+	/* Program cpu-time t0. */
+	const vtim_real t0 = VTIM_real();
 
 	/* Retrieve info from struct filled by VCL vm_backend(...) call. */
 	struct vmod_kvm_backend *kvmr;
@@ -504,6 +508,9 @@ kvmbe_gethdrs(const struct director *dir,
 	if (kvm_settings.backend_timings) {
 		kvm_ts(ctx.vsl, "TenantResponse", &kvmr->t_work, &kvmr->t_prev);
 	}
+
+	/* Program cpu-time statistic. */
+	kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
 
 	free(must_free_chunk);
 	return (res);

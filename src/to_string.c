@@ -21,6 +21,7 @@
 #include "vcl.h"
 #include "vcc_compute_if.h"
 
+extern void kvm_varnishstat_program_cpu_time(vtim_real);
 extern uint64_t kvm_allocate_memory(KVM_SLOT, uint64_t bytes);
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
 	const struct kvm_chain_item *, struct backend_post *, struct backend_result *);
@@ -54,6 +55,9 @@ minimal_response(uint16_t status, const char *ctype, const char *content)
 static struct kvm_http_response
 to_string(VRT_CTX, struct kvm_program_chain *chain)
 {
+	/* Program cpu-time t0. */
+	const vtim_real t0 = VTIM_real();
+
 	/* The backend_result contains many iovec-like buffers needed for
 	   extracting data from the VM without copying to a temporary buffer. */
 	struct backend_result *result =
@@ -158,6 +162,9 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 		assert(coff == &content[result->content_length]);
 		*coff = 0;
 	}
+
+	/* Program cpu-time statistic. */
+	kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
 
 	struct kvm_http_response res;
 	res.status     = result->status;

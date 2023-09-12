@@ -62,7 +62,10 @@ int v_matchproto_(vmod_event_f)
 	return (0);
 }
 
-void kvm_varnishstat_referenced_program()
+void kvm_varnishstat_program_cpu_time(vtim_real duration)
 {
-	__sync_fetch_and_add(&vsc_vmod_kvm->program_referenced, 1);
+	static uint64_t cpu_time_kinda;
+
+	__sync_fetch_and_add(&cpu_time_kinda, duration * 4096);
+	vsc_vmod_kvm->cpu_time = cpu_time_kinda / 4096;
 }
