@@ -16,6 +16,7 @@
 #include <malloc.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <vsb.h>
 #include <vtim.h>
 #include "vcl.h"
 #include "vcc_compute_if.h"
@@ -175,13 +176,54 @@ VCL_STRING kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
 	VCL_STRING program, VCL_STRING url, VCL_STRING arg, VCL_STRING on_error)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	AN(task);
 
 	/* Lookup internal tenant using VCL task */
 	struct vmod_kvm_tenant *tenant =
 		kvm_tenant_find(task, program);
 	if (tenant == NULL) {
-		VRT_fail(ctx, "KVM: Tenant not found: %s", program);
+		VRT_fail(ctx, "KVM: Program not found: %s", program);
 		return (NULL);
+	}
+
+	/* Cannot fail at this point, add to chain */
+	struct kvm_chain_item *invocation =
+		kvm_init_chain(ctx, tenant, url, arg);
+	if (invocation == NULL) {
+		return (on_error);
+	}
+
+	invocation->inputs.method = "GET"; /* Convenience */
+	invocation->inputs.content_type = "";
+
+	/* XXX: Immediately reset it. It's a thread_local! */
+	struct kvm_program_chain chain = *kvm_chain_get_queue();
+	kvm_chain_get_queue()->count = 0;
+
+	struct kvm_http_response resp = to_string(ctx, &chain);
+	if (resp.status < 500 && resp.content != NULL)
+		return (resp.content);
+	else
+		return (on_error);
+}
+
+VCL_INT kvm_vm_synth(VRT_CTX, VCL_PRIV task, VCL_INT status,
+	VCL_STRING program, VCL_STRING url, VCL_STRING arg)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	AN(task);
+
+	if (ctx->method != VCL_MET_SYNTH && ctx->method != VCL_MET_BACKEND_ERROR) {
+		VRT_fail(ctx, "KVM: synth() must be called from vcl_synth or vcl_backend_error");
+		return (0);
+	}
+
+	/* Lookup internal tenant using VCL task */
+	struct vmod_kvm_tenant *tenant =
+		kvm_tenant_find(task, program);
+	if (tenant == NULL) {
+		VRT_fail(ctx, "KVM: Program not found: %s", program);
+		return (0);
 	}
 
 	/* Cannot fail at this point, add to chain */
@@ -199,8 +241,22 @@ VCL_STRING kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
 	kvm_chain_get_queue()->count = 0;
 
 	struct kvm_http_response resp = to_string(ctx, &chain);
-	if (resp.status < 500 && resp.content != NULL)
-		return (resp.content);
-	else
-		return (on_error);
+	struct http *hp = ctx->http_resp ? ctx->http_resp : ctx->http_beresp;
+
+	status = (status >= 200 && status < 700) ? status : resp.status;
+	http_SetStatus(hp, status);
+	http_PrintfHeader(hp, "Content-Length: %zu", resp.content_size);
+	http_PrintfHeader(hp, "Content-Type: %.*s", (int)resp.ctype_size, resp.ctype);
+
+	struct vsb *vsb = (struct vsb *)ctx->specific;
+	CHECK_OBJ_NOTNULL(vsb, VSB_MAGIC);
+	VSB_delete(vsb);
+
+	/* This is unfortunately a double copy. If we return a fixed-length VSB,
+	   varnish will crash if return(deliver) is not used immediately after. */
+	vsb = VSB_new_auto();
+	((struct vrt_ctx *)ctx)->specific = vsb;
+	VSB_bcat(vsb, resp.content, resp.content_size);
+
+	return (status);
 }

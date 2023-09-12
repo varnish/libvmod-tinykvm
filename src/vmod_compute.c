@@ -164,6 +164,8 @@ extern struct director *vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg);
 extern const char *kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg, VCL_STRING on_error);
+extern int kvm_vm_synth(VRT_CTX, VCL_PRIV task, VCL_INT status,
+	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg);
 extern VCL_BOOL kvm_vm_begin_epoll(VRT_CTX, VCL_PRIV, VCL_STRING program,
 	int fd, const char *arg);
 
@@ -181,13 +183,18 @@ VCL_BACKEND vmod_program(VRT_CTX, VCL_PRIV task,
 	return (vmod_vm_backend(ctx, task, program, arg, json_config));
 }
 
-/* Create a string response from given program. */
+/* Create a string response from given program and arguments. */
 VCL_STRING vmod_to_string(VRT_CTX, VCL_PRIV task,
 	VCL_STRING program, VCL_STRING url, VCL_STRING argument, VCL_STRING on_error)
 {
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-
 	return (kvm_vm_to_string(ctx, task, program, url, argument, on_error));
+}
+
+/* Create a synthetic response from given program and arguments. */
+VCL_INT vmod_synth(VRT_CTX, VCL_PRIV task, VCL_INT status,
+	VCL_STRING program, VCL_STRING url, VCL_STRING argument)
+{
+	return (kvm_vm_synth(ctx, task, status, program, url, argument));
 }
 
 /* Steal the current clients fd and pass it to the given program. */

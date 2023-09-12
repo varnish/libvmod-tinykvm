@@ -158,13 +158,18 @@ Example:
 	}
 
 
-$Function STRING to_string(PRIV_VCL, STRING program, STRING arg = "", STRING config = "", STRING on_error = "")
+$Function STRING to_string(PRIV_VCL, STRING program, STRING url = "", STRING arg = "", STRING on_error = "")
 
 - Returns a string of the response produced by the given program.
 - Supports GET, POST and other HTTP requests.
 - If the program fails, this function returns the on_error string instead.
 - Works with chaining, and calls to_string() for the final string after chained programs.
 - NOTE: Uses extra workspace for each call. See: man varnishd.
+
+$Function INT synth(PRIV_VCL, INT status, STRING program, STRING url = "", STRING arg = "")
+
+- Returns true if a synthetic response was generated from the given program and arguments.
+- Works exactly the same as to_string().
 
 
 $Function BOOL steal(PRIV_VCL, STRING program, STRING arg = "")
