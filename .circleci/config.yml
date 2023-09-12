@@ -167,6 +167,7 @@ workflows:
                 - ubuntu-focal
                 - ubuntu-jammy
                 - debian-bullseye
+                - debian-bookworm
                 - almalinux-8
                 - almalinux-9
                 - rockylinux-8
