@@ -170,6 +170,7 @@ workflows:
                 - almalinux-8
                 - almalinux-9
                 - rockylinux-8
+                - rockylinux-9
           requires:
             - main/dist
             - main/tar-pkg-tools
