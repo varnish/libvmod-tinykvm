@@ -71,3 +71,6 @@ struct MemoryStruct
 };
 extern int
 kvm_curl_fetch(VRT_CTX, const char *url, void(*callback)(void*, struct MemoryStruct *), void *usr);
+
+/* Varnish statistics */
+extern struct VSC_vmod_kvm *vsc_vmod_kvm;

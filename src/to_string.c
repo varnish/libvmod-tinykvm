@@ -19,7 +19,9 @@
 #include <vsb.h>
 #include <vtim.h>
 #include "vcl.h"
+
 #include "vcc_compute_if.h"
+#include "VSC_vmod_kvm.h"
 
 extern void kvm_varnishstat_program_cpu_time(vtim_real);
 extern uint64_t kvm_allocate_memory(KVM_SLOT, uint64_t bytes);
@@ -190,6 +192,7 @@ VCL_STRING kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
 		kvm_tenant_find(task, program);
 	if (tenant == NULL) {
 		VRT_fail(ctx, "KVM: Program not found: %s", program);
+		__sync_fetch_and_add(&vsc_vmod_kvm->program_notfound, 1);
 		return (NULL);
 	}
 
@@ -230,6 +233,7 @@ VCL_INT kvm_vm_synth(VRT_CTX, VCL_PRIV task, VCL_INT status,
 		kvm_tenant_find(task, program);
 	if (tenant == NULL) {
 		VRT_fail(ctx, "KVM: Program not found: %s", program);
+		__sync_fetch_and_add(&vsc_vmod_kvm->program_notfound, 1);
 		return (0);
 	}
 

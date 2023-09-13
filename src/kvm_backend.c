@@ -629,6 +629,7 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 		kvm_tenant_find(task, program);
 	if (tenant == NULL) {
 		VRT_fail(ctx, "KVM: Program not found: %s", program);
+		__sync_fetch_and_add(&vsc_vmod_kvm->program_notfound, 1);
 		return (NULL);
 	}
 
@@ -669,6 +670,7 @@ VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
 		kvm_tenant_find_key(task, program, key);
 	if (tenant == NULL) {
 		VRT_fail(ctx, "KVM: Program not found: %s", program);
+		__sync_fetch_and_add(&vsc_vmod_kvm->program_notfound, 1);
 		return (NULL);
 	}
 	if (!kvm_tenant_debug_allowed(tenant)) {
@@ -718,6 +720,7 @@ VCL_BOOL vmod_chain(VRT_CTX, VCL_PRIV task,
 		kvm_tenant_find(task, program);
 	if (tenant == NULL) {
 		VRT_fail(ctx, "KVM: Program not found: %s", program);
+		__sync_fetch_and_add(&vsc_vmod_kvm->program_notfound, 1);
 		return (0);
 	}
 
