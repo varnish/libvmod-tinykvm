@@ -44,6 +44,9 @@ using namespace kvm;
 extern "C" {
 #include "vtim.h"
 #include "kvm_backend.h"
+void kvm_varnishstat_program_exception();
+void kvm_varnishstat_program_timeout();
+void kvm_varnishstat_program_status(uint16_t status);
 }
 static constexpr bool VERBOSE_BACKEND = false;
 
@@ -70,7 +73,7 @@ static int16_t sanitize_status_code(int16_t code)
 
 static inline void kvm_ts(struct vsl_log *vsl, const char *event, double work, double& prev)
 {
-	if (kvm_settings.backend_timings) {
+	if (UNLIKELY(kvm_settings.backend_timings)) {
 		VSLb_ts(vsl, event, work, &prev, VTIM_real());
 	}
 }
@@ -134,6 +137,8 @@ static void fetch_result(kvm::VMPoolItem* slot,
 		result->stream_callback = callb_va;
 		result->stream_argument = callb_arg;
 	}
+	/* Record program status counter */
+	kvm_varnishstat_program_status(result->status);
 }
 
 /* Error handling is an optional callback into the request VM when an
@@ -142,6 +147,9 @@ static void fetch_result(kvm::VMPoolItem* slot,
 static void error_handling(kvm::VMPoolItem* slot,
 	const struct kvm_chain_item *invoc, struct backend_result *result, const char *exception)
 {
+	/* Record exception in varnish stat counter. */
+	kvm_varnishstat_program_exception();
+
 	auto& machine = *slot->mi;
 	/* The machine should be reset (after request). */
 	machine.reset_needed_now();
@@ -180,6 +188,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 		return;
 
 	} catch (const tinykvm::MachineTimeoutException& mte) {
+		kvm_varnishstat_program_timeout();
 		VSLb(ctx->vsl, SLT_Error,
 			"%s: Backend VM timed out (%f seconds)",
 			machine.name().c_str(), mte.seconds());
@@ -205,6 +214,8 @@ static void error_handling(kvm::VMPoolItem* slot,
 		0,
 		0, {}
 	};
+	/* Record program status counter */
+	kvm_varnishstat_program_status(result->status);
 }
 
 extern "C"
@@ -214,7 +225,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 {
 	double t_prev = 0.0;
 	double t_work = t_prev;
-	if (kvm_settings.backend_timings) t_prev = VTIM_real();
+	if (UNLIKELY(kvm_settings.backend_timings)) t_prev = VTIM_real();
 
 	auto& machine = *slot->mi;
 
@@ -340,6 +351,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 		return;
 
 	} catch (const tinykvm::MachineTimeoutException& mte) {
+		kvm_varnishstat_program_timeout();
 		VSLb(ctx->vsl, SLT_Error,
 			"%s: Backend VM timed out (%f seconds)",
 			machine.name().c_str(), mte.seconds());
@@ -435,6 +447,8 @@ int kvm_backend_streaming_post(struct backend_post *post,
 		VSLb(post->ctx->vsl, SLT_Error,
 			"VM call exception: %s", e.what());
 	}
+	/* Record exception in varnish stat counter. */
+	kvm_varnishstat_program_exception();
 	/* An error result */
 	return -1;
 }
@@ -481,6 +495,8 @@ ssize_t kvm_backend_streaming_delivery(
 		VSLb(result->stream_vsl, SLT_Error,
 			"VM call exception: %s", e.what());
 	}
+	/* Record exception in varnish stat counter. */
+	kvm_varnishstat_program_exception();
 	/* An error result */
 	return -1;
 }

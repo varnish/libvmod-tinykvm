@@ -69,3 +69,21 @@ void kvm_varnishstat_program_cpu_time(vtim_real duration)
 	__sync_fetch_and_add(&cpu_time_kinda, duration * 4096);
 	vsc_vmod_kvm->cpu_time = cpu_time_kinda / 4096;
 }
+
+void kvm_varnishstat_program_exception()
+{
+	__sync_fetch_and_add(&vsc_vmod_kvm->program_exception, 1);
+}
+
+void kvm_varnishstat_program_timeout()
+{
+	__sync_fetch_and_add(&vsc_vmod_kvm->program_timeout, 1);
+}
+
+void kvm_varnishstat_program_status(uint16_t status)
+{
+	if (status >= 500)
+		__sync_fetch_and_add(&vsc_vmod_kvm->program_status_5xx, 1);
+	else if (status >= 400)
+		__sync_fetch_and_add(&vsc_vmod_kvm->program_status_4xx, 1);
+}

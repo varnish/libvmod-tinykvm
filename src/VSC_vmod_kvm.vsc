@@ -13,6 +13,34 @@
 
 	Total number of programs not found.
 
+.. varnish_vsc::	program_exception
+	:type:		counter
+	:level:		info
+	:oneliner:	Exceptions reported by programs
+
+	Total number of CPU exceptions and any other run-time cancelling exceptions.
+
+.. varnish_vsc::	program_timeout
+	:type:		counter
+	:level:		info
+	:oneliner:	Timeouts reported by programs
+
+	Total number of timeouts cancelling execution of a program.
+
+.. varnish_vsc::	program_status_4xx
+	:type:		counter
+	:level:		info
+	:oneliner:	HTTP status 4xx errors reported by programs
+
+	Total number of HTTP status 4xx errors reported by programs.
+
+.. varnish_vsc::	program_status_5xx
+	:type:		counter
+	:level:		info
+	:oneliner:	HTTP status 5xx errors reported by programs
+
+	Total number of HTTP status 5xx errors reported by programs.
+
 .. varnish_vsc::	cpu_time
 	:type:		counter
 	:level:		info
