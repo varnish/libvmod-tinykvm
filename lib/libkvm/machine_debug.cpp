@@ -40,7 +40,7 @@ void MachineInstance::open_debugger(uint16_t port, float timeout)
 
 	// Begin debugging (without locks)
 	auto& client = program().rspclient;
-	client->set_machine(machine());
+	client->set_vcpu(machine().cpu());
 
 	try {
 		// Debugger loop
@@ -68,7 +68,7 @@ void MachineInstance::storage_debugger(float timeout)
 		return;
 	}
 	auto& old_machine = client->machine();
-	client->set_machine(machine());
+	client->set_vcpu(machine().cpu());
 
 	try {
 		// Tell GDB that machine is "running"
@@ -79,7 +79,7 @@ void MachineInstance::storage_debugger(float timeout)
 		while (client->process_one() && !machine().stopped());
 	} catch (const std::exception& e) {
 		printf("Error when debugging storage: %s\n", e.what());
-		client->set_machine(old_machine);
+		client->set_vcpu(old_machine.cpu());
 		throw;
 	}
 
@@ -89,7 +89,7 @@ void MachineInstance::storage_debugger(float timeout)
 	}
 
 	/* Restore old machine used by debugger. */
-	client->set_machine(old_machine);
+	client->set_vcpu(old_machine.cpu());
 }
 
 }
