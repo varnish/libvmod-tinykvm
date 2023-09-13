@@ -40,7 +40,6 @@ struct vmod_kvm_backend
 
 	int debug;
 	uint64_t max_response_size;
-	const struct director* backend;
 
 	double t_prev;
 	double t_work;

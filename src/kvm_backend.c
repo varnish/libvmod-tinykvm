@@ -48,35 +48,34 @@ struct kvm_program_chain* kvm_chain_get_queue()
 	return &kqueue;
 }
 
+static inline struct vmod_priv *
+kvm_get_priv_task(VRT_CTX)
+{
+	if (ctx->req) {
+		return VRT_priv_task(ctx, ctx->req);
+	} else {
+		return VRT_priv_task(ctx, ctx->bo);
+	}
+}
+
 static int
 kvm_release_after_request(VRT_CTX, KVM_SLOT slot)
 {
-	struct vmod_priv* priv_task;
-	if (ctx->req) {
-		priv_task = VRT_priv_task(ctx, ctx->req);
-	} else {
-		priv_task = VRT_priv_task(ctx, ctx->bo);
-	}
+	struct vmod_priv* priv_task = kvm_get_priv_task(ctx);
 	priv_task->priv = slot;
 	priv_task->len  = 0;
 	priv_task->free = kvm_get_free_function();
 	return (1);
 }
-static int
+static void
 kvm_early_slot_release(VRT_CTX, KVM_SLOT slot)
 {
-	struct vmod_priv* priv_task;
-	if (ctx->req) {
-		priv_task = VRT_priv_task(ctx, ctx->req);
-	} else {
-		priv_task = VRT_priv_task(ctx, ctx->bo);
-	}
+	struct vmod_priv* priv_task = kvm_get_priv_task(ctx);
 	priv_task->priv = NULL;
 	priv_task->len  = 0;
 	if (priv_task->free)
 		priv_task->free(slot);
 	priv_task->free = NULL;
-	return (1);
 }
 
 static void v_matchproto_(vdi_panic_f)
@@ -456,6 +455,10 @@ kvmbe_gethdrs(const struct director *dir,
 			break;
 		}
 
+		/* Setting last_slot here enables short-response optimization for errors. */
+		last_tenant = invocation->tenant;
+		last_slot = slot;
+
 		/* Explicitly set content-type when present. This allows
 		   other programs in the chain to read it as needed.
 		   An empty content-type is treated as no-change. Programs
@@ -471,9 +474,6 @@ kvmbe_gethdrs(const struct director *dir,
 					"%s %.*s", H_Content_Type + 1, (int)result->tsize, result->type);
 			}
 		}
-
-		last_tenant = invocation->tenant;
-		last_slot = slot;
 	}
 
 	/**
@@ -595,12 +595,6 @@ static void init_kvmr(struct vmod_kvm_backend *kvmr)
 	kvmr->chain = kqueue;
 	/* XXX: Immediately reset it. It's a thread_local! */
 	kqueue.count = 0;
-}
-
-void vmod_kvm_set_kvmr_backend(struct director *dir, VCL_BACKEND backend)
-{
-	struct vmod_kvm_backend *kvmr = (struct vmod_kvm_backend *)dir->priv;
-	kvmr->backend = backend;
 }
 
 VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
