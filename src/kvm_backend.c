@@ -707,6 +707,7 @@ VCL_BOOL vmod_chain(VRT_CTX, VCL_PRIV task,
 				"KVM: 'fetch' must be first program, and '%s' should be a self-request", url);
 			return (0);
 		}
+		return (1);
 	}
 
 	/* Lookup internal tenant using VCL task */
