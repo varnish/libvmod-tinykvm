@@ -168,8 +168,10 @@ $Function STRING to_string(PRIV_VCL, STRING program, STRING url = "", STRING arg
 
 $Function INT synth(PRIV_VCL, INT status, STRING program, STRING url = "", STRING arg = "")
 
-- Returns true if a synthetic response was generated from the given program and arguments.
-- Works exactly the same as to_string().
+- Directly delivers a synthetic response. If status is non-zero, the HTTP status will be overridden.
+- Generates a synthetic response from the given program and arguments.
+- If the synthetic response fails, the function returns 0.
+- Works the same way as to_string().
 
 
 $Function BOOL steal(PRIV_VCL, STRING program, STRING arg = "")

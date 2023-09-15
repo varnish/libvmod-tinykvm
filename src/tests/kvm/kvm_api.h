@@ -140,6 +140,11 @@ begin_streaming_response(int16_t status, const void *t, size_t, size_t content_l
  * HTTP header field manipulation
  *
 **/
+static const int HDR_REQ     = 0;
+static const int HDR_REQ_TOP = 1;
+static const int HDR_RESP    = 2;
+static const int HDR_BEREQ   = 4;
+static const int HDR_BERESP  = 5;
 static const int BEREQ  = 4;  /* Get values from this. */
 static const int BERESP = 5;  /* Set values on this. */
 static const unsigned HTTP_FMT_SIZE = 4096; /* Most header fields fit. */
@@ -401,7 +406,10 @@ int adns_get_count(int idx, int entry) {
 
 /* A vector-based buffer used by calls into storage. */
 struct virtbuffer {
-	const void *data;
+	union {
+		const void *data;
+		const char *data_str;
+	};
 	size_t      len;
 };
 /**
