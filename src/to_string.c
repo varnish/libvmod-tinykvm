@@ -20,6 +20,7 @@
 #include <vtim.h>
 #include "vcl.h"
 
+#define VARNISH_PLUS
 #include "vcc_compute_if.h"
 #include "VSC_vmod_kvm.h"
 
@@ -39,17 +40,20 @@ struct kvm_http_response {
 
 	const char* content;
 	size_t content_size;
+	bool   writable_content;
 
 	uint16_t status;
 };
 static struct kvm_http_response
-minimal_response(uint16_t status, const char *ctype, const char *content)
+minimal_response(uint16_t status, const char *content)
 {
+	AN(content);
 	return (struct kvm_http_response) {
-		.ctype = ctype,
-		.ctype_size = ctype ? strlen(ctype) : 0u,
+		.ctype = "text/plain",
+		.ctype_size = strlen("text/plain"),
 		.content = content,
-		.content_size = content ? strlen(content) : 0u,
+		.content_size = strlen(content),
+		.writable_content = false,
 		.status = status
 	};
 }
@@ -66,7 +70,7 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 		(struct backend_result *)WS_Alloc(ctx->ws, VMBE_RESULT_SIZE);
 	if (result == NULL) {
 		VSLb(ctx->vsl, SLT_Error, "KVM: Out of workspace for result");
-		return (minimal_response(500, NULL, NULL));
+		return (minimal_response(500, "Out of workspace"));
 	}
 	result->bufcount = VMBE_NUM_BUFFERS;
 
@@ -76,7 +80,7 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 		post = (struct backend_post *)WS_Alloc(ctx->ws, sizeof(struct backend_post));
 		if (post == NULL) {
 			VSLb(ctx->vsl, SLT_Error, "KVM: Out of workspace for POST structure");
-			return (minimal_response(500, NULL, NULL));
+			return (minimal_response(500, "Out of workspace"));
 		}
 		post->ctx = ctx;
 	}
@@ -101,7 +105,7 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 			}
 			VSLb(ctx->vsl, SLT_Error,
 				"KVM: Unable to reserve '%s'", kvm_tenant_name(invocation->tenant));
-			return (minimal_response(500, NULL, NULL));
+			return (minimal_response(500, "Unable to make reservation"));
 		}
 
 		bool use_post = false;
@@ -118,7 +122,7 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 			{
 				kvm_free_reserved_machine(ctx, slot);
 				kvm_free_reserved_machine(ctx, last_slot);
-				return (minimal_response(500, NULL, NULL));
+				return (minimal_response(500, "Unable to transfer in chain"));
 			}
 
 			kvm_free_reserved_machine(ctx, last_slot);
@@ -137,33 +141,31 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 			VSLb(ctx->vsl, SLT_Error,
 				"KVM: Error status %u from call to %s",
 				result->status, kvm_tenant_name(invocation->tenant));
-			return (minimal_response(500, NULL, NULL));
+			return (minimal_response(500, "Error status in chain"));
 		}
 
 		last_slot = slot;
 	}
 
-	/* Finalize result into a string. */
-	char *content = "";
-	if (result->bufcount > 0)
-	{
-		/* Allocate room for zero-terminated content */
-		content = (char *)WS_Alloc(ctx->ws, result->content_length + 1);
-		if (content == NULL) {
-			VSLb(ctx->vsl, SLT_Error,
-				"KVM: Out of workspace for final content (size=%zu bytes)", result->content_length);
-			return (minimal_response(500, NULL, NULL));
+	/* Finalize result into a string.
+	   Allocate room for zero-terminated content */
+	char *content = (char *)WS_Alloc(ctx->ws, result->content_length + 1);
+	if (content == NULL) {
+		if (last_slot != NULL) {
+			kvm_free_reserved_machine(ctx, last_slot);
 		}
-		/* Extract content from VM */
-		char *coff = content;
-		for (size_t b = 0; b < result->bufcount; b++) {
-			memcpy(coff, result->buffers[b].data, result->buffers[b].size);
-			coff += result->buffers[b].size;
-		}
-		/* Zero-terminate content */
-		assert(coff == &content[result->content_length]);
-		*coff = 0;
+		VSLb(ctx->vsl, SLT_Error,
+			"KVM: Out of workspace for final content (size=%zu bytes)", result->content_length);
+		return (minimal_response(500, "Out of workspace"));
 	}
+	/* Extract content from VM */
+	char *coff = content;
+	for (size_t b = 0; b < result->bufcount; b++) {
+		memcpy(coff, result->buffers[b].data, result->buffers[b].size);
+		coff += result->buffers[b].size;
+	}
+	/* Zero-terminate content */
+	content[result->content_length] = 0;
 
 	/* Program cpu-time statistic. */
 	kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
@@ -174,6 +176,7 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 	res.ctype_size = result->tsize;
 	res.content    = content;
 	res.content_size = result->content_length;
+	res.writable_content = true;
 
 	if (last_slot != NULL) {
 		kvm_free_reserved_machine(ctx, last_slot);
@@ -255,19 +258,38 @@ VCL_INT kvm_vm_synth(VRT_CTX, VCL_PRIV task, VCL_INT status,
 	struct http *hp = ctx->http_resp ? ctx->http_resp : ctx->http_beresp;
 
 	status = (status >= 200 && status < 700) ? status : resp.status;
+#ifdef VARNISH_PLUS
 	http_SetStatus(hp, status);
+#else
+	const char *reason = http_Status2Reason(status, NULL);
+	http_SetStatus(hp, status, reason ? reason : "Unknown reason");
+#endif
 	http_PrintfHeader(hp, "Content-Length: %zu", resp.content_size);
 	http_PrintfHeader(hp, "Content-Type: %.*s", (int)resp.ctype_size, resp.ctype);
 
 	struct vsb *vsb = (struct vsb *)ctx->specific;
 	CHECK_OBJ_NOTNULL(vsb, VSB_MAGIC);
-	VSB_delete(vsb);
 
-	/* This is unfortunately a double copy. If we return a fixed-length VSB,
-	   varnish will crash if return(deliver) is not used immediately after. */
-	vsb = VSB_new_auto();
-	((struct vrt_ctx *)ctx)->specific = vsb;
-	VSB_bcat(vsb, resp.content, resp.content_size);
+#ifdef VARNISH_PLUS
+	if (resp.writable_content)
+	{
+		// Delete any old heap-allocated data
+		if (vsb->s_flags & VSB_DYNAMIC) {
+			free(vsb->s_buf);
+		}
+		// Make VSB fixed length, which does not call free
+		// XXX: Varnish will literally store a \0 at s_len.
+		vsb->s_buf = (char *)resp.content;
+		vsb->s_size = resp.content_size + 1; /* pretend-zero */
+		vsb->s_len  = resp.content_size;
+		vsb->s_flags = VSB_FIXEDLEN | VSB_AUTOEXTEND;
+	} else {
+#endif
+		VSB_clear(vsb);
+		VSB_bcat(vsb, resp.content, resp.content_size);
+#ifdef VARNISH_PLUS
+	}
+#endif
 
 	return (status);
 }
