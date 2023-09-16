@@ -55,10 +55,8 @@ VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
 }
 
 Storage::Storage(std::vector<uint8_t> storage_elf)
-	: storage_binary{std::move(storage_elf)},
-	  m_storage_async_queue {ASYNC_STORAGE_NICE, ASYNC_STORAGE_LOWPRIO}
+	: storage_binary{std::move(storage_elf)}
 {
-
 }
 
 ProgramInstance::ProgramInstance(
@@ -130,7 +128,7 @@ ProgramInstance::ProgramInstance(
 				data->status = status;
 				if (status == 304) {
 					if constexpr (VERBOSE_PROGRAM_STARTUP) {
-						printf("Loading '%s' from local disk\n", data->ten->config.name.c_str());
+						printf("Loading '%s' from disk\n", data->ten->config.name.c_str());
 					}
 					data->prog->request_binary = file_loader(data->ten->config.request_program_filename());
 					if (data->prog->has_storage())
@@ -225,10 +223,6 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 			// 1. Create the storage VM, used for shared mutable storage.
 			storage().storage_vm = std::make_unique<MachineInstance>
 				(storage().storage_binary, ctx, ten, this, true, debug);
-
-			// The extra vCPU is used for async storage access.
-			storage().storage_vm_extra_cpu_stack = EXTRA_CPU_STACK_SIZE +
-				storage().storage_vm->machine().mmap_allocate(EXTRA_CPU_STACK_SIZE);
 
 			// Run through main, verify wait_for_requests() etc.
 			storage().storage_vm->initialize();
@@ -337,18 +331,12 @@ ProgramInstance::~ProgramInstance()
 	m_storage_queue.wait_until_empty();
 	m_storage_queue.wait_until_nothing_in_flight();
 
-	if (has_storage()) {
-		storage().m_storage_async_queue.wait_until_nothing_in_flight();
-		if (storage().storage_vm_extra_cpu) {
-			// XXX: This might be deleted too early
-			storage().storage_vm_extra_cpu->deinit();
-		}
-	}
-
+#ifdef KVM_ADNS
 	for (const auto& adns : m_adns_tags) {
 		if (!adns.tag.empty())
 			libadns_untag(adns.tag, this->m_vcl);
 	}
+#endif
 }
 
 long ProgramInstance::wait_for_initialization()
@@ -530,7 +518,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 	return future.get();
 }
 
-long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
+long ProgramInstance::storage_task(gaddr_t func, std::string argument)
 {
 	/* Check allow-list for what storage functions are allowed. */
 	if (!storage().is_allowed(func))
@@ -543,89 +531,38 @@ long ProgramInstance::async_storage_call(bool async, gaddr_t func, gaddr_t arg)
 		storage().m_async_tasks.pop_front();
 
 	// Block and finish previous async tasks
-	if (async == false)
+	storage().m_async_tasks.push_back(
+		m_storage_queue.enqueue(
+	[=, data_arg = std::move(argument)] () -> long
 	{
-		storage().m_async_tasks.push_back(
-			m_storage_queue.enqueue(
-		[=] () -> long
-		{
+		if constexpr (VERBOSE_STORAGE_TASK) {
+			printf("-> Async task on main queue\n");
+		}
+		auto& stm = storage().storage_vm->machine();
+
+		try {
 			if constexpr (VERBOSE_STORAGE_TASK) {
-				printf("-> Async task on main queue\n");
+				printf("Calling 0x%lX\n", func);
 			}
-			auto& stm = storage().storage_vm->machine();
+			/* Avoid async storage while still initializing. */
+			this->try_wait_for_startup_and_initialization();
 
-			try {
-				if constexpr (VERBOSE_STORAGE_TASK) {
-					printf("Calling 0x%lX\n", func);
-				}
-				/* Avoid async storage while still initializing. */
-				this->try_wait_for_startup_and_initialization();
+			unsigned long long rsp = stm.stack_address();
+			auto data_addr = stm.stack_push(rsp, data_arg);
 
-				stm.timed_reentry(func, ASYNC_STORAGE_TIMEOUT,
-					(uint64_t)arg);
-				if constexpr (VERBOSE_STORAGE_TASK) {
-					printf("<- Async task finished 0x%lX\n", func);
-				}
-				return 0;
-			} catch (const std::exception& e) {
-				if constexpr (VERBOSE_STORAGE_TASK) {
-					printf("<- Async task failure: %s\n", e.what());
-				}
-				return -1;
-			}
-		}));
-	} else {
-		/* Use separate queue: m_storage_async_queue. */
-		storage().m_async_tasks.push_back(
-			storage().m_storage_async_queue.enqueue(
-		[=] () -> long
-		{
+			stm.timed_reentry_stack(func, rsp, ASYNC_STORAGE_TIMEOUT,
+				uint64_t(data_addr), uint64_t(data_arg.size()));
 			if constexpr (VERBOSE_STORAGE_TASK) {
-				printf("-> Async task on async queue\n");
+				printf("<- Async task finished 0x%lX\n", func);
 			}
-			auto& stm = storage().storage_vm->machine();
-
-			try {
-				if constexpr (VERBOSE_STORAGE_TASK) {
-					printf("Calling 0x%lX with stack 0x%lX\n",
-						func, storage().storage_vm_extra_cpu_stack);
-				}
-				/* Avoid async storage while still initializing. */
-				this->try_wait_for_startup_and_initialization();
-
-				if (!storage().storage_vm_extra_cpu) {
-					storage().storage_vm_extra_cpu.reset(new tinykvm::vCPU);
-					storage().storage_vm_extra_cpu->smp_init(EXTRA_CPU_ID, stm);
-				}
-				/* For the love of GOD don't try to change this to
-				   a timed_reentry_stack call *again*. This function
-				   specfically uses *storage_vm_extra_cpu*. */
-				tinykvm::tinykvm_x86regs regs;
-				stm.setup_call(regs, func, storage().storage_vm_extra_cpu_stack, (uint64_t)arg);
-				//regs.rip = stm.reentry_address();
-				storage().storage_vm_extra_cpu->set_registers(regs);
-				storage().storage_vm_extra_cpu->run(tinykvm::to_ticks(ASYNC_STORAGE_TIMEOUT));
-				if constexpr (VERBOSE_STORAGE_TASK) {
-					printf("<- Async task finished 0x%lX\n", func);
-				}
-				return 0;
+			return 0;
+		} catch (const std::exception& e) {
+			if constexpr (VERBOSE_STORAGE_TASK) {
+				printf("<- Async task failure: %s\n", e.what());
 			}
-			catch (const tinykvm::MachineTimeoutException& me) {
-				printf("Async storage task timed out: %s (%fs)\n",
-					me.what(), me.seconds());
-				return -1;
-			}
-			catch (const tinykvm::MachineException& me) {
-				printf("Async storage task error: %s (0x%lX)\n",
-					me.what(), me.data());
-				return -1;
-			}
-			catch (const std::exception& e) {
-				printf("Async storage task error: %s\n", e.what());
-				return -1;
-			}
-		}));
-	}
+			return -1;
+		}
+	}));
 	return 0;
 }
 

@@ -6,11 +6,11 @@
 #include "adns.hpp"
 #include "utils/cpptime.hpp"
 #include <blockingconcurrentqueue.h>
-#include <tinykvm/util/threadpool.h>
 #include <tinykvm/util/threadtask.hpp>
 #include <unordered_set>
 struct vcl;
 struct vsl_log;
+typedef void (*priv_task_free_func_t) (void*);
 
 namespace kvm {
 struct VirtBuffer {
@@ -36,9 +36,10 @@ struct VMPoolItem {
 	// We can use this to avoid having to start in a serialized manner
 	std::future<long> task_future;
 };
+
 struct Reservation {
 	VMPoolItem* slot;
-	void (*free) (void*);
+	priv_task_free_func_t free;
 };
 
 enum class ProgramEntryIndex : uint8_t {
@@ -64,18 +65,12 @@ public:
 
 	/* Ready-made *storage* VM that provides a shared mutable storage */
 	std::unique_ptr<MachineInstance> storage_vm;
-	/* Extra vCPU used for async storage tasks */
-	std::unique_ptr<tinykvm::vCPU> storage_vm_extra_cpu = nullptr;
-	uint64_t storage_vm_extra_cpu_stack = 0x0;
 
 	std::vector<uint8_t> storage_binary;
 
 	/* Tasks executed in storage outside an active request. */
 	std::deque<std::future<long>> m_async_tasks;
 	std::mutex m_async_mtx;
-
-	/* Separate queue for async calls into main VM. */
-	tinykvm::ThreadTask m_storage_async_queue;
 
 	std::unordered_set<uint64_t> allow_list;
 
@@ -154,7 +149,7 @@ public:
 		gaddr_t func, size_t n, VirtBuffer[], gaddr_t, size_t);
 
 	/* Async serialized vmcall into storage VM. */
-	long async_storage_call(bool async, gaddr_t func, gaddr_t arg);
+	long storage_task(gaddr_t func, std::string argument);
 
 	/* Serialized call into storage VM during live update */
 	long live_update_call(const vrt_ctx*,

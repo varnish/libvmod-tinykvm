@@ -140,23 +140,26 @@ static void syscall_storage_task(vCPU& cpu, MachineInstance& inst)
 	auto& regs = cpu.registers();
 	const uint64_t function = regs.rdi;
 	const uint64_t argument = regs.rsi;
-	const int      async = regs.rdx;
+	const size_t   arglen   = regs.rdx;
 	const uint64_t start    = regs.rcx;
 	const uint64_t period   = regs.r8;
+
+	const std::string task_buffer =
+		cpu.machine().buffer_to_string(argument, arglen, STORAGE_TASK_MAX_ARGUMENT);
+
 	if (start == 0 && period == 0) {
-		regs.rax = inst.program().async_storage_call(
-			async, function, argument);
+		regs.rax = inst.program().storage_task(
+			function, std::move(task_buffer));
 	} else {
 		/* XXX: Racy spam avoidance of async tasks. */
 		auto *prog = &inst.program();
 		if (prog->m_timer_system.racy_count() < STORAGE_TASK_MAX_TIMERS) {
 			regs.rax = prog->m_timer_system.add(
 				std::chrono::milliseconds(start),
-				[=](auto)
+				[=, argument = std::move(task_buffer)](auto)
 				{
 					try {
-						prog->async_storage_call(
-							async, function, argument);
+						prog->storage_task(function, std::move(argument));
 					} catch (const std::exception& e) {
 						/* XXX: We have nowhere to post this error */
 						//fprintf(stderr, "");
