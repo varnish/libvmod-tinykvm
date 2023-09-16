@@ -270,26 +270,9 @@ VCL_INT kvm_vm_synth(VRT_CTX, VCL_PRIV task, VCL_INT status,
 	struct vsb *vsb = (struct vsb *)ctx->specific;
 	CHECK_OBJ_NOTNULL(vsb, VSB_MAGIC);
 
-#ifdef VARNISH_PLUS
-	if (resp.writable_content)
-	{
-		// Delete any old heap-allocated data
-		if (vsb->s_flags & VSB_DYNAMIC) {
-			free(vsb->s_buf);
-		}
-		// Make VSB fixed length, which does not call free
-		// XXX: Varnish will literally store a \0 at s_len.
-		vsb->s_buf = (char *)resp.content;
-		vsb->s_size = resp.content_size + 1; /* pretend-zero */
-		vsb->s_len  = resp.content_size;
-		vsb->s_flags = VSB_FIXEDLEN | VSB_AUTOEXTEND;
-	} else {
-#endif
-		VSB_clear(vsb);
-		VSB_bcat(vsb, resp.content, resp.content_size);
-#ifdef VARNISH_PLUS
-	}
-#endif
+	/* XXX: Don't bother with VSB_FIXEDLEN here. It's broken and leaks memory. */
+	VSB_clear(vsb);
+	VSB_bcat(vsb, resp.content, resp.content_size);
 
 	return (status);
 }
