@@ -16,3 +16,4 @@ vcc*if.h
 VSC_*.c
 VSC_*.h
 *.log
+*.trs

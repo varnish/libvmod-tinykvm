@@ -298,10 +298,8 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 		// Tenant configuration
 		if (is_tenant(obj))
 		{
-			if (UNLIKELY(!obj.contains("group"))) {
-				throw std::runtime_error("kvm: Program without group: " + it.key());
-			}
-			const std::string& grname = obj["group"];
+			const std::string grname =
+				!obj.contains("group") ? "test" : obj["group"];
 			auto grit = groups.find(grname);
 			if (UNLIKELY(grit == groups.end())) {
 				throw std::runtime_error("Could not find group " + grname + " for '" + it.key() + "'");
@@ -324,8 +322,8 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			std::string uri = "";
 			if (obj.contains("uri")) uri = obj["uri"];
 			/* Verify: No filename and no key is an unreachable program. */
-			if (filename.empty() && uri.empty() && lvu_key.empty())
-				throw std::runtime_error("kvm: Unreachable program " + it.key() + " has no filename and no way to update");
+			if (filename.empty() && uri.empty())
+				throw std::runtime_error("kvm: Unreachable program " + it.key() + " has no URI or filename");
 
 			/* Use the group data except filename */
 			kvm::load_tenant(ctx, task, kvm::TenantConfig{
