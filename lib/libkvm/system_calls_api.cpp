@@ -51,6 +51,11 @@ static void syscall_storage_return(vCPU& cpu, MachineInstance& inst)
 	inst.finish_call(2);
 	cpu.stop();
 }
+static void syscall_storage_noreturn(vCPU& cpu, MachineInstance& inst)
+{
+	inst.finish_call(3);
+	cpu.stop();
+}
 
 static void syscall_set_cacheable(vCPU& cpu, MachineInstance& inst)
 {

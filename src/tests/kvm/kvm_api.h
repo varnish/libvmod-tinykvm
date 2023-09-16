@@ -489,46 +489,42 @@ storage_call(storage_func func, const void *src, size_t len, void *res, size_t r
 	return storage_callv(func, 1, buf, res, reslen);
 }
 
-/* Create a task in storage that is scheduled to run next. The new
-   task waits until other tasks are done before starting a new one,
-   which will block the current thread, making this a blocking call.
+/* Create a task in storage that is scheduled to run next.
    If start or period is set, the task will be scheduled to run after
    start milliseconds, and then run every period milliseconds. The
    system call returns the timer id.
-   If async is enabled, it is possible re-enter storage. NB: Watch out
-   for race conditions!
    If it is a periodic task, it will return a task id. */
+typedef void (*storage_task_func) (void *data, size_t len);
+
 extern long
-sys_storage_task(void (*task)(void* arg), void* arg, int async, uint64_t start, uint64_t period);
+sys_storage_task(storage_task_func, void* data, size_t len, uint64_t start, uint64_t period);
 
-/* Schedule a storage task to happen outside of request handling. */
+/* Schedule a storage task to happen next. It will be queued up for storage access. */
 static inline long
-storage_task(void (*task)(void *arg), void *arg) { return sys_storage_task(task, arg, 0, 0, 0); }
+storage_task(storage_task_func task, void *data, size_t len) { return sys_storage_task(task, data, len, 0, 0); }
 
-/* Schedule a storage task to happen at some point outside of request handling. */
+/* Schedule a storage task to happen at some point. It will be queued up for storage access periodically. */
 static inline long
-schedule_storage_task(void (*task)(void *arg), void *arg, float start, float period) {
-	return sys_storage_task(task, arg, 0, start * 1000, period * 1000);
+schedule_storage_task(storage_task_func task, void *data, size_t len, float start, float period) {
+	return sys_storage_task(task, data, len, start * 1000, period * 1000);
 }
-
-/* Async storage tasks happen even while storage is entered somewhere
-   else. It is a re-entrant call, so watch out for race conditions.
-   This functions allows scheduling work from storage even if it
-   very busy in ordinary requests, or you are fetching directly
-   from Varnish where the request would try to enter storage. */
-static inline long
-async_storage_task(void (*task)(void *arg), void *arg) { return sys_storage_task(task, arg, 1, 0, 0); }
 
 /* Stop a previously scheduled task. Returns TRUE on success. */
 extern long
 stop_storage_task(long task);
 
-/* Used to return data from storage functions. */
+/* Used to return data from a storage function, and then return and complete the function.
+   NOTE: This function *always* returns back allowing cleanup, such as destructors. */
 extern void
 storage_return(const void* data, size_t len);
 
 static inline void
 storage_return_nothing(void) { storage_return(NULL, 0); }
+
+/* Used to return data from storage functions, and never returns back to finish the function.
+   NOTE: The function *never* returns back, preventing cleanup and destructors from running. */
+extern void __attribute__ ((noreturn))
+storage_noreturn(const void* data, size_t len);
 
 /* Allow a certain function to be called from a request VM.
    If this function is never called, all functions are allowed. */
@@ -934,6 +930,14 @@ asm(".global storage_return\n"
 	"	mov $0x10011, %eax\n"
 	"	out %eax, $0\n"
 	"	ret\n"
+	".cfi_endproc\n");
+
+asm(".global storage_noreturn\n"
+	".type storage_noreturn, @function\n"
+	"storage_noreturn:\n"
+	".cfi_startproc\n"
+	"	mov $0x10013, %eax\n"
+	"	out %eax, $0\n"
 	".cfi_endproc\n");
 
 asm(".global multiprocess\n"

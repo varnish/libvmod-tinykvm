@@ -52,4 +52,4 @@ target_include_directories(kvm PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
 # ActiveDNS
 target_link_libraries(kvm PRIVATE adns)
-target_compile_definitions(kvm PUBLIC VMOD_EVENT_ENABLED=1)
+target_compile_definitions(kvm PUBLIC KVM_ADNS=1 VMOD_EVENT_ENABLED=1)

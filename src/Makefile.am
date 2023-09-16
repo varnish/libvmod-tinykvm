@@ -1,5 +1,5 @@
-AM_CFLAGS = $(VARNISHAPI_CFLAGS)
-AM_CPPFLAGS = -I$(top_srcdir)/lib/libkvm
+AM_CFLAGS = $(VARNISHAPI_CFLAGS) -DKVM_ADNS 
+AM_CPPFLAGS = -DKVM_ADNS -I$(top_srcdir)/lib/libkvm
 
 # Modules
 

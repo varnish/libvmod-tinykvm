@@ -10,11 +10,7 @@
 #include "VSC_vmod_kvm.h"
 
 extern void handle_vmod_event(struct vcl *vcl, enum vcl_event_e e);
-#ifdef VARNISH_PLUS
 #define EVENT_NAME  vmod_event
-#else
-#define EVENT_NAME  vmod_vmod_event /* ??? */
-#endif
 
 static unsigned vsc_init_counter = 0;
 static struct   vsc_seg *vsc_segment;

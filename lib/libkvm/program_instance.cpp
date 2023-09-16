@@ -481,8 +481,11 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 				stm.run(timeout);
 			}
 
-			/* The machine must be stopped, and it must have called storage_return. */
-			if (!stm.stopped() || !storage().storage_vm->response_called(2)) {
+			const bool storage_resume   = storage().storage_vm->response_called(2);
+			const bool storage_noreturn = storage().storage_vm->response_called(3);
+
+			/* The machine must be stopped, and it must have called storage_[no]return. */
+			if (!stm.stopped() || !(storage_resume || storage_noreturn)) {
 				throw std::runtime_error("Storage did not respond properly");
 			}
 
@@ -494,12 +497,17 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 				/* Copy from the storage machine back into tenant VM instance */
 				src.copy_from_machine(res_addr, stm, st_res_buffer, st_res_size);
 			}
-			/* Resume, run the function to the end, allowing cleanup */
-			stm.run(STORAGE_CLEANUP_TIMEOUT);
+
 			/* If res_addr is zero, we will just return the
 			   length provided by storage as-is, to allow some
 			   communication without a buffer. */
 			const auto retval = (res_addr != 0) ? st_res_size : regs.rsi;
+
+			if (storage_resume)
+			{
+				/* Resume, run the function to the end, allowing cleanup */
+				stm.run(STORAGE_CLEANUP_TIMEOUT);
+			}
 
 			if constexpr (VERBOSE_STORAGE_TASK) {
 				printf("<- Storage task on main queue returning %llu to 0x%lX\n",
