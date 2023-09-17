@@ -133,7 +133,7 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 		/* Make a backend VM call (with optional POST). */
 		kvm_backend_call(ctx, slot, invocation, use_post ? post : NULL, result);
 
-		if (result->status >= 500) {
+		if (result->status >= 400) {
 			kvm_free_reserved_machine(ctx, slot);
 			if (last_slot != NULL) {
 				kvm_free_reserved_machine(ctx, last_slot);
@@ -141,7 +141,7 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 			VSLb(ctx->vsl, SLT_Error,
 				"KVM: Error status %u from call to %s",
 				result->status, kvm_tenant_name(invocation->tenant));
-			return (minimal_response(500, "Error status in chain"));
+			return (minimal_response(result->status, "Error status in chain"));
 		}
 
 		last_slot = slot;
@@ -214,7 +214,7 @@ VCL_STRING kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
 	kvm_chain_get_queue()->count = 0;
 
 	struct kvm_http_response resp = to_string(ctx, &chain);
-	if (resp.status < 500 && resp.content != NULL)
+	if (resp.status < 400)
 		return (resp.content);
 	else
 		return (on_error);

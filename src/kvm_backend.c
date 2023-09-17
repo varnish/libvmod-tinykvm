@@ -446,7 +446,7 @@ kvmbe_gethdrs(const struct director *dir,
 			kvm_ts(ctx.vsl, "TenantProcess", &kvmr->t_work, &kvmr->t_prev);
 		}
 
-		if (result->status >= 500) {
+		if (result->status >= 400) {
 			VSLb(ctx.vsl, SLT_Error,
 				"KVM: Error status %u from call to %s at index %d in chain",
 				result->status, kvm_tenant_name(invocation->tenant), index);
