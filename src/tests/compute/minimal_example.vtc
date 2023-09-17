@@ -1,5 +1,7 @@
 varnishtest "Compute: Minimal program example"
 
+feature cmd "ls /dev/kvm"
+
 shell {
 cat >hello.c <<-EOF
 #include "kvm_api.h"
