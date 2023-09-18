@@ -100,6 +100,9 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 		struct vmod_kvm_slot *slot =
 			kvm_temporarily_reserve_machine(ctx, invocation->tenant, false);
 		if (slot == NULL) {
+			/* Global program cpu-time statistic. */
+			kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
+
 			if (last_slot != NULL) {
 				kvm_free_reserved_machine(ctx, last_slot);
 			}
@@ -120,6 +123,9 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 
 			if (kvm_handle_post_to_another(ctx, post, invocation, result) < 0)
 			{
+				/* Global program cpu-time statistic. */
+				kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
+
 				kvm_free_reserved_machine(ctx, slot);
 				kvm_free_reserved_machine(ctx, last_slot);
 				return (minimal_response(500, "Unable to transfer in chain"));
@@ -134,6 +140,9 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 		kvm_backend_call(ctx, slot, invocation, use_post ? post : NULL, result);
 
 		if (result->status >= 400) {
+			/* Global program cpu-time statistic. */
+			kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
+
 			kvm_free_reserved_machine(ctx, slot);
 			if (last_slot != NULL) {
 				kvm_free_reserved_machine(ctx, last_slot);
@@ -146,6 +155,9 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 
 		last_slot = slot;
 	}
+
+	/* Global program cpu-time statistic. */
+	kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
 
 	/* Finalize result into a string.
 	   Allocate room for zero-terminated content */
@@ -166,9 +178,6 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 	}
 	/* Zero-terminate content */
 	content[result->content_length] = 0;
-
-	/* Program cpu-time statistic. */
-	kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
 
 	struct kvm_http_response res;
 	res.status     = result->status;

@@ -60,10 +60,11 @@ int v_matchproto_(vmod_event_f)
 
 void kvm_varnishstat_program_cpu_time(vtim_real duration)
 {
+	static const uint64_t precision = 1024 * 1024UL; /* Arbritrary, good enough. */
 	static uint64_t cpu_time_kinda;
 
-	__sync_fetch_and_add(&cpu_time_kinda, duration * 4096);
-	vsc_vmod_kvm->cpu_time = cpu_time_kinda / 4096;
+	__sync_fetch_and_add(&cpu_time_kinda, duration * precision);
+	vsc_vmod_kvm->cpu_time = cpu_time_kinda / precision;
 }
 
 void kvm_varnishstat_program_exception()
