@@ -37,12 +37,6 @@ extern int kvm_get_body(struct backend_post *, struct busyobj *);
 extern int kvm_backend_streaming_post(struct backend_post *, const void*, ssize_t);
 __thread struct kvm_program_chain kqueue;
 
-static inline void kvm_ts(struct vsl_log *vsl, const char *event,
-						  double *work, double *prev)
-{
-	VSLb_ts(vsl, event, *work, prev, VTIM_real());
-}
-
 struct kvm_program_chain* kvm_chain_get_queue()
 {
 	return &kqueue;
@@ -337,11 +331,6 @@ kvmbe_gethdrs(const struct director *dir,
 			continue;
 		}
 
-		if (kvm_settings.backend_timings) {
-			kvmr->t_prev = bo->t_prev;
-			kvm_ts(ctx.vsl, "TenantStart", &kvmr->t_work, &kvmr->t_prev);
-		}
-
 		/* Reserving a VM means putting ourselves in a concurrent queue
 		waiting for a free VM, and then getting exclusive access until
 		the end of the request. */
@@ -374,9 +363,6 @@ kvmbe_gethdrs(const struct director *dir,
 				index, kvm_tenant_name(invocation->tenant));
 			return (-1);
 		}
-		if (kvm_settings.backend_timings) {
-			kvm_ts(ctx.vsl, "TenantReserve", &kvmr->t_work, &kvmr->t_prev);
-		}
 
 		/* Gather request body data if it exists. Check taken from stp_fetch.
 		If the body is cached already, bereq_body will be non-null.
@@ -402,9 +388,6 @@ kvmbe_gethdrs(const struct director *dir,
 					kvm_free_reserved_machine(&ctx, slot);
 				return (-1);
 			}
-			if (kvm_settings.backend_timings) {
-				kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev);
-			}
 		}
 		else if (index > 0)
 		{
@@ -429,10 +412,6 @@ kvmbe_gethdrs(const struct director *dir,
 
 			kvm_free_reserved_machine(&ctx, last_slot);
 
-			if (kvm_settings.backend_timings) {
-				kvm_ts(ctx.vsl, "TenantRequestBody", &kvmr->t_work, &kvmr->t_prev);
-			}
-
 			use_post = true;
 		}
 		/* At this point any previously reserved VM has been freed.
@@ -441,10 +420,6 @@ kvmbe_gethdrs(const struct director *dir,
 
 		/* Make a backend VM call (with optional POST). */
 		kvm_backend_call(&ctx, slot, invocation, use_post ? post : NULL, result);
-
-		if (kvm_settings.backend_timings) {
-			kvm_ts(ctx.vsl, "TenantProcess", &kvmr->t_work, &kvmr->t_prev);
-		}
 
 		if (result->status >= 400) {
 			VSLb(ctx.vsl, SLT_Error,
@@ -504,10 +479,6 @@ kvmbe_gethdrs(const struct director *dir,
 	   the last result, etc. Send backend response to varnish storage. */
 	const int res = kvmbe_write_response(
 		bo, &ctx, result);
-
-	if (kvm_settings.backend_timings) {
-		kvm_ts(ctx.vsl, "TenantResponse", &kvmr->t_work, &kvmr->t_prev);
-	}
 
 	/* Program cpu-time statistic. */
 	kvm_varnishstat_program_cpu_time(VTIM_real() - t0);

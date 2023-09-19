@@ -15,6 +15,7 @@ libvmod_compute_la_LDFLAGS = $(VMOD_LDFLAGS)  \
 	-lcurl \
 	-L$(VARNISHAPI_VMODDIR)/../ \
 	-ladns \
+	-lrt \
 	-Wl,-rpath,$(VARNISHAPI_VMODDIR)/../
 
 libvmod_compute_la_SOURCES = \

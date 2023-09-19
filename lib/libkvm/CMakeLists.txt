@@ -13,6 +13,7 @@ set(KVM_SOURCES
 	backend.cpp
 	epoll_vm.cpp
 	kvm_settings.cpp
+	kvm_stats.cpp
 	kvm_vcc_api.cpp
 	live_update.cpp
 	long_lived.cpp

@@ -29,8 +29,10 @@
 #include <cstring>
 #include <tinykvm/rsp_client.hpp>
 #include <unistd.h>
-extern "C" int usleep(uint32_t usec);
-
+extern "C" {
+#include "vtim.h"
+extern int usleep(uint32_t usec);
+}
 namespace kvm {
 extern std::vector<uint8_t> file_loader(const std::string&);
 extern bool file_writer(const std::string& file, const std::vector<uint8_t>&);
@@ -445,8 +447,10 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 		}
 		auto& stm = storage().storage_vm->machine();
 		uint64_t vaddr = stm.stack_address();
+		size_t total_input = 0;
 
 		for (size_t i = 0; i < n; i++) {
+			total_input += buffers[i].len;
 			vaddr -= buffers[i].len;
 			vaddr &= ~(uint64_t)0x7;
 			stm.copy_from_machine(vaddr, src, buffers[i].addr, buffers[i].len);
@@ -458,6 +462,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 		stm.copy_to_guest(stm_bufaddr, buffers, n * sizeof(VirtBuffer));
 
 		const uint64_t new_stack = vaddr & ~0xFL;
+		storage().storage_vm->stats().input_bytes += total_input;
 
 		try {
 			if constexpr (VERBOSE_STORAGE_TASK) {
@@ -466,6 +471,8 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			}
 			const float timeout = storage().storage_vm->tenant().config.max_storage_time();
 			storage().storage_vm->begin_call();
+			storage().storage_vm->stats().invocations++;
+			const auto t0 = VTIM_real();
 
 			/* Build call manually. */
 			tinykvm::tinykvm_x86regs regs;
@@ -496,6 +503,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			if (res_addr != 0x0 && st_res_buffer != 0x0) {
 				/* Copy from the storage machine back into tenant VM instance */
 				src.copy_from_machine(res_addr, stm, st_res_buffer, st_res_size);
+				storage().storage_vm->stats().output_bytes += st_res_size;
 			}
 
 			/* If res_addr is zero, we will just return the
@@ -509,6 +517,10 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 				stm.run(STORAGE_CLEANUP_TIMEOUT);
 			}
 
+			/* Normal CPU-time. */
+			const auto cpu_time = VTIM_real() - t0;
+			storage().storage_vm->stats().request_cpu_time += cpu_time;
+
 			if constexpr (VERBOSE_STORAGE_TASK) {
 				printf("<- Storage task on main queue returning %llu to 0x%lX\n",
 					retval, st_res_buffer);
@@ -520,6 +532,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 				printf("<- Storage task on main queue failed: %s\n",
 					e.what());
 			}
+			storage().storage_vm->stats().exceptions++;
 			return -1;
 		}
 	});
@@ -555,6 +568,10 @@ long ProgramInstance::storage_task(gaddr_t func, std::string argument)
 			/* Avoid async storage while still initializing. */
 			this->try_wait_for_startup_and_initialization();
 
+			storage().storage_vm->stats().invocations++;
+			storage().storage_vm->stats().input_bytes += data_arg.size();
+			const auto t0 = VTIM_real();
+
 			unsigned long long rsp = stm.stack_address();
 			auto data_addr = stm.stack_push(rsp, data_arg);
 
@@ -563,11 +580,17 @@ long ProgramInstance::storage_task(gaddr_t func, std::string argument)
 			if constexpr (VERBOSE_STORAGE_TASK) {
 				printf("<- Async task finished 0x%lX\n", func);
 			}
+
+			/* Normal CPU-time. */
+			const auto cpu_time = VTIM_real() - t0;
+			storage().storage_vm->stats().request_cpu_time += cpu_time;
+
 			return 0;
 		} catch (const std::exception& e) {
 			if constexpr (VERBOSE_STORAGE_TASK) {
 				printf("<- Async task failure: %s\n", e.what());
 			}
+			storage().storage_vm->stats().exceptions++;
 			return -1;
 		}
 	}));

@@ -58,6 +58,22 @@ VCL_BOOL vmod_init_self_requests(VRT_CTX, VCL_PRIV task,
 	return (kvm_set_self_request(ctx, task, unix_path, uri, max_concurrency));
 }
 
+VCL_STRING vmod_stats(VRT_CTX, VCL_PRIV task, VCL_STRING pattern, VCL_INT indent)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	if (pattern == NULL) {
+		VSLb(ctx->vsl, SLT_VCL_Error,
+			"compute.stats(): Regex pattern was null");
+		return ("{}");
+	}
+	if (indent < -1)
+		indent = -1;
+	if (indent > 16)
+		indent = 16;
+
+	return kvm_json_stats(ctx, task, pattern, (unsigned)indent);
+}
+
 struct unloader_state {
 	VRT_CTX;
 	vre_t *regex;

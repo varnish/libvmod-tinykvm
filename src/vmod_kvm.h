@@ -40,6 +40,7 @@ extern int  kvm_init_tenants_str(VRT_CTX, VCL_PRIV, const char *source, const ch
 extern int  kvm_init_tenants_file(VRT_CTX, VCL_PRIV, const char *, int init);
 extern int  kvm_init_tenants_uri(VRT_CTX, VCL_PRIV, const char *uri, int init);
 extern const char * kvm_tenant_name(TEN_PTR tenant);
+extern const char * kvm_json_stats(VRT_CTX, VCL_PRIV task, const char *pattern, unsigned indent);
 extern TEN_PTR kvm_tenant_find(VCL_PRIV, const char *name);
 extern TEN_PTR kvm_tenant_find_key(VCL_PRIV, const char *name, const char *key);
 extern int     kvm_tenant_foreach(VCL_PRIV, vmod_kvm_foreach_t func, void *);

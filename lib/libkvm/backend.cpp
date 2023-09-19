@@ -71,13 +71,6 @@ static int16_t sanitize_status_code(int16_t code)
 	throw tinykvm::MachineException("Invalid HTTP status code returned by program", code);
 }
 
-static inline void kvm_ts(struct vsl_log *vsl, const char *event, double work, double& prev)
-{
-	if (UNLIKELY(kvm_settings.backend_timings)) {
-		VSLb_ts(vsl, event, work, &prev, VTIM_real());
-	}
-}
-
 static void fetch_result(kvm::VMPoolItem* slot,
 	MachineInstance& mi, struct backend_result *result)
 {
@@ -92,6 +85,21 @@ static void fetch_result(kvm::VMPoolItem* slot,
 	const uint16_t status = regs.rdi;
 	const uint64_t tvaddr = regs.rsi;
 	const uint16_t tlen   = regs.rdx;
+
+	/* Status code statistics */
+	if (status < 200) {
+		mi.stats().status_unknown ++;
+	} else if (status < 300) {
+		mi.stats().status_2xx++;
+	} else if (status < 400) {
+		mi.stats().status_3xx++;
+	} else if (status < 500) {
+		mi.stats().status_4xx++;
+	} else if (status < 600) {
+		mi.stats().status_5xx++;
+	} else {
+		mi.stats().status_unknown++;
+	}
 
 	/* Immediately copy out content-type because small. */
 	char *tbuf = (char *)WS_Alloc(mi.ctx()->ws, tlen+1);
@@ -137,6 +145,7 @@ static void fetch_result(kvm::VMPoolItem* slot,
 		result->stream_callback = callb_va;
 		result->stream_argument = callb_arg;
 	}
+	mi.stats().output_bytes += result->content_length;
 	/* Record program status counter */
 	kvm_varnishstat_program_status(result->status);
 }
@@ -151,6 +160,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 	kvm_varnishstat_program_exception();
 
 	auto& machine = *slot->mi;
+	machine.stats().exceptions++;
 	/* The machine should be reset (after request). */
 	machine.reset_needed_now();
 	/* Print sane backtrace (faulting RIP) */
@@ -165,6 +175,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 		[&] () -> long {
 			/* Enforce that guest program calls the backend_response system call. */
 			machine.begin_call();
+			const auto t0 = VTIM_real();
 
 			/* Call the on_error callback with exception reason. */
 			auto on_error_addr = prog.entry_at(ProgramEntryIndex::BACKEND_ERROR);
@@ -180,6 +191,10 @@ static void error_handling(kvm::VMPoolItem* slot,
 
 			/* Make sure no SMP work is in-flight. */
 			vm.smp_wait();
+
+			/* Exception CPU-time. */
+			const auto cpu_time = VTIM_real() - t0;
+			machine.stats().error_cpu_time += cpu_time;
 
 			fetch_result(slot, machine, result);
 			return 0L;
@@ -223,16 +238,11 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 	const struct kvm_chain_item *invoc,
 	struct backend_post *post, struct backend_result *result)
 {
-	double t_prev = 0.0;
-	double t_work = t_prev;
-	if (UNLIKELY(kvm_settings.backend_timings)) t_prev = VTIM_real();
-
 	auto& machine = *slot->mi;
 
 	if constexpr (VERBOSE_BACKEND) {
 		VSLb(ctx->vsl, SLT_VCL_Log, "Tenant: %s", machine.name().c_str());
 	}
-	kvm_ts(ctx->vsl, "ProgramStart", t_work, t_prev);
 
 	try {
 		auto fut = slot->tp.enqueue(
@@ -241,13 +251,14 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				printf("Begin backend %s %s (arg=%s)\n", invoc->inputs.method,
 					invoc->inputs.url, invoc->inputs.argument);
 			}
-			kvm_ts(ctx->vsl, "ProgramCall", t_work, t_prev);
+			const auto t0 = VTIM_real();
 
 			/* Setting the VRT_CTX allows access to HTTP and VSL, etc. */
 			machine.set_ctx(ctx);
 
 			/* Enforce that guest program calls the backend_response system call. */
 			machine.begin_call();
+			machine.stats().invocations ++;
 
 			const auto timeout = machine.max_req_time();
 			const auto& prog = machine.program();
@@ -282,6 +293,8 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					inputs.ctype = vm.stack_push(stack, invoc->inputs.content_type, inputs.ctype_len + 1);
 					inputs.data  = post->address;
 					inputs.data_len = post->length;
+
+					machine.stats().input_bytes += post->length;
 				}
 				else
 				{
@@ -325,6 +338,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				VSLb(ctx->vsl, SLT_VCL_Log,
 					"%s: Calling on_post() at 0x%lX",
 					machine.name().c_str(), on_post_addr);
+				machine.stats().input_bytes += post->length;
 
 				vm.timed_vmcall(on_post_addr,
 					timeout,
@@ -333,24 +347,26 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					invoc->inputs.content_type,
 					uint64_t(post->address), uint64_t(post->length));
 			}
-			kvm_ts(ctx->vsl, "ProgramResponse", t_work, t_prev);
 
 			/* Make sure no SMP work is in-flight. */
 			vm.smp_wait();
+
+			/* Normal CPU-time. */
+			const auto cpu_time = VTIM_real() - t0;
+			machine.stats().request_cpu_time += cpu_time;
 
 			if constexpr (VERBOSE_BACKEND) {
 				printf("Finish backend %s %s\n", invoc->inputs.method, invoc->inputs.url);
 			}
 			/* Verify response and fill out result struct. */
 			fetch_result(slot, machine, result);
-
-			kvm_ts(ctx->vsl, "ProgramProcess", t_work, t_prev);
 			return 0L;
 		});
 		fut.get();
 		return;
 
 	} catch (const tinykvm::MachineTimeoutException& mte) {
+		machine.stats().timeouts++;
 		kvm_varnishstat_program_timeout();
 		VSLb(ctx->vsl, SLT_Error,
 			"%s: Backend VM timed out (%f seconds)",
@@ -438,12 +454,20 @@ int kvm_backend_streaming_post(struct backend_post *post,
 		return 0;
 
 	} catch (const tinykvm::MemoryException& e) {
+		mi.stats().exceptions++;
 		memory_error_handling(post->ctx->vsl, e);
+	} catch (const tinykvm::MachineTimeoutException& e) {
+		mi.stats().timeouts++;
+		VSLb(post->ctx->vsl, SLT_Error,
+			"Backend VM exception: %s (data: 0x%lX)",
+			e.what(), e.data());
 	} catch (const tinykvm::MachineException& e) {
+		mi.stats().exceptions++;
 		VSLb(post->ctx->vsl, SLT_Error,
 			"Backend VM exception: %s (data: 0x%lX)",
 			e.what(), e.data());
 	} catch (const std::exception& e) {
+		mi.stats().exceptions++;
 		VSLb(post->ctx->vsl, SLT_Error,
 			"VM call exception: %s", e.what());
 	}
@@ -486,12 +510,20 @@ ssize_t kvm_backend_streaming_delivery(
 		return len;
 
 	} catch (const tinykvm::MemoryException& e) {
+		mi.stats().exceptions++;
 		memory_error_handling(result->stream_vsl, e);
+	} catch (const tinykvm::MachineTimeoutException& e) {
+		mi.stats().timeouts++;
+		VSLb(result->stream_vsl, SLT_Error,
+			"Backend VM exception: %s (data: 0x%lX)",
+			e.what(), e.data());
 	} catch (const tinykvm::MachineException& e) {
+		mi.stats().exceptions++;
 		VSLb(result->stream_vsl, SLT_Error,
 			"Backend VM exception: %s (data: 0x%lX)",
 			e.what(), e.data());
 	} catch (const std::exception& e) {
+		mi.stats().exceptions++;
 		VSLb(result->stream_vsl, SLT_Error,
 			"VM call exception: %s", e.what());
 	}

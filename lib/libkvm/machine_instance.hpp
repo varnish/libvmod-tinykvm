@@ -3,6 +3,7 @@
 #include <cstdarg>
 #include <tinykvm/machine.hpp>
 #include "instance_cache.hpp"
+#include "machine_stats.hpp"
 
 struct vrt_ctx;
 struct vre;
@@ -43,12 +44,15 @@ public:
 	bool has_ctx() const noexcept { return m_ctx != nullptr; }
 	void set_ctx(const vrt_ctx* ctx) { m_ctx = ctx; }
 	const auto& tenant() const noexcept { return *m_tenant; }
-	auto& program() { return *m_inst; }
-	const auto& program() const { return *m_inst; }
+	auto& program() noexcept { return *m_inst; }
+	const auto& program() const noexcept { return *m_inst; }
 
 	float max_req_time() const noexcept;
 	const std::string& name() const noexcept;
 	const std::string& group() const noexcept;
+
+	auto& stats() noexcept { return this->m_stats; }
+	const auto& stats() const noexcept { return this->m_stats; }
 
 	bool is_debug() const noexcept { return m_is_debug; }
 	bool is_storage() const noexcept { return m_is_storage; }
@@ -100,15 +104,17 @@ private:
 	machine_t m_machine;
 	const TenantInstance* m_tenant = nullptr;
 	ProgramInstance* m_inst;
-	bool        m_is_debug = false;
-	bool        m_is_storage = false;
+	const bool  m_is_debug;
+	const bool  m_is_storage;
 	bool        m_is_ephemeral = true;
 	bool        m_waiting_for_requests = false;
 	uint8_t     m_response_called = 0;
 	bool        m_reset_needed = false;
 	bool        m_print_stdout = false;
 	mutable bool m_last_newline = true;
-	gaddr_t     m_sighandler = 0;
+	gaddr_t     m_sighandler = 0x0;
+
+	MachineStats m_stats;
 
 	Cache<int> m_fd;
 	Cache<vre*> m_regex;
