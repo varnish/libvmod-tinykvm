@@ -10,7 +10,11 @@
 #include "VSC_vmod_kvm.h"
 
 extern void handle_vmod_event(struct vcl *vcl, enum vcl_event_e e);
+#ifdef VARNISH_PLUS
 #define EVENT_NAME  vmod_event
+#else
+#define EVENT_NAME  vmod_vmod_event /* ??? */
+#endif
 
 static unsigned vsc_init_counter = 0;
 static struct   vsc_seg *vsc_segment;
@@ -58,13 +62,19 @@ int v_matchproto_(vmod_event_f)
 	return (0);
 }
 
-void kvm_varnishstat_program_cpu_time(vtim_real duration)
+void kvm_varnishstat_program_cpu_time(vtim_real duration, vtim_real fetch_duration)
 {
 	static const uint64_t precision = 1024 * 1024UL; /* Arbritrary, good enough. */
 	static uint64_t cpu_time_kinda;
+	static uint64_t fetch_time_kinda;
 
 	__sync_fetch_and_add(&cpu_time_kinda, duration * precision);
 	vsc_vmod_kvm->cpu_time = cpu_time_kinda / precision;
+
+	if (fetch_duration > 0.0) {
+		__sync_fetch_and_add(&fetch_time_kinda, fetch_duration * precision);
+		vsc_vmod_kvm->fetch_time = fetch_time_kinda / precision;
+	}
 }
 
 void kvm_varnishstat_program_exception()

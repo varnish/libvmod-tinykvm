@@ -49,4 +49,12 @@
 
 	Total time spent executing programs.
 
+.. varnish_vsc::	fetch_time
+	:type:		counter
+	:level:		info
+	:format:	duration
+	:oneliner:	Cumulative time spent fetching content
+
+	Total time spent fetching content for programs.
+
 .. varnish_vsc_end::	vmod_kvm

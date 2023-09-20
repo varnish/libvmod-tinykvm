@@ -30,7 +30,7 @@
 #include "vcc_compute_if.h"
 #include "VSC_vmod_kvm.h"
 
-extern void kvm_varnishstat_program_cpu_time(vtim_real);
+extern void kvm_varnishstat_program_cpu_time(vtim_real, vtim_real);
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
 	const struct kvm_chain_item *, struct backend_post *, struct backend_result *);
 extern int kvm_get_body(struct backend_post *, struct busyobj *);
@@ -304,6 +304,7 @@ kvmbe_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
 #endif
 	/* Program cpu-time t0. */
 	const vtim_real t0 = VTIM_real();
+	vtim_real self_request_time = 0.0;
 
 	/* Retrieve info from struct filled by VCL vm_backend(...) call. */
 	struct vmod_kvm_backend *kvmr;
@@ -376,7 +377,12 @@ kvmbe_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
 		if (invocation->special_function != NULL)
 		{
 			/* Only self-request fetches for now. */
-			if (kvm_self_request(&ctx, invocation->inputs.url, result) < 0)
+			const vtim_real srt0 = VTIM_real();
+			int res =
+				kvm_self_request(&ctx, invocation->inputs.url, result);
+			self_request_time = VTIM_real() - srt0;
+
+			if (res < 0)
 				break;
 			/* Only used to free the chunk after usage. */
 			must_free_chunk = TRUST_ME(result->buffers[0].data);
@@ -532,7 +538,7 @@ kvmbe_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
 	free(must_free_chunk);
 
 	/* Program cpu-time statistic. */
-	kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
+	kvm_varnishstat_program_cpu_time(VTIM_real() - t0 - self_request_time, self_request_time);
 
 	/* Finish the response.
 	   After the last function call, the result buffer is filled with
