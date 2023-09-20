@@ -37,12 +37,12 @@
 **/
 #include "tenant_instance.hpp"
 #include "program_instance.hpp"
+#include "scoped_duration.hpp"
 #include "settings.hpp"
 #include "varnish.hpp"
 #include <stdexcept>
 using namespace kvm;
 extern "C" {
-#include "vtim.h"
 #include "kvm_backend.h"
 void kvm_varnishstat_program_exception();
 void kvm_varnishstat_program_timeout();
@@ -175,7 +175,8 @@ static void error_handling(kvm::VMPoolItem* slot,
 		[&] () -> long {
 			/* Enforce that guest program calls the backend_response system call. */
 			machine.begin_call();
-			const auto t0 = VTIM_real();
+			/* Exception CPU-time. */
+			ScopedDuration error_counter(machine.stats().error_cpu_time);
 
 			/* Call the on_error callback with exception reason. */
 			auto on_error_addr = prog.entry_at(ProgramEntryIndex::BACKEND_ERROR);
@@ -191,10 +192,6 @@ static void error_handling(kvm::VMPoolItem* slot,
 
 			/* Make sure no SMP work is in-flight. */
 			vm.smp_wait();
-
-			/* Exception CPU-time. */
-			const auto cpu_time = VTIM_real() - t0;
-			machine.stats().error_cpu_time += cpu_time;
 
 			fetch_result(slot, machine, result);
 			return 0L;
@@ -251,7 +248,8 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				printf("Begin backend %s %s (arg=%s)\n", invoc->inputs.method,
 					invoc->inputs.url, invoc->inputs.argument);
 			}
-			const auto t0 = VTIM_real();
+			/* Regular CPU-time. */
+			ScopedDuration cputime(machine.stats().request_cpu_time);
 
 			/* Setting the VRT_CTX allows access to HTTP and VSL, etc. */
 			machine.set_ctx(ctx);
@@ -351,10 +349,6 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			/* Make sure no SMP work is in-flight. */
 			vm.smp_wait();
 
-			/* Normal CPU-time. */
-			const auto cpu_time = VTIM_real() - t0;
-			machine.stats().request_cpu_time += cpu_time;
-
 			if constexpr (VERBOSE_BACKEND) {
 				printf("Finish backend %s %s\n", invoc->inputs.method, invoc->inputs.url);
 			}
@@ -405,31 +399,30 @@ int kvm_backend_streaming_post(struct backend_post *post,
 			throw tinykvm::MachineException("POST request too large", post->capacity);
 		}
 
-		/* Copy the data segment into VM */
-		vm.copy_to_guest(post->address + post->length, data_ptr, data_len);
-
 		/* Call the backend streaming function, if set. */
 		const auto call_addr =
 			mi.program().entry_at(ProgramEntryIndex::BACKEND_STREAM);
 		if (call_addr != 0x0) {
-			/* Copy the data segment into VM at the right offset,
-			   building a sequential, complete buffer. */
-			vm.copy_to_guest(post->address, data_ptr, data_len);
-
 			auto fut = slot.tp.enqueue(
 			[&] () -> long {
+				/* Regular CPU-time. */
+				ScopedDuration cputime(mi.stats().request_cpu_time);
+
+				unsigned long long rsp = vm.stack_address();
+				auto data_vaddr = vm.stack_push(rsp, data_ptr, size_t(data_len));
+
 				const auto timeout = mi.max_req_time();
 				if (post->length == 0) {
-					vm.timed_vmcall(call_addr, timeout,
+					vm.timed_vmcall_stack(call_addr, rsp, timeout,
 						post->inputs.url, post->inputs.argument,
 						post->inputs.content_type,
-						(uint64_t)post->address, (uint64_t)data_len,
+						(uint64_t)data_vaddr, (uint64_t)data_len,
 						(uint64_t)post->length);
 				} else {
-					vm.timed_reentry(call_addr, timeout,
+					vm.timed_reentry_stack(call_addr, rsp, timeout,
 						post->inputs.url, post->inputs.argument,
 						post->inputs.content_type,
-						(uint64_t)post->address, (uint64_t)data_len,
+						(uint64_t)data_vaddr, (uint64_t)data_len,
 						(uint64_t)post->length);
 				}
 				return 0L;
@@ -444,6 +437,13 @@ int kvm_backend_streaming_post(struct backend_post *post,
 		}
 		else
 		{
+			/* Regular POST, first payload: Allocate payload in VM. */
+			if (post->length == 0)
+			{
+				assert(post->address == 0);
+				post->address = mi.allocate_post_data(post->capacity);
+			}
+
 			/* Copy the data segment into VM at the right offset,
 			   building a sequential, complete buffer. */
 			vm.copy_to_guest(post->address + post->length, data_ptr, data_len);
@@ -492,6 +492,9 @@ ssize_t kvm_backend_streaming_delivery(
 		/* Call the backend streaming function, if set. */
 		auto fut = slot.tp.enqueue(
 		[&] () -> long {
+			/* Regular CPU-time. */
+			ScopedDuration cputime(mi.stats().request_cpu_time);
+
 			const auto timeout = STREAM_HANDLING_TIMEOUT;
 			vm.timed_reentry(result->stream_callback, timeout,
 				(uint64_t)result->stream_argument,

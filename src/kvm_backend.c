@@ -431,7 +431,7 @@ kvmbe_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
 		{
 			/* Retrieve body by copying directly into backend VM. */
 			post->slot = slot;
-			post->address = kvm_allocate_post_memory(slot, POST_BUFFER); /* Buffer bytes */
+			post->address = 0;
 			post->capacity = POST_BUFFER;
 			post->length  = 0;
 			post->inputs = invocation->inputs;
@@ -452,7 +452,7 @@ kvmbe_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
 		{
 			/* Allocate exact bytes from previous result in reserved VM */
 			post->slot = slot;
-			post->address = kvm_allocate_post_memory(slot, result->content_length);
+			post->address = 0;
 			post->capacity = result->content_length;
 			post->length  = 0;
 			post->inputs = invocation->inputs;

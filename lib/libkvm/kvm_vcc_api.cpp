@@ -115,14 +115,6 @@ uint64_t kvm_allocate_memory(kvm::VMPoolItem* slot, uint64_t bytes)
 {
 	return slot->mi->machine().mmap_allocate(bytes);
 }
-/* Used for POST to a machine and POST between machines. */
-extern "C"
-uint64_t kvm_allocate_post_memory(kvm::VMPoolItem* slot, uint64_t bytes)
-{
-	/* This memory range is managed and remapped by the instance,
-	   and automatically resets on crashes. */
-	return slot->mi->allocate_post_data(bytes);
-}
 
 extern "C"
 int kvm_is_mmap_range(kvm::VMPoolItem* slot, uint64_t address)
