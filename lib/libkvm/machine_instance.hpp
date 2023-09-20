@@ -84,6 +84,8 @@ public:
 	void open_debugger(uint16_t, float timeout);
 	void storage_debugger(float timeout);
 
+	uint64_t allocate_post_data(size_t size);
+
 	static void kvm_initialize();
 	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool storage, bool dbg);
 	MachineInstance(const MachineInstance&, const TenantInstance*, ProgramInstance*);
@@ -113,6 +115,9 @@ private:
 	bool        m_print_stdout = false;
 	mutable bool m_last_newline = true;
 	gaddr_t     m_sighandler = 0x0;
+
+	gaddr_t     m_post_data = 0x0;
+	size_t      m_post_size = 0;
 
 	MachineStats m_stats;
 

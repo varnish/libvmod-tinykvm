@@ -37,6 +37,14 @@ extern int kvm_get_body(struct backend_post *, struct busyobj *);
 extern int kvm_backend_streaming_post(struct backend_post *, const void*, ssize_t);
 __thread struct kvm_program_chain kqueue;
 
+#ifndef VARNISH_PLUS
+static const struct vmod_priv_methods kvm_priv_methods[1] = {{
+	.magic = VMOD_PRIV_METHODS_MAGIC,
+	.type = "vmod_kvm",
+	.fini = kvm_free_reserved_machine
+}};
+#endif
+
 struct kvm_program_chain* kvm_chain_get_queue()
 {
 	return &kqueue;
@@ -58,18 +66,28 @@ kvm_release_after_request(VRT_CTX, KVM_SLOT slot)
 	struct vmod_priv* priv_task = kvm_get_priv_task(ctx);
 	priv_task->priv = slot;
 	priv_task->len  = 0;
+#ifdef VARNISH_PLUS
 	priv_task->free = kvm_get_free_function();
+#else
+	priv_task->methods = kvm_priv_methods;
+#endif
 	return (1);
 }
 static void
-kvm_early_slot_release(VRT_CTX, KVM_SLOT slot)
+kvm_early_slot_release(struct vmod_priv *priv_task)
 {
-	struct vmod_priv* priv_task = kvm_get_priv_task(ctx);
+	AN(priv_task);
+#ifdef VARNISH_PLUS
+	if (priv_task->free)
+		priv_task->free(priv_task->priv);
+	priv_task->free = NULL;
+#else
+	if (priv_task->methods)
+		priv_task->methods->fini(NULL, priv_task->priv);
+	priv_task->methods = NULL;
+#endif
 	priv_task->priv = NULL;
 	priv_task->len  = 0;
-	if (priv_task->free)
-		priv_task->free(slot);
-	priv_task->free = NULL;
 }
 
 static void v_matchproto_(vdi_panic_f)
@@ -79,6 +97,7 @@ kvmbe_panic(const struct director *dir, struct vsb *vsb)
 	(void)vsb;
 }
 
+#ifdef VARNISH_PLUS
 static void v_matchproto_(vdi_finish_f)
 kvmbe_finish(const struct director *dir, struct worker *wrk, struct busyobj *bo)
 {
@@ -90,6 +109,21 @@ kvmbe_finish(const struct director *dir, struct worker *wrk, struct busyobj *bo)
 	bo->htc->magic = 0;
 	bo->htc = NULL;
 }
+#else
+static void v_matchproto_(vdi_finish_f)
+kvmbe_finish(VRT_CTX, const struct director *dir)
+{
+	(void)dir;
+
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	struct busyobj *bo = ctx->bo;
+
+	CHECK_OBJ_NOTNULL(bo->htc, HTTP_CONN_MAGIC);
+	bo->htc->priv = NULL;
+	bo->htc->magic = 0;
+	bo->htc = NULL;
+}
+#endif
 
 static enum vfp_status v_matchproto_(vfp_pull_f)
 kvmfp_pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
@@ -191,6 +225,9 @@ kvmbe_write_response(struct busyobj *bo,
 	bo->htc->content_length = result->content_length;
 	bo->htc->priv = (void *)result;
 	bo->htc->body_status = BS_LENGTH;
+#ifndef VARNISH_PLUS
+	bo->htc->doclose = SC_REM_CLOSE;
+#endif
 
 	/* Initialize fetch processor, which will retrieve the data from
 	   the VM, buffer by buffer, and send it to Varnish storage.
@@ -242,6 +279,7 @@ int kvm_handle_post_to_another(VRT_CTX, struct backend_post *post,
 	return (0);
 }
 
+#ifdef VARNISH_PLUS
 static int v_matchproto_(vdi_gethdrs_f)
 kvmbe_gethdrs(const struct director *dir,
 	struct worker *wrk, struct busyobj *bo)
@@ -252,7 +290,18 @@ kvmbe_gethdrs(const struct director *dir,
 	CHECK_OBJ_NOTNULL(bo->bereq, HTTP_MAGIC);
 	CHECK_OBJ_NOTNULL(bo->beresp, HTTP_MAGIC);
 	AZ(bo->htc);
+#else
+static int v_matchproto_(vdi_gethdrs_f)
+kvmbe_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
+{
+	CHECK_OBJ_NOTNULL(dir, DIRECTOR_MAGIC);
+	struct busyobj *bo = other_ctx->bo;
 
+	CHECK_OBJ_NOTNULL(bo, BUSYOBJ_MAGIC);
+	CHECK_OBJ_NOTNULL(bo->bereq, HTTP_MAGIC);
+	CHECK_OBJ_NOTNULL(bo->beresp, HTTP_MAGIC);
+	AZ(bo->htc);
+#endif
 	/* Program cpu-time t0. */
 	const vtim_real t0 = VTIM_real();
 
@@ -275,8 +324,12 @@ kvmbe_gethdrs(const struct director *dir,
 
 	/* Request body first, then VM result */
 	struct backend_post *post = NULL;
+#ifdef VARNISH_PLUS
 	const bool is_post =
 		(bo->initial_req_body_status != REQ_BODY_NONE || bo->bereq_body != NULL);
+#else
+	const bool is_post = (bo->bereq_body != NULL);
+#endif
 	if (is_post || kvmr->chain.count > 1)
 	{
 		/* Initialize POST. */
@@ -323,11 +376,11 @@ kvmbe_gethdrs(const struct director *dir,
 		if (invocation->special_function != NULL)
 		{
 			/* Only self-request fetches for now. */
-			if (kvm_self_request(&ctx, invocation->inputs.url, result) == 0)
-			{
-				/* Only used to free the chunk after usage. */
-				must_free_chunk = TRUST_ME(result->buffers[0].data);
-			}
+			if (kvm_self_request(&ctx, invocation->inputs.url, result) < 0)
+				break;
+			/* Only used to free the chunk after usage. */
+			must_free_chunk = TRUST_ME(result->buffers[0].data);
+			/* Straight to next in chain. */
 			continue;
 		}
 
@@ -372,7 +425,7 @@ kvmbe_gethdrs(const struct director *dir,
 		{
 			/* Retrieve body by copying directly into backend VM. */
 			post->slot = slot;
-			post->address = kvm_allocate_memory(slot, POST_BUFFER); /* Buffer bytes */
+			post->address = kvm_allocate_post_memory(slot, POST_BUFFER); /* Buffer bytes */
 			post->capacity = POST_BUFFER;
 			post->length  = 0;
 			post->inputs = invocation->inputs;
@@ -393,7 +446,7 @@ kvmbe_gethdrs(const struct director *dir,
 		{
 			/* Allocate exact bytes from previous result in reserved VM */
 			post->slot = slot;
-			post->address = kvm_allocate_memory(slot, result->content_length);
+			post->address = kvm_allocate_post_memory(slot, result->content_length);
 			post->capacity = result->content_length;
 			post->length  = 0;
 			post->inputs = invocation->inputs;
@@ -421,6 +474,10 @@ kvmbe_gethdrs(const struct director *dir,
 		/* Make a backend VM call (with optional POST). */
 		kvm_backend_call(&ctx, slot, invocation, use_post ? post : NULL, result);
 
+		/* Setting last_slot here enables short-response optimization for errors. */
+		last_tenant = invocation->tenant;
+		last_slot = slot;
+
 		if (result->status >= 400) {
 			VSLb(ctx.vsl, SLT_Error,
 				"KVM: Error status %u from call to %s at index %d in chain",
@@ -429,10 +486,6 @@ kvmbe_gethdrs(const struct director *dir,
 				kvm_free_reserved_machine(&ctx, slot);
 			break;
 		}
-
-		/* Setting last_slot here enables short-response optimization for errors. */
-		last_tenant = invocation->tenant;
-		last_slot = slot;
 
 		/* Explicitly set content-type when present. This allows
 		   other programs in the chain to read it as needed.
@@ -465,44 +518,75 @@ kvmbe_gethdrs(const struct director *dir,
 				memcpy(&cnt[len], result->buffers[i].data, result->buffers[i].size);
 				len += result->buffers[i].size;
 			}
+			assert(len == result->content_length);
+
 			result->bufcount = 1;
 			result->buffers[0].data = cnt;
 			result->buffers[0].size = len;
 			/* We don't need to hold the VM reservation anymore.
 			NOTE: result is already on the workspace */
-			kvm_early_slot_release(&ctx, last_slot);
+			kvm_early_slot_release(kvm_get_priv_task(&ctx));
 		}
 	}
 
-	/* Finish the response.
-	   After the last function call, the result buffer is filled with
-	   the last result, etc. Send backend response to varnish storage. */
-	const int res = kvmbe_write_response(
-		bo, &ctx, result);
+	free(must_free_chunk);
 
 	/* Program cpu-time statistic. */
 	kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
 
-	free(must_free_chunk);
+	/* Finish the response.
+	   After the last function call, the result buffer is filled with
+	   the last result. Send backend response to varnish storage. */
+	const int res = kvmbe_write_response(
+		bo, &ctx, result);
+
 	return (res);
 }
 
+#ifndef VARNISH_PLUS
+static const struct vdi_methods kvm_director_methods[1] = {{
+	.magic = VDI_METHODS_MAGIC,
+	.type  = "kvm_director_methods",
+	.gethdrs = kvmbe_gethdrs,
+	.finish  = kvmbe_finish,
+}};
+#endif
+
 static void init_director(VRT_CTX, struct vmod_kvm_backend *kvmr)
 {
-	kvmr->dir = WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_backend));
-	if (kvmr->dir == NULL) {
+	struct director *dir =
+		WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_backend));
+	if (dir == NULL) {
 		VRT_fail(ctx, "KVM: Out of workspace for director");
 		return;
 	}
 
-	struct director *dir = kvmr->dir;
 	INIT_OBJ(dir, DIRECTOR_MAGIC);
 	dir->priv = kvmr;
-	dir->name = "KVM backend director";
 	dir->vcl_name = "vmod_kvm";
+	kvmr->dir = dir;
+
+#ifdef VARNISH_PLUS
+	dir->name = "KVM backend director";
 	dir->gethdrs = kvmbe_gethdrs;
 	dir->finish  = kvmbe_finish;
 	dir->panic   = kvmbe_panic;
+#else
+	struct vcldir *vdir =
+		WS_Alloc(ctx->ws, sizeof(struct vcldir));
+	if (vdir == NULL) {
+		VRT_fail(ctx, "KVM: Out of workspace for internal director");
+		return;
+	}
+	memset(vdir, 0, sizeof(*vdir));
+	vdir->magic = VCLDIR_MAGIC;
+	vdir->dir = dir;
+	vdir->vcl = ctx->vcl;
+	vdir->flags |= VDIR_FLG_NOREFCNT;
+	vdir->methods = kvm_director_methods;
+
+	dir->vdir = vdir;
+#endif
 }
 struct kvm_chain_item *
 kvm_init_chain(VRT_CTX, struct vmod_kvm_tenant *tenant, const char *url, const char *arg)

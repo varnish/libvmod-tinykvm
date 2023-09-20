@@ -50,14 +50,15 @@ int kvm_self_request(VRT_CTX, const char *c_path, backend_result *result)
 {
 	struct curl_slist *req_list = NULL;
 	int retvalue = -1;
-	const std::string path = c_path;
+	const size_t c_path_len = strlen(c_path);
 
 	MemoryStruct chunk {
 		.memory = (char *)malloc(1),
 		.size = 0
 	};
-	if (chunk.memory == NULL || path.size() < 1u) {
+	if (chunk.memory == NULL || c_path_len < 1u || c_path[0] != '/') {
 		set_error_result(result, 500);
+		free(chunk.memory);
 		return (-1);
 	}
 
@@ -65,17 +66,31 @@ int kvm_self_request(VRT_CTX, const char *c_path, backend_result *result)
 	{
 		kvm::self_request_concurrency--;
 		set_error_result(result, 500);
+		free(chunk.memory);
 		return (-1);
 	}
 
-	std::string url;
-	if (path[0] == '/')
-		url = kvm::self_request_prefix + path;
-	else
-		url = path;
+	/* Mandatory self-request prefix */
+	char url_buffer[2048];
+	const int url_res =
+		snprintf(url_buffer, sizeof(url_buffer),
+			"%.*s%.*s",
+			(int)kvm::self_request_prefix.size(),
+			kvm::self_request_prefix.c_str(),
+			(int)c_path_len,
+			c_path);
+
+	if (UNLIKELY(url_res <= 0)) {
+		kvm::self_request_concurrency--;
+		set_error_result(result, 500);
+		free(chunk.memory);
+		return (-1);
+	}
+	const char  *url     = url_buffer;
+	const size_t url_len = url_res;
 
 	CURL *curl = curl_easy_init();
-	curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, (write_callback)kvm_SelfRequestCallback);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &chunk);
 
@@ -85,6 +100,7 @@ int kvm_self_request(VRT_CTX, const char *c_path, backend_result *result)
 			set_error_result(result, 500);
 			curl_easy_cleanup(curl);
 			kvm::self_request_concurrency--;
+			free(chunk.memory);
 			return (-1);
 		}
 	}
@@ -100,10 +116,10 @@ int kvm_self_request(VRT_CTX, const char *c_path, backend_result *result)
 	if (res != CURLE_OK) {
 		VSLb(ctx->vsl, SLT_Error,
 			"kvm.curl_fetch(): cURL failed for '%s': %s",
-			url.c_str(), curl_easy_strerror(res));
+			url, curl_easy_strerror(res));
 		fprintf(stderr,
 			"kvm.curl_fetch(): cURL failed for '%s': %s\n",
-			url.c_str(), curl_easy_strerror(res));
+			url, curl_easy_strerror(res));
 
 		free(chunk.memory);
 

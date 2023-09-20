@@ -20,12 +20,11 @@
 #include <vtim.h>
 #include "vcl.h"
 
-#define VARNISH_PLUS
 #include "vcc_compute_if.h"
 #include "VSC_vmod_kvm.h"
 
 extern void kvm_varnishstat_program_cpu_time(vtim_real);
-extern uint64_t kvm_allocate_memory(KVM_SLOT, uint64_t bytes);
+extern uint64_t kvm_allocate_post_memory(KVM_SLOT, uint64_t bytes);
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
 	const struct kvm_chain_item *, struct backend_post *, struct backend_result *);
 extern struct kvm_program_chain* kvm_chain_get_queue();
@@ -116,7 +115,7 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 		{
 			/* Allocate exact bytes from previous result in reserved VM */
 			post->slot = slot;
-			post->address = kvm_allocate_memory(slot, result->content_length);
+			post->address = kvm_allocate_post_memory(slot, result->content_length);
 			post->capacity = result->content_length;
 			post->length  = 0;
 			post->inputs = invocation->inputs;

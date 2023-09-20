@@ -36,6 +36,7 @@ add_subdirectory(ext/concurrentqueue concurrentqueue)
 
 add_library(kvm STATIC ${KVM_SOURCES})
 target_include_directories(kvm PRIVATE ../../src)
+target_compile_definitions(kvm PUBLIC VARNISH_PLUS=1)
 target_link_libraries(kvm PRIVATE tinykvm curl concurrentqueue nlohmann_json archive)
 
 if (SHARED_KVM)

@@ -180,19 +180,24 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 	/* We only reset ephemeral VMs. */
 	if (reset_needed) {
 		this->m_reset_needed = false;
+
+		stats().resets ++;
 		machine().reset_to(source.machine(), {
 			.max_mem = tenant().config.max_main_memory(),
 			.max_cow_mem = tenant().config.max_req_memory(),
 			.reset_free_work_mem = tenant().config.limit_req_memory(),
 		});
-	}
-	m_sighandler = source.m_sighandler;
+		/* The POST memory area is gone. */
+		this->m_post_size = 0;
 
-	/* Load the fds of the source */
-	m_fd.reset_and_loan(source.m_fd);
-	/* Load the compiled regexes of the source */
-	m_regex.reset_and_loan(source.m_regex);
-	/* XXX: Todo: reset more stuff */
+		m_sighandler = source.m_sighandler;
+
+		/* Load the fds of the source */
+		m_fd.reset_and_loan(source.m_fd);
+		/* Load the compiled regexes of the source */
+		m_regex.reset_and_loan(source.m_regex);
+		/* XXX: Todo: reset more stuff */
+	}
 }
 
 MachineInstance::~MachineInstance()
@@ -255,6 +260,20 @@ const vrt_ctx* MachineInstance::ctx() const
 	if (UNLIKELY(m_ctx == nullptr))
 		throw std::runtime_error("CTX was null");
 	return m_ctx;
+}
+
+uint64_t MachineInstance::allocate_post_data(size_t bytes)
+{
+	/* Simple mremap scheme. */
+	if (this->m_post_size < bytes)
+	{
+		if (this->m_post_size > 0)
+			machine().mmap_unmap(m_post_data, m_post_size);
+
+		this->m_post_data = machine().mmap_allocate(bytes);
+		this->m_post_size = bytes;
+	}
+	return this->m_post_data;
 }
 
 void MachineInstance::print(std::string_view text) const
