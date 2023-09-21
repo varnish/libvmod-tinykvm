@@ -87,6 +87,13 @@ void kvm_varnishstat_program_timeout()
 	__sync_fetch_and_add(&vsc_vmod_kvm->program_timeout, 1);
 }
 
+void kvm_varnishstat_self_request(int failed)
+{
+	__sync_fetch_and_add(&vsc_vmod_kvm->self_requests, 1);
+	if (failed)
+		__sync_fetch_and_add(&vsc_vmod_kvm->self_requests_failed, 1);
+}
+
 void kvm_varnishstat_program_status(uint16_t status)
 {
 	if (status >= 500)

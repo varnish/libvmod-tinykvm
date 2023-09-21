@@ -66,7 +66,7 @@ extern int      kvm_is_mmap_range(KVM_SLOT, uint64_t addr);
 
 struct backend_result;
 extern int kvm_set_self_request(VRT_CTX, VCL_PRIV, const char *unix_path, const char *uri, long max);
-extern int kvm_self_request(VRT_CTX, const char *path, struct backend_result *result);
+extern int kvm_self_request(VRT_CTX, const char *path, const char *config, struct backend_result *result);
 
 /* Fetch something with cURL. Returns 0: success, <0: failure */
 struct MemoryStruct

@@ -57,4 +57,18 @@
 
 	Total time spent fetching content for programs.
 
+.. varnish_vsc::	self_requests
+	:type:		counter
+	:level:		info
+	:oneliner:	Compute chain self-requests
+
+	Total number of requested self-requests.
+
+.. varnish_vsc::	self_requests_failed
+	:type:		counter
+	:level:		info
+	:oneliner:	Failed self-requests
+
+	Total number of failed self-requests.
+
 .. varnish_vsc_end::	vmod_kvm

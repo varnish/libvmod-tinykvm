@@ -378,11 +378,11 @@ kvmbe_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
 		{
 			/* Only self-request fetches for now. */
 			const vtim_real srt0 = VTIM_real();
-			int res =
-				kvm_self_request(&ctx, invocation->inputs.url, result);
+			int res = kvm_self_request(&ctx,
+				invocation->inputs.url, invocation->inputs.argument, result);
 			self_request_time = VTIM_real() - srt0;
 
-			if (res < 0)
+			if (res < 0 || result->status >= 400)
 				break;
 			/* Only used to free the chunk after usage. */
 			must_free_chunk = TRUST_ME(result->buffers[0].data);
