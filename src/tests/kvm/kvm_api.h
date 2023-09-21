@@ -35,7 +35,7 @@ extern void register_func(int, ...);
  * Example:
  *   static void on_get(const char* url, const char *arg)
  *   {
- *      http_setf(BERESP, "X-Hello: World", 14);
+ *      http_setf(RESP, "X-Hello: World", 14);
  *      backend_response_str(200, "text/plain", "Hello World!");
  *   }
  *   int main()
@@ -140,13 +140,10 @@ begin_streaming_response(int16_t status, const void *t, size_t, size_t content_l
  * HTTP header field manipulation
  *
 **/
-static const int HDR_REQ     = 0;
-static const int HDR_REQ_TOP = 1;
-static const int HDR_RESP    = 2;
-static const int HDR_BEREQ   = 4;
-static const int HDR_BERESP  = 5;
-static const int BEREQ  = 4;  /* Get values from this. */
-static const int BERESP = 5;  /* Set values on this. */
+static const int REQ      = 0;
+static const int RESP     = 1;
+static const int REQUEST  = REQ;
+static const int RESPONSE = RESP;
 static const unsigned HTTP_FMT_SIZE = 4096; /* Most header fields fit. */
 
 extern long
@@ -497,15 +494,15 @@ storage_call(storage_func func, const void *src, size_t len, void *res, size_t r
 typedef void (*storage_task_func) (void *data, size_t len);
 
 extern long
-sys_storage_task(storage_task_func, void* data, size_t len, uint64_t start, uint64_t period);
+sys_storage_task(storage_task_func, const void* data, size_t len, uint64_t start, uint64_t period);
 
 /* Schedule a storage task to happen next. It will be queued up for storage access. */
 static inline long
-storage_task(storage_task_func task, void *data, size_t len) { return sys_storage_task(task, data, len, 0, 0); }
+storage_task(storage_task_func task, const void *data, size_t len) { return sys_storage_task(task, data, len, 0, 0); }
 
 /* Schedule a storage task to happen at some point. It will be queued up for storage access periodically. */
 static inline long
-schedule_storage_task(storage_task_func task, void *data, size_t len, float start, float period) {
+schedule_storage_task(storage_task_func task, const void *data, size_t len, float start, float period) {
 	return sys_storage_task(task, data, len, start * 1000, period * 1000);
 }
 

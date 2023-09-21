@@ -1,8 +1,4 @@
 #include <cstdint>
-struct txt {
-	const char* begin;
-	const char* end;
-};
 extern "C" {
 	void http_SetH(struct http *to, unsigned n, const char *fm);
 	void http_UnsetIdx(struct http *hp, unsigned idx);
@@ -11,12 +7,16 @@ enum {
 #define SLTH(tag, ind, req, resp, sdesc, ldesc)	ind,
 #include "tbl/vsl_tags_http.h"
 };
-void VSLbt(struct vsl_log *vsl, enum VSL_tag_e tag, txt t);
+struct easy_txt {
+	const char* begin;
+	const char* end;
+};
+void VSLbt(struct vsl_log *vsl, enum VSL_tag_e tag, easy_txt t);
 }
 struct http {
 	unsigned       magic;
 	uint16_t       fields_max;
-	txt*           field_array;
+	easy_txt*      field_array;
 	unsigned char* field_flags;
 	uint16_t       field_count;
 	int            logtag;
@@ -26,6 +26,7 @@ struct http {
 	uint8_t        protover;
 	uint8_t        conds;
 };
+
 
 #define HDR_FIRST     5
 #define HDR_INVALID   UINT32_MAX
@@ -39,7 +40,7 @@ struct guest_header_field {
 	bool     foreach = false;
 };
 
-inline void foreach(http* hp, const std::function<void(http*, txt&, size_t)>& cb)
+inline void foreach(http* hp, const std::function<void(http*, easy_txt&, size_t)>& cb)
 {
 	for (size_t i = 0; i < hp->field_count; i++) {
 		cb(hp, hp->field_array[i], i);
@@ -57,28 +58,30 @@ inline http*
 get_http(VRT_CTX, int where)
 {
 	struct http* hp = nullptr;
-	switch (where) {
-	case HDR_REQ:
-		hp = ctx->http_req;
-		break;
-	case HDR_REQ_TOP:
-		hp = ctx->http_req_top;
-		break;
-	case HDR_BEREQ:
-		hp = ctx->http_bereq;
-		break;
-	case HDR_BERESP:
-		hp = ctx->http_beresp;
-		break;
-	case HDR_RESP:
-		hp = ctx->http_resp;
-		break;
+	if (ctx->bo) {
+		switch (where) {
+		case 0:
+			hp = ctx->http_bereq;
+			break;
+		case 1:
+			hp = ctx->http_beresp;
+			break;
+		}
+	} else if (ctx->req) {
+		switch (where) {
+		case 0:
+			hp = ctx->http_req;
+			break;
+		case 1:
+			hp = ctx->http_resp;
+			break;
+		}
 	}
 	if (UNLIKELY(hp == nullptr))
 		throw std::runtime_error("Selected HTTP not available at this time: " + std::to_string(where));
 	return hp;
 }
-inline std::tuple<http*, txt&>
+inline std::tuple<http*, easy_txt&>
 get_field(VRT_CTX, int where, uint32_t index)
 {
 	auto* hp = get_http(ctx, (gethdr_e) where);
@@ -124,7 +127,7 @@ http_unsetat(struct http *hp, unsigned idx)
 	hp->field_count--;
 }
 
-inline uint32_t field_length(const txt& field)
+inline uint32_t field_length(const easy_txt& field)
 {
 	return field.end - field.begin;
 }
@@ -333,9 +336,13 @@ static void syscall_regex_copyto(vCPU& cpu, MachineInstance& inst)
 		auto* begin = srchp->field_array[u].begin;
 		auto* end   = srchp->field_array[u].end;
 
+#ifdef VARNISH_PLUS
 		const bool matches =
         	(VRE_exec(entry.item, begin, end - begin, 0,
             	0, nullptr, 0, nullptr) >= 0);
+#else
+		const bool matches = 0;
+#endif
 		if (matches) {
 			if (http_header_append(dsthp, begin, end - begin) != HDR_INVALID)
 				appended++;
