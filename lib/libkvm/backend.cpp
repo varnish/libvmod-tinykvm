@@ -187,7 +187,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 				"%s: Calling on_error() at 0x%lX",
 				machine.name().c_str(), on_error_addr);
 
-			vm.timed_reentry(on_error_addr,
+			vm.timed_vmcall(on_error_addr,
 				ERROR_HANDLING_TIMEOUT, invoc->inputs.url, invoc->inputs.argument, exception);
 
 			/* Make sure no SMP work is in-flight. */
@@ -412,19 +412,11 @@ int kvm_backend_streaming_post(struct backend_post *post,
 				auto data_vaddr = vm.stack_push(rsp, data_ptr, size_t(data_len));
 
 				const auto timeout = mi.max_req_time();
-				if (post->length == 0) {
-					vm.timed_vmcall_stack(call_addr, rsp, timeout,
-						post->inputs.url, post->inputs.argument,
-						post->inputs.content_type,
-						(uint64_t)data_vaddr, (uint64_t)data_len,
-						(uint64_t)post->length);
-				} else {
-					vm.timed_reentry_stack(call_addr, rsp, timeout,
-						post->inputs.url, post->inputs.argument,
-						post->inputs.content_type,
-						(uint64_t)data_vaddr, (uint64_t)data_len,
-						(uint64_t)post->length);
-				}
+				vm.timed_vmcall_stack(call_addr, rsp, timeout,
+					post->inputs.url, post->inputs.argument,
+					post->inputs.content_type,
+					(uint64_t)data_vaddr, (uint64_t)data_len,
+					(uint64_t)post->length);
 				return 0L;
 			});
 			fut.get();
@@ -496,7 +488,7 @@ ssize_t kvm_backend_streaming_delivery(
 			ScopedDuration cputime(mi.stats().request_cpu_time);
 
 			const auto timeout = STREAM_HANDLING_TIMEOUT;
-			vm.timed_reentry(result->stream_callback, timeout,
+			vm.timed_vmcall(result->stream_callback, timeout,
 				(uint64_t)result->stream_argument,
 				(uint64_t)max_len, (uint64_t)written,
 				(uint64_t)result->content_length);

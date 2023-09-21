@@ -478,7 +478,6 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			tinykvm::tinykvm_x86regs regs;
 			stm.setup_call(regs, func, new_stack,
 				(uint64_t)n, (uint64_t)stm_bufaddr, (uint64_t)res_size);
-			regs.rip = stm.reentry_address();
 			stm.set_registers(regs);
 
 			/* Check if this is a debug program. */
@@ -575,7 +574,7 @@ long ProgramInstance::storage_task(gaddr_t func, std::string argument)
 			unsigned long long rsp = stm.stack_address();
 			auto data_addr = stm.stack_push(rsp, data_arg);
 
-			stm.timed_reentry_stack(func, rsp, ASYNC_STORAGE_TIMEOUT,
+			stm.timed_vmcall_stack(func, rsp, ASYNC_STORAGE_TIMEOUT,
 				uint64_t(data_addr), uint64_t(data_arg.size()));
 			if constexpr (VERBOSE_STORAGE_TASK) {
 				printf("<- Async task finished 0x%lX\n", func);
