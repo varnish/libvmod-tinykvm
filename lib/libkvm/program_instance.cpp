@@ -24,6 +24,7 @@
 #include "curl_fetch.hpp"
 #include "settings.hpp"
 #include "tenant_instance.hpp"
+#include "scoped_duration.hpp"
 #include "timing.hpp"
 #include "varnish.hpp"
 #include <cstring>
@@ -395,8 +396,14 @@ Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 	/* What happens when the transaction is done */
 	return {slot, vm_free_function};
 }
+#ifdef VARNISH_PLUS
 void ProgramInstance::vm_free_function(void* slotv)
 {
+#else
+void ProgramInstance::vm_free_function(VRT_CTX, void* slotv)
+{
+	(void)ctx;
+#endif
 	auto* slot = (VMPoolItem *)slotv;
 	auto& mi = *slot->mi;
 
@@ -445,7 +452,8 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 		if constexpr (VERBOSE_STORAGE_TASK) {
 			printf("-> Storage task on main queue ENTERED\n");
 		}
-		auto& stm = storage().storage_vm->machine();
+		auto& storage_vm = *storage().storage_vm;
+		auto& stm = storage_vm.machine();
 		uint64_t vaddr = stm.stack_address();
 		size_t total_input = 0;
 
@@ -462,17 +470,17 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 		stm.copy_to_guest(stm_bufaddr, buffers, n * sizeof(VirtBuffer));
 
 		const uint64_t new_stack = vaddr & ~0xFL;
-		storage().storage_vm->stats().input_bytes += total_input;
+		storage_vm.stats().input_bytes += total_input;
 
 		try {
 			if constexpr (VERBOSE_STORAGE_TASK) {
 				printf("Storage task calling 0x%lX with stack 0x%lX\n",
 					func, new_stack);
 			}
-			const float timeout = storage().storage_vm->tenant().config.max_storage_time();
-			storage().storage_vm->begin_call();
-			storage().storage_vm->stats().invocations++;
-			const auto t0 = VTIM_real();
+			const float timeout = storage_vm.tenant().config.max_storage_time();
+			storage_vm.begin_call();
+			storage_vm.stats().invocations++;
+			ScopedDuration cputime(storage_vm.stats().request_cpu_time);
 
 			/* Build call manually. */
 			tinykvm::tinykvm_x86regs regs;
@@ -481,14 +489,14 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			stm.set_registers(regs);
 
 			/* Check if this is a debug program. */
-			if (storage().storage_vm->is_debug()) {
-				storage().storage_vm->storage_debugger(timeout);
+			if (storage_vm.is_debug()) {
+				storage_vm.storage_debugger(timeout);
 			} else {
 				stm.run(timeout);
 			}
 
-			const bool storage_resume   = storage().storage_vm->response_called(2);
-			const bool storage_noreturn = storage().storage_vm->response_called(3);
+			const bool storage_resume   = storage_vm.response_called(2);
+			const bool storage_noreturn = storage_vm.response_called(3);
 
 			/* The machine must be stopped, and it must have called storage_[no]return. */
 			if (!stm.stopped() || !(storage_resume || storage_noreturn)) {
@@ -502,7 +510,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 			if (res_addr != 0x0 && st_res_buffer != 0x0) {
 				/* Copy from the storage machine back into tenant VM instance */
 				src.copy_from_machine(res_addr, stm, st_res_buffer, st_res_size);
-				storage().storage_vm->stats().output_bytes += st_res_size;
+				storage_vm.stats().output_bytes += st_res_size;
 			}
 
 			/* If res_addr is zero, we will just return the
@@ -516,10 +524,6 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 				stm.run(STORAGE_CLEANUP_TIMEOUT);
 			}
 
-			/* Normal CPU-time. */
-			const auto cpu_time = VTIM_real() - t0;
-			storage().storage_vm->stats().request_cpu_time += cpu_time;
-
 			if constexpr (VERBOSE_STORAGE_TASK) {
 				printf("<- Storage task on main queue returning %llu to 0x%lX\n",
 					retval, st_res_buffer);
@@ -531,7 +535,7 @@ long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,
 				printf("<- Storage task on main queue failed: %s\n",
 					e.what());
 			}
-			storage().storage_vm->stats().exceptions++;
+			storage_vm.stats().exceptions++;
 			return -1;
 		}
 	});
@@ -558,7 +562,8 @@ long ProgramInstance::storage_task(gaddr_t func, std::string argument)
 		if constexpr (VERBOSE_STORAGE_TASK) {
 			printf("-> Async task on main queue\n");
 		}
-		auto& stm = storage().storage_vm->machine();
+		auto& storage_vm = *storage().storage_vm;
+		auto& stm = storage_vm.machine();
 
 		try {
 			if constexpr (VERBOSE_STORAGE_TASK) {
@@ -567,9 +572,9 @@ long ProgramInstance::storage_task(gaddr_t func, std::string argument)
 			/* Avoid async storage while still initializing. */
 			this->try_wait_for_startup_and_initialization();
 
-			storage().storage_vm->stats().invocations++;
-			storage().storage_vm->stats().input_bytes += data_arg.size();
-			const auto t0 = VTIM_real();
+			storage_vm.stats().invocations++;
+			storage_vm.stats().input_bytes += data_arg.size();
+			ScopedDuration cputime(storage_vm.stats().request_cpu_time);
 
 			unsigned long long rsp = stm.stack_address();
 			auto data_addr = stm.stack_push(rsp, data_arg);
@@ -580,16 +585,12 @@ long ProgramInstance::storage_task(gaddr_t func, std::string argument)
 				printf("<- Async task finished 0x%lX\n", func);
 			}
 
-			/* Normal CPU-time. */
-			const auto cpu_time = VTIM_real() - t0;
-			storage().storage_vm->stats().request_cpu_time += cpu_time;
-
 			return 0;
 		} catch (const std::exception& e) {
 			if constexpr (VERBOSE_STORAGE_TASK) {
 				printf("<- Async task failure: %s\n", e.what());
 			}
-			storage().storage_vm->stats().exceptions++;
+			storage_vm.stats().exceptions++;
 			return -1;
 		}
 	}));
