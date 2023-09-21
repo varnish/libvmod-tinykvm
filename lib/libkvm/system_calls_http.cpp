@@ -61,9 +61,11 @@ get_http(VRT_CTX, int where)
 	if (ctx->bo) {
 		switch (where) {
 		case 0:
+		case HDR_BEREQ:
 			hp = ctx->http_bereq;
 			break;
 		case 1:
+		case HDR_BERESP:
 			hp = ctx->http_beresp;
 			break;
 		}
