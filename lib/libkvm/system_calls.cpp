@@ -197,9 +197,6 @@ void MachineInstance::setup_syscall_interface()
 			case 0x20000: // CURL_FETCH
 				syscall_fetch(cpu, inst);
 				return;
-			case 0x20001: // SELF_REQUEST
-				syscall_request(cpu, inst);
-				return;
 			case 0x7F000: // LOG
 				syscall_log(cpu, inst);
 				return;

@@ -390,36 +390,6 @@ static void syscall_fetch(vCPU& vcpu, MachineInstance& inst)
 		is_self_request ? kvm::self_request_uri : "");
 }
 
-static void syscall_request(vCPU& vcpu, MachineInstance& inst)
-{
-	auto& regs = vcpu.registers();
-	/**
-	 * rdi = URL
-	 * rsi = URL length
-	 * rdx = result buffer
-	 * rcx = fields buffer
-	 * r8  = options buffer
-	 **/
-	const uint64_t op_buffer = regs.rdx;
-	const uint64_t fields_buffer = regs.rcx;
-	const uint64_t options_buffer = regs.r8;
-
-	/* Self-requesting URL */
-	const auto url = kvm::self_request_prefix +
-		vcpu.machine().buffer_to_string(regs.rdi, regs.rsi, CURL_REQ_URL_MAX_LENGTH);
-
-	opresult opres;
-	vcpu.machine().copy_from_guest(&opres, op_buffer, sizeof(opresult));
-
-	syscall_curl_fetch_helper(
-		vcpu, inst,
-		url,
-		op_buffer,
-		fields_buffer,
-		options_buffer,
-		kvm::self_request_uri);
-}
-
 } // kvm
 
 #include "self_request.cpp"
