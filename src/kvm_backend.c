@@ -538,7 +538,8 @@ kvmbe_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
 	free(must_free_chunk);
 
 	/* Program cpu-time statistic. */
-	kvm_varnishstat_program_cpu_time(VTIM_real() - t0 - self_request_time, self_request_time);
+	const vtim_real cputime = VTIM_real() - t0 - self_request_time;
+	kvm_varnishstat_program_cpu_time(cputime >= 0.0 ? cputime : 0.0, self_request_time);
 
 	/* Finish the response.
 	   After the last function call, the result buffer is filled with
@@ -650,9 +651,6 @@ kvm_init_fetch(VRT_CTX, const char *url, const char *arg)
 static void init_kvmr(struct vmod_kvm_backend *kvmr)
 {
 	INIT_OBJ(kvmr, KVM_BACKEND_MAGIC);
-	if (kvm_settings.backend_timings) {
-		kvmr->t_work = VTIM_real();
-	}
 	kvmr->chain = kqueue;
 	/* XXX: Immediately reset it. It's a thread_local! */
 	kqueue.count = 0;
