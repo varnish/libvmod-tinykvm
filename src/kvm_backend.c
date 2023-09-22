@@ -492,22 +492,21 @@ kvmbe_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
 				kvm_free_reserved_machine(&ctx, slot);
 			break;
 		}
+	}
 
-		/* Explicitly set content-type when present. This allows
-		   other programs in the chain to read it as needed.
-		   An empty content-type is treated as no-change. Programs
-		   and VCL can unset the content-type if needed. */
-		if (result->tsize > 0)
+	/* Final content-type. */
+	if (result->tsize > 0)
+	{
+		// If the Content-Type is different,
+		if (!http_HdrIs(bo->beresp, H_Content_Type, result->type))
 		{
-			// If the Content-Type is different,
-			if (!http_HdrIs(bo->beresp, H_Content_Type, result->type))
-			{
-				// Unset old one, and set new one
-				http_Unset(bo->beresp, H_Content_Type);
-				http_PrintfHeader(bo->beresp,
-					"%s %.*s", H_Content_Type + 1, (int)result->tsize, result->type);
-			}
+			// Unset old one, and set new one
+			http_Unset(bo->beresp, H_Content_Type);
+			http_PrintfHeader(bo->beresp,
+				"%s %.*s", H_Content_Type + 1, (int)result->tsize, result->type);
 		}
+	} else {
+		http_Unset(bo->beresp, H_Content_Type);
 	}
 
 	/**
