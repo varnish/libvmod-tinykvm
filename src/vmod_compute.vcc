@@ -123,7 +123,7 @@ $Function BOOL start(PRIV_VCL, STRING program, BOOL async = 1)
   Requests will always wait until the program is fully initialized.
 - Must be called from vcl_init.
 
-$Function STRING stats(PRIV_VCL, STRING pattern = "", INT indentation = 4)
+$Function STRING stats(PRIV_VCL, STRING pattern = "", INT indentation = -1)
 
 - Produces a JSON string with detailed statistics from each program matching the pattern.
 - Unloaded programs will not produce statistics.
