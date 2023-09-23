@@ -130,11 +130,13 @@ $Function STRING stats(PRIV_VCL, STRING pattern = "", INT indentation = -1)
 - When indentation is -1, minify the JSON.
 - Must be called after initialization.
 
-$Function BOOL chain(PRIV_VCL, STRING program, STRING arg = "", STRING config = "")
+$Function BOOL chain(PRIV_VCL, STRING program, STRING arg = "", STRING config = "",
+	INT error_treshold = 400)
 
 - Queue this program up for execution in the exact order given.
 - Returns true if the program was found.
 - A program chain always end with a call to program() or to_string().
+- End processing if program status is >= error_treshold.
 - Must be called from vcl_backend_fetch.
 
 $Function BACKEND program(PRIV_VCL, STRING program, STRING arg = "", STRING config = "")
@@ -165,12 +167,13 @@ Example:
 	}
 
 
-$Function STRING to_string(PRIV_VCL, STRING program, STRING url = "", STRING arg = "", STRING on_error = "")
+$Function STRING to_string(PRIV_VCL, STRING program, STRING url = "", STRING arg = "", STRING on_error = "", INT error_treshold = 400)
 
 - Returns a string of the response produced by the given program.
 - Supports GET, POST and other HTTP requests.
 - If the program fails, this function returns the on_error string instead.
 - Works with chaining, and calls to_string() for the final string after chained programs.
+- A final status >= error_treshold will produce the error string.
 - NOTE: Uses extra workspace for each call. See: man varnishd.
 
 $Function INT synth(PRIV_VCL, INT status, STRING program, STRING url = "", STRING arg = "")

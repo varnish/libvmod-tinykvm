@@ -14,6 +14,9 @@
 #include <vsb.h>
 #include <vcl.h>
 #include "vcc_compute_if.h"
+#ifndef VARNISH_PLUS
+#include <vre.h>
+#endif
 #include <errno.h>
 #include <stdio.h>
 #define SEMPTY(s)			!((s) && *(s))
@@ -82,9 +85,13 @@ static int unloader(const char *program, struct vmod_kvm_tenant *tenant, void *v
 {
 	const struct unloader_state *state = (const struct unloader_state *)vstate;
 
+#ifdef VARNISH_PLUS
 	const int matches =
-        VRE_exec(state->regex, program, strlen(program), 0,
-            0, NULL, 0, NULL);
+		VRE_exec(state->regex, program, strlen(program), 0,
+			0, NULL, 0, NULL);
+#else
+	const int matches = 0;
+#endif
 	if (matches > 0) {
 		VSLb(state->ctx->vsl, SLT_VCL_Log,
 			"compute: Unloading '%s'", program);
@@ -102,9 +109,15 @@ VCL_INT vmod_invalidate_programs(VRT_CTX, VCL_PRIV task, VCL_STRING pattern)
 	}
 
 	/* Compile regex pattern (NOTE: uses a lot of stack). */
+#ifdef VARNISH_PLUS
 	const char* error = "";
 	int         error_offset = 0;
 	vre_t *re = VRE_compile(pattern, 0, &error, &error_offset);
+#else
+	int error = 0;
+	int error_offset = 0;
+	vre_t *re = VRE_compile(pattern, 0, &error, &error_offset, 0);
+#endif
 
 	if (re == NULL) {
 		/* TODO: Nice regex error explanation. */
@@ -179,7 +192,7 @@ VCL_BOOL vmod_start(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_BOOL async)
 extern struct director *vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg);
 extern const char *kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
-	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg, VCL_STRING on_error);
+	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg, VCL_STRING on_error, VCL_INT);
 extern int kvm_vm_synth(VRT_CTX, VCL_PRIV task, VCL_INT status,
 	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg);
 extern VCL_BOOL kvm_vm_begin_epoll(VRT_CTX, VCL_PRIV, VCL_STRING program,
@@ -201,9 +214,10 @@ VCL_BACKEND vmod_program(VRT_CTX, VCL_PRIV task,
 
 /* Create a string response from given program and arguments. */
 VCL_STRING vmod_to_string(VRT_CTX, VCL_PRIV task,
-	VCL_STRING program, VCL_STRING url, VCL_STRING argument, VCL_STRING on_error)
+	VCL_STRING program, VCL_STRING url, VCL_STRING argument,
+	VCL_STRING on_error, VCL_INT error_treshold)
 {
-	return (kvm_vm_to_string(ctx, task, program, url, argument, on_error));
+	return (kvm_vm_to_string(ctx, task, program, url, argument, on_error, error_treshold));
 }
 
 /* Create a synthetic response from given program and arguments. */

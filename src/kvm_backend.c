@@ -484,7 +484,7 @@ kvmbe_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
 		last_tenant = invocation->tenant;
 		last_slot = slot;
 
-		if (result->status >= 400) {
+		if (result->status >= invocation->break_status) {
 			VSLb(ctx.vsl, SLT_Error,
 				"KVM: Error status %u from call to %s at index %d in chain",
 				result->status, kvm_tenant_name(invocation->tenant), index);
@@ -743,7 +743,7 @@ VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
 }
 
 VCL_BOOL vmod_chain(VRT_CTX, VCL_PRIV task,
-	VCL_STRING program, VCL_STRING url, VCL_STRING arg)
+	VCL_STRING program, VCL_STRING url, VCL_STRING arg, VCL_INT break_status)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	AN(task);
@@ -778,9 +778,12 @@ VCL_BOOL vmod_chain(VRT_CTX, VCL_PRIV task,
 	}
 
 	/* Cannot fail at this point, add to chain */
-	if (!kvm_init_chain(ctx, tenant, url, arg)) {
-		return (0);
+	struct kvm_chain_item *item =
+		kvm_init_chain(ctx, tenant, url, arg);
+	if (item != NULL) {
+		item->break_status = break_status;
+		return (1);
 	}
 
-	return (1);
+	return (0);
 }

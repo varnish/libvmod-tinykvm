@@ -23,6 +23,7 @@ struct kvm_chain_item
 	struct vmod_kvm_tenant *tenant;
 	const char *special_function;
 	struct vmod_kvm_inputs inputs;
+	uint16_t break_status;
 };
 struct kvm_program_chain
 {
@@ -34,7 +35,7 @@ struct kvm_program_chain
 struct vmod_kvm_backend
 {
 	uint64_t magic;
-	struct director *dir;
+	const struct director *dir;
 
 	struct kvm_program_chain chain;
 

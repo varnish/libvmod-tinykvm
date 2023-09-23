@@ -137,7 +137,7 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 		/* Make a backend VM call (with optional POST). */
 		kvm_backend_call(ctx, slot, invocation, use_post ? post : NULL, result);
 
-		if (result->status >= 400) {
+		if (result->status >= invocation->break_status) {
 			/* Global program cpu-time statistic. */
 			kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
 
@@ -192,7 +192,8 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 }
 
 VCL_STRING kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
-	VCL_STRING program, VCL_STRING url, VCL_STRING arg, VCL_STRING on_error)
+	VCL_STRING program, VCL_STRING url, VCL_STRING arg, VCL_STRING on_error,
+	VCL_INT error_treshold)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	AN(task);
@@ -215,13 +216,14 @@ VCL_STRING kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
 
 	invocation->inputs.method = "GET"; /* Convenience */
 	invocation->inputs.content_type = "";
+	invocation->break_status = error_treshold;
 
 	/* XXX: Immediately reset it. It's a thread_local! */
 	struct kvm_program_chain chain = *kvm_chain_get_queue();
 	kvm_chain_get_queue()->count = 0;
 
 	struct kvm_http_response resp = to_string(ctx, &chain);
-	if (resp.status < 400)
+	if (resp.status < error_treshold)
 		return (resp.content);
 	else
 		return (on_error);
@@ -256,6 +258,7 @@ VCL_INT kvm_vm_synth(VRT_CTX, VCL_PRIV task, VCL_INT status,
 
 	invocation->inputs.method = "GET"; /* Convenience */
 	invocation->inputs.content_type = "";
+	invocation->break_status = 999;
 
 	/* XXX: Immediately reset it. It's a thread_local! */
 	struct kvm_program_chain chain = *kvm_chain_get_queue();
