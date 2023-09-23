@@ -122,6 +122,7 @@ void MachineInstance::initialize()
 }
 
 MachineInstance::MachineInstance(
+	unsigned reqid,
 	const MachineInstance& source, const TenantInstance* ten, ProgramInstance* inst)
 	: m_ctx(nullptr),
 	  m_machine(source.machine(), tinykvm::MachineOptions{
@@ -143,6 +144,8 @@ MachineInstance::MachineInstance(
 #endif
 	machine().set_userdata<MachineInstance> (this);
 	machine().set_printer(get_vsl_printer());
+	/* vCPU request id */
+	machine().cpu().set_vcpu_table_at(1, reqid);
 	/* Load the fds of the source */
 	m_fd.reset_and_loan(source.m_fd);
 	/* Load the compiled regexes of the source */

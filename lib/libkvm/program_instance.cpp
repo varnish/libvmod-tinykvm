@@ -42,7 +42,7 @@ extern void extract_programs_to(kvm::ProgramInstance&, const char *, size_t);
 static constexpr bool VERBOSE_STORAGE_TASK = false;
 static constexpr bool VERBOSE_PROGRAM_STARTUP = false;
 
-VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
+VMPoolItem::VMPoolItem(unsigned reqid, const MachineInstance& main_vm,
 	TenantInstance* ten, ProgramInstance* prog)
 	: mi {nullptr},
 	  tp {REQUEST_VM_NICE, false}
@@ -52,7 +52,7 @@ VMPoolItem::VMPoolItem(const MachineInstance& main_vm,
 	this->task_future = tp.enqueue(
 	[=, &main_vm] () -> long {
 		this->mi = std::make_unique<MachineInstance> (
-			main_vm, ten, prog);
+			reqid, main_vm, ten, prog);
 		return 0;
 	});
 }
@@ -269,7 +269,7 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 		// Instantiate first forked VM
 		// XXX: This can fail and throw an exception,
 		// think *long and hard* about the consequences!
-		m_vms.emplace_back(*main_vm, ten, this);
+		m_vms.emplace_back(0, *main_vm, ten, this);
 
 		// Make sure the first VM is up and running before queueing
 		m_vms.front().task_future.get();
@@ -282,7 +282,7 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 
 		// Instantiate remaining concurrency
 		for (size_t i = 1; i < max_vms; i++) {
-			m_vms.emplace_back(*main_vm, ten, this);
+			m_vms.emplace_back(i, *main_vm, ten, this);
 		}
 
 		size_t initialized = 1;
@@ -419,18 +419,6 @@ void ProgramInstance::vm_free_function(VRT_CTX, void* slotv)
 	// Signal waiters that slot is ready again
 	// If there any waiters, they keep the program referenced (atomically)
 	ref->m_vmqueue.enqueue(slot);
-}
-
-MachineInstance* ProgramInstance::tls_reserve_vm(const vrt_ctx* ctx,
-	TenantInstance* ten, std::shared_ptr<ProgramInstance> prog)
-{
-	(void)ctx;
-	thread_local std::unique_ptr<MachineInstance> inst = nullptr;
-
-	if (inst == nullptr) {
-		inst.reset(new MachineInstance(*prog->main_vm, ten, prog.get()));
-	}
-	return inst.get();
 }
 
 long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,

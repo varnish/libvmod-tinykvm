@@ -88,7 +88,7 @@ public:
 
 	static void kvm_initialize();
 	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool storage, bool dbg);
-	MachineInstance(const MachineInstance&, const TenantInstance*, ProgramInstance*);
+	MachineInstance(unsigned reqid, const MachineInstance&, const TenantInstance*, ProgramInstance*);
 	void initialize();
 	~MachineInstance();
 	void tail_reset();

@@ -187,9 +187,7 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 	if (ctx->req) {
 		priv_task = VRT_priv_task(ctx, ctx->req);
 	} else {
-		// For backend side, we use 'this' in order to allow many
-		// different kinds of programs, once.
-		priv_task = VRT_priv_task(ctx, this);
+		priv_task = VRT_priv_task(ctx, ctx->bo);
 	}
 	if (!priv_task->priv)
 	{
@@ -209,7 +207,19 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 
 			priv_task->priv = resv.slot;
 			priv_task->len  = KVM_PROGRAM_MAGIC;
+#ifdef VARNISH_PLUS
 			priv_task->free = resv.free;
+#else
+			auto* ptm = (struct vmod_priv_methods *)WS_Alloc(ctx->ws, sizeof(struct vmod_priv_methods));
+			if (UNLIKELY(ptm == nullptr)) {
+				resv.free(ctx, resv.slot);
+				return nullptr;
+			}
+			ptm->magic = VMOD_PRIV_METHODS_MAGIC;
+			ptm->type  = "vmod_kvm";
+			ptm->fini  = resv.free;
+			priv_task->methods = ptm;
+#endif
 		} catch (std::exception& e) {
 			// It makes no sense to reserve a VM without a request w/VSL
 			VSLb(ctx->vsl, SLT_Error,
@@ -252,23 +262,16 @@ VMPoolItem* TenantInstance::temporary_vmreserve(const vrt_ctx* ctx, bool debug)
 		return nullptr;
 	}
 }
-void TenantInstance::temporary_vmreserve_free(const vrt_ctx*, void* slotv)
+void TenantInstance::temporary_vmreserve_free(const vrt_ctx* ctx, void* slotv)
 {
 	VMPoolItem *slot = (VMPoolItem *)slotv;
 
+#ifdef VARNISH_PLUS
+	(void)ctx;
 	ProgramInstance::vm_free_function(slot);
-}
-
-MachineInstance* TenantInstance::tlsreserve(const vrt_ctx* ctx, bool debug)
-{
-	auto prog = this->ref(ctx, debug);
-	if (UNLIKELY(prog == nullptr))
-		return nullptr;
-
-	// Reserve a machine through blocking queue.
-	// May throw if dequeue from the queue times out.
-	return prog->tls_reserve_vm(ctx, this, std::move(prog));
-	// prog is nullptr after this ^
+#else
+	ProgramInstance::vm_free_function(ctx, slot);
+#endif
 }
 
 std::shared_ptr<ProgramInstance> TenantInstance::ref(const vrt_ctx *ctx, bool debug)

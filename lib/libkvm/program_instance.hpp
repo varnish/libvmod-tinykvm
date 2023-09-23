@@ -6,11 +6,16 @@
 #include "adns.hpp"
 #include "utils/cpptime.hpp"
 #include <blockingconcurrentqueue.h>
+#include <tinykvm/util/threadpool.h>
 #include <tinykvm/util/threadtask.hpp>
 #include <unordered_set>
 struct vcl;
 struct vsl_log;
+#ifdef VARNISH_PLUS
 typedef void (*priv_task_free_func_t) (void*);
+#else
+typedef void (*priv_task_free_func_t) (const vrt_ctx *, void*);
+#endif
 
 namespace kvm {
 struct VirtBuffer {
@@ -26,7 +31,7 @@ struct VirtBuffer {
  * data transfers, and is then put back in a blocking queue.
 **/
 struct VMPoolItem {
-	VMPoolItem(const MachineInstance&, TenantInstance*, ProgramInstance*);
+	VMPoolItem(unsigned reqid, const MachineInstance&, TenantInstance*, ProgramInstance*);
 	// VM instance
 	std::unique_ptr<MachineInstance> mi;
 	// Reference that keeps active program alive
@@ -137,11 +142,11 @@ public:
 	Reservation reserve_vm(const vrt_ctx*,
 		TenantInstance*, std::shared_ptr<ProgramInstance>);
 	/* Free a reserved VM. This can potentially finish a program. */
+#ifdef VARNISH_PLUS
 	static void vm_free_function(void*);
-
-	/* Reserve VM from blocking queue. */
-	MachineInstance* tls_reserve_vm(const vrt_ctx*,
-		TenantInstance*, std::shared_ptr<ProgramInstance>);
+#else
+	static void vm_free_function(const vrt_ctx*, void*);
+#endif
 
 	/* Serialized vector-based vmcall into storage VM.
 	   NOTE: buffers are clobbered by the function call. */
