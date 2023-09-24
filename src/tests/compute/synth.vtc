@@ -3,14 +3,6 @@ varnishtest "Compute: Synthetic response"
 feature cmd "ls /dev/kvm"
 
 shell {
-cat >synth.json <<-EOF
-{
-	"test1": {
-		"filename": "${tmpdir}/synth",
-		"group": "test"
-	}
-}
-EOF
 cat >synth.c <<-EOF
 #include "kvm_api.h"
 
@@ -34,7 +26,10 @@ vcl 4.1;
 	backend default none;
 
 	sub vcl_init {
-		compute.library("file://${tmpdir}/synth.json");
+		compute.configure("test1",
+			"""{
+				"filename": "${tmpdir}/synth"
+			}""");
 	}
 
 	sub vcl_recv {
