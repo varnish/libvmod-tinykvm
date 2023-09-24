@@ -381,14 +381,16 @@ Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 {
 	const auto tmo = std::chrono::seconds(ten->config.group.max_queue_time);
 	VMPoolItem* slot = nullptr;
+	auto t0 = ScopedDuration<CLOCK_MONOTONIC>::nanos_now();
 	{
-		AtomicScopedDuration<CLOCK_REALTIME> sd(prog->stats.reservation_time_us);
 		if (UNLIKELY(!m_vmqueue.wait_dequeue_timed(slot, tmo))) {
 			prog->stats.reservation_timeouts ++; /* Racy, but uncontended */
 			throw std::runtime_error("Queue timeout");
 		}
 		assert(slot && ctx);
 	}
+	/* Time spent reserving this VM. */
+	slot->mi->stats().reservation_time += (ScopedDuration<CLOCK_MONOTONIC>::nanos_now() - t0) * 1e-9;
 
 	/* Set the new active VRT CTX. */
 	slot->mi->set_ctx(ctx);

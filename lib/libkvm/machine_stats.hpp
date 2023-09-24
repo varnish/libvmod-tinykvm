@@ -9,6 +9,7 @@ struct MachineStats
 	uint64_t exceptions  = 0;
 	uint64_t timeouts    = 0;
 
+	double reservation_time = 0;
 	double request_cpu_time = 0;
 	double error_cpu_time   = 0;
 

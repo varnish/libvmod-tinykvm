@@ -18,6 +18,12 @@ namespace kvm
 			clock_gettime(CLK, &ts);
 			return (ts.tv_sec + 1e-9 * ts.tv_nsec);
 		}
+		static inline uint64_t nanos_now() noexcept {
+			struct timespec ts;
+
+			clock_gettime(CLK, &ts);
+			return (ts.tv_sec * 1000000000ULL + ts.tv_nsec);
+		}
 
 	private:
 		double& m_counter;

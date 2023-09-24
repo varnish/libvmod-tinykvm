@@ -30,6 +30,7 @@ static auto gather_stats(const MachineInstance& mi, tinykvm::ThreadTask& taskq)
 		{"resets",      stats.resets},
 		{"exceptions",  stats.exceptions},
 		{"timeouts",    stats.timeouts},
+		{"reservation_time",   stats.reservation_time},
 		{"request_cpu_time",   stats.request_cpu_time},
 		{"exception_cpu_time", stats.error_cpu_time},
 		{"input_bytes", stats.input_bytes},
@@ -82,6 +83,7 @@ static void gather_stats(VRT_CTX,
 	auto machines = json::array();
 
 	/* Individual request VMs */
+	double total_resv_time = 0.0;
 	for (size_t i = 0; i < prog->m_vms.size(); i++)
 	{
 		auto& mi = *prog->m_vms[i].mi;
@@ -92,6 +94,8 @@ static void gather_stats(VRT_CTX,
 		totals.resets += mi.stats().resets;
 		totals.timeouts += mi.stats().timeouts;
 
+		total_resv_time += mi.stats().reservation_time;
+		totals.reservation_time += mi.stats().reservation_time;
 		totals.request_cpu_time += mi.stats().request_cpu_time;
 		totals.error_cpu_time += mi.stats().error_cpu_time;
 
@@ -113,6 +117,7 @@ static void gather_stats(VRT_CTX,
 		{"resets",      totals.resets},
 		{"exceptions",  totals.exceptions},
 		{"timeouts",    totals.timeouts},
+		{"reservation_time",   totals.reservation_time},
 		{"request_cpu_time",   totals.request_cpu_time},
 		{"exception_cpu_time", totals.error_cpu_time},
 		{"input_bytes", totals.input_bytes},
@@ -126,7 +131,7 @@ static void gather_stats(VRT_CTX,
 	obj["program"] = {
 		{"live_updates", prog->stats.live_updates},
 		{"live_update_transfer_bytes", prog->stats.live_update_transfer_bytes},
-		{"reservation_time",     AtomicScopedDuration<>::to_seconds(prog->stats.reservation_time_us)},
+		{"reservation_time",     total_resv_time},
 		{"reservation_timeouts", prog->stats.reservation_timeouts},
 	};
 

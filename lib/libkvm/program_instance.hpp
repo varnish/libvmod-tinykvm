@@ -212,7 +212,6 @@ public:
 	std::mutex rsp_mtx;
 
 	struct Stats {
-		uint64_t reservation_time_us = 0;
 		uint64_t reservation_timeouts = 0;
 		uint64_t live_updates = 0;
 		int64_t  live_update_transfer_bytes = 0;
