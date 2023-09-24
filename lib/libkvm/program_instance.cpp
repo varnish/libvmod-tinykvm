@@ -381,10 +381,14 @@ Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 {
 	const auto tmo = std::chrono::seconds(ten->config.group.max_queue_time);
 	VMPoolItem* slot = nullptr;
-	if (UNLIKELY(!m_vmqueue.wait_dequeue_timed(slot, tmo))) {
-		throw std::runtime_error("Queue timeout");
+	{
+		AtomicScopedDuration<CLOCK_REALTIME> sd(prog->stats.reservation_time_us);
+		if (UNLIKELY(!m_vmqueue.wait_dequeue_timed(slot, tmo))) {
+			prog->stats.reservation_timeouts ++; /* Racy, but uncontended */
+			throw std::runtime_error("Queue timeout");
+		}
+		assert(slot && ctx);
 	}
-	assert(slot && ctx);
 
 	/* Set the new active VRT CTX. */
 	slot->mi->set_ctx(ctx);
@@ -540,6 +544,7 @@ long ProgramInstance::storage_task(gaddr_t func, std::string argument)
 	// Avoid the last task in case it is still active
 	while (storage().m_async_tasks.size() > 1)
 		// TODO: Read the return value of the tasks to detect errors
+		// XXX: This can re-throw a forwarded exception. Handle it?
 		storage().m_async_tasks.pop_front();
 
 	// Block and finish previous async tasks

@@ -351,6 +351,7 @@ void TenantInstance::serialize_storage_state(
 				old->live_update_call(ctx, old_ser_func, *inst, new_deser_func);
 			VSLb(ctx->vsl, SLT_VCL_Log,
 				 "Transferred %ld bytes", res);
+			inst->stats.live_update_transfer_bytes = res;
 		} else {
 			VSLb(ctx->vsl, SLT_VCL_Log,
 				"Live-update deserialization skipped (new program lacks restorer)");
@@ -376,6 +377,9 @@ void TenantInstance::commit_program_live(VRT_CTX,
 		TenantInstance::serialize_storage_state(
 			ctx, current, new_prog);
 	}
+
+	/* Increment live-update counter from old to new program */
+	new_prog->stats.live_updates = current->stats.live_updates + 1;
 
 	/* Swap out old program with new program. */
 	if (!new_prog->main_vm->is_debug())

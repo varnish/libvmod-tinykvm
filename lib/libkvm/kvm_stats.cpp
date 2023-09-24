@@ -10,6 +10,7 @@
  */
 #include "common_defs.hpp"
 #include "program_instance.hpp"
+#include "scoped_duration.hpp"
 #include "tenant_instance.hpp"
 #include "varnish.hpp"
 #include <atomic>
@@ -20,7 +21,7 @@ using foreach_function_t = int(*)(const char *, kvm::TenantInstance*, void *);
 extern "C" int kvm_tenant_foreach(VCL_PRIV task, foreach_function_t func, void* state);
 
 namespace kvm {
-static auto gather_stats(const MachineInstance& mi)
+static auto gather_stats(const MachineInstance& mi, tinykvm::ThreadTask& taskq)
 {
 	const auto& stats = mi.stats();
 
@@ -41,11 +42,13 @@ static auto gather_stats(const MachineInstance& mi)
 		{"vm_bank_capacity", mi.tenant().config.max_req_memory()},
 		{"vm_bank_highest",  mi.machine().banked_memory_capacity_bytes()},
 		{"vm_bank_current",  mi.machine().banked_memory_bytes()},
+		{"tasks_queued",   taskq.racy_queue_size()}
 	});
 }
 static void gather_stats(VRT_CTX,
 	nlohmann::json& j, TenantInstance* tenant)
 {
+	using namespace nlohmann;
 	static constexpr bool debug = false;
 
 	std::shared_ptr<ProgramInstance> prog;
@@ -68,22 +71,21 @@ static void gather_stats(VRT_CTX,
 	if (prog->has_storage())
 	{
 		auto& storage = prog->storage();
+		auto stats = gather_stats(*storage.storage_vm, prog->m_storage_queue);
+		stats.push_back({"tasks_inschedule", prog->m_timer_system.racy_count()});
 
-		obj["storage"] = {
-			gather_stats(*storage.storage_vm),
-		};
+		obj["storage"] = {stats};
 	}
 
 	MachineStats totals {};
 	auto& requests = obj["request"];
+	auto machines = json::array();
 
 	/* Individual request VMs */
 	for (size_t i = 0; i < prog->m_vms.size(); i++)
 	{
 		auto& mi = *prog->m_vms[i].mi;
-		requests["req" + std::to_string(i)] = {
-			gather_stats(mi),
-		};
+		machines.push_back(gather_stats(mi, prog->m_vms[i].tp));
 
 		totals.invocations += mi.stats().invocations;
 		totals.exceptions += mi.stats().exceptions;
@@ -103,8 +105,10 @@ static void gather_stats(VRT_CTX,
 		totals.status_unknown += mi.stats().status_unknown;
 	}
 
+	requests["machines"] = std::move(machines);
+
 	/* Cumulative totals */
-	requests["totals"] = {
+	requests.push_back({"totals", {
 		{"invocations", totals.invocations},
 		{"resets",      totals.resets},
 		{"exceptions",  totals.exceptions},
@@ -117,7 +121,15 @@ static void gather_stats(VRT_CTX,
 		{"status_3xx",  totals.status_3xx},
 		{"status_4xx",  totals.status_4xx},
 		{"status_5xx",  totals.status_5xx},
+	}});
+
+	obj["program"] = {
+		{"live_updates", prog->stats.live_updates},
+		{"live_update_transfer_bytes", prog->stats.live_update_transfer_bytes},
+		{"reservation_time",     AtomicScopedDuration<>::to_seconds(prog->stats.reservation_time_us)},
+		{"reservation_timeouts", prog->stats.reservation_timeouts},
 	};
+
 }
 } // kvm
 
@@ -131,9 +143,15 @@ const char * kvm_json_stats(VRT_CTX, VCL_PRIV task, const char *pattern, unsigne
 	vre_t *re = nullptr;
 	try {
 		/* Compile regex pattern (NOTE: uses a lot of stack). */
+#ifdef VARNISH_PLUS
 		const char *error = "";
 		int error_offset = 0;
 		re = VRE_compile(pattern, 0, &error, &error_offset);
+#else
+		int error = 0;
+		int error_offset = 0;
+		re = VRE_compile(pattern, 0, &error, &error_offset, 0);
+#endif
 
 		if (re == NULL)
 		{

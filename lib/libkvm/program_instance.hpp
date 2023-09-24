@@ -211,6 +211,13 @@ public:
 	MachineInstance* rsp_script = nullptr;
 	std::mutex rsp_mtx;
 
+	struct Stats {
+		uint64_t reservation_time_us = 0;
+		uint64_t reservation_timeouts = 0;
+		uint64_t live_updates = 0;
+		int64_t  live_update_transfer_bytes = 0;
+	} stats;
+
 private:
 	void begin_initialization(const vrt_ctx *, TenantInstance *, bool debug);
 	/* Wait for Varnish to listen and this program to complete initialization. */
