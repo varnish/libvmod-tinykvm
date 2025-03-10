@@ -1,0 +1,135 @@
+$Module kvm 3 "High-Performance KVM Sandbox For Varnish"
+
+DESCRIPTION
+===========
+
+vmod_kvm allows using ultra-low overhead sandboxed programs
+directly from VCL. They are native 64-bit Linux programs.
+Each tenant lives in complete separation and does not affect any
+other tenants or the general operation of the cache.
+Programs communicate with Varnish using a provded API that covers
+all the operational tasks that tenants are allowed to perform.
+
+The VMOD is configured by specifying a list of tenants with
+each having a program. Tenants do not need to have an
+existing program for Varnish to start. New programs can be
+uploaded while Varnish is running and will not affect the
+run-time availability or performance of the cache.
+
+Additionally, it is possible to live-debug programs in production.
+Each live-debugging session will use a temporary tenant that does
+not persist changes in the cache.
+
+
+TENANT
+======
+
+A tenant defines a single program for a group. 
+
+GROUP
+======
+
+A group consists of one or more tenants and defines how tenants are executed
+within a virtual machine.
+
+- concurrency: The number of available request VMs
+- max_boot_time
+- max_request_time
+- max_storage_time
+- max_memory: The size of the main storage memory
+- max_request_memory: The available memory for each request
+- hugepages
+- allow_debug
+- allow_make_ephemeral
+- allowed_paths (default: []): a list of paths that the tenant can open/load.
+
+API
+===
+
+$Event vmod_event
+
+$Function BOOL load_tenants(PRIV_VCL, STRING filename)
+
+- Load tenant JSON configuration from file
+- See below for example JSON
+
+$Function BOOL fetch_tenants(PRIV_VCL, STRING url)
+
+- Fetch tenant JSON configuration from given URL
+- Connection and transmission delays will affect startup time of Varnish
+- See below for example JSON
+
+$Function VOID embed_tenants(PRIV_VCL, STRING json)
+
+- Parse tenant configuration directly from embedded JSON.
+- Example:
+	kvm.embed_tenants("""
+		{
+			"xpizza.com": {
+				"filename": "/tmp/xpizza",
+				"key": "key used to verify live updates",
+				"group": "test",
+
+				"max_request_memory": 128,
+				"max_request_time": 4.0
+			}
+		}
+	""");
+
+$Function BOOL tenant_is_ready(PRIV_VCL, STRING tenant)
+
+- Returns true if a given tenant has a properly initialized program.
+- Sending a new program by live update that fails will not replace
+  the current program. The only way a tenant can fail to be ready is
+  when there is no program provided or it was failing at startup.
+
+$Function BACKEND live_update(PRIV_VCL, STRING tenant, STRING key, BYTES max_size = 50MB)
+
+- Update this machine using binary data received in a POST
+  request. If the machine fails to load, the old machine
+  will be kept running.
+- The key is used to decide whether the poster is allowed
+  to POST programs. It does not have to be used, but it has
+  to match the key used for the tenant in the JSON structure.
+- Example:
+	sub vcl_backend_fetch {
+		if (bereq.method == "POST" && bereq.http.X-LiveUpdate) {
+			set bereq.backend = kvm.live_update(
+				bereq.http.Host, bereq.http.X-LiveUpdate, 100MB);
+			return (fetch);
+		}
+	}
+
+$Function BOOL live_update_file(PRIV_VCL, STRING tenant, STRING filename)
+
+- Provide a new program for a tenant from the local filesystem.
+
+$Function BACKEND live_debug(PRIV_VCL, STRING tenant, STRING key, BYTES max_size = 2097152)
+
+- Receive a binary suitable for debugging.
+- Whenever a request triggers a breakpoint, open a port
+  for GDB remote debugging.
+
+$Function BACKEND vm_backend(PRIV_VCL, STRING tenant, STRING url, STRING arg = "")
+
+- Returns a backend that will call into the current machine to produce a response.
+- Produces 500 server error if there is not enough memory,
+  a limit is hit, or an error is produced.
+
+	set bereq.backend = kvm.vm_backend(bereq.http.Host, bereq.url);
+
+- If the client sends a POST request, it returns a backend that will
+  retrieve a POST body first, then call into a KVM program with the body
+  and length as arguments. A response must be produced as normal.
+- The VMOD will call the POST function in the program, instead of the
+  normal GET function.
+- If a streaming function is registered, the VMOD will call the streaming
+  function in the program for each data segment it receives, and then finally
+  it will call the POST function at the end with the whole data segment.
+
+$Function BACKEND vm_debug_backend(PRIV_VCL, STRING tenant, STRING key, STRING url, STRING arg = "")
+
+- Execute request in a tenants debug program.
+- The program must have previously been installed via a live_debug() POST request.
+- Debug programs are allowed to execute the breakpoint system call,
+  which opens up the ability to use GDB to live-debug the request.

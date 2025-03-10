@@ -1,0 +1,85 @@
+varnishtest "KVM Backend: Basic POST test"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include "kvm_api.h"
+#include <assert.h>
+#include <string.h>
+
+static void on_get(const char *url, const char *arg)
+{
+	assert(0);
+}
+static void on_post(const char *url, const char *arg,
+	const char *content_type,
+	const unsigned char *data, size_t len)
+{
+	assert(strcmp(url, "/arg") == 0);
+
+	if (memcmp("Hello World", data, 11) == 0)
+		backend_response_str(201, "text/plain", "OK");
+	else
+		backend_response_str(401, "text/plain", "Not OK");
+}
+static long on_stream(const char *url, const char *arg,
+	const char *content_type,
+	const unsigned char *data, size_t len, size_t offset)
+{
+	assert(strcmp(url, "/arg") == 0);
+	assert(memcmp(data, "Hello World", len) == 0);
+	assert(len == 11);
+	assert(offset == 0);
+	return len;
+}
+
+int main(int argc, char **argv)
+{
+	set_backend_get(on_get);
+	set_backend_post(on_post);
+	set_backend_stream_post(on_stream);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""{
+			"test.com": {
+				"filename": "${tmpdir}/${testname}",
+				"group": "test"
+			}
+		}""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				bereq.url);
+		return (fetch);
+	}
+} -start
+
+client c1 {
+	txreq -url "/arg" -req GET -hdr "Host: test.com" -body "Hello World"
+	rxresp
+	expect resp.status == 201
+	expect resp.body == "OK"
+	txreq -url "/arg" -req POST -hdr "Host: test.com" -body "Hello World"
+	rxresp
+	expect resp.status == 201
+	expect resp.body == "OK"
+	txreq -url "/arg" -req TEST -hdr "Host: test.com" -body "Hello World"
+	rxresp
+	expect resp.status == 201
+	expect resp.body == "OK"
+} -run

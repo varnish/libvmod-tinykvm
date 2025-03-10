@@ -1,0 +1,203 @@
+$Module tinykvm 3 "High-Performance Compute For Varnish Enterprise"
+
+DESCRIPTION
+===========
+
+vmod_compute uses sandboxed native programs in order to read and
+transform data without having to worry about security and integrity
+issues. Programs are loaded on-demand and can also be individually
+configured to meet the specific needs of each Varnish Cache server.
+
+A library defines a group of ready-to-use native programs. Varnish Enterprise
+has a list of officially supported programs, each of which solve a specific task.
+A library will only contain definitions of programs, and they do not consume
+any resources until a program is needed by a request, by being explicitly
+referenced from VCL. When a program is needed, it is fetched, loaded and then
+it will process requests until shutdown. This means that the first request to
+any program will wait for it to load.
+
+Programs provided by a library are ready-to-use, and will often have one
+single purpose and a few configuration options. Programs are documented on
+the Varnish Software docs website and comes with a simple explanation of what
+they do, and what configuration should be provided to make a program perform a
+given function.
+
+See http://tinykvm.varnish-software.com for a list of official programs.
+
+Example:
+	sub vcl_init {
+		tinykvm.library("https://.../tinykvm.json");
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = tinykvm.backend("webp",
+			"/images/" + bereq.url);
+	}
+
+	This will employ 'webp' as a backend. The webp program converts JPEG and
+	PNG images to the WebP image format on-the-fly.
+
+
+The primary way to increase or decrease the resource consumption of a program
+is to control the concurrency level. If a program starts to build a queue of
+waiting requests, try increasing the concurrency level for that program. If even
+that is not enough, see if it is possible to increase the processing speed of a
+program at the cost of larger output. Image transcoders typically has this option.
+
+Example:
+	sub vcl_init {
+		tinykvm.library("https://.../tinykvm.json");
+
+		# Override the default settings of the 'webp' program.
+		tinykvm.configure("webp", """{
+			"concurrency": 4
+		}""");
+
+		# Immediately start the 'webp' program.
+		tinykvm.start("webp");
+	}
+
+Most programs should have a healthy amount of maximum memory available to them in
+order to complete their tasks. You can tweak this manually using the same configure
+function as needed.
+
+You can find each individual setting at http://tinykvm.varnish-software.com.
+
+API
+===
+
+$Event vmod_event
+
+$Function BOOL library(PRIV_VCL, STRING uri)
+
+- Read library of program definitions that is pre-installed with Varnish Enterprise.
+- Libraries only contain program definitions, and programs are not started unless
+  and until explicitly referenced by a request from VCL.
+- Must be called from vcl_init.
+
+$Function BOOL init_self_requests(PRIV_VCL, STRING unix_socket,
+	STRING http_prefix = "http://127.0.0.1:6081",
+	INT max_concurrent_requests = 50)
+
+- Used by all self-requests.
+- Set the location where Varnish (or another server) can be found.
+- If unix_path is specified, it must be a Unix Domain Socket path accessible by Varnish.
+- If unix_path is not specified, the http_prefix must be accessible by Varnish.
+- The max concurrent self-requests parameter is a last resort to avoid loops.
+- Must be called from vcl_init.
+
+	Example:
+	1. Start varnishd with an additional listener:
+	varnishd -a :8080 -a /tmp/tinykvm.sock ...
+
+	2. Tell Compute VMOD where to send self-requests:
+	sub vcl_init {
+		tinykvm.library("https://.../tinykvm.json");
+
+		# Tell VMOD compute how to contact Varnish (Unix Socket *ONLY*)
+		tinykvm.init_self_requests("/tmp/tinykvm.sock");
+	}
+
+	Please note that the listener must be accessible to the varnish user in order
+	for it to work.
+
+$Function BOOL configure(PRIV_VCL, STRING program, STRING json)
+
+- Provide a JSON configuration to override defaults to unstarted programs.
+- The JSON configuration is the same as when configuring a program normally,
+  but there are no mandatory fields.
+- Can also be used to define a new program inline in VCL.
+- Returns true on success.
+- Must be called from vcl_init.
+
+$Function BOOL main_arguments(PRIV_VCL, STRING program, STRANDS arguments)
+
+- Set additional arguments to the main() function. The first added argument will be at argv[3].
+- Overrides previously set arguments, including via JSON.
+- Returns true on success.
+- Can be called from any VCL function. Unloading the program will apply the new arguments.
+
+$Function INT invalidate_programs(PRIV_VCL, STRING regex = "")
+
+- Unloads programs matching the regular expression pattern.
+- An empty pattern unloads all programs.
+- Future requests to an unloaded program will cause the program to be reloaded.
+- Returns the number of programs unloaded.
+
+$Function BOOL start(PRIV_VCL, STRING program, BOOL async = 1)
+
+- Start program during early Varnish startup.
+- When async, program intialization will not delay Varnish from starting up.
+  Requests will always wait until the program is fully initialized.
+- Must be called from vcl_init.
+
+$Function STRING stats(PRIV_VCL, STRING pattern = "", INT indentation = -1)
+
+- Produces a JSON string with detailed statistics from each program matching the pattern.
+- Unloaded programs will not produce statistics.
+- When indentation is -1, minify the JSON.
+- Must be called after initialization.
+
+$Function BOOL chain(PRIV_VCL, STRING program, STRING arg = "", STRING config = "",
+	INT error_treshold = 400)
+
+- Queue this program up for execution in the exact order given.
+- Returns true if the program was found.
+- A program chain always end with a call to program() or to_string().
+- End processing if program status is >= error_treshold.
+- Must be called from vcl_backend_fetch.
+
+$Function BACKEND program(PRIV_VCL, STRING program, STRING arg = "", STRING config = "")
+
+- Create a backend that will call the given program to produce a response, in place of a
+  regular Varnish backend. Most programs make self-requests into Varnish in order to fetch
+  content to be processed, which enables the usual observability and customizability in
+  how assets are retrieved.
+
+- If a program chain is used, each program in the chain will be executed first and *then*
+  finally, this program will produce a final response.
+
+- Supports GET, POST and other HTTP requests, as well as streaming modes.
+- All computation happens in between vcl_backend_fetch and vcl_backend_response.
+- Must be called from vcl_backend_fetch.
+
+Example:
+	sub vcl_backend_fetch {
+		if (bereq.url == "/avif") {
+			# The 'avif' program transcodes a JPEG image to AVIF.
+			# Get the image from a self-request to Varnish at '/avif/image':
+			set bereq.backend = tinykvm.program("avif", "/avif/image");
+		}
+		else if (bereq.url == "/avif/image") {
+			# Use a normal backend to fetch the original image.
+			set bereq.backend = ...
+		}
+	}
+
+
+$Function STRING to_string(PRIV_VCL, STRING program, STRING url = "", STRING arg = "", STRING on_error = "", INT error_treshold = 400)
+
+- Returns a string of the response produced by the given program.
+- Supports GET, POST and other HTTP requests.
+- If the program fails, this function returns the on_error string instead.
+- Works with chaining, and calls to_string() for the final string after chained programs.
+- A final status >= error_treshold will produce the error string.
+- NOTE: Uses extra workspace for each call. See: man varnishd.
+
+$Function INT synth(PRIV_VCL, INT status, STRING program, STRING url = "", STRING arg = "")
+
+- Directly delivers a synthetic response. If status is non-zero, the HTTP status will be overridden.
+- Generates a synthetic response from the given program and arguments.
+- If the synthetic response fails, the function returns 0.
+- Works the same way as to_string().
+
+
+$Function BOOL steal(PRIV_VCL, STRING program, STRING arg = "")
+
+- Takes over the current clients TCP connection and passes it to the given program.
+- The request fails if the HTTP version is 2.x or 3.x. Only 1.x is supported.
+- The program must have socket callbacks. The entries are specified in the API docs.
+- The program has access to the underlying file descriptor (virtualized).
+- The on_connect callback receives the client IP and the provided argument.
+- Returns true if detaching the clients fd succeeded, including on_connect.
+- Must be called from vcl_recv.

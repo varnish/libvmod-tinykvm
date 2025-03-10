@@ -1,0 +1,9 @@
+[submodule "lib/libkvm/ext/tinykvm"]
+	path = lib/libkvm/ext/tinykvm
+	url = https://github.com/libriscv/tinykvm.git
+[submodule "lib/libkvm/ext/json"]
+	path = lib/libkvm/ext/json
+	url = https://github.com/nlohmann/json.git
+[submodule "lib/libkvm/ext/concurrentqueue"]
+	path = lib/libkvm/ext/concurrentqueue
+	url = https://github.com/cameron314/concurrentqueue

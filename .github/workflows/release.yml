@@ -1,0 +1,45 @@
+name: Release
+on:
+  workflow_call:
+
+jobs:
+  release:
+    runs-on: ubuntu-20.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: artifacts
+          merge-multiple: true
+          path: artifacts
+          name: artifacts
+      - name: Delete draft release(s)
+        uses: hugo19941994/delete-draft-releases@v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Archive
+        shell: sh
+        run: |
+          for f in artifacts/*.tar.gz; do
+            tar -xzf $f -C artifacts
+            rm -f $f
+          done
+          zip -r "artifacts.zip" artifacts
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Nightly Builds
+          files: |
+            artifacts.zip
+          generate_release_notes: true
+          draft: true
+          prerelease: true
+          fail_on_unmatched_files: true
+      - name: Delete artifact
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: |
+            artifacts

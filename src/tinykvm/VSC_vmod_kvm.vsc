@@ -1,0 +1,74 @@
+# Counters for KVM
+
+.. varnish_vsc_begin::	vmod_kvm
+	:oneliner:	Counters for KVM
+	:order:		70
+
+	Information counters for KVM.
+
+.. varnish_vsc::	program_notfound
+	:type:		counter
+	:level:		info
+	:oneliner:	Programs not found
+
+	Total number of programs not found.
+
+.. varnish_vsc::	program_exception
+	:type:		counter
+	:level:		info
+	:oneliner:	Exceptions reported by programs
+
+	Total number of CPU exceptions and any other run-time cancelling exceptions.
+
+.. varnish_vsc::	program_timeout
+	:type:		counter
+	:level:		info
+	:oneliner:	Timeouts reported by programs
+
+	Total number of timeouts cancelling execution of a program.
+
+.. varnish_vsc::	program_status_4xx
+	:type:		counter
+	:level:		info
+	:oneliner:	HTTP status 4xx errors reported by programs
+
+	Total number of HTTP status 4xx errors reported by programs.
+
+.. varnish_vsc::	program_status_5xx
+	:type:		counter
+	:level:		info
+	:oneliner:	HTTP status 5xx errors reported by programs
+
+	Total number of HTTP status 5xx errors reported by programs.
+
+.. varnish_vsc::	cpu_time
+	:type:		counter
+	:level:		info
+	:format:	duration
+	:oneliner:	Cumulative CPU-time of programs
+
+	Total time spent executing programs.
+
+.. varnish_vsc::	fetch_time
+	:type:		counter
+	:level:		info
+	:format:	duration
+	:oneliner:	Cumulative time spent fetching content
+
+	Total time spent fetching content for programs.
+
+.. varnish_vsc::	self_requests
+	:type:		counter
+	:level:		info
+	:oneliner:	Compute chain self-requests
+
+	Total number of requested self-requests.
+
+.. varnish_vsc::	self_requests_failed
+	:type:		counter
+	:level:		info
+	:oneliner:	Failed self-requests
+
+	Total number of failed self-requests.
+
+.. varnish_vsc_end::	vmod_kvm

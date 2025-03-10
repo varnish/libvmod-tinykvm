@@ -1,0 +1,45 @@
+varnishtest "KVM: Minimal program example"
+
+feature cmd "ls /dev/kvm"
+
+shell {
+cat >hello.c <<-EOF
+#include "kvm_api.h"
+
+static void on_get(const char *url, const char *arg)
+{
+	backend_response_str(200, "text/plain", "Hello Compute World");
+}
+
+int main(int argc, char **argv)
+{
+	set_backend_get(on_get);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 hello.c -I${testdir} -o hello
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import tinykvm;
+	backend default none;
+
+	sub vcl_init {
+		tinykvm.configure("my_program",
+		"""{
+			"filename": "${tmpdir}/hello"
+		}""");
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = tinykvm.program("my_program", bereq.url);
+	}
+} -start
+
+client c1 {
+	txreq -url "/1"
+	rxresp
+	expect resp.body == "Hello Compute World"
+	expect resp.status == 200
+} -run

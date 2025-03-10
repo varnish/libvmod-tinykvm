@@ -1,0 +1,62 @@
+varnishtest "KVM Backend: Verify that we can have hundreds of VMs"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include <string.h>
+#include "kvm_api.h"
+
+static void my_backend(const char *arg)
+{
+	if (strcmp(arg, "/my_backend") == 0) {
+		backend_response_str(404, "text/plain", "Not found");
+	}
+	else if (strcmp(arg, "/my_admin") == 0) {
+		backend_response_str(403, "text/plain", "Forbidden");
+	}
+	backend_response_str(401, "text/plain", "Unauthorized");
+}
+
+int main()
+{
+	set_backend_get(my_backend);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""
+			{
+				"xpizza.com": {
+					"filename": "${tmpdir}/${testname}",
+					"key": "",
+					"group": "test",
+					"concurrency": 450
+				}
+			}
+		""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				bereq.url);
+	}
+} -start
+
+client c1 {
+	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 404
+} -run

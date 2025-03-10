@@ -1,0 +1,76 @@
+varnishtest "KVM: Rotate VCLs"
+# This test switches between 2 loaded VCLs,
+# while making client requests to Varnish.
+# The goal is to find VCL-switching bugs, usually
+# related to globals that should be a VCL_TASK instead.
+
+shell {
+cat >${tmpdir}/program.c <<-EOF
+#include "kvm_api.h"
+
+static void my_backend(const char *url, const char *arg)
+{
+	set_cacheable(0, 1.0f, 0.0f, 0.0f);
+	backend_response_str(200, "text/plain", url);
+}
+
+int main(int argc, char **argv)
+{
+	set_backend_get(my_backend);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 ${tmpdir}/program.c -I${testdir} -o ${tmpdir}/program
+}
+
+shell {
+cat >${tmpdir}/program.vcl <<-EOF
+	vcl 4.1;
+	import kvm;
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""{
+			"xpizza.com": {
+				"filename": "${tmpdir}/program",
+				"key": "",
+				"group": "test"
+			}
+		}""");
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				"Hello World");
+	}
+EOF
+}
+
+varnish v1 -arg "-f ${tmpdir}/program.vcl" -start
+varnish v1 -cliok "vcl.load vcl1 ${tmpdir}/program.vcl"
+varnish v1 -cliok "vcl.load vcl2 ${tmpdir}/program.vcl"
+
+define m1 make_requests {
+	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+}
+
+client c1 -repeat 50 {
+	${m1_make_requests}
+	${m1_make_requests}
+} -start
+
+loop 25 {
+	varnish v1 -cliok "vcl.use vcl1"
+	varnish v1 -cliok "vcl.state vcl2 cold"
+	varnish v1 -cliok "vcl.state vcl2 auto"
+	varnish v1 -cliok "vcl.use vcl2"
+	varnish v1 -cliok "vcl.state vcl1 auto"
+	varnish v1 -cliok "vcl.state vcl1 cold"
+	varnish v1 -cliok "vcl.state vcl1 auto"
+}
+
+client c1 -wait

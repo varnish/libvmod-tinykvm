@@ -1,0 +1,75 @@
+varnishtest "KVM: Allowed paths"
+
+shell {
+cat >${tmpdir}/${testname}_secrets <<-EOF
+super_secret!
+EOF
+
+cat >${tmpdir}/${testname}.c <<-EOF
+#include <stdio.h>
+#include <string.h>
+#include "kvm_api.h"
+
+static void my_backend()
+{
+	FILE *fp;
+	char buff[255];
+	fp = fopen("${tmpdir}/${testname}_secrets", "r");
+	fscanf(fp, "%s", buff);
+	fclose(fp);
+	backend_response_str(200, "text/plain", buff);
+}
+
+int main(int argc, char **argv)
+{
+	set_backend_get(my_backend);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""{
+			"allow": {
+				"allowed_paths": [
+					"/tmp"
+				]
+			},
+			"deny.com": {
+				"filename": "${tmpdir}/${testname}",
+				"group": "test"
+			},
+			"allow.com": {
+				"filename": "${tmpdir}/${testname}",
+				"group": "allow"
+			}
+		}""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				"");
+	}
+} -start
+
+client c1 {
+	txreq -url "/" -hdr "Host: allow.com"
+	rxresp
+	expect resp.body == "super_secret!"
+	expect resp.status == 200
+	txreq -url "/" -hdr "Host: deny.com"
+	rxresp
+	expect resp.status == 500
+} -run

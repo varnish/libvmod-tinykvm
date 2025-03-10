@@ -1,0 +1,128 @@
+varnishtest "KVM Backend: HTTP illegal fields test"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
+#include "kvm_api.h"
+
+struct Value {
+	const char *str;
+	size_t len;
+};
+static struct Value illegal_values[] = {
+	{"X-Value: 1", 10},
+	{"X-Value: 1", 9},
+	{"X-Value:", 8},
+	{"X-:Value", 8},
+	{"X:-Value", 8},
+	{":X-Value", 8},
+	{":", 1},
+	{":", 2},
+	{"", 0},
+	{"", 1},
+	{"", 2},
+	{NULL, 0},
+	{NULL, 1},
+};
+static const unsigned illegal_count = sizeof(illegal_values) / sizeof(void*);
+
+static void on_get(const char *url, const char *arg)
+{
+	const int num = atoi(&url[1]);
+	assert(num < illegal_count);
+
+	struct Value *val = &illegal_values[num];
+	sys_http_append(BERESP, val->str, val->len);
+
+	backend_response_str(200, "text/plain", "OK");
+}
+
+int main()
+{
+	set_backend_get(on_get);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""{
+			"test.com": {
+				"filename": "${tmpdir}/${testname}",
+				"group": "test"
+			}
+		}""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				bereq.url);
+	}
+} -start
+
+define m1 request_ok {
+	rxresp
+	expect resp.body == "OK"
+	expect resp.status == 200
+}
+define m1 request_fails {
+	rxresp
+	expect resp.status == 500
+}
+
+client c1 {
+	txreq -url "/0" -hdr "Host: test.com"
+	${m1_request_ok}
+
+	txreq -url "/1" -hdr "Host: test.com"
+	${m1_request_fails}
+
+	txreq -url "/2" -hdr "Host: test.com"
+	${m1_request_fails}
+
+	txreq -url "/3" -hdr "Host: test.com"
+	${m1_request_fails}
+
+	txreq -url "/4" -hdr "Host: test.com"
+	${m1_request_fails}
+
+	txreq -url "/5" -hdr "Host: test.com"
+	${m1_request_fails}
+
+	txreq -url "/6" -hdr "Host: test.com"
+	${m1_request_fails}
+
+	txreq -url "/7" -hdr "Host: test.com"
+	${m1_request_fails}
+
+	txreq -url "/8" -hdr "Host: test.com"
+	${m1_request_fails}
+
+	txreq -url "/9" -hdr "Host: test.com"
+	${m1_request_fails}
+
+	txreq -url "/10" -hdr "Host: test.com"
+	${m1_request_fails}
+
+	txreq -url "/11" -hdr "Host: test.com"
+	${m1_request_fails}
+
+	txreq -url "/12" -hdr "Host: test.com"
+	${m1_request_fails}
+
+	txreq -url "/13" -hdr "Host: test.com"
+	${m1_request_fails}
+} -run

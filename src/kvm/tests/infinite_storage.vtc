@@ -1,0 +1,88 @@
+varnishtest "KVM: Storage execution timeout"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include "kvm_api.h"
+#include <assert.h>
+
+static void loopy(size_t n, struct virtbuffer buffers[n], size_t reslen)
+{
+	while(1);
+}
+static void gucci(size_t n, struct virtbuffer buffers[n], size_t reslen)
+{
+	storage_return("Hello World", 11);
+}
+
+static void on_get(const char *arg)
+{
+	char result[256];
+	long rlen = 0;
+
+	if (strcmp(arg, "/1") == 0)
+		rlen = storage_callv(loopy, 0, NULL, result, sizeof(result));
+	else if (strcmp(arg, "/2") == 0)
+		rlen = storage_callv(gucci, 0, NULL, result, sizeof(result));
+	else
+		__builtin_trap();
+
+	const char ctype[] = "text/plain";
+	backend_response(200, ctype, sizeof(ctype)-1, result, rlen);
+}
+
+int main()
+{
+	set_backend_get(on_get);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""
+			{
+				"diefast": {
+					"max_request_time": 1.0,
+					"max_memory": 256,
+					"max_work_memory": 4
+				},
+				"xpizza.com": {
+					"filename": "${tmpdir}/${testname}",
+					"key": "",
+					"group": "diefast",
+					"storage": true
+				}
+			}
+		""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				bereq.url);
+	}
+} -start
+
+client c1 {
+	# The first URL enters storage and causes timeout
+	txreq -url "/1" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 500
+
+	# The other URL should NOT timeout and replies normally
+	txreq -url "/2" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Hello World"
+} -run
