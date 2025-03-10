@@ -1,0 +1,62 @@
+varnishtest "KVM: Synthetic response"
+
+feature cmd "ls /dev/kvm"
+
+shell {
+cat >synth.c <<-EOF
+#include "kvm_api.h"
+
+static void on_get(const char *url, const char *arg)
+{
+	backend_response_str(200, "text/plain", "Hello World");
+}
+
+int main(int argc, char **argv)
+{
+	set_backend_get(on_get);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 synth.c -I${testdir} -o synth
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+	backend default none;
+
+	sub vcl_init {
+		kvm.configure("test1",
+			"""{
+				"filename": "${tmpdir}/synth"
+			}""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_error {
+		if (bereq.url == "/1") {
+			# Status=0 => Inherit from program
+			kvm.synth(0, "test1");
+			return (deliver);
+		} else if (bereq.url == "/2") {
+			# Status=500 => Override status from program
+			kvm.synth(501, "test1");
+			return (deliver);
+		}
+	}
+} -start
+
+client c1 {
+	txreq -url "/1" -hdr "Host: test"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+
+	txreq -url "/2" -hdr "Host: test"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 501
+} -run

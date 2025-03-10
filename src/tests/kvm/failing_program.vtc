@@ -1,0 +1,67 @@
+varnishtest "KVM: Failing program should not be ready"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include <assert.h>
+#include <string.h>
+#include "kvm_api.h"
+
+int main()
+{
+	assert(0);
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""
+			{
+				"xpizza.com": {
+					"filename": "${tmpdir}/${testname}",
+					"key": "",
+					"group": "test"
+				}
+			}
+		""");
+	}
+
+	sub vcl_recv {
+		if (req.url == "/") {
+			if (kvm.tenant_is_ready("xpizza.com")) {
+				return (synth(404, "Tenant is ready"));
+			} else {
+				return (synth(403, "Tenant is *not* ready"));
+			}
+		}
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host, "/");
+	}
+} -start
+
+client c1 {
+	# Here we control the status codes:
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 403
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 403
+	# If the program doesn't exist it's a VRT_fail:
+	txreq -url "/fail" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 503
+	txreq -url "/fail" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 503
+} -run

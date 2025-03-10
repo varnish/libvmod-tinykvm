@@ -1,0 +1,92 @@
+varnishtest "KVM: Program from remote archive"
+
+feature cmd "ls /dev/kvm"
+
+shell {
+cat >${tmpdir}/test.json <<-EOF
+{
+	"test1": {
+		"filename": "${tmpdir}/test",
+		"group": "test"
+	},
+	"test2": {
+		"uri": "file://${tmpdir}/test.tar.xz",
+		"group": "test"
+	}
+}
+EOF
+cat >test.c <<-EOF
+#include "kvm_api.h"
+
+static void on_get(const char *url, const char *arg)
+{
+	backend_response_str(200, "text/plain", "Hello World");
+}
+
+int main(int argc, char **argv)
+{
+	set_backend_get(on_get);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 test.c -I${testdir} -o test
+tar -cJf test.tar.xz test
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+	backend default none;
+
+	sub vcl_init {
+		kvm.library("file://${tmpdir}/test.json");
+	}
+
+	sub vcl_recv {
+		if (req.url == "/invalidate") {
+			kvm.invalidate_programs();
+			return (synth(200));
+		}
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		if (bereq.url == "/1") {
+			set bereq.backend = kvm.program("test1",
+				bereq.url, "");
+		} else if (bereq.url == "/2") {
+			set bereq.backend = kvm.program("test2",
+				bereq.url, "");
+		}
+	}
+} -start
+
+client c1 {
+	txreq -url "/1" -hdr "Host: test"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+
+	txreq -url "/invalidate" -hdr "Host: test"
+	rxresp
+	expect resp.status == 200
+
+	txreq -url "/1" -hdr "Host: test"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+
+	txreq -url "/2" -hdr "Host: test"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+
+	txreq -url "/invalidate" -hdr "Host: test"
+	rxresp
+	expect resp.status == 200
+
+	txreq -url "/2" -hdr "Host: test"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+} -run

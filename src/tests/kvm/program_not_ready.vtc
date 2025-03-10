@@ -1,0 +1,53 @@
+varnishtest "KVM: Failing program should not be ready"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+int main()
+{
+	// Do nothing (forget to wait_for_requests) //
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""
+			{
+				"xpizza.com": {
+					"filename": "${tmpdir}/${testname}",
+					"key": "",
+					"group": "test"
+				}
+			}
+		""");
+	}
+
+	sub vcl_recv {
+		if (kvm.tenant_is_ready("xpizza.com")) {
+			return (synth(404, "Tenant is ready"));
+		} else {
+			return (synth(403, "Tenant is *not* ready"));
+		}
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				bereq.url);
+	}
+} -start
+
+client c1 {
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 403
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 403
+} -run

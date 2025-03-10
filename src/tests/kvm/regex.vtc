@@ -1,0 +1,82 @@
+varnishtest "KVM Backend: Regex test"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+#include "kvm_api.h"
+
+static int r2;
+
+static void on_get(const char *url)
+{
+	/* Retrieve header field from request. */
+	char buffer[256];
+	int len = http_find_str(BEREQ, "X-Value", buffer, sizeof(buffer));
+	assert(memcmp(buffer, "X-Value: 5", len) == 0);
+
+	int r1 = sys_regex_compile(": .*", 4);
+	assert(r1 >= 0);
+
+	/* Replace X-Value: 5 with X-Value: 666 */
+	char result[256];
+	sys_regex_subst(r1, buffer, ": 666", result, sizeof(result), 0);
+	assert(strcmp(result, "X-Value: 666") == 0);
+
+	/* Add X-Value to response and free regex */
+	http_setf(BERESP, result);
+	sys_regex_free(r1);
+
+	/* Copy X-Copy* to response */
+	sys_regex_copyto(r2, BEREQ, BERESP);
+
+	backend_response_str(200, "text/plain", url);
+}
+
+int main()
+{
+	r2 = sys_regex_compile("X-Copy*.", 8);
+
+	set_backend_get(on_get);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""{
+			"xpizza.com": {
+				"filename": "${tmpdir}/${testname}",
+				"key": "",
+				"group": "test"
+			}
+		}""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				bereq.url);
+	}
+} -start
+
+client c1 {
+	txreq -url "/test1" -hdr "Host: xpizza.com" -hdr "X-Value: 5" -hdr "X-CopyMe: 123"
+	rxresp
+	expect resp.http.X-Value == "666"
+	expect resp.http.X-CopyMe == "123"
+	expect resp.body == "/test1"
+	expect resp.status == 200
+} -run

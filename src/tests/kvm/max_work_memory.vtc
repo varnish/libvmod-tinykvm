@@ -1,0 +1,136 @@
+varnishtest "KVM: Max work memory"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "kvm_api.h"
+
+static void my_backend(const char *arg)
+{
+	char *string;
+	int n = atol(arg + 1);
+	string = malloc(sizeof(char) * n);
+
+	int i;
+	for (i=0;i<n;i++) {
+		string[i] = '!';
+	}
+	string[n] = '\0';
+	backend_response_str(200, "text/plain", string);
+
+	free(string);
+}
+
+int main(int argc, char **argv)
+{
+	set_backend_get(my_backend);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""
+			{
+				"success.com": {
+					"filename": "${tmpdir}/${testname}",
+					"key": "",
+					"group": "success"
+				},
+				"failure.com": {
+					"filename": "${tmpdir}/${testname}",
+					"key": "",
+					"group": "failure"
+				},
+				"failure": {
+					"max_work_memory": 1
+				},
+				"tenant_failure.com": {
+					"filename": "${tmpdir}/${testname}",
+					"key": "",
+					"group": "tenant_failure",
+					"max_work_memory": 1
+				},
+				"group_failure": {
+					"max_work_memory": 1
+				},
+				"group_failure.com": {
+					"filename": "${tmpdir}/${testname}",
+					"key": "",
+					"group": "group_failure"
+				}
+			}
+		""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				bereq.url);
+	}
+} -start
+
+client c1 {
+	# 2 MB (success)
+	txreq -url "/2000000" -hdr "Host: success.com"
+	rxresp
+	expect resp.status == 200
+	expect resp.bodylen == 2000000
+} -repeat 2 -run
+
+# Assert error in vtc_log_emit(),
+#../ext/varnish-cache-plus/bin/varnishtest/vtc_log.c line 158:
+# Condition(vtclog_left > l) not true. (errno=0 Success)
+client c2 {
+	# 2 MB (success)
+	txreq -url "/2000000" -hdr "Host: success.com"
+	rxresp
+	expect resp.status == 200
+	expect resp.bodylen == 2000000
+} -repeat 100 #-run
+
+client c3 {
+	# 2 MB (failure)
+	txreq -url "/2000000" -hdr "Host: failure.com"
+	rxresp
+	expect resp.status == 503
+	expect resp.bodylen <= 300
+} -repeat 2 -run
+
+# note: this test will fail if VERBOSE or DEBUG logging is enabled.
+client c4 {
+	# 2 MB (failure)
+	txreq -url "/2000000" -hdr "Host: failure.com"
+	rxresp
+	expect resp.status == 503
+	expect resp.bodylen <= 300
+} -repeat 100 -run
+
+client c5 {
+	# 2 MB (failure)
+	txreq -url "/2000000" -hdr "Host: tenant_failure.com"
+	rxresp
+	expect resp.status == 503
+	expect resp.bodylen <= 300
+} -repeat 2 -run
+
+client c6 {
+	# 2 MB (failure)
+	txreq -url "/2000000" -hdr "Host: group_failure.com"
+	rxresp
+	expect resp.status == 503
+	expect resp.bodylen <= 300
+} -repeat 2 -run

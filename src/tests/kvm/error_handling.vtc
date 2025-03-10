@@ -1,0 +1,56 @@
+varnishtest "KVM Backend: Error handling test"
+
+shell {
+cat >${tmpdir}/${testname}.c <<-EOF
+#include "kvm_api.h"
+
+static void my_backend(const char *arg)
+{
+	/* Forget to return something useful. */
+}
+static void on_error(const char *arg, const char* error)
+{
+	backend_response_str(555, "text/plain", error);
+}
+
+int main(int argc, char **argv)
+{
+	set_backend_get(my_backend);
+	set_on_error(on_error);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""{
+			"xpizza.com": {
+				"filename": "${tmpdir}/${testname}",
+				"key": "",
+				"group": "test"
+			}
+		}""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				"Hello World");
+	}
+} -start
+
+client c1 {
+	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 555
+} -run

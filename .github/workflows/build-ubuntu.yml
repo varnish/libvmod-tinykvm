@@ -1,0 +1,66 @@
+name: Ubuntu Linux 22.04
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    strategy:
+      matrix:
+        compiler: [{cc: gcc, cxx: g++}, {cc: clang, cxx: clang++}]
+      fail-fast: true
+    name: Ubuntu Linux ${{matrix.compiler.cc}}
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Varnish Cache 7.6
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apt-transport-https
+          curl -s https://packagecloud.io/install/repositories/varnishcache/varnish76/script.deb.sh | sudo bash
+          sudo apt-get update
+          sudo apt-get install -y varnish varnish-dev
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install g++ clang ccache ninja-build libcurl4-openssl-dev libpcre3-dev libarchive-dev
+          git submodule update --init
+
+      - name: '🚧 CCache setup'
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ubuntu-linux
+          max-size: 200M
+
+      - name: Configure
+        env:
+          CC: ccache ${{matrix.compiler.cc}}
+          CXX: ccache ${{matrix.compiler.cxx}}
+        run: >
+          cmake -S. -Bbuild
+          -G Ninja
+          -DCMAKE_BUILD_TYPE=DebWithRelInfo
+          -DVARNISH_PLUS=OFF
+          -DPython3_EXECUTABLE=$(which python3)
+      - name: Build
+        run: >
+          cmake --build build
+          --config DebWithRelInfo
+          --target all
+          -v -j4
+          && mkdir -p ubuntu-linux-22.04
+          && mv build/libvmod_* ubuntu-linux-22.04
+          && tar -czf ubuntu-linux-22.04.tar.gz ubuntu-linux-22.04
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-ubuntu-linux-22.04
+          path: ./ubuntu-linux-22.04.tar.gz
+          overwrite: true
+          if-no-files-found: error # 'warn' or 'ignore' are also available, defaults to `warn`
+          retention-days: 1 # 90 days by default

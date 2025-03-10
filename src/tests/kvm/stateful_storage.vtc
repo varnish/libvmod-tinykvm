@@ -1,0 +1,79 @@
+varnishtest "KVM Backend: Shared memory storage test"
+
+shell {
+cat >${tmpdir}/${testname}_storage.c <<-EOF
+#include "kvm_api.h"
+int storage_counter = 0;
+
+int main()
+{
+	wait_for_requests();
+}
+EOF
+cat >${tmpdir}/${testname}.c <<-EOF
+#include <string.h>
+#include "kvm_api.h"
+extern int storage_counter;
+
+static void my_backend(char *arg)
+{
+	__sync_fetch_and_add(&storage_counter, 1);
+	arg[11] = '0' + (storage_counter % 10);
+
+	const char ctype[] = "text/plain";
+	backend_response(200, ctype, sizeof(ctype)-1, arg, strlen(arg));
+}
+
+int main()
+{
+	set_backend_get(my_backend);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 -Wl,-Ttext-segment=0x44000000 ${tmpdir}/${testname}_storage.c -I${testdir} -o ${tmpdir}/${testname}_storage
+objcopy -w --extract-symbol --strip-symbol=!*storage* --strip-symbol=* ${tmpdir}/${testname}_storage ${tmpdir}/${testname}_storage.syms
+gcc -static -O2 -Wl,--just-symbols=${tmpdir}/${testname}_storage.syms ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""{
+			"xpizza.com": {
+				"filename": "${tmpdir}/${testname}",
+				"key": "",
+				"group": "test",
+				"storage": true
+			}
+		}""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				bereq.url);
+	}
+} -start
+
+client c1 {
+	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "/helloworld1"
+	expect resp.status == 200
+	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "/helloworld2"
+	expect resp.status == 200
+	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "/helloworld3"
+	expect resp.status == 200
+} -run
