@@ -3,8 +3,8 @@ set -e
 
 mkdir -p .build
 pushd .build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DVARNISH_PLUS=OFF -G Ninja
-ninja
+cmake .. -DCMAKE_BUILD_TYPE=Release -DVARNISH_PLUS=OFF
+cmake --build . -j6
 popd
 
 echo "Installing vmod into /usr/lib/varnish/vmods/"

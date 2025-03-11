@@ -20,6 +20,10 @@ libarchive-dev
 
 This VMOD does not have an installation procedure. Simply build it from source, and copy the final `libvmod_*.so` into your VMOD folder (usually `/usr/lib/varnish/vmods/`):
 ```sh
+./build.sh
+```
+Or manually:
+```sh
 # Create a .build folder and build the VMOD in it
 mkdir -p .build
 pushd .build
