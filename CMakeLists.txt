@@ -27,7 +27,7 @@ find_program(VARNISHTEST "varnishtest")
 # Example: vmod_debug vmod_debug.vcc
 function(add_vmod LIBNAME VCCNAME comment)
 	# generate config.h
-	configure_file(${CMAKE_SOURCE_DIR}/config.h.in ${CMAKE_BINARY_DIR}/config.h)
+	configure_file(${CMAKE_SOURCE_DIR}/src/config.h.in ${CMAKE_BINARY_DIR}/config.h)
 	# generate VCC .c and .h
 	set(VCCFILE "${CMAKE_CURRENT_SOURCE_DIR}/${VCCNAME}")
 	set(OUTFILES vcc_if.c vcc_if.h)

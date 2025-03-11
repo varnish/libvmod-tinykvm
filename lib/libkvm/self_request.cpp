@@ -114,7 +114,7 @@ int kvm_self_request(VRT_CTX, const char *c_path,  const char *arg, backend_resu
 
 	if (!kvm::self_request_uri.empty())
 	{
-		if (int err = curl_easy_setopt(curl, CURLOPT_UNIX_SOCKET_PATH, kvm::self_request_uri.c_str()) != CURLE_OK) {
+		if (int err = curl_easy_setopt(curl, CURLOPT_UNIX_SOCKET_PATH, kvm::self_request_uri.c_str()); err != CURLE_OK) {
 			set_error_result(result, 500);
 			curl_easy_cleanup(curl);
 			kvm::self_request_concurrency--;
