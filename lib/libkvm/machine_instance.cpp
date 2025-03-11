@@ -335,6 +335,12 @@ void MachineInstance::logprint(std::string_view text, bool says) const
 			VSLb(vsl, SLT_VCL_Log,
 				"%.*s", (int)text.size(), text.begin());
 		}
+	} else {
+		if (says) {
+			printf(">>> [%s] %.*s", name().c_str(), (int)text.size(), text.begin());
+		} else {
+			printf("%.*s", (int)text.size(), text.begin());
+		}
 	}
 }
 tinykvm::Machine::printer_func MachineInstance::get_vsl_printer() const
