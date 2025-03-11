@@ -122,6 +122,8 @@ $Function INT invalidate_programs(PRIV_VCL, STRING regex = "")
 - Unloads programs matching the regular expression pattern.
 - An empty pattern unloads all programs.
 - Future requests to an unloaded program will cause the program to be reloaded.
+- Programs with live-update sequences are immediately reloaded, transferring state from
+  the old program to the new program. The current request is paused until this completes.
 - Returns the number of programs unloaded.
 
 $Function BOOL start(PRIV_VCL, STRING program, BOOL async = 1)

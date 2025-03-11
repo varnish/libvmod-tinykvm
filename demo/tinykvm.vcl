@@ -311,6 +311,10 @@ sub vcl_backend_fetch {
 		//tinykvm.invalidate_program("watermark");
 		set bereq.backend = tinykvm.program("watermark");
 	}
+	else if (bereq.url ~ "^/x/reload") {
+		tinykvm.invalidate_programs("gbc");
+		set bereq.backend = tinykvm.program("gbc", bereq.url);
+	}
 	else if (bereq.url ~ "^/x") {
 		# Gameboy emulator (used by demo page)
 		set bereq.backend = tinykvm.program("gbc", bereq.url);

@@ -90,7 +90,8 @@ static int unloader(const char *program, struct vmod_kvm_tenant *tenant, void *v
 		VRE_exec(state->regex, program, strlen(program), 0,
 			0, NULL, 0, NULL);
 #else
-	const int matches = 0;
+	const int matches =
+		VRE_match(state->regex, program, strlen(program), 0, NULL);
 #endif
 	if (matches > 0) {
 		VSLb(state->ctx->vsl, SLT_VCL_Log,

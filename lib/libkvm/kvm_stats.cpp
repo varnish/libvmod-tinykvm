@@ -185,7 +185,8 @@ const char * kvm_json_stats(VRT_CTX, VCL_PRIV task, const char *pattern, unsigne
 				VRE_exec(s.regex, program, strlen(program), 0,
 					0, NULL, 0, NULL);
 #else
-			const int matches = 1;
+			const int matches =
+				VRE_match(s.regex, program, strlen(program), 0, NULL);
 #endif
 			if (matches > 0) {
 				VSLb(s.ctx->vsl, SLT_VCL_Log,
