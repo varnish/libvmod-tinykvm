@@ -4,9 +4,7 @@ The TinyKVM VMOD processes data in Varnish at native performance using your serv
 
 ## Documentation
 
-No documentation has currently been uploaded yet.
-
-[Documentation here](https://sandbox.varnish-software.com/docs).
+You can find the complete [VMOD documentation here](docs/README.md).
 
 ## Building and installing
 
