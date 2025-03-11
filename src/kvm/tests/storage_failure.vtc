@@ -11,13 +11,13 @@ static void storage_test1() {
 static void storage_test2() {
 	storage_call(storage_test2, NULL, 0, NULL, 0);
 }
-static void storage_test3(void *arg) {
+static void storage_test3(void *arg, size_t len) {
 	storage_call(storage_test2, NULL, 0, NULL, 0);
 }
-static void storage_test4(void *arg) {
-	async_storage_task(storage_test4, NULL);
+static void storage_test4(void *arg, size_t len) {
+	storage_task(storage_test4, NULL, 0);
 }
-static void storage_test5(void *arg) {
+static void storage_test5(void *arg, size_t len) {
 	storage_return("OK", 2);
 }
 
@@ -28,9 +28,9 @@ static void my_backend(const char *url, const char *arg)
 	else if (strcmp(url, "/2") == 0)
 		storage_call(storage_test2, NULL, 0, NULL, 0);
 	else if (strcmp(url, "/3") == 0)
-		async_storage_task(storage_test3, NULL);
+		storage_task(storage_test3, NULL, 0);
 	else if (strcmp(url, "/4") == 0)
-		async_storage_task(storage_test4, NULL);
+		storage_task(storage_test4, NULL, 0);
 	else if (strcmp(url, "/5") == 0)
 		// This function is not allowed, results in a failed request
 		storage_call(storage_test5, NULL, 0, NULL, 0);

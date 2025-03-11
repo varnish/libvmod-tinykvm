@@ -92,12 +92,12 @@ endfunction()
 function(add_vmod_tests LIBNAME IMPORT_NAME)
 	if (NOT SINGLE_PROCESS)
 		set(LIBPATH "${CMAKE_BINARY_DIR}/lib${LIBNAME}.so")
-		set(VMOD_PATH "${CMAKE_BINARY_DIR}")
+		#set(VMOD_PATH "${CMAKE_BINARY_DIR}")
 		# varnishtest doesn't like to run with no tests
 		foreach (FILENAME ${ARGN})
 		get_filename_component(TEST ${FILENAME} NAME_WE)
 		add_test(NAME ${LIBNAME}_${TEST}
-			COMMAND ${VARNISHTEST} -l "-Dvarnishd=${VARNISHD}" "-DVMOD_SO=\"${LIBPATH}\"" "-Dtestname=${TEST}" "-Dtopsrc=${VARNISH_SOURCE_DIR}" "-pvmod_path=${VMOD_PATH}" ${FILENAME}
+			COMMAND ${VARNISHTEST} -l "-Dvarnishd=${VARNISHD}" "-DVMOD_SO=\"${LIBPATH}\"" "-Dtestname=${TEST}" "-Dtopsrc=${VARNISH_SOURCE_DIR}" ${FILENAME}
 			WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 		)
 		set_tests_properties(${LIBNAME}_${TEST}

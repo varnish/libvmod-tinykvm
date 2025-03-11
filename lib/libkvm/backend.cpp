@@ -341,8 +341,8 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					throw std::runtime_error("The POST callback has not been registered");
 
 				VSLb(machine.ctx()->vsl, SLT_VCL_Log,
-					"%s: Calling on_post() at 0x%lX",
-					machine.name().c_str(), on_post_addr);
+					"%s: Calling on_post() at 0x%lX with data at 0x%lX, len %zu",
+					machine.name().c_str(), on_post_addr, post->address, size_t(post->length));
 				machine.stats().input_bytes += post->length;
 
 				vm.timed_vmcall(on_post_addr,

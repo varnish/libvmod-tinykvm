@@ -5,6 +5,7 @@ cat >${tmpdir}/${testname}.c <<-EOF
 #include "kvm_api.h"
 #include <assert.h>
 #include <string.h>
+static uint8_t buffer[1024];
 
 static void on_get(const char *url, const char *arg)
 {
@@ -16,7 +17,7 @@ static void on_post(const char *url, const char *arg,
 {
 	assert(strcmp(url, "/arg") == 0);
 
-	if (memcmp("Hello World", data, 11) == 0)
+	if (memcmp("Hello World", buffer, 11) == 0)
 		backend_response_str(201, "text/plain", "OK");
 	else
 		backend_response_str(401, "text/plain", "Not OK");
@@ -29,6 +30,7 @@ static long on_stream(const char *url, const char *arg,
 	assert(memcmp(data, "Hello World", len) == 0);
 	assert(len == 11);
 	assert(offset == 0);
+	memcpy(buffer, data, len);
 	return len;
 }
 

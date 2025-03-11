@@ -189,6 +189,8 @@ static void syscall_http_append(vCPU& cpu, MachineInstance& inst)
 	auto& regs = cpu.registers();
 	auto *hp = get_http(inst.ctx(), (gethdr_e)regs.rdi);
 	const uint64_t addr = regs.rsi;
+	if (regs.rdx > 0xFFFF)
+		throw std::runtime_error("HTTP header field too large");
 	const uint32_t len = regs.rdx & 0xFFFF;
 
 	auto *val = (char *)WS_Alloc(inst.ctx()->ws, len + 1);
@@ -206,6 +208,8 @@ static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
 	auto& regs = cpu.registers();
 	const int where = regs.rdi;
 	const uint64_t g_what = regs.rsi;
+	if (regs.rdx > 0xFFFF)
+		throw std::runtime_error("HTTP header field too large");
 	const uint32_t g_wlen = regs.rdx & 0xFFFF;
 	if (UNLIKELY(g_wlen == 0)) {
 		regs.rax = 0;

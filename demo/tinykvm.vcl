@@ -1,16 +1,13 @@
 vcl 4.1;
 import tinykvm;
 
-backend default {
-	.host = "127.0.0.1";
-	.port = "7443";
-}
+backend default none;
 
 sub vcl_init {
 	# Download and activate a Varnish-provided library of compute programs.
 	# A full list of programs and how they can be used would be on the docs site.
-	#tinykvm.library("https://filebin.varnish-software.com/tinykvm_programs/compute.json");
-	tinykvm.library("file:///home/gonzo/github/kvm_demo/compute.json");
+	tinykvm.library("https://filebin.varnish-software.com/tinykvm_programs/compute.json");
+	#tinykvm.library("file:///home/gonzo/github/kvm_demo/compute.json");
 
 	# Tell VMOD compute how to contact Varnish (Unix Socket *ONLY*)
 	tinykvm.init_self_requests("/tmp/tinykvm.sock");
@@ -166,7 +163,7 @@ sub vcl_backend_fetch {
 			"""{ "json": "value" }""");
 	}
 	else if (bereq.url == "/minify.json") {
-		set bereq.backend = tinykvm.program("fetch", "https://filebin.varnish-software.com/tinykvm_programs/tinykvm.json",
+		set bereq.backend = tinykvm.program("fetch", "https://filebin.varnish-software.com/tinykvm_programs/compute.json",
 			"""{
 				"headers": ["Host: filebin.varnish-software.com"]
 			}""");
@@ -179,6 +176,9 @@ sub vcl_backend_fetch {
 	}
 	else if (bereq.url ~ "/chain")
 	{
+		# curl -D - http://127.0.0.1:8080/chain?tiny
+		# curl -D - http://127.0.0.1:8080/chain?small
+		# curl -D - http://127.0.0.1:8080/chain?medium
 		tinykvm.chain("thumbnails",
 			bereq.url,
 			"""{

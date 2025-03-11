@@ -21,7 +21,7 @@ static void partial_buffers(size_t n, struct virtbuffer buffers[n], size_t r)
 	/* Data contains the inputs */
 	storage_return(state, current - state);
 }
-static void async_task(void*)
+static void async_task(void*, size_t)
 {
 
 }
@@ -49,11 +49,11 @@ static void my_backend(const char *arg, const char *arg2)
 	}
 	else if (strcmp(arg, "/2") == 0)
 	{
-		async_storage_task(async_task, 0);
+		schedule_storage_task(async_task, NULL, 0, 0.1, 0.0);
 	}
 	else if (strcmp(arg, "/3") == 0)
 	{
-		schedule_storage_task(async_task, 0, 0.1, 0.1);
+		schedule_storage_task(async_task, NULL, 0, 0.1, 0.1);
 	}
 
 	const char ctype[] = "text/plain";
@@ -108,10 +108,10 @@ client c1 {
 
 	txreq -url /2 -hdr "Host: xpizza.com"
 	rxresp
-	expect resp.status == 500
+	expect resp.status == 200
 	txreq -url /2 -hdr "Host: xpizza.com"
 	rxresp
-	expect resp.status == 500
+	expect resp.status == 200
 
 	txreq -url /3 -hdr "Host: xpizza.com"
 	rxresp

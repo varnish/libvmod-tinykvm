@@ -15,7 +15,7 @@ static void my_storage(size_t n, struct virtbuffer buffers[n], size_t reslen)
 	storage_return(hello_string->data, hello_string->len);
 }
 
-static void my_backend(const char *arg)
+static void my_backend(const char *url, const char *arg)
 {
 	const struct virtbuffer buffers[1] = {
 		{.data = TRUST_ME(arg), .len = strlen(arg)}

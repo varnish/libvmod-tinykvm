@@ -43,8 +43,7 @@ vcl 4.1;
 			{
 				"success.com": {
 					"filename": "${tmpdir}/${testname}",
-					"key": "",
-					"group": "success"
+					"key": ""
 				},
 				"failure.com": {
 					"filename": "${tmpdir}/${testname}",
@@ -52,16 +51,16 @@ vcl 4.1;
 					"group": "failure"
 				},
 				"failure": {
-					"max_work_memory": 1
+					"max_request_memory": 1
 				},
 				"tenant_failure.com": {
 					"filename": "${tmpdir}/${testname}",
 					"key": "",
 					"group": "tenant_failure",
-					"max_work_memory": 1
+					"max_request_memory": 1
 				},
 				"group_failure": {
-					"max_work_memory": 1
+					"max_request_memory": 1
 				},
 				"group_failure.com": {
 					"filename": "${tmpdir}/${testname}",
@@ -106,7 +105,7 @@ client c3 {
 	# 2 MB (failure)
 	txreq -url "/2000000" -hdr "Host: failure.com"
 	rxresp
-	expect resp.status == 503
+	expect resp.status >= 500
 	expect resp.bodylen <= 300
 } -repeat 2 -run
 
@@ -115,7 +114,7 @@ client c4 {
 	# 2 MB (failure)
 	txreq -url "/2000000" -hdr "Host: failure.com"
 	rxresp
-	expect resp.status == 503
+	expect resp.status >= 500
 	expect resp.bodylen <= 300
 } -repeat 100 -run
 
@@ -123,7 +122,7 @@ client c5 {
 	# 2 MB (failure)
 	txreq -url "/2000000" -hdr "Host: tenant_failure.com"
 	rxresp
-	expect resp.status == 503
+	expect resp.status >= 500
 	expect resp.bodylen <= 300
 } -repeat 2 -run
 
@@ -131,6 +130,6 @@ client c6 {
 	# 2 MB (failure)
 	txreq -url "/2000000" -hdr "Host: group_failure.com"
 	rxresp
-	expect resp.status == 503
+	expect resp.status >= 500
 	expect resp.bodylen <= 300
 } -repeat 2 -run

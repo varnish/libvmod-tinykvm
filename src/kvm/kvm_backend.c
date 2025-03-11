@@ -334,7 +334,9 @@ kvmbe_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
 	const bool is_post =
 		(bo->initial_req_body_status != REQ_BODY_NONE || bo->bereq_body != NULL);
 #else
-	const bool is_post = (bo->bereq_body != NULL);
+	/// XXX: Is this correct?
+	const bool is_post = (bo->bereq_body != NULL
+		|| (bo->req != NULL && bo->req->req_body_status != NULL && bo->req->req_body_status->avail));
 #endif
 	if (is_post || kvmr->chain.count > 1)
 	{
