@@ -970,6 +970,12 @@ asm(".global vcpuid\n"
 	"	mov %gs:(0x0), %eax\n"
 	"   ret\n");
 
+asm(".global vcpureqid\n"
+	".type vcpureqid, @function\n"
+	"vcpureqid:\n"
+	"	mov %gs:(0x4), %eax\n"
+	"   ret\n");
+
 asm(".global get_meminfo\n"
 	".type get_meminfo, @function\n"
 	"get_meminfo:\n"
