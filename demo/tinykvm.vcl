@@ -13,42 +13,6 @@ sub vcl_init {
 	tinykvm.init_self_requests("/tmp/tinykvm.sock");
 	#tinykvm.init_self_requests("", "http://127.0.0.1:8080");
 
-	# Create new programs inline in VCL
-	tinykvm.configure("counter",
-		"""{
-			"group" : "test",
-			"uri": "file:///home/gonzo/github/kvm_demo/c/counter",
-			"shared_memory": 2,
-			"concurrency": 4,
-			"ephemeral": false
-		}""");
-	tinykvm.configure("v8",
-		"""{
-			"uri": "file:///home/gonzo/github/EmbedV8/v8-cmake/build/v8",
-			"concurrency": 8,
-			"req_mem_limit_after_reset": 64
-		}""");
-	tinykvm.main_arguments("v8", """
-		function fibonacci(n) {
-		return n < 1 ? 0
-				: n <= 2 ? 1
-				: fibonacci(n - 1) + fibonacci(n - 2)
-		}
-
-		print("Version: " + version())
-		fibonacci(20)
-	""");
-
-	tinykvm.configure("go",
-		"""{
-			"uri": "file:///home/gonzo/github/kvm_demo/go/example/example",
-			"max_memory": 2048,
-			"remapping": ["0xC000000000", 256],
-			"concurrency": 4,
-			"storage": true
-		}""");
-	#tinykvm.start("counter");
-
 	# Add concurrency to important programs
 	tinykvm.configure("avif",
 		"""{
@@ -67,24 +31,16 @@ sub vcl_recv {
 		tinykvm.invalidate_programs();
 		return (synth(200));
 	}
-	else if (req.url == "/stats") {
+	else if (req.url == "/" || req.url == "/stats") {
 		return (synth(803));
 	}
 	else if (req.url == "/scounter") {
 		return (synth(801));
 	}
-	else if (req.url == "/sv8") {
-		return (synth(804));
-	}
 	else if (req.url == "/chain" || req.url == "/avif/image" || req.url ~ "/cat/") {
 		return (hash);
 	}
 	return (pass);
-}
-sub vcl_synth {
-	if (resp.status == 401) {
-		set resp.http.WWW-Authenticate = """Basic realm="Access to section" """;
-	}
 }
 
 sub vcl_backend_fetch {
@@ -302,11 +258,6 @@ sub vcl_backend_fetch {
 		set bereq.backend = tinykvm.program("llama",
 			bereq.http.X-Prompt, "");
 	}
-	else if (bereq.url == "/v8") {
-		#tinykvm.invalidate_programs("v8");
-		set bereq.backend = tinykvm.program("v8", bereq.url);
-		return (fetch);
-	}
 	else if (bereq.url == "/watermark") {
 		//tinykvm.invalidate_program("watermark");
 		set bereq.backend = tinykvm.program("watermark");
@@ -324,8 +275,8 @@ sub vcl_backend_fetch {
 		set bereq.backend = tinykvm.program("avif");
 	}
 	else {
-		# All unknown URLs to demo static site
-		set bereq.backend = tinykvm.program("demo", bereq.url);
+		tinykvm.chain("fetch", "https://http.cat/404");
+		set bereq.backend = tinykvm.program("avif");
 	}
 }
 
@@ -345,9 +296,6 @@ sub vcl_synth {
 		set resp.http.Content-Type = "application/json";
 		set resp.body = tinykvm.stats();
 		set resp.status = 200;
-		return (deliver);
-	} else if (resp.status == 804) {
-		tinykvm.synth(200, "v8", req.url);
 		return (deliver);
 	}
 	tinykvm.synth(resp.status, "fetch", "/cat/" + resp.status);
