@@ -46,6 +46,10 @@ There is a build-merge-release CI system that currently only builds for Ubuntu 2
 
 [Demonstration VCL here](/demo/tinykvm.vcl). Use `run.sh` in the same directory to try it out.
 
+## Examples
+
+[Programs and examples repository](https://github.com/varnish/tinykvm_examples).
+
 ## Licensing
 
 TinyKVM and VMOD-TinyKVM are released under a dual licensing model:
