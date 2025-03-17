@@ -253,6 +253,9 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	{
 		group.allowed_paths = obj.value().template get<std::vector<std::string>>();
 	}
+	else if (obj.key() == "verbose") {
+		group.verbose = obj.value();
+	}
 	else if (obj.key() == "group") { /* Silently ignore. */ }
 	else if (obj.key() == "key")   { /* Silently ignore. */ }
 	else if (obj.key() == "uri")   { /* Silently ignore. */ }

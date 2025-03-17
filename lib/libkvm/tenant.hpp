@@ -35,6 +35,7 @@ struct TenantGroup {
 	bool     control_ephemeral = false;
 	bool     ephemeral = true;
 	bool     print_stdout = false; /* Print directly to stdout */
+	bool     verbose = false;
 
 	std::vector<std::string> environ {
 		"LC_TYPE=C", "LC_ALL=C", "USER=root"

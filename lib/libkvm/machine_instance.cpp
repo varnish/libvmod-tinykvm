@@ -54,6 +54,7 @@ MachineInstance::MachineInstance(
 		.max_cow_mem = 0UL,
 		.vmem_base_address = detect_gigapage_from(binary),
 		.remappings {ten->config.group.vmem_remappings},
+		.verbose_loader = ten->config.group.verbose,
 		.hugepages = ten->config.hugepages(),
 		.master_direct_memory_writes = false,
 		.allow_fixed_mmap {!ten->config.group.vmem_remappings.empty()},
