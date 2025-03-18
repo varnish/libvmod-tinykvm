@@ -2,7 +2,7 @@
 
 ## Processing example
 
-Processing data with the TinyKVM VMOD is fairly straight-forward. The process is planned in `vcl_backend_fetch`, executed in between the functions, and the result is available in `vcl_backend_response`.
+Processing data with the TinyKVM VMOD is fairly straight-forward. The process is planned in `vcl_backend_fetch`, executed _in between_ the functions, and the result is available in `vcl_backend_response`.
 
 For example, if we want to produce an on-demand thumbnail of an image, we can use the `thumbnails` program:
 

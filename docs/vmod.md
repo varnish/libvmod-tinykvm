@@ -5,8 +5,8 @@ Add `import tinykvm;` at the top of your VCL to load the TinyKVM VMOD.
 ---
 > `tinykvm.library(uri)`
 
-- Fetch library of programs that is pre-installed with Varnish Enterprise.
-- Libraries contain program definitions, but programs are only started on-demand.
+- Fetch library of program definitions from the given URI.
+- Libraries can contain many program definitions, but programs are only started on-demand.
 - Must be called from vcl_init.
 
 ---
