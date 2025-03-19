@@ -21,6 +21,18 @@ sub vcl_init {
 			"ephemeral": false
 		}""");
 	#tinykvm.start("avif");
+
+	# Some programs require startup arguments
+	tinykvm.main_arguments("v8", """
+		function fibonacci(n) {
+		return n < 1 ? 0
+				: n <= 2 ? 1
+				: fibonacci(n - 1) + fibonacci(n - 2)
+		}
+
+		print("Version: " + version())
+		"fibonacci(20): " + fibonacci(20)
+	""");
 }
 sub vcl_recv {
 	if (req.url == "/tcp") {
@@ -229,10 +241,6 @@ sub vcl_backend_fetch {
 
 		set bereq.backend = tinykvm.program("xml", "", "{}");
 	}
-	else if (bereq.url == "/rust") {
-		//tinykvm.invalidate_programs("rust");
-		set bereq.backend = tinykvm.program("rust", bereq.url);
-	}
 	else if (bereq.url == "/small_xml") {
 		# Pass a small valid XML as response
 		set bereq.backend = tinykvm.program("xml", "<a/>", "{}");
@@ -257,6 +265,9 @@ sub vcl_backend_fetch {
 		#tinykvm.invalidate_programs("llama");
 		set bereq.backend = tinykvm.program("llama",
 			bereq.http.X-Prompt, "");
+	}
+	else if (bereq.url == "/v8") {
+		set bereq.backend = tinykvm.program("v8");
 	}
 	else if (bereq.url == "/watermark") {
 		//tinykvm.invalidate_program("watermark");
