@@ -44,6 +44,7 @@ struct TenantGroup {
 	std::shared_ptr<std::vector<std::string>> main_arguments = nullptr;
 
 	std::vector<tinykvm::VirtualRemapping> vmem_remappings;
+	bool vmem_heap_executable = false;
 
 	std::vector<std::string> allowed_paths;
 

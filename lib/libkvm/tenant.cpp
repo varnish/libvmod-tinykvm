@@ -229,7 +229,7 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		auto vec = obj.value().template get<std::vector<std::string>>();
 		group.environ.insert(group.environ.end(), vec.begin(), vec.end());
 	}
-	else if (obj.key() == "remapping")
+	else if (obj.key() == "remapping" || obj.key() == "executable_remapping")
 	{
 		// Append remappings
 		auto entry = obj.value().template get<std::pair<std::string, uint32_t>>();
@@ -240,14 +240,21 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		} else if (errno != 0) {
 			throw std::runtime_error("Remapping does not fit in 64-bit address");
 		}
-		group.vmem_remappings.push_back({
+		tinykvm::VirtualRemapping vmem {
 			.phys = 0x0,
 			.virt = address,
 			.size = entry.second << 20U,
-		});
+			.writable   = true,
+			.executable = obj.key() == "executable_remapping"
+		};
+		group.vmem_remappings.push_back(vmem);
 		//printf("Remapping at 0x%llX  size 0x%X\n",
 		//	group.vmem_remappings.back().virt,
 		//	group.vmem_remappings.back().size);
+	}
+	else if (obj.key() == "executable_heap")
+	{
+		group.vmem_heap_executable = obj.value();
 	}
 	else if (obj.key() == "allowed_paths")
 	{
