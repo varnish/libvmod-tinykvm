@@ -63,6 +63,8 @@ public:
 	void set_ephemeral(bool e) noexcept { m_is_ephemeral = e; }
 
 	void wait_for_requests() { m_waiting_for_requests = true; }
+	/* For now, pausing does nothing. */
+	void wait_for_requests_paused();
 	bool is_waiting_for_requests() const noexcept { return m_waiting_for_requests; }
 	/* With this we can enforce that certain syscalls have been invoked before
 	   we even check the validity of responses. This makes sure that crashes does

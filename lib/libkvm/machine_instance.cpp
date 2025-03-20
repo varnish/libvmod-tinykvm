@@ -13,7 +13,9 @@
  * 
 **/
 #include "machine_instance.hpp"
+#include "paused_vm_state.hpp"
 #include "settings.hpp"
+#include "program_instance.hpp"
 #include "tenant_instance.hpp"
 #include "timing.hpp"
 #include "varnish.hpp"
@@ -245,6 +247,18 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 MachineInstance::~MachineInstance()
 {
 	this->tail_reset();
+}
+
+void MachineInstance::wait_for_requests_paused()
+{
+	this->m_waiting_for_requests = true;
+
+	std::any& state = program().get_paused_vm_state();
+	auto& pvs = state.emplace<PausedVMState>(
+		PausedVMState{machine().registers(), machine().fpu_registers()});
+	pvs.regs.rflags = 2 | (3 << 12);
+	pvs.regs.rip += 2; // Skip the OUT instruction
+	//printf("*** Waiting for requests in paused state\n");
 }
 
 void MachineInstance::copy_to(uint64_t addr, const void* src, size_t len, bool zeroes)

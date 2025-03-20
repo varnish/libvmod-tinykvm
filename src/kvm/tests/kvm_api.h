@@ -93,6 +93,12 @@ static inline void set_on_live_restore(void(*f)(size_t datalen)) { register_func
    a new stack, and will not trample the old stack, including red-zone. */
 extern void wait_for_requests();
 
+/* Wait for requests by pausing the machine and recording the current
+   state of machine registers. This allowed resumption in event loops
+   and other types of event-driven programming. Request URL and other
+   data can be retrieved from the struct backend_request argument. */
+extern void wait_for_requests_paused(struct backend_request* req);
+
 /**
  * When a request arrives the handler function is the only function that will
  * be called. main() is no longer in the picture. Any actions performed during
@@ -755,6 +761,13 @@ asm(".global wait_for_requests\n"
 	"wait_for_requests:\n"
 	"	mov $0x10001, %eax\n"
 	"	out %eax, $0\n");
+
+asm(".global wait_for_requests_paused\n"
+	".type wait_for_requests_paused, @function\n"
+	"wait_for_requests_paused:\n"
+	"	mov $0x10002, %eax\n"
+	"	out %eax, $0\n"
+	"	ret\n");
 
 asm(".global sys_set_cacheable\n"
 	".type sys_set_cacheable, @function\n"

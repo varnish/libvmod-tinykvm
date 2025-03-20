@@ -99,6 +99,9 @@ void MachineInstance::setup_syscall_interface()
 			case 0x10001: // WAIT_FOR_REQUESTS
 				syscall_wait_for_requests(cpu, inst);
 				return;
+			case 0x10002: // PAUSE_FOR_REQUESTS
+				syscall_pause_for_requests(cpu, inst);
+				return;
 			case 0x10005: // SET_CACHEABLE
 				syscall_set_cacheable(cpu, inst);
 				return;

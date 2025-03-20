@@ -36,6 +36,7 @@
  * 
 **/
 #include "tenant_instance.hpp"
+#include "paused_vm_state.hpp"
 #include "program_instance.hpp"
 #include "scoped_duration.hpp"
 #include "settings.hpp"
@@ -49,6 +50,18 @@ void kvm_varnishstat_program_timeout();
 void kvm_varnishstat_program_status(uint16_t status);
 }
 static constexpr bool VERBOSE_BACKEND = false;
+struct backend_inputs {
+	uint64_t method;
+	uint64_t url;
+	uint64_t arg;
+	uint64_t ctype;
+	uint16_t method_len;
+	uint16_t url_len;
+	uint16_t arg_len;
+	uint16_t ctype_len;
+	uint64_t data; /* Content: Can be NULL. */
+	uint64_t data_len;
+};
 
 static void memory_error_handling(struct vsl_log *vsl, const tinykvm::MemoryException& e)
 {
@@ -236,12 +249,45 @@ static void error_handling(kvm::VMPoolItem* slot,
 	kvm_varnishstat_program_status(result->status);
 }
 
+static void fill_backend_inputs(
+	MachineInstance& machine, __u64& stack,
+	const struct kvm_chain_item *invoc,
+	const struct backend_post *post,
+	backend_inputs& inputs)
+{
+	auto& vm = machine.machine();
+	inputs.method_len = __builtin_strlen(invoc->inputs.method);
+	inputs.method     = vm.stack_push(stack, invoc->inputs.method, inputs.method_len + 1);
+	inputs.url_len = __builtin_strlen(invoc->inputs.url);
+	inputs.url     = vm.stack_push(stack, invoc->inputs.url, inputs.url_len + 1);
+	inputs.arg_len = __builtin_strlen(invoc->inputs.argument);
+	inputs.arg     = vm.stack_push(stack, invoc->inputs.argument, inputs.arg_len + 1);
+	if (post != nullptr) {
+		/* POST data information. */
+		inputs.ctype_len = __builtin_strlen(invoc->inputs.content_type);
+		inputs.ctype = vm.stack_push(stack, invoc->inputs.content_type, inputs.ctype_len + 1);
+		inputs.data  = post->address;
+		inputs.data_len = post->length;
+
+		machine.stats().input_bytes += post->length;
+	}
+	else
+	{
+		/* Guarantee readable strings. */
+		inputs.ctype = vm.stack_push_cstr(stack, "");
+		inputs.ctype_len = 0;
+		/* Buffers with known length can be NULL. */
+		inputs.data  = 0;
+		inputs.data_len = 0;
+	}
+}
+
 extern "C"
 void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 	const struct kvm_chain_item *invoc,
 	struct backend_post *post, struct backend_result *result)
 {
-	auto& machine = *slot->mi;
+	MachineInstance& machine = *slot->mi;
 	/* Setting the VRT_CTX allows access to HTTP and VSL, etc. */
 	machine.set_ctx(ctx);
 
@@ -268,48 +314,17 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			const auto timeout = machine.max_req_time();
 			const auto& prog = machine.program();
 			auto& vm = machine.machine();
+			if (post != nullptr) {
+				/* Try to reduce POST mmap allocation */
+				vm.mmap_relax(post->address, post->capacity, post->length);
+			}
 
 			auto on_method_addr = prog.entry_at(ProgramEntryIndex::BACKEND_METHOD);
 			if (on_method_addr != 0x0) {
-				struct backend_inputs {
-					uint64_t method;
-					uint64_t url;
-					uint64_t arg;
-					uint64_t ctype;
-					uint16_t method_len;
-					uint16_t url_len;
-					uint16_t arg_len;
-					uint16_t ctype_len;
-					uint64_t data; /* Content: Can be NULL. */
-					uint64_t data_len;
-				} inputs {};
+				/* Call the backend METHOD function */
+				struct backend_inputs inputs {};
 				__u64 stack = vm.stack_address();
-				inputs.method_len = __builtin_strlen(invoc->inputs.method);
-				inputs.method     = vm.stack_push(stack, invoc->inputs.method, inputs.method_len + 1);
-				inputs.url_len = __builtin_strlen(invoc->inputs.url);
-				inputs.url     = vm.stack_push(stack, invoc->inputs.url, inputs.url_len + 1);
-				inputs.arg_len = __builtin_strlen(invoc->inputs.argument);
-				inputs.arg     = vm.stack_push(stack, invoc->inputs.argument, inputs.arg_len + 1);
-				if (post != nullptr) {
-					/* Try to reduce POST mmap allocation. */
-					vm.mmap_relax(post->address, post->capacity, post->length);
-					/* POST data information. */
-					inputs.ctype_len = __builtin_strlen(invoc->inputs.content_type);
-					inputs.ctype = vm.stack_push(stack, invoc->inputs.content_type, inputs.ctype_len + 1);
-					inputs.data  = post->address;
-					inputs.data_len = post->length;
-
-					machine.stats().input_bytes += post->length;
-				}
-				else
-				{
-					/* Guarantee readable strings. */
-					inputs.ctype = vm.stack_push_cstr(stack, "");
-					inputs.ctype_len = 0;
-					/* Buffers with known length can be NULL. */
-					inputs.data  = 0;
-					inputs.data_len = 0;
-				}
+				fill_backend_inputs(machine, stack, invoc, post, inputs);
 				uint64_t struct_addr = vm.stack_push(stack, inputs);
 
 				VSLb(machine.ctx()->vsl, SLT_VCL_Log,
@@ -320,26 +335,18 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				vm.timed_vmcall_stack(on_method_addr,
 					stack, timeout, (uint64_t)struct_addr);
 
-			} else if (post == nullptr) {
+			} else if (post == nullptr && prog.entry_at(ProgramEntryIndex::BACKEND_GET) != 0x0) {
 				/* Call the backend GET function */
 				auto on_get_addr = prog.entry_at(ProgramEntryIndex::BACKEND_GET);
-				if (UNLIKELY(on_get_addr == 0x0))
-					throw std::runtime_error("The GET callback has not been registered");
-
 				VSLb(machine.ctx()->vsl, SLT_VCL_Log,
 					"%s: Calling on_get() at 0x%lX",
 					machine.name().c_str(), on_get_addr);
 
 				/* Call into VM doing a full pagetable/cache flush. */
 				vm.timed_vmcall(on_get_addr, timeout, invoc->inputs.url, invoc->inputs.argument);
-			} else {
-				/* Try to reduce POST mmap allocation */
-				vm.mmap_relax(post->address, post->capacity, post->length);
+			} else if (post != nullptr && prog.entry_at(ProgramEntryIndex::BACKEND_POST) != 0x0) {
 				/* Call the backend POST function */
 				auto on_post_addr = prog.entry_at(ProgramEntryIndex::BACKEND_POST);
-				if (UNLIKELY(on_post_addr == 0x0))
-					throw std::runtime_error("The POST callback has not been registered");
-
 				VSLb(machine.ctx()->vsl, SLT_VCL_Log,
 					"%s: Calling on_post() at 0x%lX with data at 0x%lX, len %zu",
 					machine.name().c_str(), on_post_addr, post->address, size_t(post->length));
@@ -351,6 +358,28 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					invoc->inputs.argument,
 					invoc->inputs.content_type,
 					uint64_t(post->address), uint64_t(post->length));
+			} else if (prog.get_paused_vm_state().has_value()) {
+				/* Allocate 16KB space for struct backend_inputs */
+				struct backend_inputs inputs {};
+				__u64 stack = vm.mmap_allocate(16384) + 16384;
+				fill_backend_inputs(machine, stack, invoc, post, inputs);
+				const PausedVMState& state = std::any_cast<PausedVMState> (prog.get_paused_vm_state());
+				auto& regs = vm.registers();
+				regs = state.regs;
+				vm.set_registers(regs);
+				vm.set_fpu_registers(state.fpu);
+				/* RDI is address of struct backend_inputs */
+				const uint64_t g_struct_addr = regs.rdi;
+				vm.copy_to_guest(g_struct_addr, &inputs, sizeof(inputs));
+
+				VSLb(machine.ctx()->vsl, SLT_VCL_Log,
+					"%s: Resuming VM at PC=0x%lX",
+					machine.name().c_str(), regs.rip);
+
+				/* Resume execution */
+				vm.run_in_usermode(timeout);
+			} else {
+				throw std::runtime_error("No backend method set and no paused VM state");
 			}
 
 			/* Make sure no SMP work is in-flight. */

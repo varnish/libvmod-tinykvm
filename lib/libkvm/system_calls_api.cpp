@@ -35,6 +35,16 @@ static void syscall_wait_for_requests(vCPU& cpu, MachineInstance& inst)
 		throw std::runtime_error("wait_for_requests(): Cannot be called after initialization");
 	}
 }
+static void syscall_pause_for_requests(vCPU& cpu, MachineInstance& inst)
+{
+	if (inst.is_waiting_for_requests() == false) {
+		// Wait for events by pausing the machine, resuming it from this PC on each request
+		inst.wait_for_requests_paused();
+		cpu.stop();
+	} else {
+		throw std::runtime_error("wait_for_requests(): Cannot be called after initialization");
+	}
+}
 
 static void syscall_backend_response(vCPU& cpu, MachineInstance& inst)
 {
