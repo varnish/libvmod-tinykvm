@@ -458,12 +458,44 @@ void MachineInstance::setup_syscall_interface()
 					cpu.machine().copy_to_guest(buffer, &vstat, sizeof(vstat));
 				}
 			} catch (...) {
-				printf("ERROR\n");
 				regs.rax = -1;
 			}
 
 			SYSPRINT("NEWFSTATAT to vfd=%lld, fd=%ld, path=%s, data=0x%llX, flags=0x%X = %lld\n",
 				regs.rdi, fd, path, buffer, flags, regs.rax);
+			cpu.set_registers(regs);
+		});
+	Machine::install_syscall_handler(
+		332, [] (vCPU& cpu) { // STATX
+			auto& inst = *cpu.machine().get_userdata<MachineInstance>();
+			auto& regs = cpu.registers();
+			long fd = AT_FDCWD; // rdi
+			const auto vpath  = regs.rsi;
+			const auto flags  = regs.rdx;
+			const auto mask   = regs.r10;
+			const auto buffer = regs.r8;
+
+			char path[PATH_MAX];
+			cpu.machine().copy_from_guest(path, vpath, sizeof(path));
+
+			try {
+				inst.sanitize_path(path, sizeof(path));
+
+				// Translate from vfd when fd != AT_FDCWD
+				if ((long)regs.rdi != AT_FDCWD)
+					fd = inst.m_fd.translate(regs.rdi);
+
+				struct statx vstat;
+				regs.rax = statx(fd, path, flags, mask, &vstat);
+				if (regs.rax == 0) {
+					cpu.machine().copy_to_guest(buffer, &vstat, sizeof(vstat));
+				}
+			} catch (...) {
+				regs.rax = -1;
+			}
+
+			SYSPRINT("STATX to vfd=%lld, fd=%ld, path=%s, data=0x%llX, flags=0x%llX, mask=0x%llX = %lld\n",
+				regs.rdi, fd, path, buffer, flags, mask, regs.rax);
 			cpu.set_registers(regs);
 		});
 }
