@@ -316,7 +316,7 @@ static void syscall_breakpoint(vCPU& cpu, MachineInstance& inst)
 {
 	auto& regs = cpu.registers();
 	if (inst.ctx() && inst.ctx()->vsl) {
-		if (inst.is_debug()) {
+		if (inst.is_debug() || inst.allows_debugging()) {
 			VSLb(inst.ctx()->vsl, SLT_VCL_Log,
 				"VM breakpoint at 0x%lX", (long) regs.rip);
 			inst.open_debugger(DEBUG_PORT, inst.max_req_time());

@@ -15,15 +15,17 @@ void MachineInstance::open_debugger(uint16_t port, float timeout)
 
 		// Listener activated
 		tinykvm::RSP server { machine(), port };
-		printf(">>> Remote debugger waiting on a breakpoint...\n");
+		printf(">>> Remote debugger waiting on a breakpoint... (port %d)\n", port);
 		program().rspclient = server.accept();
 
 		// Check if accept failed
 		if (program().rspclient == nullptr) {
 			program().rsp_script = nullptr;
+			printf(">>> Remote debugger failed to connect\n");
 			return;
 		}
 		printf(">>> Remote debugger connected\n");
+		this->m_is_debug = true;
 
 	} else if (program().rsp_script != this) {
 		// Someone else already listening or debugging

@@ -54,6 +54,7 @@ public:
 	auto& stats() noexcept { return this->m_stats; }
 	const auto& stats() const noexcept { return this->m_stats; }
 
+	bool allows_debugging() const noexcept;
 	bool is_debug() const noexcept { return m_is_debug; }
 	bool is_storage() const noexcept { return m_is_storage; }
 	bool is_ephemeral() const noexcept { return m_is_ephemeral; }
@@ -106,7 +107,7 @@ private:
 	machine_t m_machine;
 	const TenantInstance* m_tenant = nullptr;
 	ProgramInstance* m_inst;
-	const bool  m_is_debug;
+	bool        m_is_debug;
 	const bool  m_is_storage;
 	bool        m_is_ephemeral = true;
 	bool        m_waiting_for_requests = false;

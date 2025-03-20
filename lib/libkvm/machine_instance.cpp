@@ -246,6 +246,10 @@ void MachineInstance::copy_to(uint64_t addr, const void* src, size_t len, bool z
 	machine().copy_to_guest(addr, src, len, zeroes);
 }
 
+bool MachineInstance::allows_debugging() const noexcept
+{
+	return tenant().config.group.allow_debug;
+}
 float MachineInstance::max_req_time() const noexcept {
 	return tenant().config.max_req_time(is_debug());
 }
