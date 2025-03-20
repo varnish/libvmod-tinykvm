@@ -164,6 +164,11 @@ Enable hugepages for request handling (memory banks). This can result in a modes
 
 Default: Disabled
 
+* `allow_debug`
+
+Allow remotely debugging requests with GDB. The request to be debugged has to cause a breakpoint. In the C API this is done with `sys_breakpoint()`. The GDB instance must load the program using `file myprogram` before it can remotely connect using `target remote :2159`.
+
+
 * `environment`
 
 An array of environment variables appended to the programs environ, accessible with getenv().
