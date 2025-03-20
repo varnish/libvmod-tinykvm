@@ -44,10 +44,11 @@ TenantInstance::TenantInstance(VRT_CTX, const TenantConfig& conf)
 		MachineInstance::kvm_initialize();
 	}
 
-	this->begin_initialize(ctx);
+	const bool debug = false;
+	this->begin_initialize(ctx, debug);
 }
 
-void TenantInstance::begin_initialize(VRT_CTX)
+void TenantInstance::begin_initialize(VRT_CTX, bool debug)
 {
 	/* Prevent initializing many times, with a warning. */
 	if (this->m_started_init) {
@@ -83,7 +84,7 @@ void TenantInstance::begin_initialize(VRT_CTX)
 		/* Load the program from cURL fetch. */
 		try {
 			auto prog = std::make_shared<ProgramInstance> (
-				config.uri, std::move(filename_mtime), ctx, this);
+				config.uri, std::move(filename_mtime), ctx, this, debug);
 			std::atomic_store(&this->program, std::move(prog));
 		} catch (const std::exception& e) {
 			/* TODO: Retry with file loader here from local filesyste, if
@@ -136,18 +137,19 @@ void TenantInstance::begin_initialize(VRT_CTX)
 		this->handle_exception(config, e);
 	}
 }
-void TenantInstance::begin_async_initialize(const vrt_ctx *ctx)
+void TenantInstance::begin_async_initialize(const vrt_ctx *ctx, bool debug)
 {
 	/* Block other requests from trying to initialize. */
 	std::scoped_lock lock(this->mtx_running_init);
 
 	if (!this->m_started_init) {
-		this->begin_initialize(ctx);
+		this->begin_initialize(ctx, debug);
 	}
 }
 bool TenantInstance::wait_guarded_initialize(const vrt_ctx *ctx, std::shared_ptr<ProgramInstance>& prog)
 {
-	begin_async_initialize(ctx);
+	const bool debug = false;
+	begin_async_initialize(ctx, debug);
 
 	/* This may take some time, as it is blocking, but this will allow the
 		request to proceed.

@@ -15,9 +15,10 @@
 using namespace kvm;
 
 extern "C"
-int kvm_tenant_async_start(const vrt_ctx *ctx, kvm::TenantInstance* tenant)
+int kvm_tenant_async_start(const vrt_ctx *ctx, kvm::TenantInstance* tenant, int debug)
 {
-	tenant->begin_async_initialize(ctx);
+	assert(tenant);
+	tenant->begin_async_initialize(ctx, debug);
 	return 1;
 }
 

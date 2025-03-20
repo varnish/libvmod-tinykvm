@@ -43,8 +43,8 @@ public:
 	/* Create tenant and immediately begin initialization. */
 	TenantInstance(const vrt_ctx*, const TenantConfig&);
 
-	void begin_initialize(const vrt_ctx *);
-	void begin_async_initialize(const vrt_ctx *);
+	void begin_initialize(const vrt_ctx *, bool debug);
+	void begin_async_initialize(const vrt_ctx *, bool debug);
 	std::shared_ptr<ProgramInstance> wait_for_initialization();
 
 	/* Initialized during vcl_init */

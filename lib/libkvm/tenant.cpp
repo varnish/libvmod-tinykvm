@@ -127,7 +127,8 @@ static inline bool load_tenant(VRT_CTX, VCL_PRIV task,
 		}
 		/* If initialization needed, create program immediately. */
 		if (initialize) {
-			it->second.begin_initialize(ctx);
+			const bool debug = false;
+			it->second.begin_initialize(ctx, debug);
 		}
 		return true;
 

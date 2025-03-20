@@ -124,7 +124,7 @@ $Function INT invalidate_programs(PRIV_VCL, STRING regex = "")
   the old program to the new program. The current request is paused until this completes.
 - Returns the number of programs unloaded.
 
-$Function BOOL start(PRIV_VCL, STRING program, BOOL async = 1)
+$Function BOOL start(PRIV_VCL, STRING program, BOOL async = 1, BOOL debug = 0)
 
 - Start program during early Varnish startup.
 - When async, program intialization will not delay Varnish from starting up.

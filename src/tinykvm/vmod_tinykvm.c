@@ -190,7 +190,7 @@ VCL_BOOL vmod_main_arguments(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_STR
 	return (kvm_tenant_arguments(ctx, tenant, arguments->n, arguments->p));
 }
 
-VCL_BOOL vmod_start(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_BOOL async)
+VCL_BOOL vmod_start(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_BOOL async, VCL_BOOL debug)
 {
 	(void) async;
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
@@ -202,7 +202,7 @@ VCL_BOOL vmod_start(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_BOOL async)
 	struct vmod_kvm_tenant *tenant = kvm_tenant_find(task, program);
 	if (tenant != NULL) {
 		/* TODO: If async == false use kvm_reserve_vm() to synchronize init. */
-		return (kvm_tenant_async_start(ctx, tenant));
+		return (kvm_tenant_async_start(ctx, tenant, debug));
 	} else {
 		VRT_fail(ctx,
 			"compute: No such program '%s' for async start", program);

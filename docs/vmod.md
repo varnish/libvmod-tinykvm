@@ -34,11 +34,12 @@ Add `import tinykvm;` at the top of your VCL to load the TinyKVM VMOD.
 - Must be called from vcl_init.
 
 ---
-> `tinykvm.start(program, async = true)`
+> `tinykvm.start(program, async = true, debug = false)`
 
 - Start program during early Varnish startup.
 - When async, program initialization will not delay Varnish from starting up.
   Requests to the program will always wait until it is fully initialized.
+- When debug is enabled, immediately start remote GDB session.
 - Must be called from vcl_init.
 
 ---

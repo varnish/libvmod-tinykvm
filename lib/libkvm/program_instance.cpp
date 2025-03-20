@@ -309,12 +309,13 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 		}
 
 		(void) t1;
-		printf("Program '%s' is loaded (%s, %s, vm=%zu, nodes=%d, huge=%d/%d, ready=%.2fms)\n",
+		printf("Program '%s' is loaded (%s, %s, vm=%zu, nodes=%d, huge=%d/%d, ready=%.2fms%s)\n",
 			main_vm->name().c_str(),
 			this->binary_was_local() ? "local" : "remote",
 			this->binary_was_cached() ? "cached" : "not cached",
 			initialized, n_nodes, ten->config.hugepages(), ten->config.ephemeral_hugepages(),
-			nanodiff(t0, t2) / 1e6);
+			nanodiff(t0, t2) / 1e6,
+			debug ? ", remote debug" : "");
 
 	} catch (const std::exception& e) {
 		// Make sure we signal that there is no program, if the

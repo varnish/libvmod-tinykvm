@@ -101,7 +101,11 @@ void MachineInstance::initialize()
 			args,
 			tenant().config.environ());
 
-		// Run through main()
+		if (this->is_debug()) {
+			this->open_debugger(2159, 120.0f);
+		}
+
+		// Continue/resume or run through main()
 		machine().run( tenant().config.max_boot_time() );
 
 		// Make sure the program is waiting for requests
@@ -160,6 +164,7 @@ MachineInstance::MachineInstance(
 		.max_mem = ten->config.max_main_memory(),
 		.max_cow_mem = ten->config.max_req_memory(),
 		.reset_free_work_mem = ten->config.limit_req_memory(),
+		.remappings {},
 		.hugepages = ten->config.ephemeral_hugepages(),
 		.allow_fixed_mmap = !ten->config.group.vmem_remappings.empty(),
 	  }),
@@ -222,6 +227,7 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 			.max_mem = tenant().config.max_main_memory(),
 			.max_cow_mem = tenant().config.max_req_memory(),
 			.reset_free_work_mem = tenant().config.limit_req_memory(),
+			.remappings {},
 		});
 		/* The POST memory area is gone. */
 		this->m_post_size = 0;
