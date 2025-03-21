@@ -115,6 +115,15 @@ void MachineInstance::initialize()
 			throw std::runtime_error("Program did not wait for requests");
 		}
 
+		// We don't know if this is a resumable VM, but if it is we must skip
+		// over the OUT instruction that was executed in the backend call.
+		// We can do this regardless of whether it is a resumable VM or not.
+		// This will also help make faulting VMs return back to the correct
+		// state when they are being reset.
+		auto& regs = machine().registers();
+		regs.rip += 2;
+		machine().set_registers(regs);
+
 		// Only request VMs need the copy-on-write mechanism enabled
 		if (!is_storage())
 		{
@@ -233,6 +242,8 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 		});
 		/* The POST memory area is gone. */
 		this->m_post_size = 0;
+		/* The ephemeral backend_inputs "stack" area is gone. */
+		this->m_inputs_allocation = 0;
 
 		m_sighandler = source.m_sighandler;
 

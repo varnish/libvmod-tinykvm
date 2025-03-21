@@ -361,7 +361,10 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			} else {
 				/* Allocate 16KB space for struct backend_inputs */
 				struct backend_inputs inputs {};
-				__u64 stack = vm.mmap_allocate(16384) + 16384;
+				if (machine.get_inputs_allocation() == 0) {
+					machine.get_inputs_allocation() = vm.mmap_allocate(16384) + 16384;
+				}
+				__u64 stack = machine.get_inputs_allocation();
 				fill_backend_inputs(machine, stack, invoc, post, inputs);
 
 				auto& regs = vm.registers();
@@ -372,10 +375,6 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					const PausedVMState& state = std::any_cast<PausedVMState> (prog.get_paused_vm_state());
 					regs = state.regs;
 					vm.set_fpu_registers(state.fpu);
-					vm.set_registers(regs);
-				} else if (machine.is_waiting_for_requests()) {
-					// Skip the OUT instruction
-					regs.rip += 2;
 					vm.set_registers(regs);
 				}
 				/* RDI is address of struct backend_inputs */

@@ -89,6 +89,7 @@ public:
 	void storage_debugger(float timeout);
 
 	uint64_t allocate_post_data(size_t size);
+	gaddr_t& get_inputs_allocation() { return m_inputs_allocation; }
 
 	static void kvm_initialize();
 	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool storage, bool dbg);
@@ -122,6 +123,7 @@ private:
 
 	gaddr_t     m_post_data = 0x0;
 	size_t      m_post_size = 0;
+	gaddr_t     m_inputs_allocation = 0x0;
 
 	MachineStats m_stats;
 
