@@ -358,16 +358,26 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					invoc->inputs.argument,
 					invoc->inputs.content_type,
 					uint64_t(post->address), uint64_t(post->length));
-			} else if (prog.get_paused_vm_state().has_value()) {
+			} else {
 				/* Allocate 16KB space for struct backend_inputs */
 				struct backend_inputs inputs {};
 				__u64 stack = vm.mmap_allocate(16384) + 16384;
 				fill_backend_inputs(machine, stack, invoc, post, inputs);
-				const PausedVMState& state = std::any_cast<PausedVMState> (prog.get_paused_vm_state());
+
 				auto& regs = vm.registers();
-				regs = state.regs;
-				vm.set_registers(regs);
-				vm.set_fpu_registers(state.fpu);
+				if (machine.tenant().config.group.ephemeral) {
+					if (!prog.get_paused_vm_state().has_value()) {
+						throw std::runtime_error("No paused VM state to resume");
+					}
+					const PausedVMState& state = std::any_cast<PausedVMState> (prog.get_paused_vm_state());
+					regs = state.regs;
+					vm.set_fpu_registers(state.fpu);
+					vm.set_registers(regs);
+				} else if (machine.is_waiting_for_requests()) {
+					// Skip the OUT instruction
+					regs.rip += 2;
+					vm.set_registers(regs);
+				}
 				/* RDI is address of struct backend_inputs */
 				const uint64_t g_struct_addr = regs.rdi;
 				vm.copy_to_guest(g_struct_addr, &inputs, sizeof(inputs));
@@ -378,8 +388,23 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 
 				/* Resume execution */
 				vm.run_in_usermode(timeout);
-			} else {
-				throw std::runtime_error("No backend method set and no paused VM state");
+				/* Verify response and fill out result struct. */
+				fetch_result(slot, machine, result);
+				/* Ephemeral VMs are reset and don't need to run until halt. */
+				if (!machine.tenant().config.group.ephemeral) {
+					// Skip the OUT instruction (again)
+					regs.rip += 2;
+					vm.set_registers(regs);
+					/* Run the VM until it halts again, and it should be waiting for requests. */
+					machine.reset_wait_for_requests();
+					vm.run_in_usermode(1.0f);
+				}
+				/* Make sure no SMP work is in-flight. */
+				vm.smp_wait();
+				if (UNLIKELY(!machine.is_waiting_for_requests())) {
+					throw std::runtime_error("VM did not wait for requests after backend request");
+				}
+				return 0L;
 			}
 
 			/* Make sure no SMP work is in-flight. */

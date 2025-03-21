@@ -253,11 +253,14 @@ void MachineInstance::wait_for_requests_paused()
 {
 	this->m_waiting_for_requests = true;
 
-	std::any& state = program().get_paused_vm_state();
-	auto& pvs = state.emplace<PausedVMState>(
-		PausedVMState{machine().registers(), machine().fpu_registers()});
-	pvs.regs.rflags = 2 | (3 << 12);
-	pvs.regs.rip += 2; // Skip the OUT instruction
+	/* Only ephemeral VMs need PausedVMState */
+	if (this->tenant().config.group.ephemeral) {
+		std::any& state = program().get_paused_vm_state();
+		auto& pvs = state.emplace<PausedVMState>(
+			PausedVMState{machine().registers(), machine().fpu_registers()});
+		pvs.regs.rflags = 2 | (3 << 12);
+		pvs.regs.rip += 2; // Skip the OUT instruction
+	}
 	//printf("*** Waiting for requests in paused state\n");
 }
 

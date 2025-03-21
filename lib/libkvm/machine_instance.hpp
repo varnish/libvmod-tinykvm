@@ -62,6 +62,7 @@ public:
 	gaddr_t shared_memory_size() const noexcept;
 	void set_ephemeral(bool e) noexcept { m_is_ephemeral = e; }
 
+	void reset_wait_for_requests() { m_waiting_for_requests = false; }
 	void wait_for_requests() { m_waiting_for_requests = true; }
 	/* For now, pausing does nothing. */
 	void wait_for_requests_paused();

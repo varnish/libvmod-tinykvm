@@ -782,6 +782,7 @@ asm(".global backend_response\n"
 	".cfi_startproc\n"
 	"	mov $0x10010, %eax\n"
 	"	out %eax, $0\n"
+	"	ret\n"
 	".cfi_endproc\n");
 
 asm(".global begin_streaming_response\n"
