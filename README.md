@@ -14,6 +14,7 @@ varnish-dev
 libcurl4-openssl-dev
 libpcre3-dev
 libarchive-dev
+libjemalloc-dev
 ```
 
 This VMOD does not have an installation procedure. Simply build it from source, and copy the final `libvmod_*.so` into your VMOD folder (usually `/usr/lib/varnish/vmods/`):

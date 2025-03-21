@@ -50,6 +50,7 @@ function(add_vmod LIBNAME VCCNAME comment)
 	target_include_directories(${LIBNAME} PUBLIC ${VINCLUDE})
 	#target_compile_options(${LIBNAME} PRIVATE "-fno-lto") # LTO discards too much
 	target_compile_definitions(${LIBNAME} PRIVATE VMOD=1 HAVE_CONFIG_H _GNU_SOURCE)
+	target_link_libraries(${LIBNAME} jemalloc)
 	if (VARNISH_PLUS)
 		target_compile_definitions(${LIBNAME} PRIVATE VARNISH_PLUS=1)
 		target_link_libraries(${LIBNAME} PkgConfig::LIBVARNISH)
