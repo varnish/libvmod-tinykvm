@@ -240,6 +240,7 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 			.reset_free_work_mem = tenant().config.limit_req_memory(),
 			.remappings {},
 		});
+		this->m_waiting_for_requests = source.m_waiting_for_requests;
 		/* The POST memory area is gone. */
 		this->m_post_size = 0;
 		/* The ephemeral backend_inputs "stack" area is gone. */

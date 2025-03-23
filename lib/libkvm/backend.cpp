@@ -359,6 +359,16 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					invoc->inputs.content_type,
 					uint64_t(post->address), uint64_t(post->length));
 			} else {
+				/* Ephemeral VMs are reset and don't need to run until halt. */
+				if (!machine.tenant().config.group.ephemeral) {
+					if (!machine.is_waiting_for_requests()) {
+						/* Run the VM until it halts again, and it should be waiting for requests. */
+						vm.run_in_usermode(1.0f);
+						if (!machine.is_waiting_for_requests()) {
+							throw std::runtime_error("VM did not wait for requests after backend request");
+						}
+					}
+				}
 				/* Allocate 16KB space for struct backend_inputs */
 				struct backend_inputs inputs {};
 				if (machine.get_inputs_allocation() == 0) {
@@ -394,14 +404,8 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					// Skip the OUT instruction (again)
 					regs.rip += 2;
 					vm.set_registers(regs);
-					/* Run the VM until it halts again, and it should be waiting for requests. */
+					/* We're delivering a response, and clearly not waiting for requests. */
 					machine.reset_wait_for_requests();
-					vm.run_in_usermode(1.0f);
-				}
-				/* Make sure no SMP work is in-flight. */
-				vm.smp_wait();
-				if (UNLIKELY(!machine.is_waiting_for_requests())) {
-					throw std::runtime_error("VM did not wait for requests after backend request");
 				}
 				return 0L;
 			}
