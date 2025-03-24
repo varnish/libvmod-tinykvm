@@ -59,7 +59,7 @@ MachineInstance::MachineInstance(
 		.verbose_loader = ten->config.group.verbose,
 		.hugepages = ten->config.hugepages(),
 		.master_direct_memory_writes = false,
-		.allow_fixed_mmap = !ten->config.group.vmem_remappings.empty(),
+		.relocate_fixed_mmap = ten->config.group.relocate_fixed_mmap,
 		.executable_heap = ten->config.group.vmem_heap_executable,
 	  }),
 	  m_tenant(ten), m_inst(inst),
@@ -151,6 +151,9 @@ void MachineInstance::initialize()
 	}
 	catch (const tinykvm::MachineException& me)
 	{
+		if (tenant().config.group.verbose_pagetable) {
+			machine().print_pagetables();
+		}
 		fprintf(stderr,
 			"Machine not initialized properly: %s\n", name().c_str());
 		fprintf(stderr,
@@ -159,6 +162,9 @@ void MachineInstance::initialize()
 	}
 	catch (const std::exception& e)
 	{
+		if (tenant().config.group.verbose_pagetable) {
+			machine().print_pagetables();
+		}
 		fprintf(stderr,
 			"Machine not initialized properly: %s\n", name().c_str());
 		fprintf(stderr,
@@ -177,7 +183,7 @@ MachineInstance::MachineInstance(
 		.reset_free_work_mem = ten->config.limit_req_memory(),
 		.remappings {},
 		.hugepages = ten->config.ephemeral_hugepages(),
-		.allow_fixed_mmap = !ten->config.group.vmem_remappings.empty(),
+		.relocate_fixed_mmap = ten->config.group.relocate_fixed_mmap,
 	  }),
 	  m_tenant(ten), m_inst(inst),
 	  m_is_debug(source.is_debug()),

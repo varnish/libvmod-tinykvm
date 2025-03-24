@@ -224,16 +224,21 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		// Set the default ephemeralness for this group/tenant
 		group.ephemeral = obj.value();
 	}
+	else if (obj.key() == "relocate_fixed_mmap")
+	{
+		// Force fixed mmap to be relocated to current mmap address
+		group.relocate_fixed_mmap = obj.value();
+	}
 	else if (obj.key() == "environment")
 	{
 		// Append environment variables (NOTE: unable to overwrite defaults)
 		auto vec = obj.value().template get<std::vector<std::string>>();
 		group.environ.insert(group.environ.end(), vec.begin(), vec.end());
 	}
-	else if (obj.key() == "remapping" || obj.key() == "executable_remapping")
+	else if (obj.key() == "remapping" || obj.key() == "executable_remapping" || obj.key() == "blackout_area")
 	{
 		// Append remappings
-		auto entry = obj.value().template get<std::pair<std::string, uint32_t>>();
+		auto entry = obj.value().template get<std::pair<std::string, size_t>>();
 		char *end;
 		unsigned long long address = strtoull(entry.first.c_str(), &end, 16);
 		if (address < 0x20000) {
@@ -246,12 +251,10 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 			.virt = address,
 			.size = entry.second << 20U,
 			.writable   = true,
-			.executable = obj.key() == "executable_remapping"
+			.executable = obj.key() == "executable_remapping",
+			.blackout   = obj.key() == "blackout_area"
 		};
 		group.vmem_remappings.push_back(vmem);
-		//printf("Remapping at 0x%llX  size 0x%X\n",
-		//	group.vmem_remappings.back().virt,
-		//	group.vmem_remappings.back().size);
 	}
 	else if (obj.key() == "executable_heap")
 	{
@@ -263,6 +266,9 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	}
 	else if (obj.key() == "verbose") {
 		group.verbose = obj.value();
+	}
+	else if (obj.key() == "verbose_pagetables") {
+		group.verbose_pagetable = obj.value();
 	}
 	else if (obj.key() == "group") { /* Silently ignore. */ }
 	else if (obj.key() == "key")   { /* Silently ignore. */ }

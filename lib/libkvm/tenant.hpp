@@ -32,10 +32,12 @@ struct TenantGroup {
 	bool     hugepages    = false;
 	bool     ephemeral_hugepages = false;
 	bool     allow_debug = false;
+	bool     relocate_fixed_mmap = true;
 	bool     control_ephemeral = false;
 	bool     ephemeral = true;
 	bool     print_stdout = false; /* Print directly to stdout */
 	bool     verbose = false;
+	bool     verbose_pagetable = false;
 
 	std::vector<std::string> environ {
 		"LC_TYPE=C", "LC_ALL=C", "USER=root"
