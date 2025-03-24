@@ -103,6 +103,11 @@ void MachineInstance::initialize()
 			args,
 			tenant().config.environ());
 
+		// If verbose pagetables, print them just before running
+		if (tenant().config.group.verbose_pagetable) {
+			machine().print_pagetables();
+		}
+
 		if (this->is_debug()) {
 			this->open_debugger(2159, 120.0f);
 		}
@@ -151,9 +156,6 @@ void MachineInstance::initialize()
 	}
 	catch (const tinykvm::MachineException& me)
 	{
-		if (tenant().config.group.verbose_pagetable) {
-			machine().print_pagetables();
-		}
 		fprintf(stderr,
 			"Machine not initialized properly: %s\n", name().c_str());
 		fprintf(stderr,
@@ -162,9 +164,6 @@ void MachineInstance::initialize()
 	}
 	catch (const std::exception& e)
 	{
-		if (tenant().config.group.verbose_pagetable) {
-			machine().print_pagetables();
-		}
 		fprintf(stderr,
 			"Machine not initialized properly: %s\n", name().c_str());
 		fprintf(stderr,

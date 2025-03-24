@@ -169,6 +169,19 @@ Default: Disabled
 Allow remotely debugging requests with GDB. The request to be debugged has to cause a breakpoint. In the C API this is done with `sys_breakpoint()`. The GDB instance must load the program using `file myprogram` before it can remotely connect using `target remote :2159`.
 
 
+* `main_arguments`
+
+An array of arguments that will get passed to the main() function during startup.
+
+```json
+	"main_arguments": [
+		"--jitless"
+	]
+```
+
+The guest program has 3 mandatory arguments: The program, a single writable state file and an argument indicating whether or not the instance is a storage or request VM. The `main_arguments` array is added after these arguments. Using the JSON above as example, one might see: `my_program state request --jitless`.
+
+
 * `environment`
 
 An array of environment variables appended to the programs environ, accessible with getenv().

@@ -229,6 +229,14 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		// Force fixed mmap to be relocated to current mmap address
 		group.relocate_fixed_mmap = obj.value();
 	}
+	else if (obj.key() == "main_arguments")
+	{
+		auto& vec = group.main_arguments;
+		vec = std::make_shared<std::vector<std::string>>();
+		for (const auto& arg : obj.value()) {
+			vec->push_back(arg);
+		}
+	}
 	else if (obj.key() == "environment")
 	{
 		// Append environment variables (NOTE: unable to overwrite defaults)
