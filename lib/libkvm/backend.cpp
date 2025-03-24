@@ -539,7 +539,7 @@ ssize_t kvm_backend_streaming_delivery(
 	ssize_t max_len, ssize_t written)
 {
 	assert(result && result->stream_callback);
-	auto& slot = *(kvm::VMPoolItem *)result->stream_slot;
+	kvm::VMPoolItem& slot = *(kvm::VMPoolItem *)result->stream_slot;
 	auto& mi = *slot.mi;
 	mi.set_ctx(nullptr);
 	try {

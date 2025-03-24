@@ -156,6 +156,7 @@ int kvm_synth(VRT_CTX, kvm::MachineInstance* machine,
 		synth->status = status;
 		/* Content-Type */
 		if (tlen >= sizeof(synth->ct_buf)) {
+			VRT_fail(ctx, "Invalid synth response: Content-Type too long");
 			return (-1);
 		}
 		synth->ct_len = tlen;

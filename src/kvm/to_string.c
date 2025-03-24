@@ -56,8 +56,9 @@ minimal_response(uint16_t status, const char *content)
 	};
 }
 
+typedef void (*content_func_f)(const struct backend_result *, struct kvm_http_response *, void *);
 static struct kvm_http_response
-to_string(VRT_CTX, struct kvm_program_chain *chain)
+to_string(VRT_CTX, struct kvm_program_chain *chain, content_func_f content_callback, void *content_opaque)
 {
 	/* Program cpu-time t0. */
 	const vtim_real t0 = VTIM_real();
@@ -157,38 +158,56 @@ to_string(VRT_CTX, struct kvm_program_chain *chain)
 	/* Global program cpu-time statistic. */
 	kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
 
-	/* Finalize result into a string.
-	   Allocate room for zero-terminated content */
-	char *content = (char *)WS_Alloc(ctx->ws, result->content_length + 1);
-	if (content == NULL) {
-		if (last_slot != NULL) {
-			kvm_free_reserved_machine(ctx, last_slot);
-		}
-		VSLb(ctx->vsl, SLT_Error,
-			"KVM: Out of workspace for final content (size=%zu bytes)", result->content_length);
-		return (minimal_response(500, "Out of workspace"));
-	}
-	/* Extract content from VM */
-	char *coff = content;
-	for (size_t b = 0; b < result->bufcount; b++) {
-		memcpy(coff, result->buffers[b].data, result->buffers[b].size);
-		coff += result->buffers[b].size;
-	}
-	/* Zero-terminate content */
-	content[result->content_length] = 0;
+	struct kvm_http_response resp;
+	resp.status     = result->status;
+	resp.ctype      = result->type;
+	resp.ctype_size = result->tsize;
 
-	struct kvm_http_response res;
-	res.status     = result->status;
-	res.ctype      = result->type;
-	res.ctype_size = result->tsize;
-	res.content    = content;
-	res.content_size = result->content_length;
-	res.writable_content = true;
+	/* Finalize result by calling the content callback. */
+	content_callback(result, &resp, content_opaque);
 
 	if (last_slot != NULL) {
 		kvm_free_reserved_machine(ctx, last_slot);
 	}
-	return (res);
+	return (resp);
+}
+
+
+static void to_string_callback(const struct backend_result *result, struct kvm_http_response *resp, void *opaque)
+{
+	struct vrt_ctx *ctx = (struct vrt_ctx *)opaque;
+	struct ws *ws = ctx->ws;
+	CHECK_OBJ_NOTNULL(ws, WS_MAGIC);
+
+	/* Copy the result into the workspace */
+	size_t total_size = 0;
+	for (size_t i = 0; i < result->bufcount; i++) {
+		total_size += result->buffers[i].size;
+	}
+
+	/* Allocate content-length + zero-termination */
+	char *content = (char *)WS_Alloc(ws, total_size + 1);
+	if (content == NULL) {
+		VRT_fail(ctx,
+			"KVM: Out of workspace for final content (size=%zu bytes)", total_size);
+		resp->content = "";
+		resp->content_size = 0;
+		return;
+	}
+
+	/* Copy the content */
+	char *coff = content;
+	for (size_t i = 0; i < result->bufcount; i++) {
+		memcpy(coff, result->buffers[i].data, result->buffers[i].size);
+		coff += result->buffers[i].size;
+	}
+	/* Zero-terminate content */
+	content[total_size] = 0;
+
+	/* Set the content */
+	resp->content = content;
+	resp->content_size = total_size;
+	resp->writable_content = true;
 }
 
 VCL_STRING kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
@@ -222,11 +241,31 @@ VCL_STRING kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
 	struct kvm_program_chain chain = *kvm_chain_get_queue();
 	kvm_chain_get_queue()->count = 0;
 
-	struct kvm_http_response resp = to_string(ctx, &chain);
+	struct kvm_http_response resp = to_string(ctx, &chain, &to_string_callback, (void *)ctx);
 	if (resp.status < error_treshold)
 		return (resp.content);
 	else
 		return (on_error);
+}
+
+static void to_synth_callback(const struct backend_result *result, struct kvm_http_response *resp, void *opaque)
+{
+	struct vrt_ctx *ctx = (struct vrt_ctx *)opaque;
+	struct ws *ws = ctx->ws;
+	CHECK_OBJ_NOTNULL(ws, WS_MAGIC);
+
+	/* In vcl_synth or vcl_backend_error, we have access to a VSB for content */
+	struct vsb *vsb = (struct vsb *)ctx->specific;
+	CHECK_OBJ_NOTNULL(vsb, VSB_MAGIC);
+
+	/* Copy the content type */
+	resp->ctype = result->type;
+	resp->ctype_size = result->tsize;
+
+	VSB_clear(vsb);
+	for (size_t i = 0; i < result->bufcount; i++) {
+		VSB_bcat(vsb, result->buffers[i].data, result->buffers[i].size);
+	}
 }
 
 VCL_INT kvm_vm_synth(VRT_CTX, VCL_PRIV task, VCL_INT status,
@@ -264,7 +303,7 @@ VCL_INT kvm_vm_synth(VRT_CTX, VCL_PRIV task, VCL_INT status,
 	struct kvm_program_chain chain = *kvm_chain_get_queue();
 	kvm_chain_get_queue()->count = 0;
 
-	struct kvm_http_response resp = to_string(ctx, &chain);
+	struct kvm_http_response resp = to_string(ctx, &chain, &to_synth_callback, (void *)ctx);
 	struct http *hp = ctx->http_resp ? ctx->http_resp : ctx->http_beresp;
 
 	status = (status >= 200 && status < 700) ? status : resp.status;
@@ -280,13 +319,6 @@ VCL_INT kvm_vm_synth(VRT_CTX, VCL_PRIV task, VCL_INT status,
 #endif
 	http_PrintfHeader(hp, "Content-Length: %zu", resp.content_size);
 	http_PrintfHeader(hp, "Content-Type: %.*s", (int)resp.ctype_size, resp.ctype);
-
-	struct vsb *vsb = (struct vsb *)ctx->specific;
-	CHECK_OBJ_NOTNULL(vsb, VSB_MAGIC);
-
-	/* XXX: Don't bother with VSB_FIXEDLEN here. It's broken and leaks memory. */
-	VSB_clear(vsb);
-	VSB_bcat(vsb, resp.content, resp.content_size);
 
 	return (status);
 }
