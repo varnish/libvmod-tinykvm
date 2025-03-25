@@ -86,7 +86,7 @@ backend default none;
 
 sub vcl_init {
 	# Make the Varnish Enterprise public compute library available
-	tinykvm.library("https://filebin.varnish-software.com/tinykvm_programs/tinykvm.json");
+	tinykvm.library("https://filebin.varnish-software.com/tinykvm_programs/compute.json");
 }
 
 sub vcl_backend_fetch {

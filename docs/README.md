@@ -6,7 +6,7 @@ That is the official wording, at least. A simpler explanation is that it takes a
 
 TinyKVM VMOD programs are processing data the same way any of your normal Linux programs would. Instead of opening files and reading/writing to standard pipes, we instead get a request from Varnish, and we produce a regular HTTP response. Many existing programs are tested and verified locally on the terminal, with the usual access to developer tools.
 
-The foundation for this VMOD is the same foundation used by the public cloud, which is KVM. The most trusted, most robust and battle hardened hardware virtualization API, with an amazingly low attack surface. However, in our case the attack surface is even smaller than that, as there is fundamentally no I/O, requiring no drivers which is a big source of overhead and attack surface for QEMU. _[TinyKVM paper](https://github.com/varnish/libvmod-tinykvm/releases/download/v0.1/Introducing_TinyKVM_Alf_2023__CloudCom.pdf)._
+The foundation for this VMOD is the same foundation used by the public cloud, which is KVM. The most trusted, most robust and battle hardened hardware virtualization API, with an amazingly low attack surface. However, in our case the attack surface is even smaller than that, as there is fundamentally no I/O, requiring no drivers which is a source of overhead and attack surface for QEMU. _[TinyKVM paper](https://github.com/varnish/libvmod-tinykvm/releases/download/v0.1/Introducing_TinyKVM_Alf_2023__CloudCom.pdf)._
 
 
 ## Navigation

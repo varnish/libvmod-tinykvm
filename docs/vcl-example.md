@@ -2,9 +2,9 @@
 
 Using the TinyKVM VMOD is fairly straight-forward:
 
-1. Initialize official programs by fetching the official library.
+1. Load a library of programs.
 2. Read documentation about each individual program in order to understand usage and how to configure the program to do your bidding.
-3. Make use of compute resources in VCL, eg. passing images into transcoder programs.
+3. Make use of any combination of programs in VCL, eg. passing images into transcoder programs.
 
 
 ## Example image transcoding
@@ -13,8 +13,8 @@ Using the TinyKVM VMOD is fairly straight-forward:
 import tinykvm;
 
 sub vcl_init {
-	# Download and activate a Varnish-provided library of compute programs.
-	tinykvm.library("https://filebin.varnish-software.com/tinykvm_programs/tinykvm.json");
+	# Download and activate an example library of compute programs.
+	tinykvm.library("https://filebin.varnish-software.com/tinykvm_programs/compute.json");
 
 	# Tell VMOD TinyKVM how to contact Varnish (Unix Socket *ONLY*).
 	tinykvm.init_self_requests("/tmp/tinykvm.sock");
@@ -40,8 +40,8 @@ sub vcl_backend_fetch {
 import tinykvm;
 
 sub vcl_init {
-	# Download and activate a Varnish-provided library of compute programs.
-	tinykvm.library("https://filebin.varnish-software.com/tinykvm_programs/tinykvm.json");
+	# Download and activate an example library of compute programs.
+	tinykvm.library("https://filebin.varnish-software.com/tinykvm_programs/compute.json");
 
 	# Tell VMOD TinyKVM how to contact Varnish (Unix Socket *ONLY*).
 	tinykvm.init_self_requests("/tmp/tinykvm.sock");

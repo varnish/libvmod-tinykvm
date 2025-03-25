@@ -54,7 +54,7 @@ Add `import tinykvm;` at the top of your VCL to load the TinyKVM VMOD.
 
 - Queue this program up for execution in the exact order given.
 - Returns true if the program was found.
-- A program chain always end with a call to program().
+- A program chain always end with a call to `tinykvm.program()`.
 - Must be called from vcl_backend_fetch.
 
 ---
@@ -72,16 +72,16 @@ Add `import tinykvm;` at the top of your VCL to load the TinyKVM VMOD.
 - Returns a string of the response produced by the given program.
 - Supports GET, POST and other HTTP requests.
 - If the program fails or returns an error, this function returns the on_error string instead.
-- Works with chaining, and calls to_string() for the final string after chained programs.
+- Works with chaining, and calls to_string() for the final string after processing chain.
 - NOTE: Uses extra workspace for each call. See: man varnishd, workspace_backend.
 
 ---
 > `tinykvm.synth(status, program, url = "", arg = "")`
 
-- Directly delivers a synthetic response. If status is non-zero, the HTTP status will be overridden.
+- Directly delivers a synthetic response. If status is non-zero, final HTTP status will be overridden.
 - Generates a synthetic response from the given program and arguments.
 - If the synthetic response fails, the function returns 0.
-- Works the same way as to_string().
+- Works the same way as to_string(), and supports chaining.
 
 ---
 > `tinykvm.steal(program, argument = "")`
