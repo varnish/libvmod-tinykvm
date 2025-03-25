@@ -214,6 +214,10 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	{
 		group.allow_debug = obj.value();
 	}
+	else if (obj.key() == "remote_debug_on_exception")
+	{
+		group.remote_debug_on_exception = obj.value();
+	}
 	else if (obj.key() == "control_ephemeral")
 	{
 		// Allow guest to control ephemeral using system call

@@ -169,6 +169,11 @@ Default: Disabled
 Allow remotely debugging requests with GDB. The request to be debugged has to cause a breakpoint. In the C API this is done with `sys_breakpoint()`. The GDB instance must load the program using `file myprogram` before it can remotely connect using `target remote :2159`.
 
 
+* `remote_debug_on_exception`
+
+Start a remote debugging session with GDB as soon as a request VM has an exception thrown. This allows inspecting hard-to-trigger bugs. The GDB instance must load the program using `file myprogram` before it can remotely connect using `target remote :2159`. The session has a 5-minute timeout, after which it is disconnected.
+
+
 * `main_arguments`
 
 An array of arguments that will get passed to the main() function during startup.

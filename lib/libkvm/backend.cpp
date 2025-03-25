@@ -184,9 +184,20 @@ static void error_handling(kvm::VMPoolItem* slot,
 
 	const auto& prog = machine.program();
 	auto* ctx = machine.ctx();
-	if (prog.entry_at(ProgramEntryIndex::BACKEND_ERROR) != 0x0) {
+
 	try {
-		auto& vm = machine.machine();
+		/* Check if the program is configured to open a remote GDB session on exception. */
+		if (machine.tenant().config.group.remote_debug_on_exception) {
+			auto fut = slot->tp.enqueue(
+			[&] () -> long {
+				/* Open a remote GDB session on the VM. */
+				machine.open_debugger(2159, 5 * 60.0f);
+				return 0L;
+			});
+			fut.get();
+		}
+		/* Check if the program has a backend_error callback. */
+		if (prog.entry_at(ProgramEntryIndex::BACKEND_ERROR) != 0x0) {
 		auto fut = slot->tp.enqueue(
 		[&] () -> long {
 			auto& machine = *slot->mi;
@@ -206,6 +217,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 				"%s: Calling on_error() at 0x%lX",
 				machine.name().c_str(), on_error_addr);
 
+			auto& vm = machine.machine();
 			vm.timed_vmcall(on_error_addr,
 				ERROR_HANDLING_TIMEOUT, invoc->inputs.url, invoc->inputs.argument, exception);
 
@@ -217,7 +229,7 @@ static void error_handling(kvm::VMPoolItem* slot,
 		});
 		fut.get();
 		return;
-
+		} // error callback
 	} catch (const tinykvm::MachineTimeoutException& mte) {
 		kvm_varnishstat_program_timeout();
 		VSLb(ctx->vsl, SLT_Error,
@@ -231,7 +243,6 @@ static void error_handling(kvm::VMPoolItem* slot,
 			machine.name().c_str(), e.what(), e.data());
 	} catch (const std::exception& e) {
 		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
-	}
 	}
 	try {
 		/* Make sure no SMP work is in-flight. */

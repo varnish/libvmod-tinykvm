@@ -32,6 +32,7 @@ struct TenantGroup {
 	bool     hugepages    = false;
 	bool     ephemeral_hugepages = false;
 	bool     allow_debug = false;
+	bool     remote_debug_on_exception = false;
 	bool     relocate_fixed_mmap = true;
 	bool     control_ephemeral = false;
 	bool     ephemeral = true;
