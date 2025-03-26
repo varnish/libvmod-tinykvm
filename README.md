@@ -47,7 +47,41 @@ There is a build-merge-release CI system that currently only builds for Ubuntu 2
 
 [Demonstration VCL here](/demo/tinykvm.vcl). Use `run.sh` in the same directory to try it out.
 
-## Examples
+### Example VCL
+
+```vcl
+vcl 4.1;
+import tinykvm;
+backend default none;
+
+sub vcl_init {
+	# Download and activate a Varnish-provided library of compute programs.
+	# A full list of programs and how they can be used would be on the docs site.
+	tinykvm.library("https://filebin.varnish-software.com/tinykvm_programs/compute.json");
+
+	# Tell VMOD compute how to contact Varnish (Unix Socket *ONLY*)
+	tinykvm.init_self_requests("/tmp/tinykvm.sock");
+}
+
+sub vcl_backend_fetch {
+	# Fetch a JPG image from a remote server
+	tinykvm.chain("fetch",
+		"https://filebin.varnish-software.com/tinykvm_programs/spooky.jpg",
+		"""{
+			"headers": ["Host: filebin.varnish-software.com"]
+		}""");
+	# Transcode JPG to AVIF and compress with Zstandard
+	tinykvm.chain("avif");
+	set bereq.backend = tinykvm.program("zstd", "",
+		"""{
+			"action": "compress",
+			"level": 6,
+			"resp_headers": ["Content-Disposition: inline; filename=spooky.avif"]
+		}""");
+}
+```
+
+## Example programs
 
 [Programs and examples repository](https://github.com/varnish/tinykvm_examples).
 
