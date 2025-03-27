@@ -1,0 +1,13 @@
+services:
+  tinykvm-docker:
+    image: vmod-tinykvm:latest
+    container_name: tinykvm-varnish
+    ports:
+      - "8080:80"
+    restart: always
+    group_add:
+      - "${KVM_GID:-109}"
+    devices:
+      - "/dev/kvm:/dev/kvm"
+    volumes:
+      - ./demo/tinykvm.vcl:/etc/varnish/default.vcl

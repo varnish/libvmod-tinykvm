@@ -6,6 +6,12 @@ The TinyKVM VMOD processes data in Varnish at native performance using your serv
 
 You can find the complete [VMOD documentation here](docs/README.md).
 
+## Demonstration
+
+```sh
+KVM_GID=$(getent group kvm | cut -d: -f3) docker compose up
+```
+
 ## Building and installing
 
 The build dependencies for this VMOD can be found in CI, but briefly:
@@ -43,10 +49,6 @@ There is a build-merge-release CI system that currently only builds for Ubuntu 2
 
 [Packages here](https://github.com/varnish/libvmod-tinykvm/releases/download/v0.1/artifacts.zip).
 
-## Try it out
-
-[Demonstration VCL here](/demo/tinykvm.vcl). Use `run.sh` in the same directory to try it out.
-
 ### Example VCL
 
 ```vcl
@@ -70,14 +72,11 @@ sub vcl_backend_fetch {
 		"""{
 			"headers": ["Host: filebin.varnish-software.com"]
 		}""");
-	# Transcode JPG to AVIF and compress with Zstandard
-	tinykvm.chain("avif");
-	set bereq.backend = tinykvm.program("zstd", "",
-		"""{
-			"action": "compress",
-			"level": 6,
-			"resp_headers": ["Content-Disposition: inline; filename=spooky.avif"]
-		}""");
+	# Transcode JPG to AVIF
+	set bereq.backend = tinykvm.program("avif", "", """{
+		"speed": 10,
+		"quality": 35
+	}""");
 }
 ```
 
