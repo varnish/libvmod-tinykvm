@@ -252,6 +252,8 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		if (!obj.value().is_array() || obj.value().size() != 2) {
 			throw std::runtime_error("Remapping must be an array of two elements");
 		}
+		// Reset errno
+		errno = 0;
 		// Append remappings
 		auto& arr = obj.value();
 		size_t size = 0;
