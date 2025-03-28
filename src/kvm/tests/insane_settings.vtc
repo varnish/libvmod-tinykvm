@@ -55,7 +55,43 @@ vcl 4.1;
 	}
 } -start
 
-client c1 {
+client c1 -connect ${v1_sock} {
+	txreq -url "/my_backend" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.status == 503
+} -run
+
+varnish v2 -vcl+backend {
+vcl 4.1;
+	import kvm;
+
+	backend default none;
+
+	sub vcl_init {
+		kvm.embed_tenants("""
+			{
+				"xpizza.com": {
+					"filename": "${tmpdir}/${testname}",
+					"key": "",
+					"group": "test",
+					"concurrency": 128
+				}
+			}
+		""");
+	}
+
+	sub vcl_recv {
+		return (pass);
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = kvm.vm_backend(
+				bereq.http.Host,
+				bereq.url);
+	}
+} -start
+
+client c2 -connect ${v2_sock} {
 	txreq -url "/my_backend" -hdr "Host: xpizza.com"
 	rxresp
 	expect resp.status == 404

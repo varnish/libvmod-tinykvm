@@ -164,6 +164,11 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		// Limits the memory of the Main VM.
 		group.set_max_memory(obj.value());
 	}
+	else if (obj.key() == "address_space")
+	{
+		// Limits the address space of the Main VM.
+		group.set_max_address(obj.value());
+	}
 	else if (obj.key() == "max_request_memory")
 	{
 		// Limits the memory of an ephemeral VM. Ephemeral VMs are used to handle
@@ -187,6 +192,9 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	else if (obj.key() == "concurrency")
 	{
 		group.max_concurrency = obj.value();
+		if (group.max_concurrency > 128) {
+			throw std::runtime_error("VM concurrency cannot be larger than 128");
+		}
 	}
 	else if (obj.key() == "storage")
 	{
