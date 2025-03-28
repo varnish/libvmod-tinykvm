@@ -88,7 +88,7 @@ void MachineInstance::initialize()
 		//printf("Heap BRK: 0x%lX -> 0x%lX\n", machine().heap_address(), machine().heap_address() + tinykvm::Machine::BRK_MAX);
 		//printf("Stack: 0x%lX -> 0x%lX\n", stack, stack + MAIN_STACK_SIZE);
 
-		// Make forkable (with *NO* working memory)
+		// Use constrained working memory
 		machine().prepare_copy_on_write(tenant().config.max_main_memory());
 
 		// Main arguments: 3x mandatory + N configurable
