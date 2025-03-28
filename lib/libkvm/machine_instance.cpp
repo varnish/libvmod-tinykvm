@@ -183,7 +183,6 @@ MachineInstance::MachineInstance(
 		.max_mem = ten->config.max_main_memory(),
 		.max_cow_mem = ten->config.max_req_memory(),
 		.reset_free_work_mem = ten->config.limit_req_memory(),
-		.remappings {},
 		.hugepages = ten->config.ephemeral_hugepages(),
 		.relocate_fixed_mmap = ten->config.group.relocate_fixed_mmap,
 	  }),
@@ -275,6 +274,9 @@ void MachineInstance::wait_for_requests_paused()
 
 	/* Only ephemeral VMs need PausedVMState */
 	if (this->tenant().config.group.ephemeral) {
+		if (machine().is_forked()) {
+			return;
+		}
 		std::any& state = program().get_paused_vm_state();
 		auto& pvs = state.emplace<PausedVMState>(
 			PausedVMState{machine().registers(), machine().fpu_registers()});
