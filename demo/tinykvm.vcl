@@ -7,16 +7,14 @@ sub vcl_init {
 	# Download and activate a Varnish-provided library of compute programs.
 	# A full list of programs and how they can be used would be on the docs site.
 	tinykvm.library("https://filebin.varnish-software.com/tinykvm_programs/compute.json");
-	#tinykvm.library("file:///home/gonzo/github/kvm_demo/compute.json");
 
 	# Tell VMOD compute how to contact Varnish (Unix Socket *ONLY*)
 	tinykvm.init_self_requests("/tmp/tinykvm.sock");
-	#tinykvm.init_self_requests("", "http://127.0.0.1:8080");
 
 	# Add concurrency to important programs
 	tinykvm.configure("avif",
 		"""{
-			"concurrency": 2,
+			"concurrency": 4,
 			"req_mem_limit_after_reset": 20,
 			"ephemeral": false
 		}""");
@@ -70,10 +68,12 @@ sub vcl_backend_fetch {
 			}""");
 	}
 	else if (bereq.url == "/avif/bench") {
-		set bereq.backend = tinykvm.program("avif",
+		set bereq.backend = tinykvm.program("avif", "",
 			"""{
-				"action": "bench",
-				"image": "https://filebin.varnish-software.com/tinykvm_programs/rose.jpg"
+				"action": "benchmark",
+				"quality": 30,
+				"speed": 10,
+				"headers": ["Host: filebin.varnish-software.com"]
 			}""");
 	}
 	else if (bereq.url == "/webp/bench") {
