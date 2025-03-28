@@ -2,6 +2,8 @@ services:
   tinykvm-docker:
     image: vmod-tinykvm:latest
     container_name: tinykvm-varnish
+    build:
+      dockerfile: Dockerfile
     ports:
       - "8080:80"
     restart: always
