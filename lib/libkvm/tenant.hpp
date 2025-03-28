@@ -20,6 +20,7 @@ struct TenantGroup {
 	float    max_req_time; /* Seconds */
 	float    max_storage_time; /* Seconds */
 	uint32_t max_queue_time; /* Seconds */
+	uint64_t max_address_space; /* Megabytes */
 	uint64_t max_main_memory; /* Megabytes */
 	uint32_t max_req_mem; /* Megabytes */
 	uint32_t limit_req_mem; /* Megabytes of memory banks to keep after request completion */
@@ -51,7 +52,12 @@ struct TenantGroup {
 
 	std::vector<std::string> allowed_paths;
 
-	void set_max_memory(uint64_t newmax_mb) { this->max_main_memory = newmax_mb * 1048576ul; }
+	void set_max_address(uint64_t newmax_mb) { this->max_address_space = newmax_mb * 1048576ul; }
+	void set_max_memory(uint64_t newmax_mb) {
+		this->max_main_memory = newmax_mb * 1048576ul;
+		// The address space should be at least as large as the memory.
+		this->max_address_space = std::max(this->max_address_space, this->max_main_memory);
+	}
 	void set_max_workmem(uint64_t newmax_mb) { this->max_req_mem = newmax_mb * 1048576ul; }
 	void set_limit_workmem_after_req(uint64_t newmax_mb) { this->limit_req_mem = newmax_mb * 1048576ul; }
 	void set_shared_mem(uint64_t newmax_mb) { this->shared_memory = newmax_mb * 1048576ul; }
@@ -66,6 +72,7 @@ struct TenantGroup {
 		  max_req_time(REQUEST_VM_TIMEOUT),
 		  max_storage_time(STORAGE_TIMEOUT),
 		  max_queue_time(RESV_QUEUE_TIMEOUT),
+		  max_address_space(MAIN_MEMORY_SIZE * 1048576ul),
 		  max_main_memory(MAIN_MEMORY_SIZE * 1048576ul),
 		  max_req_mem(REQUEST_MEMORY_SIZE * 1048576ul),
 		  limit_req_mem(REQUEST_MEMORY_AFTER_RESET * 1048576ul),
@@ -91,6 +98,7 @@ struct TenantConfig
 		return group.max_req_time;
 	}
 	float    max_storage_time() const noexcept { return group.max_storage_time; }
+	uint64_t max_address() const noexcept { return group.max_address_space; }
 	uint64_t max_main_memory() const noexcept { return group.max_main_memory; }
 	uint32_t max_req_memory() const noexcept { return group.max_req_mem; }
 	uint32_t limit_req_memory() const noexcept { return group.limit_req_mem; }

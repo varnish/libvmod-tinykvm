@@ -52,13 +52,13 @@ MachineInstance::MachineInstance(
 	bool storage, bool debug)
 	: m_ctx(ctx),
 	  m_machine(binary, tinykvm::MachineOptions{
-		.max_mem = ten->config.max_main_memory(),
+		.max_mem = ten->config.max_address(),
 		.max_cow_mem = 0UL,
 		.vmem_base_address = detect_gigapage_from(binary),
 		.remappings {ten->config.group.vmem_remappings},
 		.verbose_loader = ten->config.group.verbose,
 		.hugepages = ten->config.hugepages(),
-		.master_direct_memory_writes = false,
+		.master_direct_memory_writes = true,
 		.relocate_fixed_mmap = ten->config.group.relocate_fixed_mmap,
 		.executable_heap = ten->config.group.vmem_heap_executable,
 	  }),
@@ -87,6 +87,9 @@ void MachineInstance::initialize()
 		machine().set_stack_address(stack_end);
 		//printf("Heap BRK: 0x%lX -> 0x%lX\n", machine().heap_address(), machine().heap_address() + tinykvm::Machine::BRK_MAX);
 		//printf("Stack: 0x%lX -> 0x%lX\n", stack, stack + MAIN_STACK_SIZE);
+
+		// Make forkable (with *NO* working memory)
+		machine().prepare_copy_on_write(tenant().config.max_main_memory());
 
 		// Main arguments: 3x mandatory + N configurable
 		std::vector<std::string> args {
