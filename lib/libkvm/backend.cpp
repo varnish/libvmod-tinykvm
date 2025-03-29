@@ -407,7 +407,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					machine.name().c_str(), regs.rip);
 
 				/* Resume execution */
-				vm.run_in_usermode(timeout);
+				vm.vmresume();
 				/* Verify response and fill out result struct. */
 				fetch_result(slot, machine, result);
 				/* Ephemeral VMs are reset and don't need to run until halt. */
