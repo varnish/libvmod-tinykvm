@@ -164,6 +164,12 @@ Enable hugepages for request handling (memory banks). This can result in a modes
 
 Default: Disabled
 
+* `split_hugepages`
+
+With very high concurrency, constraining memory as much as possible may be desirable. This option allows splitting hugepages into 4K leaf pages. It adds a level of page-walking needed to access pages, but will keep working memory slightly lower.
+
+Default: Disabled
+
 * `allow_debug`
 
 Allow remotely debugging requests with GDB. The request to be debugged has to cause a breakpoint. In the C API this is done with `sys_breakpoint()`. The GDB instance must load the program using `file myprogram` before it can remotely connect using `target remote :2159`.

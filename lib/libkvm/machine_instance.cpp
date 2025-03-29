@@ -184,6 +184,7 @@ MachineInstance::MachineInstance(
 		.max_cow_mem = ten->config.max_req_memory(),
 		.reset_free_work_mem = ten->config.limit_req_memory(),
 		.hugepages = ten->config.ephemeral_hugepages(),
+		.split_hugepages = ten->config.group.split_hugepages,
 		.relocate_fixed_mmap = ten->config.group.relocate_fixed_mmap,
 	  }),
 	  m_tenant(ten), m_inst(inst),
