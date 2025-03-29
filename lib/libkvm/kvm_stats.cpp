@@ -40,6 +40,7 @@ static auto gather_stats(const MachineInstance& mi, TT& taskq)
 		{"status_3xx",  stats.status_3xx},
 		{"status_4xx",  stats.status_4xx},
 		{"status_5xx",  stats.status_5xx},
+		{"vm_address_space", mi.tenant().config.max_address()},
 		{"vm_main_memory",   mi.tenant().config.max_main_memory()},
 		{"vm_bank_capacity", mi.tenant().config.max_req_memory()},
 		{"vm_bank_highest",  mi.machine().banked_memory_capacity_bytes()},

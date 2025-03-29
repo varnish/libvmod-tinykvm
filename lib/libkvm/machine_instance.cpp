@@ -310,7 +310,7 @@ uint64_t MachineInstance::shared_memory_boundary() const noexcept
 {
 	if (shared_memory_size() > 0)
 		/* For VMs < 4GB this works well enough. */
-		return tenant().config.group.max_main_memory - shared_memory_size();
+		return tenant().config.group.max_address_space - shared_memory_size();
 	else
 		return ~uint64_t(0);
 }
