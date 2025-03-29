@@ -88,8 +88,18 @@ void MachineInstance::initialize()
 		//printf("Heap BRK: 0x%lX -> 0x%lX\n", machine().heap_address(), machine().heap_address() + tinykvm::Machine::BRK_MAX);
 		//printf("Stack: 0x%lX -> 0x%lX\n", stack, stack + MAIN_STACK_SIZE);
 
+		// This can probably be solved later, but for now they are incompatible
+		if (shared_memory_size() > 0 && !tenant().config.group.vmem_remappings.empty())
+		{
+			throw std::runtime_error("Shared memory is currently incompatible with vmem remappings");
+		}
+		// Global shared memory boundary
+		const uint64_t shm_boundary = shared_memory_boundary();
+		//printf("Shared memory boundary: 0x%lX Max addr: 0x%lX\n",
+		//	shm_boundary, machine().max_address());
+
 		// Use constrained working memory
-		machine().prepare_copy_on_write(tenant().config.max_main_memory());
+		machine().prepare_copy_on_write(tenant().config.max_main_memory(), shm_boundary);
 
 		// Main arguments: 3x mandatory + N configurable
 		std::vector<std::string> args {
@@ -135,16 +145,6 @@ void MachineInstance::initialize()
 		// Only request VMs need the copy-on-write mechanism enabled
 		if (!is_storage())
 		{
-			// This can probably be solved later, but for now they are incompatible
-			if (shared_memory_size() > 0 && !tenant().config.group.vmem_remappings.empty())
-			{
-				throw std::runtime_error("Shared memory is currently incompatible with vmem remappings");
-			}
-			// Global shared memory boundary
-			uint64_t shm_boundary = shared_memory_boundary();
-			//printf("Shared memory boundary: 0x%lX Max addr: 0x%lX\n",
-			//	shm_boundary, machine().max_address());
-
 			// Make forkable (with *NO* working memory)
 			machine().prepare_copy_on_write(0UL, shm_boundary);
 		}
