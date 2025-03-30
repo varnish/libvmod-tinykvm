@@ -32,7 +32,7 @@ struct TenantGroup {
 	bool     has_storage  = false;
 	bool     hugepages    = false;
 	bool     ephemeral_hugepages = false;
-	bool     split_hugepages = false;
+	bool     split_hugepages = true;
 	bool     allow_debug = false;
 	bool     remote_debug_on_exception = false;
 	bool     relocate_fixed_mmap = true;

@@ -59,6 +59,7 @@ MachineInstance::MachineInstance(
 		.verbose_loader = ten->config.group.verbose,
 		.hugepages = ten->config.hugepages(),
 		.master_direct_memory_writes = true,
+		.split_hugepages = false,
 		.relocate_fixed_mmap = ten->config.group.relocate_fixed_mmap,
 		.executable_heap = ten->config.group.vmem_heap_executable,
 	  }),
