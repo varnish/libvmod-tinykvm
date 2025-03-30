@@ -14,8 +14,8 @@
 **/
 #include "machine_instance.hpp"
 #include "paused_vm_state.hpp"
-#include "settings.hpp"
 #include "program_instance.hpp"
+#include "settings.hpp"
 #include "tenant_instance.hpp"
 #include "timing.hpp"
 #include "varnish.hpp"
@@ -246,7 +246,6 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 			.max_mem = tenant().config.max_main_memory(),
 			.max_cow_mem = tenant().config.max_req_memory(),
 			.reset_free_work_mem = tenant().config.limit_req_memory(),
-			.remappings {},
 		});
 		this->m_waiting_for_requests = source.m_waiting_for_requests;
 		/* The POST memory area is gone. */
