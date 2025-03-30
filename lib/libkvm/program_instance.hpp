@@ -5,7 +5,6 @@
 #include "settings.hpp"
 #include "adns.hpp"
 #include "utils/cpptime.hpp"
-#include <any>
 #include <blockingconcurrentqueue.h>
 #include <tinykvm/util/threadpool.h>
 #include <tinykvm/util/threadtask.hpp>
@@ -218,11 +217,6 @@ public:
 		int64_t  live_update_transfer_bytes = 0;
 	} stats;
 
-	/* In the case where the VM was paused just before starting to serve
-	   requests, the state of the VM was stored here. */
-	auto& get_paused_vm_state() { return m_paused_vm_state; }
-	const auto& get_paused_vm_state() const { return m_paused_vm_state; }
-
 	static int numa_node();
 
 private:
@@ -240,7 +234,6 @@ private:
 	int8_t m_initialization_complete = 0;
 	bool m_binary_was_local = false;
 	bool m_binary_was_cached = false;
-	std::any m_paused_vm_state;
 };
 
 inline bool ProgramInstance::wait_for_main_vm()
