@@ -36,7 +36,6 @@
  * 
 **/
 #include "tenant_instance.hpp"
-#include "paused_vm_state.hpp"
 #include "program_instance.hpp"
 #include "scoped_duration.hpp"
 #include "settings.hpp"
@@ -389,15 +388,6 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				fill_backend_inputs(machine, stack, invoc, post, inputs);
 
 				auto& regs = vm.registers();
-				if (machine.tenant().config.group.ephemeral) {
-					if (!prog.get_paused_vm_state().has_value()) {
-						throw std::runtime_error("No paused VM state to resume");
-					}
-					const PausedVMState& state = std::any_cast<PausedVMState> (prog.get_paused_vm_state());
-					regs = state.regs;
-					vm.set_fpu_registers(state.fpu);
-					vm.set_registers(regs);
-				}
 				/* RDI is address of struct backend_inputs */
 				const uint64_t g_struct_addr = regs.rdi;
 				vm.copy_to_guest(g_struct_addr, &inputs, sizeof(inputs));
