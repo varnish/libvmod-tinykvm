@@ -42,8 +42,8 @@ static auto gather_stats(const MachineInstance& mi, TT& taskq)
 		{"status_5xx",  stats.status_5xx},
 		{"vm_address_space", mi.tenant().config.max_address()},
 		{"vm_main_memory",   mi.tenant().config.max_main_memory()},
-		{"vm_bank_capacity", mi.tenant().config.max_req_memory()},
-		{"vm_bank_highest",  mi.machine().banked_memory_capacity_bytes()},
+		{"vm_bank_capacity", mi.machine().banked_memory_capacity_bytes()},
+		{"vm_bank_highest",  mi.machine().banked_memory_allocated_bytes()},
 		{"vm_bank_current",  mi.machine().banked_memory_bytes()},
 		{"tasks_queued",   taskq.racy_queue_size()}
 	});
