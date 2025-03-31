@@ -50,7 +50,9 @@ void MachineInstance::sanitize_path(char* buffer, size_t buflen)
 		}
 	}
 	if (len > 0) {
-		printf("Path failed: %.*s\n", (int)len, buffer);
+		if (this->tenant().config.group.verbose) {
+			printf("Path failed: %.*s\n", (int)len, buffer);
+		}
 		throw std::runtime_error("Disallowed path used");
 	}
 }

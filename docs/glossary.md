@@ -110,7 +110,7 @@ Granularity: seconds
 
 * `max_storage_time`
 
-The maximum number of seconds access to the shared storage for a program is allowed to take.
+The maximum number of seconds of access to the shared storage a program is allowed to take.
 
 Granularity: seconds
 
@@ -118,7 +118,7 @@ Granularity: seconds
 
 The maximum memory usage allowed during both request initialization and storage initialization.
 
-Granularity: megabytes
+Granularity: 2 megabytes
 
 * `max_request_memory`
 
@@ -152,6 +152,12 @@ Granularity: 2 megabytes
 
 Default: No shared memory
 
+* `address_space`
+
+The maximum accessible address, with a maximum limit of 512GB. This value will automatically be adjusted to accommodate `max_memory`.
+
+Granularity: 2 megabytes
+
 * `hugepages`
 
 Enable hugepages for the entire address space during initialization. Not recommended. Do *NOT* enable this unless you have enough hugepages allocated beforehand.
@@ -166,9 +172,19 @@ Default: Disabled
 
 * `split_hugepages`
 
-With very high concurrency, constraining memory as much as possible may be desirable. This option allows splitting hugepages into 4K leaf pages. It adds a level of page-walking needed to access pages, but will keep working memory slightly lower.
+With very high concurrency, constraining memory as much as possible may be desirable. This option allows splitting hugepages during request handling into 4K leaf pages. It adds a level of page-walking needed to access pages, but will keep working memory slightly lower.
 
 Default: Disabled
+
+* `ephemeral`
+
+An ephemeral VM is reset after each request concludes, regardless of reason. Ephemeral VMs are reset back to their initialized state, erasing all changes that happened during the request. A non-ephemeral VM will not be reset, which increases performance but without the security and stability guarantees of ephemeralness. If a non-ephemeral VM crashes, runs out of memory or times out, it will be reset.
+
+Default: Enabled
+
+* `control_ephemeral`
+
+When enabled, a program may self-determine if ephemeral is enabled or not after initialization. The program changes this setting using `sys_make_ephemeral(bool)` before initialization concludes by waiting for requests.
 
 * `allow_debug`
 
@@ -205,7 +221,7 @@ An array of environment variables appended to the programs environ, accessible w
 
 * `allowed_paths`
 
-An array of paths specifying each individual file that a program is allowed to read from. Programs are only allowed to read files, and only individual files.
+An array of paths specifying each individual file that a program is allowed to read from. Programs are allowed to list directiories and read files, in read-only mode.
 
 ```json
 	"allowed_paths": [
@@ -215,3 +231,11 @@ An array of paths specifying each individual file that a program is allowed to r
 ```
 
 Example paths for the espeak-ng text-to-speech generator.
+
+* `verbose`
+
+Enable verbose output from program loading, as well as from certain system calls. For example, inaccessible file paths will be printed to console.
+
+* `verbose_pagetables`
+
+Print the main VMs pagetable state after initialization.
