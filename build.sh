@@ -6,6 +6,7 @@ set -e
 export CC="ccache $CC"
 export CXX="ccache $CXX"
 cmake_extra=""
+build_type="Release"
 varnish_plus="OFF"
 
 usage() {
@@ -21,6 +22,26 @@ for i in "$@"; do
             varnish_plus="ON"
             shift
             ;;
+		--sanitize)
+			build_type="Debug"
+			cmake_extra="-DSANITIZE=ON"
+			shift
+			;;
+		--no-sanitize)
+			build_type="Release"
+			cmake_extra="-DSANITIZE=OFF"
+			shift
+			;;
+		--debug)
+			build_type="Debug"
+			cmake_extra="-DSANITIZE=OFF"
+			shift
+			;;
+		--release)
+			build_type="Release"
+			cmake_extra="-DSANITIZE=OFF"
+			shift
+			;;
 		-v)
 			export VERBOSE=1
 			shift
@@ -36,7 +57,7 @@ done
 
 mkdir -p .build
 pushd .build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DVARNISH_PLUS=$varnish_plus $cmake_extra
+cmake .. -DCMAKE_BUILD_TYPE=$build_type -DVARNISH_PLUS=$varnish_plus $cmake_extra
 cmake --build . -j6
 popd
 

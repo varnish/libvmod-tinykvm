@@ -2,9 +2,17 @@ cmake_minimum_required(VERSION 3.10)
 project(compute C CXX)
 
 option(VARNISH_PLUS "Build with Varnish plus" ON)
+option(SANITIZE     "Build with sanitizers" OFF)
+
 # Set the C++ standard to C++20
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS ON)
+
+if (SANITIZE)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined -fno-omit-frame-pointer")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address,undefined -fno-omit-frame-pointer")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address,undefined -static-libasan -static-libsan")
+endif()
 
 if (VARNISH_PLUS)
 	set(VTOOLDIR   "/usr/share/varnish-plus")
@@ -62,10 +70,8 @@ function(add_vmod LIBNAME VCCNAME comment)
 		endif()
 	endif()
 	if (SANITIZE)
-		target_compile_options(${LIBNAME} PRIVATE
-			"-fno-omit-frame-pointer" "-fsanitize=address,undefined" "-fno-sanitize=function,vptr")
 		target_compile_definitions(${LIBNAME} PRIVATE SANITIZERS_ENABLED=1)
-		target_link_libraries(${LIBNAME} "-fsanitize=address,undefined")
+		target_link_libraries(${LIBNAME} -fsanitize=address,undefined -L/usr/lib/clang/19/lib/linux -l:libclang_rt.asan-x86_64.a -l:libclang_rt.ubsan_standalone-x86_64.a -l:libclang_rt.ubsan_standalone_cxx-x86_64.a)
 	endif()
 	# this will build the final .so files in the top build directory
 	# you don't always want this, so it can probably be an option,
