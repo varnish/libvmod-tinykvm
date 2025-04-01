@@ -354,6 +354,9 @@ uint64_t MachineInstance::allocate_post_data(size_t bytes)
 
 void MachineInstance::print(std::string_view text) const
 {
+	if (text.empty())
+		return;
+
 	if (this->m_last_newline) {
 		printf(">>> [%s] %.*s", name().c_str(), (int)text.size(), text.begin());
 	} else {
@@ -390,11 +393,12 @@ tinykvm::Machine::printer_func MachineInstance::get_vsl_printer() const
 		if (buffer + len < buffer || len == 0)
 			return;
 		/* Logging with $PROGRAM says: ... */
-		this->logprint(std::string_view(buffer, len), true);
-
+		this->logprint(std::string_view(buffer, len), this->m_last_newline);
+		/* Print to stdout if enabled */
 		if (this->m_print_stdout) {
 			this->print({buffer, len});
 		}
+		this->m_last_newline = (buffer[len-1] == '\n');
 	};
 }
 
