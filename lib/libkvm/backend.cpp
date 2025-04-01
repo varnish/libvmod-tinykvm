@@ -41,13 +41,19 @@
 #include "settings.hpp"
 #include "varnish.hpp"
 #include <stdexcept>
-using namespace kvm;
 extern "C" {
 #include "kvm_backend.h"
 void kvm_varnishstat_program_exception();
 void kvm_varnishstat_program_timeout();
 void kvm_varnishstat_program_status(uint16_t status);
+void kvm_SetCacheable(VRT_CTX, bool c);
+void kvm_SetTTLs(VRT_CTX, float ttl, float grace, float keep);
 }
+namespace kvm {
+	extern int kvm_http_set(tinykvm::vCPU& cpu, MachineInstance& inst,
+		int where, uint64_t g_what, uint32_t g_wlen);
+}
+using namespace kvm;
 static constexpr bool VERBOSE_BACKEND = false;
 struct backend_inputs {
 	uint64_t method;
@@ -163,6 +169,64 @@ static void fetch_result(kvm::VMPoolItem* slot,
 	mi.stats().output_bytes += result->content_length;
 	/* Record program status counter */
 	kvm_varnishstat_program_status(result->status);
+
+	if (!regular_response) {
+		return; /* Streaming response doesn't have an extra argument */
+	}
+	/* Check for struct BackendResponseExtra in r9 */
+	struct ResponseHeader {
+		uint64_t    field_ptr;
+		size_t      field_len;
+	};
+	struct BackendResponseExtra {
+		uint64_t headers_ptr;
+		uint16_t num_headers;
+		bool     cached;
+		float    ttl;
+		float    grace;
+		float    keep;
+		uint64_t reserved[4]; /* Reserved for future use. */
+	};
+	const uint64_t extra_ptr = regs.r9;
+	if (extra_ptr != 0x0) {
+		/* Check if the pointer is valid */
+		if (UNLIKELY(extra_ptr < 0x1000)) {
+			throw std::runtime_error("Invalid BackendResponseExtra pointer");
+		}
+		/* Copy out the BackendResponseExtra struct */
+		BackendResponseExtra extra;
+		mi.machine().copy_from_guest(&extra, extra_ptr, sizeof(extra));
+		if (UNLIKELY(extra.num_headers > 64)) {
+			throw std::runtime_error("Too many headers in BackendResponseExtra");
+		}
+		if (UNLIKELY(extra.headers_ptr < 0x1000)) {
+			throw std::runtime_error("Invalid BackendResponseExtra headers pointer");
+		}
+		auto* headers = (ResponseHeader *)WS_Alloc(mi.ctx()->ws,
+			sizeof(ResponseHeader) * extra.num_headers);
+		if (UNLIKELY(headers == nullptr)) {
+			throw std::runtime_error("Out of workspace for backend VM response headers");
+		}
+		for (uint16_t i = 0; i < extra.num_headers; i++) {
+			ResponseHeader header;
+			const auto header_ptr = extra.headers_ptr + i * sizeof(ResponseHeader);
+			mi.machine().copy_from_guest(&header, header_ptr, sizeof(header));
+			// This will extract the header field from the guest into the current workspace
+			// and set it in the Varnish HTTP response
+			kvm_http_set(mi.machine().cpu(), mi,
+				1, header.field_ptr, header.field_len); // 1 = HDR_RESP and HDR_BERESP
+		}
+
+		/* Set the cache settings */
+		if (extra.cached) {
+			kvm_SetCacheable(mi.ctx(), extra.cached);
+			kvm_SetTTLs(mi.ctx(), // TTL, GRACE, KEEP
+				extra.ttl, extra.grace, extra.keep);
+		} else {
+			// XXX set uncacheable?
+			kvm_SetCacheable(mi.ctx(), false);
+		}
+	} // extra headers
 }
 
 /* Error handling is an optional callback into the request VM when an
@@ -338,8 +402,8 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				uint64_t struct_addr = vm.stack_push(stack, inputs);
 
 				VSLb(machine.ctx()->vsl, SLT_VCL_Log,
-					"%s: Calling on_method() at 0x%lX (URL: %s, URL len: %u, Is-Post: %d)",
-					machine.name().c_str(), on_method_addr, invoc->inputs.url, inputs.url_len, post != nullptr);
+					"%s: Calling on_method() at 0x%lX (URL: %s, Is-Post: %d)",
+					machine.name().c_str(), on_method_addr, invoc->inputs.url, post != nullptr);
 
 				/* Call into VM doing a full pagetable/cache flush. */
 				vm.timed_vmcall_stack(on_method_addr,

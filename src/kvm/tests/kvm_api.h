@@ -66,7 +66,7 @@ struct backend_request {
 	uint16_t    arg_len;
 	uint16_t    content_type_len;
 	const uint8_t *content; /* Can be NULL. */
-	const size_t   content_len;
+	size_t         content_len;
 };
 static inline void set_backend_request(void(*f)(const struct backend_request*)) { register_func(3, f); }
 
@@ -115,13 +115,43 @@ extern void wait_for_requests_paused(struct backend_request* req);
  *  	backend_response(200, ctype, strlen(ctype), cont, strlen(cont));
  *  }
  **/
-extern void __attribute__((noreturn, used))
-backend_response(int16_t status, const void *t, size_t, const void *c, size_t);
+struct ResponseHeader {
+	const char *field;
+	size_t      field_len;
+};
+struct BackendResponseExtra {
+	const struct ResponseHeader *headers;
+	uint16_t num_headers;
+	bool cached;
+	float ttl;
+	float grace;
+	float keep;
+	uint64_t reserved[4]; /* Reserved for future use. */
+};
+extern void __attribute__((used))
+sys_backend_response(int16_t status, const void *t, size_t, const void *c, size_t,
+	const struct BackendResponseExtra *extra);
+
+static inline void
+backend_response(int16_t status, const void *t, size_t tlen, const void *c, size_t clen) {
+	sys_backend_response(status, t, tlen, c, clen, NULL);
+}
 
 static inline void
 backend_response_str(int16_t status, const char *ctype, const char *content)
 {
-	backend_response(status, ctype, __builtin_strlen(ctype), content, __builtin_strlen(content));
+	sys_backend_response(status, ctype, __builtin_strlen(ctype), content, __builtin_strlen(content), NULL);
+}
+
+/**
+ * @brief Create a response that includes HTTP headers, a status code, a body and
+ * a content type. The response is sent back to the client (or cached in Varnish).
+ */
+static inline void
+backend_response_extra(int16_t status, const void *t, size_t tlen, const void *c, size_t clen,
+	const struct BackendResponseExtra *extra)
+{
+	sys_backend_response(status, t, tlen, c, clen, extra);
 }
 
 /**
@@ -150,8 +180,8 @@ static const int REQ      = 0;
 static const int RESP     = 1;
 static const int REQUEST  = REQ;
 static const int RESPONSE = RESP;
-static const int BEREQ    = 4;
-static const int BERESP   = 5;
+static const int BEREQ    = 0;
+static const int BERESP   = 1;
 static const unsigned HTTP_FMT_SIZE = 4096; /* Most header fields fit. */
 
 extern long
@@ -427,7 +457,7 @@ struct virtbuffer {
  * static size_t cont_len = 0;
  *
  * static void
- * modify_content(size_t n, struct virtbuffer buffers[n], size_t res)
+ * modify_content(size_t n, struct virtbuffer buffers[], size_t res)
  * {
  *     // Allocate a new zero-terminated buffer from input
  *     char *new_buf = malloc(buffers[0].len + 1);
@@ -443,7 +473,7 @@ struct virtbuffer {
  *     storage_return_nothing();
  * }
  * static void
- * get_content(size_t n, struct virtbuffer buffers[n], size_t res)
+ * get_content(size_t n, struct virtbuffer buffers[], size_t res)
  * {
  *     storage_return(cont, cont_len);
  * }
@@ -472,7 +502,7 @@ struct virtbuffer {
  * from the function. This allows the system to copy the data back to the
  * request program before the function has returned and deallocated the data.
 **/
-typedef void (*storage_func) (size_t n, struct virtbuffer[n], size_t res);
+typedef void (*storage_func) (size_t n, struct virtbuffer[], size_t res);
 
 /* Returns true (1) if called from storage. */
 extern int
@@ -480,7 +510,7 @@ sys_is_storage();
 
 /* Transfer an array of buffers to storage, transfer output into @dst. */
 extern long
-storage_callv(storage_func, size_t n, const struct virtbuffer[n], void* dst, size_t);
+storage_callv(storage_func, size_t n, const struct virtbuffer[], void* dst, size_t);
 
 /* Transfer an array to storage, transfer output into @dst. */
 static inline long
@@ -599,7 +629,13 @@ extern struct shared_memory_info shared_memory_area();
 
 /* Allocate pointers to shared memory with given size and alignment. */
 #define SHM_ALLOC_BYTES(x) internal_shm_alloc(x, 8)
-#define SHM_ALLOC_TYPE(x) (typeof(x) *)internal_shm_alloc(sizeof(x), _Alignof(x))
+#ifdef __cplusplus
+#define SHM_ALLOC_TYPE(x) (x *)internal_shm_alloc(sizeof(x), alignof(x))
+#define SHM_ALLOC(x) (decltype(x) *)internal_shm_alloc(sizeof(x), alignof(x))
+#else
+#define SHM_ALLOC_TYPE(x) (x *)internal_shm_alloc(sizeof(x), _Alignof(x))
+#define SHM_ALLOC(x) (typeof(x) *)internal_shm_alloc(sizeof(x), _Alignof(x))
+#endif
 static inline void * internal_shm_alloc(size_t size, size_t align) {
 	static struct shared_memory_info info;
 	if (info.ptr == 0x0) {
@@ -776,9 +812,9 @@ asm(".global sys_set_cacheable\n"
 	"	out %eax, $0\n"
 	"	ret\n");
 
-asm(".global backend_response\n"
-	".type backend_response, @function\n"
-	"backend_response:\n"
+asm(".global sys_backend_response\n"
+	".type sys_backend_response, @function\n"
+	"sys_backend_response:\n"
 	".cfi_startproc\n"
 	"	mov $0x10010, %eax\n"
 	"	out %eax, $0\n"

@@ -35,6 +35,20 @@ static void on_request(const struct backend_request *req)
 
 		backend_response_str(200, "text/plain", "Hello World");
 	}
+	else if (strcmp(req->url, "/3") == 0)
+	{
+		struct ResponseHeader hdrs[] = {
+			{ "X-Header: Value", 15 },
+			{ "X-Header2: Value2", 17 },
+			{ "X-Header3: Value3", 17 }
+		};
+		struct BackendResponseExtra extra = {
+			.headers = hdrs,
+			.num_headers = 3,
+			.cached = 0,
+		};
+		backend_response_extra(200, "text/plain", 10, "Hello World", 11, &extra);
+	}
 
 	backend_response_str(500, "text/plain", "Failed");
 }
@@ -92,4 +106,12 @@ client c1 {
 	rxresp
 	expect resp.body == "Hello World"
 	expect resp.status == 200
+
+	txreq -req GET -url "/3" -hdr "Host: test.com"
+	rxresp
+	expect resp.body == "Hello World"
+	expect resp.status == 200
+	expect resp.http.X-Header == "Value"
+	expect resp.http.X-Header2 == "Value2"
+	expect resp.http.X-Header3 == "Value3"
 } -run

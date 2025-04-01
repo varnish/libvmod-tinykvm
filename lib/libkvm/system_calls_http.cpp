@@ -203,25 +203,20 @@ static void syscall_http_append(vCPU& cpu, MachineInstance& inst)
 	cpu.set_registers(regs);
 }
 
-static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
+int kvm_http_set(vCPU& cpu, MachineInstance& inst,
+	const int where, uint64_t g_what, uint32_t g_wlen)
 {
-	auto& regs = cpu.registers();
-	const int where = regs.rdi;
-	const uint64_t g_what = regs.rsi;
-	if (regs.rdx > 0xFFFF)
-		throw std::runtime_error("HTTP header field too large");
-	const uint32_t g_wlen = regs.rdx & 0xFFFF;
 	if (UNLIKELY(g_wlen == 0)) {
-		regs.rax = 0;
-		cpu.set_registers(regs);
-		return;
+		return 0;
+	} else if (UNLIKELY(g_wlen > 0xFFFF)) {
+		throw std::runtime_error("HTTP header field too large");
 	}
 
-	auto *hp = get_http(inst.ctx(), (gethdr_e)where);
+	auto* hp = get_http(inst.ctx(), (gethdr_e)where);
 
 	/* Read out *what* from guest and allocate in on the workspace,
 	   because in most cases we put the buffer in struct http. */
-	auto *buffer = (char *)WS_Alloc(inst.ctx()->ws, g_wlen + 1);
+	auto* buffer = (char *)WS_Alloc(inst.ctx()->ws, g_wlen + 1);
 	if (buffer == nullptr)
 		throw std::runtime_error("Unable to make room for HTTP header field");
 	cpu.machine().copy_from_guest(buffer, g_what, g_wlen);
@@ -237,14 +232,14 @@ static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
 		const auto index = http_findhdr(hp, namelen, buffer);
 		if (index > 0)
 		{
-			auto &field = hp->field_array[index];
+			auto& field = hp->field_array[index];
 			field.begin = buffer;
 			field.end   = buffer + g_wlen;
-			regs.rax = index;
+			return index;
 		}
 		else /* Not found, append. */
 		{
-			regs.rax = http_header_append(hp, buffer, g_wlen);
+			return http_header_append(hp, buffer, g_wlen);
 		}
 	}
 	else {
@@ -252,11 +247,24 @@ static void syscall_http_set(vCPU& cpu, MachineInstance &inst)
 		const auto index = http_findhdr(hp, g_wlen, buffer);
 		if (index > 0) {
 			http_unsetat(hp, index);
-			regs.rax = index;
+			return index;
 		} else {
-			regs.rax = 0;
+			return 0;
 		}
 	}
+	return -1;
+}
+
+static void syscall_http_set(vCPU& cpu, MachineInstance& inst)
+{
+	auto& regs = cpu.registers();
+	const int where = regs.rdi;
+	const uint64_t g_what = regs.rsi;
+	if (regs.rdx > 0xFFFF)
+		throw std::runtime_error("HTTP header field too large");
+	const uint32_t g_wlen = regs.rdx & 0xFFFF;
+	regs.rax = kvm_http_set(cpu, inst, where, g_what, g_wlen);
+
 	/* Return value: Index of header field */
 	cpu.set_registers(regs);
 }
