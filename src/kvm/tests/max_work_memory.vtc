@@ -51,7 +51,8 @@ vcl 4.1;
 					"group": "failure"
 				},
 				"failure": {
-					"max_request_memory": 1
+					"max_request_memory": 1,
+					"split_hugepages": false
 				},
 				"tenant_failure.com": {
 					"filename": "${tmpdir}/${testname}",
@@ -60,7 +61,8 @@ vcl 4.1;
 					"max_request_memory": 1
 				},
 				"group_failure": {
-					"max_request_memory": 1
+					"max_request_memory": 1,
+					"split_hugepages": false
 				},
 				"group_failure.com": {
 					"filename": "${tmpdir}/${testname}",
