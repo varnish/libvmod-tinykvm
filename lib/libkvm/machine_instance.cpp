@@ -166,6 +166,9 @@ void MachineInstance::initialize()
 			"Machine not initialized properly: %s\n", name().c_str());
 		fprintf(stderr,
 			"Error: %s Data: 0x%#lX\n", me.what(), me.data());
+		if (this->tenant().config.group.remote_debug_on_exception) {
+			this->open_debugger(2159, 120.0f);
+		}
 		throw; /* IMPORTANT: Re-throw */
 	}
 	catch (const std::exception& e)
@@ -174,6 +177,9 @@ void MachineInstance::initialize()
 			"Machine not initialized properly: %s\n", name().c_str());
 		fprintf(stderr,
 			"Error: %s\n", e.what());
+		if (this->tenant().config.group.remote_debug_on_exception) {
+			this->open_debugger(2159, 120.0f);
+		}
 		throw; /* IMPORTANT: Re-throw */
 	}
 }
