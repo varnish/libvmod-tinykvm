@@ -411,6 +411,8 @@ void MachineInstance::setup_syscall_interface()
 						regs.rax = -1;
 					}
 				} catch (...) {
+					SYSPRINT("OPENAT fd=%lld path=%s flags=%X = %d\n",
+						regs.rdi, path, flags, -1);
 					regs.rax = -1;
 				}
 			}
@@ -444,20 +446,34 @@ void MachineInstance::setup_syscall_interface()
 			const auto buffer = regs.rdx;
 			const int  flags  = regs.r8;
 			long fd = AT_FDCWD;
-
-			char path[PATH_MAX];
-			cpu.machine().copy_from_guest(path, vpath, sizeof(path));
+			char path[PATH_MAX] = {0};
 
 			try {
-				inst.sanitize_path(path, sizeof(path));
+				cpu.machine().copy_from_guest(path, vpath, sizeof(path));
+				path[sizeof(path)-1] = 0;
 
-				// Translate from vfd when fd != CWD
-				if ((long)regs.rdi != fd) fd = inst.m_fd.translate(regs.rdi);
+				if (regs.rdi != AT_FDCWD) {
+					// Use vfd
+					fd = inst.m_fd.translate(regs.rdi);
 
-				struct stat64 vstat;
-				regs.rax = fstatat64(fd, path, &vstat, flags);
-				if (regs.rax == 0) {
-					cpu.machine().copy_to_guest(buffer, &vstat, sizeof(vstat));
+					struct stat64 vstat;
+					// We don't use path here, as a security measure
+					regs.rax = fstatat64(fd, "", &vstat, flags);
+					if (regs.rax == 0) {
+						cpu.machine().copy_to_guest(buffer, &vstat, sizeof(vstat));
+					}
+				} else {
+					inst.sanitize_path(path, sizeof(path)); // Throws
+
+					// Translate from vfd when fd != CWD
+					if ((long)regs.rdi != fd) fd = inst.m_fd.translate(regs.rdi);
+
+					struct stat64 vstat;
+					// Path is sanitized, so we can use it
+					regs.rax = fstatat64(fd, path, &vstat, flags);
+					if (regs.rax == 0) {
+						cpu.machine().copy_to_guest(buffer, &vstat, sizeof(vstat));
+					}
 				}
 			} catch (...) {
 				regs.rax = -1;
