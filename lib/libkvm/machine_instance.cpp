@@ -58,9 +58,9 @@ MachineInstance::MachineInstance(
 		.remappings {ten->config.group.vmem_remappings},
 		.verbose_loader = ten->config.group.verbose,
 		.hugepages = ten->config.hugepages(),
+		.transparent_hugepages = ten->config.group.transparent_hugepages,
 		.master_direct_memory_writes = true,
 		.split_hugepages = false,
-		.transparent_hugepages = ten->config.group.transparent_hugepages,
 		.relocate_fixed_mmap = ten->config.group.relocate_fixed_mmap,
 		.executable_heap = ten->config.group.vmem_heap_executable,
 		.hugepages_arena_size = ten->config.group.hugepage_arena_size,
@@ -166,6 +166,7 @@ void MachineInstance::initialize()
 			"Machine not initialized properly: %s\n", name().c_str());
 		fprintf(stderr,
 			"Error: %s Data: 0x%#lX\n", me.what(), me.data());
+		this->print_backtrace();
 		if (this->tenant().config.group.remote_debug_on_exception) {
 			this->open_debugger(2159, 120.0f);
 		}
@@ -177,6 +178,7 @@ void MachineInstance::initialize()
 			"Machine not initialized properly: %s\n", name().c_str());
 		fprintf(stderr,
 			"Error: %s\n", e.what());
+		this->print_backtrace();
 		if (this->tenant().config.group.remote_debug_on_exception) {
 			this->open_debugger(2159, 120.0f);
 		}
