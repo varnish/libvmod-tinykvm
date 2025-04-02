@@ -32,6 +32,7 @@ static auto gather_stats(const MachineInstance& mi, TT& taskq)
 		{"exceptions",  stats.exceptions},
 		{"timeouts",    stats.timeouts},
 		{"reservation_time",   stats.reservation_time},
+		{"reset_time",         stats.vm_reset_time},
 		{"request_cpu_time",   stats.request_cpu_time},
 		{"exception_cpu_time", stats.error_cpu_time},
 		{"input_bytes", stats.input_bytes},

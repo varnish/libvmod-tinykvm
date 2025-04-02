@@ -14,6 +14,7 @@
 **/
 #include "machine_instance.hpp"
 #include "program_instance.hpp"
+#include "scoped_duration.hpp"
 #include "settings.hpp"
 #include "tenant_instance.hpp"
 #include "timing.hpp"
@@ -59,8 +60,10 @@ MachineInstance::MachineInstance(
 		.hugepages = ten->config.hugepages(),
 		.master_direct_memory_writes = true,
 		.split_hugepages = false,
+		.transparent_hugepages = ten->config.group.transparent_hugepages,
 		.relocate_fixed_mmap = ten->config.group.relocate_fixed_mmap,
 		.executable_heap = ten->config.group.vmem_heap_executable,
+		.hugepages_arena_size = ten->config.group.hugepage_arena_size,
 	  }),
 	  m_tenant(ten), m_inst(inst),
 	  m_is_debug(debug),
@@ -242,6 +245,8 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 		this->m_reset_needed = false;
 
 		stats().resets ++;
+		ScopedDuration cputime(this->stats().vm_reset_time);
+
 		machine().reset_to(source.machine(), {
 			.max_mem = tenant().config.max_main_memory(),
 			.max_cow_mem = tenant().config.max_req_memory(),

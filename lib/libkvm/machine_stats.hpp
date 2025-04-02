@@ -10,6 +10,7 @@ struct MachineStats
 	uint64_t timeouts    = 0;
 
 	double reservation_time = 0;
+	double vm_reset_time    = 0;
 	double request_cpu_time = 0;
 	double error_cpu_time   = 0;
 

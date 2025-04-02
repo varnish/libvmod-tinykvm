@@ -25,6 +25,7 @@ struct TenantGroup {
 	uint32_t max_req_mem; /* Megabytes */
 	uint32_t limit_req_mem; /* Megabytes of memory banks to keep after request completion */
 	uint32_t shared_memory; /* Megabytes */
+	uint64_t hugepage_arena_size = 0; /* Megabytes */
 	size_t   max_concurrency = 2; /* Request VMs */
 	size_t   max_smp         = 0; /* Multi-processing per VM */
 	size_t   max_fd       = 32;
@@ -33,6 +34,7 @@ struct TenantGroup {
 	bool     hugepages    = false;
 	bool     ephemeral_hugepages = false;
 	bool     split_hugepages = true;
+	bool     transparent_hugepages = false;
 	bool     allow_debug = false;
 	bool     remote_debug_on_exception = false;
 	bool     relocate_fixed_mmap = true;
