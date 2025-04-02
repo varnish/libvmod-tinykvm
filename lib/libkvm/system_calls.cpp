@@ -69,7 +69,7 @@ void MachineInstance::sanitize_file(char* buffer, size_t buflen)
 
 static void syscall_unknown(vCPU& cpu, MachineInstance& inst, unsigned scall)
 {
-	printf("%s: Unhandled system call %u\n",
+	fprintf(stderr, "%s: Unhandled system call %u\n",
 		inst.name().c_str(), scall);
 	auto& regs = cpu.registers();
 	regs.rax = -ENOSYS;
