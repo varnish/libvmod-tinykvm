@@ -207,7 +207,7 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	else if (obj.key() == "hugepage_arena_size")
 	{
 		group.hugepage_arena_size = uint32_t(obj.value()) * 1048576ul;
-		if (group.hugepage_arena_size < 0x200000L) {
+		if (group.hugepage_arena_size < 0x200000L && group.hugepage_arena_size != 0) {
 			throw std::runtime_error("Hugepage arena size must be at least 2MB");
 		}
 		if (group.hugepage_arena_size > 512ULL * 1024 * 1024 * 1024) {
@@ -219,12 +219,24 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		if (group.hugepage_arena_size > group.max_main_memory) {
 			throw std::runtime_error("Hugepage arena size cannot be larger than max memory");
 		}
-		if (group.hugepage_arena_size > 0)
-			group.hugepages = true; // Enable hugepages if arena size is set
+		// Enable hugepages if arena size is set
+		group.hugepages = group.hugepage_arena_size != 0;
 	}
-	else if (obj.key() == "request_hugepages")
+	else if (obj.key() == "request_hugepages" || obj.key() == "request_hugepage_arena_size")
 	{
-		group.ephemeral_hugepages = obj.value();
+		group.hugepage_requests_arena = uint32_t(obj.value()) * 1048576ul;
+		if (group.hugepage_requests_arena < 0x200000L && group.hugepage_requests_arena != 0) {
+			throw std::runtime_error("Hugepage requests arena size must be at least 2MB");
+		}
+		if (group.hugepage_requests_arena > 512ULL * 1024 * 1024 * 1024) {
+			throw std::runtime_error("Hugepage requests arena size must be less than 512GB");
+		}
+		if (group.hugepage_requests_arena % 0x200000L != 0) {
+			throw std::runtime_error("Hugepage requests arena size must be a multiple of 2MB");
+		}
+		if (group.hugepage_requests_arena > group.max_main_memory) {
+			throw std::runtime_error("Hugepage requests arena size cannot be larger than max memory");
+		}
 	}
 	else if (obj.key() == "split_hugepages")
 	{

@@ -164,11 +164,17 @@ Enable hugepages for the entire address space during initialization. Not recomme
 
 Default: Disabled
 
-* `request_hugepages`
+* `hugepage_arena_size`
 
-Enable hugepages for request handling (memory banks). This can result in a modest performance increase (above native performance). Do *NOT* enable this unless you have enough hugepages allocated beforehand.
+Enable hugepages for main memory for the given number of megabytes, after which use normal pages. Setting this to zero will disable hugepages, and setting it to 2 MB or higher will enable them up to that point. Do *NOT* enable this unless you have enough hugepages on the host system allocated beforehand.
 
-Default: Disabled
+Granularity: 2 MB
+
+* `request_hugepage_arena_size`
+
+Enable hugepages for request handling (memory banks) up to the given number of megabytes, after which use normal pages. This can result in a modest performance increase (above native performance). Do *NOT* enable this unless you have enough hugepages on the host system allocated beforehand. This setting scales with the concurrency level of the program, eg. concurrency=32 with request_hugepage_arena_size=16 would require 256x 2MB hugepages.
+
+Granularity: 2 MB
 
 * `split_hugepages`
 
