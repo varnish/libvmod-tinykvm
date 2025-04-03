@@ -2,6 +2,19 @@
 
 The TinyKVM VMOD processes data in Varnish at native performance using your servers CPU capabilities safely with sandboxing.
 
+Choose the fastest libraries, ones that may not be battle hardened. Or those that aren't available in distro packages, or libraries that solve problems in different/novel ways that lead to performance under specific conditions. Put them in a program, build once, and then __use it forever__.
+
+For example Varnish beresp.do_gzip:
+```
+Requests/sec:   2273.37
+Transfer/sec:     60.97MB
+```
+TinyKVM sandboxed libdeflate:
+```
+Requests/sec:   3695.62
+Transfer/sec:     99.04MB
+```
+
 ## Documentation
 
 You can find the complete [VMOD documentation here](docs/README.md).
