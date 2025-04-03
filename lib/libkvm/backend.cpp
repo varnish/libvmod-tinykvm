@@ -223,8 +223,7 @@ static void fetch_result(kvm::VMPoolItem* slot,
 			kvm_SetTTLs(mi.ctx(), // TTL, GRACE, KEEP
 				extra.ttl, extra.grace, extra.keep);
 		} else {
-			// XXX set uncacheable?
-			kvm_SetCacheable(mi.ctx(), false);
+			// If caching is disabled, do nothing. Let Varnish/VCL handle it.
 		}
 	} // extra headers
 }
