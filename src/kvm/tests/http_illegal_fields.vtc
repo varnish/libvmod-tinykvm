@@ -73,56 +73,61 @@ vcl 4.1;
 	}
 } -start
 
-define m1 request_ok {
+client c1 {
+	txreq -url "/0" -hdr "Host: test.com"
 	rxresp
 	expect resp.body == "OK"
 	expect resp.status == 200
-}
-define m1 request_fails {
-	rxresp
-	expect resp.status == 500
-}
-
-client c1 {
-	txreq -url "/0" -hdr "Host: test.com"
-	${m1_request_ok}
 
 	txreq -url "/1" -hdr "Host: test.com"
-	${m1_request_fails}
+	rxresp
+	expect resp.status == 500
 
 	txreq -url "/2" -hdr "Host: test.com"
-	${m1_request_fails}
+	rxresp
+	expect resp.status == 500
 
 	txreq -url "/3" -hdr "Host: test.com"
-	${m1_request_fails}
+	rxresp
+	expect resp.status == 500
 
 	txreq -url "/4" -hdr "Host: test.com"
-	${m1_request_fails}
+	rxresp
+	expect resp.status == 500
 
 	txreq -url "/5" -hdr "Host: test.com"
-	${m1_request_fails}
+	rxresp
+	expect resp.status == 500
 
 	txreq -url "/6" -hdr "Host: test.com"
-	${m1_request_fails}
+	rxresp
+	expect resp.status == 500
 
 	txreq -url "/7" -hdr "Host: test.com"
-	${m1_request_fails}
+	rxresp
+	expect resp.status == 500
 
 	txreq -url "/8" -hdr "Host: test.com"
-	${m1_request_fails}
+	rxresp
+	expect resp.status == 500
 
 	txreq -url "/9" -hdr "Host: test.com"
-	${m1_request_fails}
+	rxresp
+	expect resp.status == 500
 
 	txreq -url "/10" -hdr "Host: test.com"
-	${m1_request_fails}
+	rxresp
+	expect resp.status == 500
 
 	txreq -url "/11" -hdr "Host: test.com"
-	${m1_request_fails}
+	rxresp
+	expect resp.status == 500
 
 	txreq -url "/12" -hdr "Host: test.com"
-	${m1_request_fails}
+	rxresp
+	expect resp.status == 500
 
 	txreq -url "/13" -hdr "Host: test.com"
-	${m1_request_fails}
+	rxresp
+	expect resp.status == 500
 } -run
