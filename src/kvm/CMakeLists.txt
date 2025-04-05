@@ -37,6 +37,7 @@ add_vmod_tests(vmod_kvm vmod_kvm
 	tests/program_not_ready.vtc
 	tests/regex.vtc
 	#tests/rotate_vcl.vtc
+	tests/shared_counter.vtc
 	tests/stateful_buffered_storage.vtc
 	tests/stateful_storage.vtc
 	tests/storage_failure.vtc
