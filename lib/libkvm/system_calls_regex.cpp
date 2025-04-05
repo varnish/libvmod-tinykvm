@@ -76,7 +76,10 @@ static void syscall_regex_match(vCPU& cpu, MachineInstance& inst)
         VRE_exec(entry.item, subject.c_str(), subject.size(), 0,
             0, nullptr, 0, nullptr);
 #else
-	regs.rax = 0;
+	/* int VRE_match(const vre_t *code, const char *subject, size_t length,
+	    int options, const volatile struct vre_limits *lim); */
+	regs.rax =
+		VRE_match(entry.item, subject.c_str(), subject.size(), 0, nullptr);
 #endif
     cpu.set_registers(regs);
 }

@@ -355,7 +355,8 @@ static void syscall_regex_copyto(vCPU& cpu, MachineInstance& inst)
         	(VRE_exec(entry.item, begin, end - begin, 0,
             	0, nullptr, 0, nullptr) >= 0);
 #else
-		const bool matches = 0;
+		const bool matches =
+			VRE_match(entry.item, begin, end - begin, 0, nullptr) >= 0;
 #endif
 		if (matches) {
 			if (http_header_append(dsthp, begin, end - begin) != HDR_INVALID)
