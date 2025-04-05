@@ -71,7 +71,6 @@ ProgramInstance::ProgramInstance(
 	bool debug)
 	: request_binary{std::move(request_elf)},
 	  m_storage_queue {STORAGE_VM_NICE, false},
-	  m_vcl {ctx->vcl},
 	  rspclient{nullptr}
 {
 	if (ten->config.has_storage()) {
@@ -93,7 +92,6 @@ ProgramInstance::ProgramInstance(
 	bool debug)
 	: request_binary{},
 	  m_storage_queue {STORAGE_VM_NICE, false},
-	  m_vcl {ctx->vcl},
 	  rspclient{nullptr}
 {
 	if (ten->config.has_storage()) {
@@ -342,13 +340,6 @@ ProgramInstance::~ProgramInstance()
 	// NOTE: Thread pools need to wait on jobs here
 	m_storage_queue.wait_until_empty();
 	m_storage_queue.wait_until_nothing_in_flight();
-
-#ifdef KVM_ADNS
-	for (const auto& adns : m_adns_tags) {
-		if (!adns.tag.empty())
-			libadns_untag(adns.tag, this->m_vcl);
-	}
-#endif
 }
 
 long ProgramInstance::wait_for_initialization()

@@ -5,7 +5,6 @@
 #include "kvm_settings.h"
 
 namespace kvm {
-extern std::string adns_interp(vcl *, std::string);
 typedef size_t (*read_callback)(char *buffer, size_t size, size_t nitems, void *);
 typedef size_t (*write_callback)(char *, size_t, size_t, void *);
 typedef size_t (*header_callback)(char *buffer, size_t size, size_t nitems, void *);
@@ -367,13 +366,8 @@ static void syscall_fetch(vCPU& vcpu, MachineInstance& inst)
 	const uint64_t options_buffer = regs.r8;
 
 	/* URL */
-#ifdef KVM_ADNS
-	std::string url = adns_interp(inst.program().get_adns_key(),
-		vcpu.machine().buffer_to_string(regs.rdi, regs.rsi, CURL_REQ_URL_MAX_LENGTH));
-#else
 	std::string url = 
 		vcpu.machine().buffer_to_string(regs.rdi, regs.rsi, CURL_REQ_URL_MAX_LENGTH);
-#endif
 
 	/* Automatically turn into self-request if URL starts with slash */
 	bool is_self_request = false;
