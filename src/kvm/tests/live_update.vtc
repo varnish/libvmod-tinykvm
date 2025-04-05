@@ -4,25 +4,14 @@ shell {
 cat >${tmpdir}/${testname}.c <<-EOF
 #include <string.h>
 #include "kvm_api.h"
-
-static int counter = 0;
-static void my_storage(size_t n, struct virtbuffer buffers[n], size_t reslen)
-{
-	struct virtbuffer *hello_string = &buffers[0];
-	counter ++;
-	((char *)hello_string->data)[11] = '0' + (counter % 10);
-	/* Data contains the inputs */
-	storage_return(hello_string->data, hello_string->len);
-}
+static int *counter = NULL;
 
 static void my_backend(const char *url, const char *arg)
 {
-	const struct virtbuffer buffers[1] = {
-		{.data = TRUST_ME(arg), .len = strlen(arg)}
-	};
+	// Atomically increment the counter
+	int c = __sync_fetch_and_add(counter, 1);
 	char result[256];
-	const long rlen =
-		storage_callv(my_storage, 1, buffers, result, sizeof(result));
+	const long rlen = snprintf(result, sizeof(result), "Hello World %d", c);
 
 	const char ctype[] = "text/plain";
 	backend_response(200, ctype, sizeof(ctype)-1, result, rlen);
@@ -30,6 +19,9 @@ static void my_backend(const char *url, const char *arg)
 
 int main()
 {
+	/* Create a shared counter */
+	counter = SHM_ALLOC_TYPE(int);
+
 	set_backend_get(my_backend);
 	wait_for_requests();
 }
@@ -49,6 +41,7 @@ vcl 4.1;
 				"filename": "${tmpdir}/${testname}",
 				"key": "1",
 				"group": "test",
+				"shared_memory": 2,
 				"storage": true
 			}
 		}""");
@@ -85,23 +78,20 @@ vcl 4.1;
 	}
 } -start
 
-define m1 sanity_check {
-	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
-	rxresp
-	expect resp.body == "/helloworld1"
-	expect resp.status == 200
-	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
-	rxresp
-	expect resp.body == "/helloworld2"
-	expect resp.status == 200
-	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
-	rxresp
-	expect resp.body == "/helloworld3"
-	expect resp.status == 200
-}
 
 client c1 {
-	${m1_sanity_check}
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World 0"
+	expect resp.status == 200
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World 1"
+	expect resp.status == 200
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World 2"
+	expect resp.status == 200
 
 	# We can live update directly from the local filesystem
 	# And we can use VCL to control the response status
@@ -109,7 +99,18 @@ client c1 {
 	rxresp
 	expect resp.status == 201
 
-	${m1_sanity_check}
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World 0"
+	expect resp.status == 200
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World 1"
+	expect resp.status == 200
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World 2"
+	expect resp.status == 200
 
 	# Missing file is a 403 because the live update fails
 	txreq -url "/2" -hdr "Host: xpizza.com"
@@ -121,7 +122,18 @@ client c1 {
 	rxresp
 	expect resp.status == 201
 
-	${m1_sanity_check}
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World 0"
+	expect resp.status == 200
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World 1"
+	expect resp.status == 200
+	txreq -url "/" -hdr "Host: xpizza.com"
+	rxresp
+	expect resp.body == "Hello World 2"
+	expect resp.status == 200
 
 	# Invalid key is a failing request
 	txreq -hdr "Host: xpizza.com" -hdr "X-PostKey: 2" -bodyfrom "${tmpdir}/${testname}"
@@ -129,13 +141,13 @@ client c1 {
 	expect resp.status == 503
 
 	# Cannot use sanity check macro, as the program is unchanged
-	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
+	txreq -url "/" -hdr "Host: xpizza.com"
 	rxresp
-	expect resp.body == "/helloworld4"
-	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
+	expect resp.body == "Hello World 3"
+	txreq -url "/" -hdr "Host: xpizza.com"
 	rxresp
-	expect resp.body == "/helloworld5"
-	txreq -url "/helloworldZ" -hdr "Host: xpizza.com"
+	expect resp.body == "Hello World 4"
+	txreq -url "/" -hdr "Host: xpizza.com"
 	rxresp
-	expect resp.body == "/helloworld6"
+	expect resp.body == "Hello World 5"
 } -run

@@ -15,6 +15,7 @@ kvm_updater_be_panic(const struct director *dir, struct vsb *vsb)
 	(void)vsb;
 }
 
+#ifdef VARNISH_PLUS
 static void v_matchproto_(vdi_finish_f)
 kvm_updater_be_finish(const struct director *dir, struct worker *wrk, struct busyobj *bo)
 {
@@ -26,6 +27,23 @@ kvm_updater_be_finish(const struct director *dir, struct worker *wrk, struct bus
 	bo->htc->magic = 0;
 	bo->htc = NULL;
 }
+#else
+static void v_matchproto_(vdi_finish_f)
+kvm_updater_be_finish(VRT_CTX, const struct director *dir)
+{
+	(void)dir;
+
+	CHECK_OBJ_NOTNULL(ctx->bo, BUSYOBJ_MAGIC);
+	struct busyobj *bo = ctx->bo;
+
+	if (bo->htc == NULL)
+		return;
+	CHECK_OBJ_NOTNULL(bo->htc, HTTP_CONN_MAGIC);
+	bo->htc->priv = NULL;
+	bo->htc->magic = 0;
+	bo->htc = NULL;
+}
+#endif
 
 static enum vfp_status v_matchproto_(vfp_pull_f)
 pull(struct vfp_ctx *vc, struct vfp_entry *vfe, void *p, ssize_t *lp)
@@ -95,6 +113,7 @@ kvm_updater_aggregate_body(void *priv, unsigned flush, const void *ptr, ssize_t 
 }
 #endif
 
+#ifdef VARNISH_PLUS
 static int v_matchproto_(vdi_gethdrs_f)
 kvm_updater_be_gethdrs(const struct director *dir,
 	struct worker *wrk, struct busyobj *bo)
@@ -105,6 +124,18 @@ kvm_updater_be_gethdrs(const struct director *dir,
 	CHECK_OBJ_NOTNULL(bo->bereq, HTTP_MAGIC);
 	CHECK_OBJ_NOTNULL(bo->beresp, HTTP_MAGIC);
 	AZ(bo->htc);
+#else
+static int v_matchproto_(vdi_gethdrs_f)
+kvm_updater_be_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
+{
+	CHECK_OBJ_NOTNULL(dir, DIRECTOR_MAGIC);
+	struct busyobj *bo = other_ctx->bo;
+
+	CHECK_OBJ_NOTNULL(bo, BUSYOBJ_MAGIC);
+	CHECK_OBJ_NOTNULL(bo->bereq, HTTP_MAGIC);
+	CHECK_OBJ_NOTNULL(bo->beresp, HTTP_MAGIC);
+	AZ(bo->htc);
+#endif
 
 	/* Put request BODY into vsb */
 	struct vsb *vsb = VSB_new_auto();
@@ -117,10 +148,10 @@ kvm_updater_be_gethdrs(const struct director *dir,
 		    0, 0, -1);
 #else
 	if (bo->req)
-		return (VRB_Iterate(bo->wrk, bo->vsl, bo->req, kvm_updater_aggregate_body, vsb));
+		VRB_Iterate(bo->wrk, bo->vsl, bo->req, kvm_updater_aggregate_body, vsb);
 	else if (bo->bereq_body)
-		return (ObjIterate(bo->wrk, bo->bereq_body, vsb,
-			kvm_updater_aggregate_body, 0));
+		ObjIterate(bo->wrk, bo->bereq_body, vsb,
+			kvm_updater_aggregate_body, 0);
 #endif
 	VSB_finish(vsb);
 
@@ -132,7 +163,7 @@ kvm_updater_be_gethdrs(const struct director *dir,
 	struct vmod_kvm_updater *kvmu;
 	CAST_OBJ_NOTNULL(kvmu, dir->priv, KVM_UPDATER_MAGIC);
 
-	if (result_len > kvmu->max_binary_size)
+	if (result_len > kvmu->max_binary_size && kvmu->max_binary_size != 0)
 	{
 		http_PutResponse(bo->beresp, "HTTP/1.1", 503, "Binary too large");
 		VSB_destroy(&vsb);
@@ -176,6 +207,9 @@ kvm_updater_be_gethdrs(const struct director *dir,
 	bo->htc->content_length = result.len;
 	bo->htc->priv = WS_Copy(bo->ws, result.output, result.len);
 	bo->htc->body_status = BS_LENGTH;
+#ifndef VARNISH_PLUS
+	bo->htc->doclose = SC_REM_CLOSE;
+#endif
 	/* Delete the result */
 	if (result.destructor)
 		result.destructor(&result);
@@ -191,20 +225,41 @@ kvm_updater_be_gethdrs(const struct director *dir,
 	return (0);
 }
 
-static inline void kvm_update_director(
+#ifndef VARNISH_PLUS
+static const struct vdi_methods live_update_director_methods[1] = {{
+	.magic = VDI_METHODS_MAGIC,
+	.type  = "kvm_live_update_director_methods",
+	.gethdrs = kvm_updater_be_gethdrs,
+	.finish  = kvm_updater_be_finish,
+}};
+#endif
+
+static inline void kvm_update_director(VRT_CTX,
 	struct director *dir, struct vmod_kvm_updater *kvmu)
 {
 	INIT_OBJ(dir, DIRECTOR_MAGIC);
 	dir->priv = kvmu;
+	dir->vcl_name = "vmod_kvm";
 #ifdef VARNISH_PLUS
 	dir->name = "KVM live-update director";
-	dir->vcl_name = "vmod_kvm";
 	dir->gethdrs = kvm_updater_be_gethdrs;
 	dir->finish  = kvm_updater_be_finish;
 	dir->panic   = kvm_updater_be_panic;
 #else
-	dir->vdir = NULL;
-	return;
+	struct vcldir *vdir =
+		WS_Alloc(ctx->ws, sizeof(struct vcldir));
+	if (vdir == NULL) {
+		VRT_fail(ctx, "KVM: Out of workspace for internal director");
+		return;
+	}
+	memset(vdir, 0, sizeof(*vdir));
+	vdir->magic = VCLDIR_MAGIC;
+	vdir->dir = dir;
+	vdir->vcl = ctx->vcl;
+	vdir->flags |= VDIR_FLG_NOREFCNT;
+	vdir->methods = live_update_director_methods;
+
+	dir->vdir = vdir;
 #endif
 }
 
@@ -245,7 +300,7 @@ static VCL_BACKEND do_live_update(VRT_CTX, VCL_PRIV task,
 	kvmu->max_binary_size = max_size;
 	kvmu->tenant   = ten;
 	kvmu->is_debug = debug;
-	kvm_update_director(&kvmu->dir, kvmu);
+	kvm_update_director(ctx, &kvmu->dir, kvmu);
 
 	return (&kvmu->dir);
 }
