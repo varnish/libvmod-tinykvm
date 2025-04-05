@@ -113,7 +113,7 @@ $Function BOOL main_arguments(PRIV_VCL, STRING program, STRANDS arguments)
 - Set additional arguments to the main() function. The first added argument will be at argv[3].
 - Overrides previously set arguments, including via JSON.
 - Returns true on success.
-- Can be called from any VCL function. Unloading the program will apply the new arguments.
+- Can be called from any VCL function. Reloading the program will apply the new arguments.
 
 $Function INT invalidate_programs(PRIV_VCL, STRING regex = "")
 
@@ -190,14 +190,3 @@ $Function INT synth(PRIV_VCL, INT status, STRING program, STRING url = "", STRIN
 - Generates a synthetic response from the given program and arguments.
 - If the synthetic response fails, the function returns 0.
 - Works the same way as to_string().
-
-
-$Function BOOL steal(PRIV_VCL, STRING program, STRING arg = "")
-
-- Takes over the current clients TCP connection and passes it to the given program.
-- The request fails if the HTTP version is 2.x or 3.x. Only 1.x is supported.
-- The program must have socket callbacks. The entries are specified in the API docs.
-- The program has access to the underlying file descriptor (virtualized).
-- The on_connect callback receives the client IP and the provided argument.
-- Returns true if detaching the clients fd succeeded, including on_connect.
-- Must be called from vcl_recv.

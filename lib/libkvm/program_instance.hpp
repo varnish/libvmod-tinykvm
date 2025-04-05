@@ -1,7 +1,6 @@
 #pragma once
 #include "machine_instance.hpp"
 #include "instance_cache.hpp"
-#include "long_lived.hpp"
 #include "settings.hpp"
 #include "utils/cpptime.hpp"
 #include <blockingconcurrentqueue.h>
@@ -56,10 +55,6 @@ enum class ProgramEntryIndex : uint8_t {
 	LIVEUPD_SERIALIZE = 6,
 	LIVEUPD_DESERIALIZE = 7,
 
-	SOCKET_CONNECTED = 8,
-	SOCKET_DATA = 9,
-	SOCKET_WRITABLE = 10,
-	SOCKED_DISCONNECTED = 11,
 	TOTAL_ENTRIES
 };
 
@@ -186,10 +181,6 @@ public:
 	   storage referring to the other program members. */
 	cpptime::TimerSystem m_timer_system;
 
-
-	LongLived& epoll_system(std::shared_ptr<ProgramInstance>);
-	std::unique_ptr<LongLived> m_epoll_system = nullptr;
-	std::mutex long_lived_mtx;
 
 	/* Live debugging feature using the GDB RSP protocol.
 	   Debugging allows stepping through the tenants program line by line

@@ -247,39 +247,3 @@ VCL_INT vmod_synth(VRT_CTX, VCL_PRIV task, VCL_INT status,
 {
 	return (kvm_vm_synth(ctx, task, status, program, url, argument));
 }
-
-/* Steal the current clients fd and pass it to the given program. */
-VCL_BOOL vmod_steal(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_STRING argument)
-{
-	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
-	if (ctx->method != VCL_MET_RECV) {
-		VRT_fail(ctx, "compute: steal() should only be called from vcl_recv");
-		return (0);
-	}
-
-	if (argument == NULL)
-		argument = "";
-
-	if (ctx->req->http0->protover > 11) {
-		VRT_fail(ctx, "compute: steal() only works with HTTP 1.x");
-		return (0);
-	}
-
-	const int fd = ctx->req->sp->fd;
-	if (fd > 0) {
-		const int gucci = kvm_vm_begin_epoll(ctx, task, program,
-			fd, argument);
-
-		/* Only unset if successful. */
-		if (gucci) {
-			ctx->req->sp->fd = -1;
-			//VRT_handling(ctx, VCL_RET_SYNTH);
-		}
-		return (gucci);
-	}
-	/* dup() failed. */
-	VSLb(ctx->vsl, SLT_Error,
-		 "%s: FD steal failed (%s)",
-		 program, strerror(errno));
-	return (0);
-}

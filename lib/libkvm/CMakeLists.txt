@@ -10,12 +10,10 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++17 -O2 -g")
 set(KVM_SOURCES
 	archive.cpp
 	backend.cpp
-	epoll_vm.cpp
 	kvm_settings.cpp
 	kvm_stats.cpp
 	kvm_vcc_api.cpp
 	live_update.cpp
-	long_lived.cpp
 	machine_debug.cpp
 	machine_instance.cpp
 	program_instance.cpp
