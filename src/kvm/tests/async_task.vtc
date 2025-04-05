@@ -35,12 +35,12 @@ static void on_get(const char *url, const char* arg)
 	static const char ctype[] = "text/plain";
 
 	if (strcmp(url, "/task") == 0) {
-		async_storage_task(my_storage_task, NULL);
+		storage_task(my_storage_task, NULL, 0);
 		backend_response(200, ctype, sizeof(ctype)-1, "OK", 2);
 	}
 
 	if (strcmp(url, "/task2") == 0) {
-		async_storage_task(my_disallowed_storage_task, NULL);
+		storage_task(my_disallowed_storage_task, NULL, 0);
 		backend_response(200, ctype, sizeof(ctype)-1, "OK", 2);
 	}
 

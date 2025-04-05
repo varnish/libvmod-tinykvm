@@ -14,7 +14,7 @@ enable_testing()
 add_vmod_tests(vmod_kvm vmod_kvm
 	tests/allowed_paths.vtc
 	tests/alternate_programs.vtc
-	#tests/async_task.vtc
+	tests/async_task.vtc
 	tests/backend_request.vtc
 	tests/cached_post_backend.vtc
 	#tests/curl_fetch.vtc
