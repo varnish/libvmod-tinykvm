@@ -71,7 +71,7 @@ struct backend_request {
 	uint16_t    arg_len;
 	uint16_t    content_type_len;
 	const uint8_t *content; /* Can be NULL. */
-	const size_t   content_len;
+	size_t         content_len;
 };
 static inline void set_backend_request(void(*f)(const struct backend_request*)) { register_func(3, f); }
 
@@ -98,6 +98,12 @@ static inline void set_on_live_restore(void(*f)(size_t datalen)) { register_func
    a new stack, and will not trample the old stack, including red-zone. */
 extern void wait_for_requests();
 
+/* Wait for requests by pausing the machine and recording the current
+   state of machine registers. This allowed resumption in event loops
+   and other types of event-driven programming. Request URL and other
+   data can be retrieved from the struct backend_request argument. */
+extern void wait_for_requests_paused(struct backend_request* req);
+
 /**
  * When a request arrives the handler function is the only function that will
  * be called. main() is no longer in the picture. Any actions performed during
@@ -114,13 +120,43 @@ extern void wait_for_requests();
  *  	backend_response(200, ctype, strlen(ctype), cont, strlen(cont));
  *  }
  **/
-extern void __attribute__((noreturn, used))
-backend_response(int16_t status, const void *t, size_t, const void *c, size_t);
+struct ResponseHeader {
+	const char *field;
+	size_t      field_len;
+};
+struct BackendResponseExtra {
+	const struct ResponseHeader *headers;
+	uint16_t num_headers;
+	bool cached;
+	float ttl;
+	float grace;
+	float keep;
+	uint64_t reserved[4]; /* Reserved for future use. */
+};
+extern void __attribute__((used))
+sys_backend_response(int16_t status, const void *t, size_t, const void *c, size_t,
+	const struct BackendResponseExtra *extra);
+
+static inline void
+backend_response(int16_t status, const void *t, size_t tlen, const void *c, size_t clen) {
+	sys_backend_response(status, t, tlen, c, clen, NULL);
+}
 
 static inline void
 backend_response_str(int16_t status, const char *ctype, const char *content)
 {
-	backend_response(status, ctype, __builtin_strlen(ctype), content, __builtin_strlen(content));
+	sys_backend_response(status, ctype, __builtin_strlen(ctype), content, __builtin_strlen(content), NULL);
+}
+
+/**
+ * @brief Create a response that includes HTTP headers, a status code, a body and
+ * a content type. The response is sent back to the client (or cached in Varnish).
+ */
+static inline void
+backend_response_extra(int16_t status, const void *t, size_t tlen, const void *c, size_t clen,
+	const struct BackendResponseExtra *extra)
+{
+	sys_backend_response(status, t, tlen, c, clen, extra);
 }
 
 /**
@@ -149,8 +185,8 @@ static const int REQ      = 0;
 static const int RESP     = 1;
 static const int REQUEST  = REQ;
 static const int RESPONSE = RESP;
-static const int BEREQ    = 4;
-static const int BERESP   = 5;
+static const int BEREQ    = 0;
+static const int BERESP   = 1;
 static const unsigned HTTP_FMT_SIZE = 4096; /* Most header fields fit. */
 
 extern long
@@ -276,99 +312,6 @@ static inline long set_cacheable(bool cached, float ttl, float grace, float keep
 }
 
 /**
- * Varnish ActiveDNS
- *
- **/
-enum adns_ipv_rule {
-	ADNS_IPV_NONE = 0,
-	ADNS_IPV_AUTO,
-	ADNS_IPV_IPV4,
-	ADNS_IPV_IPV6,
-	ADNS_IPV_ALL,
-};
-enum adns_ttl_rule {
-	ADNS_TTL_NONE = 0,
-	ADNS_TTL_FORCE,
-	ADNS_TTL_ABIDE,
-	ADNS_TTL_MORETHAN,
-	ADNS_TTL_LESSTHAN,
-};
-enum adns_port_rule {
-	ADNS_PORT_NONE = 0,
-	ADNS_PORT_ABIDE,
-	ADNS_PORT_FORCE,
-};
-enum adns_mode_rule {
-	ADNS_MODE_NONE = 0,
-	ADNS_MODE_AUTO,
-	ADNS_MODE_HOST,
-	ADNS_MODE_DNS,
-	ADNS_MODE_SRV,
-};
-enum adns_update_rule {
-	ADNS_UPDATE_NONE = 0,
-	ADNS_UPDATE_ALWAYS,
-	ADNS_UPDATE_IGNORE_EMPTY,
-	ADNS_UPDATE_IGNORE_ERROR,
-};
-enum adns_nsswitch_rule {
-	ADNS_NSSWITCH_NONE = 0,
-	ADNS_NSSWITCH_AUTO,
-	ADNS_NSSWITCH_DNS_ONLY,
-	ADNS_NSSWITCH_DNS_FIRST,
-	ADNS_NSSWITCH_FILES_ONLY,
-	ADNS_NSSWITCH_FILES_FIRST,
-};
-
-union adns_rules {
-	struct {
-		uint8_t ipv;
-		uint8_t ttl;
-		uint8_t port;
-		uint8_t mode;
-		uint8_t update;
-		uint8_t nsswitch;
-	} b;
-	uint64_t reg;
-};
-extern int sys_adns_new(uint32_t key);
-extern int sys_adns_free(int idx);
-extern int sys_adns_config(int idx, const char *host, const char *service, long ttl, uint64_t rules);
-struct adns {
-	uint8_t  ipv;
-	/* IPv4, IPv6 or Hostname. */
-	uint8_t  addrlen;
-	uint8_t  address[126];
-	int8_t   touched;
-	uint16_t priority;
-	uint16_t weight;
-#define ADNS_HASH_LEN   32u
-	uint8_t  hash[ADNS_HASH_LEN];
-};
-extern int sys_adns_get(int idx, int entry, const struct adns *, size_t);
-
-/* Create new configurable ADNS entry based on integral key. Returns tag index. */
-static inline
-int adns_new(uint32_t key) { return sys_adns_new(key); }
-
-/* Configure the ADNS index with hostname, service, TTL and rules. */
-static inline
-int adns_config(int idx, const char *host, const char *service, float ttl, const union adns_rules *rules) {
-	return sys_adns_config(idx, host, service, ttl * 1024, rules->reg);
-}
-
-/* Retrieve address and information about ADNS entry from index. Returns 0 on success.
-   If adns is NULL, it will return the number of addresses in the ADNS entry. */
-static inline
-int adns_get(int idx, int entry, const struct adns *adns) {
-	return sys_adns_get(idx, entry, adns, 1UL * sizeof(*adns));
-}
-static inline
-int adns_get_count(int idx, int entry) {
-	return sys_adns_get(idx, entry, NULL, 0u);
-}
-
-/**
  * Storage program
  *
  * Every tenant or program can have storage. If storage is enabled, then
@@ -426,7 +369,7 @@ struct virtbuffer {
  * static size_t cont_len = 0;
  *
  * static void
- * modify_content(size_t n, struct virtbuffer buffers[n], size_t res)
+ * modify_content(size_t n, struct virtbuffer buffers[], size_t res)
  * {
  *     // Allocate a new zero-terminated buffer from input
  *     char *new_buf = malloc(buffers[0].len + 1);
@@ -442,7 +385,7 @@ struct virtbuffer {
  *     storage_return_nothing();
  * }
  * static void
- * get_content(size_t n, struct virtbuffer buffers[n], size_t res)
+ * get_content(size_t n, struct virtbuffer buffers[], size_t res)
  * {
  *     storage_return(cont, cont_len);
  * }
@@ -471,7 +414,7 @@ struct virtbuffer {
  * from the function. This allows the system to copy the data back to the
  * request program before the function has returned and deallocated the data.
 **/
-typedef void (*storage_func) (size_t n, struct virtbuffer[n], size_t res);
+typedef void (*storage_func) (size_t n, struct virtbuffer[], size_t res);
 
 /* Returns true (1) if called from storage. */
 extern int
@@ -479,7 +422,7 @@ sys_is_storage();
 
 /* Transfer an array of buffers to storage, transfer output into @dst. */
 extern long
-storage_callv(storage_func, size_t n, const struct virtbuffer[n], void* dst, size_t);
+storage_callv(storage_func, size_t n, const struct virtbuffer[], void* dst, size_t);
 
 /* Transfer an array to storage, transfer output into @dst. */
 static inline long
@@ -598,7 +541,13 @@ extern struct shared_memory_info shared_memory_area();
 
 /* Allocate pointers to shared memory with given size and alignment. */
 #define SHM_ALLOC_BYTES(x) internal_shm_alloc(x, 8)
-#define SHM_ALLOC_TYPE(x) (typeof(x) *)internal_shm_alloc(sizeof(x), _Alignof(x))
+#ifdef __cplusplus
+#define SHM_ALLOC_TYPE(x) (x *)internal_shm_alloc(sizeof(x), alignof(x))
+#define SHM_ALLOC(x) (decltype(x) *)internal_shm_alloc(sizeof(x), alignof(x))
+#else
+#define SHM_ALLOC_TYPE(x) (x *)internal_shm_alloc(sizeof(x), _Alignof(x))
+#define SHM_ALLOC(x) (typeof(x) *)internal_shm_alloc(sizeof(x), _Alignof(x))
+#endif
 static inline void * internal_shm_alloc(size_t size, size_t align) {
 	static struct shared_memory_info info;
 	if (info.ptr == 0x0) {
@@ -705,24 +654,6 @@ extern long sys_fetch(const char*, size_t, struct curl_op*, struct curl_fields*,
 extern long sys_request(const char*, size_t, struct curl_op*, struct curl_fields*, struct curl_options*);
 
 /**
- * TCP-related functions
-**/
-
-/**
- * Receive and control a TCP socket file descriptor.
- * This fd can be read from and written to using write().
- * Reading happens automatically outside of the guest, and the read-buffer
- * is presented through the on_read callback.
- * 
- * Register various TCP socket callbacks:
- **/
-static inline void set_socket_on_connect(int(*f)(int fd, const char *remote, const char *arg)) { register_func(8, f); }
-static inline void set_socket_on_read(void(*f)(int fd, const uint8_t*, size_t)) { register_func(9, f); }
-static inline void set_socket_on_writable(void(*f)(int fd)) { register_func(10, f); }
-static inline void set_socket_on_disconnect(void(*f)(int fd, const char *reason)) { register_func(11, f); }
-
-
-/**
  * Utility functions
 **/
 
@@ -761,6 +692,13 @@ asm(".global wait_for_requests\n"
 	"	mov $0x10001, %eax\n"
 	"	out %eax, $0\n");
 
+asm(".global wait_for_requests_paused\n"
+	".type wait_for_requests_paused, @function\n"
+	"wait_for_requests_paused:\n"
+	"	mov $0x10002, %eax\n"
+	"	out %eax, $0\n"
+	"	ret\n");
+
 asm(".global sys_set_cacheable\n"
 	".type sys_set_cacheable, @function\n"
 	"sys_set_cacheable:\n"
@@ -768,12 +706,13 @@ asm(".global sys_set_cacheable\n"
 	"	out %eax, $0\n"
 	"	ret\n");
 
-asm(".global backend_response\n"
-	".type backend_response, @function\n"
-	"backend_response:\n"
+asm(".global sys_backend_response\n"
+	".type sys_backend_response, @function\n"
+	"sys_backend_response:\n"
 	".cfi_startproc\n"
 	"	mov $0x10010, %eax\n"
 	"	out %eax, $0\n"
+	"	ret\n"
 	".cfi_endproc\n");
 
 asm(".global begin_streaming_response\n"
@@ -844,34 +783,6 @@ asm(".global sys_regex_copyto\n"
 	".type sys_regex_copyto, @function\n"
 	"sys_regex_copyto:\n"
 	"	mov $0x10035, %eax\n"
-	"	out %eax, $0\n"
-	"	ret\n");
-
-asm(".global sys_adns_new\n"
-	".type sys_adns_new, @function\n"
-	"sys_adns_new:\n"
-	"	mov $0x10200, %eax\n"
-	"	out %eax, $0\n"
-	"	ret\n");
-
-asm(".global sys_adns_free\n"
-	".type sys_adns_free, @function\n"
-	"sys_adns_free:\n"
-	"	mov $0x10201, %eax\n"
-	"	out %eax, $0\n"
-	"	ret\n");
-
-asm(".global sys_adns_config\n"
-	".type sys_adns_config, @function\n"
-	"sys_adns_config:\n"
-	"	mov $0x10202, %eax\n"
-	"	out %eax, $0\n"
-	"	ret\n");
-
-asm(".global sys_adns_get\n"
-	".type sys_adns_get, @function\n"
-	"sys_adns_get:\n"
-	"	mov $0x10203, %eax\n"
 	"	out %eax, $0\n"
 	"	ret\n");
 

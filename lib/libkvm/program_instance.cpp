@@ -39,7 +39,6 @@ extern int numa_max_node();
 namespace kvm {
 extern std::vector<uint8_t> file_loader(const std::string&);
 extern bool file_writer(const std::string& file, const std::vector<uint8_t>&);
-extern void libadns_untag(const std::string&, struct vcl*);
 extern void extract_programs_to(kvm::ProgramInstance&, const char *, size_t);
 static constexpr bool VERBOSE_STORAGE_TASK = false;
 static constexpr bool VERBOSE_PROGRAM_STARTUP = false;

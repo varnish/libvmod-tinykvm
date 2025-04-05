@@ -781,34 +781,6 @@ asm(".global sys_regex_copyto\n"
 	"	out %eax, $0\n"
 	"	ret\n");
 
-asm(".global sys_adns_new\n"
-	".type sys_adns_new, @function\n"
-	"sys_adns_new:\n"
-	"	mov $0x10200, %eax\n"
-	"	out %eax, $0\n"
-	"	ret\n");
-
-asm(".global sys_adns_free\n"
-	".type sys_adns_free, @function\n"
-	"sys_adns_free:\n"
-	"	mov $0x10201, %eax\n"
-	"	out %eax, $0\n"
-	"	ret\n");
-
-asm(".global sys_adns_config\n"
-	".type sys_adns_config, @function\n"
-	"sys_adns_config:\n"
-	"	mov $0x10202, %eax\n"
-	"	out %eax, $0\n"
-	"	ret\n");
-
-asm(".global sys_adns_get\n"
-	".type sys_adns_get, @function\n"
-	"sys_adns_get:\n"
-	"	mov $0x10203, %eax\n"
-	"	out %eax, $0\n"
-	"	ret\n");
-
 asm(".global shared_memory_area\n"
 	".type shared_memory_area, @function\n"
 	"shared_memory_area:\n"
