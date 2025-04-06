@@ -192,6 +192,10 @@ Default: Enabled
 
 When enabled, a program may self-determine if ephemeral is enabled or not after initialization. The program changes this setting using `sys_make_ephemeral(bool)` before initialization concludes by waiting for requests.
 
+* `experimental_keep_working_memory`
+
+When resetting the VM after a request completes, keep all working memory. Instead of resetting pagetables back to a former state, copy memory from the main VM into all existing working memory pages. This is usually slower than the regular reset mechanism, however with a large address space it can be faster.
+
 * `allow_debug`
 
 Allow remotely debugging requests with GDB. The request to be debugged has to cause a breakpoint. In the C API this is done with `sys_breakpoint()`. The GDB instance must load the program using `file myprogram` before it can remotely connect using `target remote :2159`.

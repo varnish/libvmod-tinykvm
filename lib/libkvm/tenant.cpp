@@ -274,6 +274,10 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		// Set the default ephemeralness for this group/tenant
 		group.ephemeral = obj.value();
 	}
+	else if (obj.key() == "experimental_keep_working_memory")
+	{
+		group.experimental_keep_working_memory = obj.value();
+	}
 	else if (obj.key() == "relocate_fixed_mmap")
 	{
 		// Force fixed mmap to be relocated to current mmap address

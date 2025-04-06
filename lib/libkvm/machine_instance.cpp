@@ -250,8 +250,6 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 
 	/* We only reset ephemeral VMs. */
 	if (reset_needed) {
-		this->m_reset_needed = false;
-
 		stats().resets ++;
 		ScopedDuration cputime(this->stats().vm_reset_time);
 
@@ -259,6 +257,9 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 			.max_mem = tenant().config.max_main_memory(),
 			.max_cow_mem = tenant().config.max_req_memory(),
 			.reset_free_work_mem = tenant().config.limit_req_memory(),
+			.reset_copy_all_registers = true,
+			// When m_reset_needed is true, we want to do a full reset
+			.reset_keep_all_work_memory = !this->m_reset_needed && tenant().config.group.experimental_keep_working_memory,
 		});
 		this->m_waiting_for_requests = source.m_waiting_for_requests;
 		/* The POST memory area is gone. */
@@ -273,6 +274,7 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 		/* Load the compiled regexes of the source */
 		m_regex.reset_and_loan(source.m_regex);
 		/* XXX: Todo: reset more stuff */
+		this->m_reset_needed = false;
 	}
 }
 
