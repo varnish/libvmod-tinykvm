@@ -1,5 +1,6 @@
 add_vmod(vmod_tinykvm vmod_tinykvm.vcc "High-Performance Compute VMOD"
 	../kvm/kvm_backend.c
+	../kvm/kvm_live_update.c
 	../kvm/kvm_post.c
 	../kvm/to_string.c
 	vmod_tinykvm.c

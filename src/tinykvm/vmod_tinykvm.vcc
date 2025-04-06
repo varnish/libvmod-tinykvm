@@ -190,3 +190,23 @@ $Function INT synth(PRIV_VCL, INT status, STRING program, STRING url = "", STRIN
 - Generates a synthetic response from the given program and arguments.
 - If the synthetic response fails, the function returns 0.
 - Works the same way as to_string().
+
+$Function BACKEND live_update(PRIV_VCL, STRING program, STRING key, BYTES max_size = 50MB)
+
+- Hotswap the current program with a new one from a POST request. If the program fails to
+  load, the old program will be kept.
+- The key is used to decide whether the poster is allowed to POST programs. It does not
+  have to be used, but it has to match 'key' in the JSON configuration.
+- Example:
+	sub vcl_backend_fetch {
+		if (bereq.method == "POST" && bereq.http.X-LiveUpdate) {
+			set bereq.backend = tinykvm.live_update(
+				bereq.http.Host, bereq.http.X-LiveUpdate, 100MB);
+			return (fetch);
+		}
+	}
+
+$Function BOOL live_update_file(PRIV_VCL, STRING program, STRING filename)
+
+- Hotswap the current program with a new one from the local filesystem.
+

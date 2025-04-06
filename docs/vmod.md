@@ -24,6 +24,9 @@ Add `import tinykvm;` at the top of your VCL to load the TinyKVM VMOD.
 
 - Unloads programs matching the regex pattern.
 - The next request to an unloaded program will cause it to be reloaded.
+- If the old program has registered a live-update state serialization callback,
+  the new program will be loaded immediately and *not* when the next request
+  comes in, in order to facilitate a state transfer.
 
 ---
 > `tinykvm.configure(program, json)`
@@ -84,12 +87,29 @@ Add `import tinykvm;` at the top of your VCL to load the TinyKVM VMOD.
 - Works the same way as to_string(), and supports chaining.
 
 ---
-> `tinykvm.steal(program, argument = "")`
+> `tinykvm.live_update(program, key, max_size = 50MB)`
 
-- Takes over the current clients TCP connection and passes it to the given program.
-- The request fails if the HTTP version is 2.x or 3.x. Only 1.x is supported.
-- The program must have socket callbacks. The entries are specified in the API docs.
-- The program has access to the underlying file descriptor (virtualized).
-- The on_connect callback receives the client IP and the provided argument.
-- Returns true if detaching the clients fd succeeded, including on_connect.
-- Must be called from vcl_recv.
+- Hotswap the current program with a new one from a POST request. If the program fails to
+  load, the old program will be kept.
+- The key is used to decide whether the poster is allowed to POST programs. It does not
+  have to be used, but it has to match 'key' in the JSON configuration.
+- If the old and new programs have registered live-update state serialization callbacks,
+  they will be called on both the old and the new programs.
+- Example:
+```
+	sub vcl_backend_fetch {
+		if (bereq.method == "POST" && bereq.http.X-LiveUpdate) {
+			set bereq.backend = tinykvm.live_update(
+				bereq.http.Host, bereq.http.X-LiveUpdate, 100MB);
+			return (fetch);
+		}
+	}
+```
+
+---
+> `tinykvm.live_update_file(program, filename)`
+
+- Hotswap the current program with a new one from the local filesystem.
+- If the old and new programs have registered live-update state serialization callbacks,
+  they will be called on both the old and the new programs.
+
