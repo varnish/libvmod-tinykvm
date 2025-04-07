@@ -33,11 +33,7 @@ sub vcl_init {
 	""");
 }
 sub vcl_recv {
-	if (req.url == "/tcp") {
-		tinykvm.steal("hello", req.url);
-		return (synth(802));
-	}
-	else if (req.url == "/invalidate") {
+	if (req.url == "/invalidate") {
 		tinykvm.invalidate_programs();
 		return (synth(200));
 	}
@@ -249,10 +245,6 @@ sub vcl_backend_fetch {
 		set bereq.backend = tinykvm.program(
 			"to_string", "application/json", tinykvm.stats());
 	}
-	else if (bereq.url == "/sd") {
-		set bereq.backend = tinykvm.program("stable_diffusion",
-			"A lovely waterfall, high quality", "blurry, ugly, jpeg compression, artifacts, unsharp");
-	}
 	else if (bereq.url == "/stockfish") {
 		tinykvm.invalidate_programs("stockfish");
 		set bereq.backend = tinykvm.program("stockfish",
@@ -260,11 +252,6 @@ sub vcl_backend_fetch {
 				go movetime 1000
 			"""
 			);
-	}
-	else if (bereq.url == "/llama") {
-		#tinykvm.invalidate_programs("llama");
-		set bereq.backend = tinykvm.program("llama",
-			bereq.http.X-Prompt, "");
 	}
 	else if (bereq.url == "/v8") {
 		set bereq.backend = tinykvm.program("v8");
