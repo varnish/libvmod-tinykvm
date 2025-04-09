@@ -99,6 +99,7 @@ static void gather_stats(VRT_CTX,
 
 		total_resv_time += mi.stats().reservation_time;
 		totals.reservation_time += mi.stats().reservation_time;
+		totals.vm_reset_time += mi.stats().vm_reset_time;
 		totals.request_cpu_time += mi.stats().request_cpu_time;
 		totals.error_cpu_time += mi.stats().error_cpu_time;
 
@@ -121,6 +122,7 @@ static void gather_stats(VRT_CTX,
 		{"exceptions",  totals.exceptions},
 		{"timeouts",    totals.timeouts},
 		{"reservation_time",   totals.reservation_time},
+		{"reset_time",         totals.vm_reset_time},
 		{"request_cpu_time",   totals.request_cpu_time},
 		{"exception_cpu_time", totals.error_cpu_time},
 		{"input_bytes", totals.input_bytes},
