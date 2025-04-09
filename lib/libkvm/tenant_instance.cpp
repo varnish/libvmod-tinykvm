@@ -376,12 +376,11 @@ void TenantInstance::commit_program_live(VRT_CTX,
 	}
 
 	if (current != nullptr) {
-		TenantInstance::serialize_storage_state(
-			ctx, current, new_prog);
+		/* Serialize and transfer state from old to new program */
+		TenantInstance::serialize_storage_state(ctx, current, new_prog);
+		/* Increment live-update counter from old to new program */
+		new_prog->stats.live_updates = current->stats.live_updates + 1;
 	}
-
-	/* Increment live-update counter from old to new program */
-	new_prog->stats.live_updates = current->stats.live_updates + 1;
 
 	/* Swap out old program with new program. */
 	if (!new_prog->main_vm->is_debug())

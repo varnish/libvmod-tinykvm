@@ -191,7 +191,7 @@ $Function INT synth(PRIV_VCL, INT status, STRING program, STRING url = "", STRIN
 - If the synthetic response fails, the function returns 0.
 - Works the same way as to_string().
 
-$Function BACKEND live_update(PRIV_VCL, STRING program, STRING key, BYTES max_size = 50MB)
+$Function BACKEND live_update(PRIV_VCL, STRING program, STRING key, BYTES max_size = 52428800)
 
 - Hotswap the current program with a new one from a POST request. If the program fails to
   load, the old program will be kept.
