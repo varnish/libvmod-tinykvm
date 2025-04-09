@@ -259,7 +259,7 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 			.reset_free_work_mem = tenant().config.limit_req_memory(),
 			.reset_copy_all_registers = true,
 			// When m_reset_needed is true, we want to do a full reset
-			.reset_keep_all_work_memory = !this->m_reset_needed && tenant().config.group.experimental_keep_working_memory,
+			.reset_keep_all_work_memory = !this->m_reset_needed && tenant().config.group.ephemeral_keep_working_memory,
 		});
 		this->m_waiting_for_requests = source.m_waiting_for_requests;
 		/* The POST memory area is gone. */

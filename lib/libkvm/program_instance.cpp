@@ -310,7 +310,8 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 			main_vm->name().c_str(),
 			this->binary_was_local() ? "local" : "remote",
 			this->binary_was_cached() ? "cached" : "not cached",
-			initialized, ten->config.group.ephemeral ? " ephemeral" : "",
+			initialized,
+			ten->config.group.ephemeral ? (ten->config.group.ephemeral_keep_working_memory ? " ephemeral-kwm" : " ephemeral") : "",
 			n_nodes, ten->config.hugepages(), ten->config.request_hugepages(),
 			nanodiff(t0, t2) / 1e6,
 			debug ? ", remote debug" : "");

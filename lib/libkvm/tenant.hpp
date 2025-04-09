@@ -40,7 +40,7 @@ struct TenantGroup {
 	bool     relocate_fixed_mmap = true;
 	bool     control_ephemeral = false;
 	bool     ephemeral = true;
-	bool     experimental_keep_working_memory = false;
+	bool     ephemeral_keep_working_memory = false;
 	bool     print_stdout = false; /* Print directly to stdout */
 	bool     verbose = false;
 	bool     verbose_pagetable = false;
