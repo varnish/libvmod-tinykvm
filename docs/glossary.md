@@ -178,33 +178,39 @@ Granularity: 2 MB
 
 * `split_hugepages`
 
-With very high concurrency, constraining memory as much as possible may be desirable. This option allows splitting hugepages during request handling into 4K leaf pages. It adds a level of page-walking needed to access pages, but will keep working memory slightly lower.
+This option allows splitting hugepages during request handling into 4K leaf pages. It adds a level of page-walking needed to access pages, but will keep working memory slightly lower. Usually beneficial.
 
-Default: Disabled
+Default: Enabled
 
 * `ephemeral`
 
-An ephemeral VM is reset after each request concludes, regardless of reason. Ephemeral VMs are reset back to their initialized state, erasing all changes that happened during the request. A non-ephemeral VM will not be reset, which increases performance but without the security and stability guarantees of ephemeralness. If a non-ephemeral VM crashes, runs out of memory or times out, it will be reset.
+An ephemeral VM is reset after each request concludes, regardless of reason. Ephemeral VMs are reset back to their initialized state, erasing all changes that happened during the request. A non-ephemeral VM will not be reset, which increases performance but without the security and stability guarantees of ephemeralness. If a non-ephemeral VM crashes, runs out of memory or times out, it will be reset. This can also be referred to as _per-request isolation_.
 
 Default: Enabled
+
+* `ephemeral_keep_working_memory`
+
+Keep working memory when resetting the VM after a request completes. This is slower than the regular reset mechanism for _small programs_, however for bigger programs it scales much better. Enabling this also enables `ephemeral`.
+
+Default: Disabled
 
 * `control_ephemeral`
 
 When enabled, a program may self-determine if ephemeral is enabled or not after initialization. The program changes this setting using `sys_make_ephemeral(bool)` before initialization concludes by waiting for requests.
 
-* `experimental_keep_working_memory`
-
-When resetting the VM after a request completes, keep all working memory. Instead of resetting pagetables back to a former state, copy memory from the main VM into all existing working memory pages. This is usually slower than the regular reset mechanism, however with a large address space it can be faster.
+Default: Disabled
 
 * `allow_debug`
 
 Allow remotely debugging requests with GDB. The request to be debugged has to cause a breakpoint. In the C API this is done with `sys_breakpoint()`. The GDB instance must load the program using `file myprogram` before it can remotely connect using `target remote :2159`.
 
+Default: Disabled
 
 * `remote_debug_on_exception`
 
 Start a remote debugging session with GDB as soon as a request VM has an exception thrown. This allows inspecting hard-to-trigger bugs. The GDB instance must load the program using `file myprogram` before it can remotely connect using `target remote :2159`. The session has a 5-minute timeout, after which it is disconnected.
 
+Default: Disabled
 
 * `main_arguments`
 
