@@ -171,3 +171,39 @@ upload_program src/myprogram
 In this example we use filebin to store the programs. Filebins expire after a while, and requires the owners permission to use. However, this example shows how we can automate building and uploading, while also compressing the program to minimize delays.
 
 The script will upload `myprogram.tar.xz` to the given bin. If you set your programs uri to `.../myprogram.tar.xz`, it will automatically decompress and load it.
+
+## Live-updating
+
+It's possible to send a program directly to a Varnish instance, where it will be reloaded and keep any previous state. A so-called live update. In order to do this, you will need a live update end-point in your VCL:
+
+```
+	if (bereq.url == "/update") {
+		set bereq.backend = tinykvm.live_update(bereq.http.Host, bereq.http.X-LiveUpdate);
+	}
+```
+What this end-point does is update a program specified in the Host header with a key from the X-LiveUpdate HTTP header. As an example, this is how I live updated my WebP encoder:
+
+```sh
+$ curl -D - -H "X-LiveUpdate: 123" -H "Host: webp" --data-binary "@.build/webpencoder" -X POST http://127.0.0.1:8080/update
+```
+
+And I made it a part of the build script of the WebP encoder to simplify things, so that on a successful build it would automatically replace the one in my Varnish instance with the new build:
+
+```sh
+#!/usr/bin/env bash
+set -e
+mkdir -p .build
+pushd .build
+cmake .. -G Ninja
+ninja
+popd
+
+file=".build/webpencoder"
+tenant="webp"
+key="123"
+host="127.0.0.1:8080"
+
+curl -H "X-LiveUpdate: $key" -H "Host: $tenant" --data-binary "@$file" -X POST http://$host/update
+```
+
+When working on a program that is nearly there, this will save a lot of time!
