@@ -143,6 +143,51 @@ static inline bool load_tenant(VRT_CTX, VCL_PRIV task,
 }
 
 template <typename It>
+static void add_remapping(kvm::TenantGroup& group, const It& obj)
+{
+	if (!obj.value().is_array() || obj.value().size() != 2) {
+		throw std::runtime_error("Remapping must be an array of two elements");
+	}
+	// Reset errno
+	errno = 0;
+	// Append remappings
+	auto& arr = obj.value();
+	size_t size = 0;
+	char *end;
+	unsigned long long address = strtoull(arr[0].template get<std::string>().c_str(), &end, 16);
+	if (address < 0x20000) {
+		throw std::runtime_error("Remapping address was not a number, or invalid");
+	} else if (errno != 0) {
+		throw std::runtime_error("Remapping does not fit in 64-bit address");
+	}
+
+	if (arr[1].is_string()) {
+		// Allow for string representation of size, in which case it's the end address
+		size = strtoull(arr[1].template get<std::string>().c_str(), &end, 16);
+		if (size < address) {
+			throw std::runtime_error("Remapping size was not a number, or is smaller than address");
+		} else if (errno != 0) {
+			throw std::runtime_error("Remapping does not fit in 64-bit address");
+		}
+		// Calculate size from address
+		size = (size - address) >> 20U;
+	} else {
+		// Allow for integer representation of size, in which case it's the size in MiB
+		size = arr[1].template get<size_t>();
+	}
+
+	tinykvm::VirtualRemapping vmem {
+		.phys = 0x0,
+		.virt = address,
+		.size = size << 20U,
+		.writable   = true,
+		.executable = obj.key() == "executable_remapping",
+		.blackout   = obj.key() == "blackout_area"
+	};
+	group.vmem_remappings.push_back(vmem);
+}
+
+template <typename It>
 static void configure_group(const std::string& name, kvm::TenantGroup& group, const It& obj)
 {
 	// All group parameters are treated as optional and can be defined in a
@@ -307,46 +352,15 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	}
 	else if (obj.key() == "remapping" || obj.key() == "executable_remapping" || obj.key() == "blackout_area")
 	{
-		if (!obj.value().is_array() || obj.value().size() != 2) {
-			throw std::runtime_error("Remapping must be an array of two elements");
-		}
-		// Reset errno
-		errno = 0;
-		// Append remappings
-		auto& arr = obj.value();
-		size_t size = 0;
-		char *end;
-		unsigned long long address = strtoull(arr[0].template get<std::string>().c_str(), &end, 16);
-		if (address < 0x20000) {
-			throw std::runtime_error("Remapping address was not a number, or invalid");
-		} else if (errno != 0) {
-			throw std::runtime_error("Remapping does not fit in 64-bit address");
-		}
-
-		if (arr[1].is_string()) {
-			// Allow for string representation of size, in which case it's the end address
-			size = strtoull(arr[1].template get<std::string>().c_str(), &end, 16);
-			if (size < address) {
-				throw std::runtime_error("Remapping size was not a number, or is smaller than address");
-			} else if (errno != 0) {
-				throw std::runtime_error("Remapping does not fit in 64-bit address");
+		if (obj.value().is_array() && obj.value().size() == 2) {
+			add_remapping(group, obj);
+		} else if (obj.value().is_object()) {
+			for (const auto& it : obj.value().items()) {
+				add_remapping(group, it);
 			}
-			// Calculate size from address
-			size = (size - address) >> 20U;
 		} else {
-			// Allow for integer representation of size, in which case it's the size in MiB
-			size = arr[1].template get<size_t>();
+			throw std::runtime_error("Remapping must be an array of two elements or an object");
 		}
-
-		tinykvm::VirtualRemapping vmem {
-			.phys = 0x0,
-			.virt = address,
-			.size = size << 20U,
-			.writable   = true,
-			.executable = obj.key() == "executable_remapping",
-			.blackout   = obj.key() == "blackout_area"
-		};
-		group.vmem_remappings.push_back(vmem);
 	}
 	else if (obj.key() == "executable_heap")
 	{
