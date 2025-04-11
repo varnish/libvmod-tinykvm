@@ -255,3 +255,26 @@ Enable verbose output from program loading, as well as from certain system calls
 * `verbose_pagetables`
 
 Print the main VMs pagetable state after initialization.
+
+* `remapping`
+
+Allocate memory from the guests heap, unmap the area and move it to the desired location. This feature allows setting up high-memory areas without needing a large address space, which has been shown to increase performance. Remappings are named objects with an array of either `["0xADDRESS", size_megabytes]` or `["0xADDRESS", "0xADDRESS"]`. Example:
+
+```json
+	"remapping": {
+		"caged_heap": ["0x1000000000", 256],
+		"another_heap": ["0xC00000000", 64]
+	},
+```
+V8 has a caged_heap feature which requires a certain bit set in order to work. We don't want to create a 64+GB address space, so instead we allocate a tiny area at the desired location, and we named it `caged_heap`.
+
+* `blackout_area`
+
+Unmap the specified area with similar rules to `remapping`. Example:
+
+```json
+	"blackout_area": {
+		"unmap_before_caged_heap": ["0x200000000", "0x1000000000"],
+	},
+```
+This will unmap 8-64GB memory areas, making them unavailable. Blacking out unused areas can improve performance and reset times, but must be done carefully. If the guest tries to use the area it will cause a CPU exception. It's usually better to have a small address space with remappings.
