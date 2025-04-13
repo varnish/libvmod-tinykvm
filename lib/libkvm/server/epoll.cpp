@@ -142,7 +142,6 @@ void EpollServer::stop()
 	if (eventfd_write(this->m_event_fd, u) < 0) {
 		fprintf(stderr, "Failed to write to eventfd: %s\n", strerror(errno));
 	}
-	/* TODO: Interrupt epoll thread. */
 	m_epoll_thread.join();
 
 	close(this->m_epoll_fd);
@@ -258,6 +257,10 @@ bool EpollServer::manage(const int fd)
 	int val = 1;
 	setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val));
 
+	/* Register the fd with the VM */
+	const int virtual_fd = 0x1000 + fd;
+	vm().file_descriptors().manage(fd, virtual_fd);
+
 	/* Don't call on_connect if the entry is 0x0. */
 	auto func = program().
 		entry_at(ProgramEntryIndex::SOCKET_CONNECTED);
@@ -267,9 +270,6 @@ bool EpollServer::manage(const int fd)
 	}
 
 	const char* argument = "";
-
-	const int virtual_fd = 0x1000 + fd;
-	vm().file_descriptors().manage(fd, virtual_fd);
 
 	const char* peer = "(unknown)";
 	if constexpr (false) {
