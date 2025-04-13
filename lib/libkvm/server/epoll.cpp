@@ -120,7 +120,12 @@ EpollServer::EpollServer(const TenantInstance* tenant, ProgramInstance* prog, in
 	// Set the server to running state
 	this->m_running = true;
 	if (this->m_system_id == 0) // Only print once
-		printf("epoll server started on '%s'\n", address.c_str());
+		printf("%s epoll server started on '%s' vm=%u, nodes=1, huge=%d/%d\n",
+			is_unix ? "Unix" : "IPv4",
+			address.c_str(),
+			tenant->config.group.epoll_systems,
+			tenant->config.group.hugepage_arena_size > 0,
+			tenant->config.group.hugepage_requests_arena > 0);
 
 	// Create a VM instance for the epoll server, by forking the program main VM
 	this->m_vm = std::make_unique<MachineInstance>(
