@@ -378,7 +378,7 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	}
 	else if (obj.key() == "server") {
 		// Server is an object with path (UNIX socket) or port (TCP socket)
-		// and address. The address is optional.
+		// and the number of epoll systems to create.
 		if (obj.value().is_object()) {
 			auto& obj2 = obj.value();
 			if (obj2.contains("port")) {
@@ -391,6 +391,11 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 			}
 			if (obj2.contains("address")) {
 				group.server_address = obj2["address"];
+			}
+			if (obj2.contains("systems")) {
+				group.epoll_systems = obj2["systems"];
+			} else {
+				group.epoll_systems = 1;
 			}
 		} else {
 			throw std::runtime_error("Server must be an object with at least a port");

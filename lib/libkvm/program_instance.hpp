@@ -159,10 +159,6 @@ public:
 	long live_update_call(const vrt_ctx*,
 		gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc);
 
-	/* EpollServer is to allow WebSockets and other non-HTTP protocols
-	   to be used within the program. */
-	EpollServer& epoll_system();
-
 	std::vector<uint8_t> request_binary;
 	/* Ready-made *request* VM that can be forked into many small VMs */
 	std::unique_ptr<MachineInstance> main_vm;
@@ -227,7 +223,7 @@ private:
 	bool m_binary_was_cached = false;
 	// EpollServer is to allow WebSockets and other non-HTTP protocols
 	// to be used within the program.
-	std::unique_ptr<EpollServer> m_epoll_system = nullptr;
+	std::deque<EpollServer> m_epoll_systems;
 };
 
 inline bool ProgramInstance::wait_for_main_vm()

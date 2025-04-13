@@ -19,8 +19,9 @@ static constexpr size_t MAX_READ_BUFFER = 1UL << 20; /* 1MB */
 static constexpr size_t MAX_VM_WR_BUFFERS = 64;
 static constexpr float CALLBACK_TIMEOUT = 8.0f; /* Seconds */
 
-EpollServer::EpollServer(const TenantInstance* tenant, ProgramInstance* prog)
-	: m_tenant(tenant),
+EpollServer::EpollServer(const TenantInstance* tenant, ProgramInstance* prog, int16_t id)
+	: m_system_id(id),
+	  m_tenant(tenant),
 	  m_program(prog)
 {
 	if (!prog->has_storage()) {
@@ -88,7 +89,7 @@ EpollServer::EpollServer(const TenantInstance* tenant, ProgramInstance* prog)
 	// Start the epoll thread
 	this->m_epoll_thread = std::thread(&EpollServer::epoll_main_loop, this);
 }
-EpollServer::~EpollServer()
+void EpollServer::stop()
 {
 	this->m_running = false;
 	/* Notify the epoll thread to stop */
@@ -103,13 +104,11 @@ EpollServer::~EpollServer()
 	close(this->m_listen_fd);
 	close(this->m_event_fd);
 }
-
-EpollServer& ProgramInstance::epoll_system()
+EpollServer::~EpollServer()
 {
-	if (this->m_epoll_system == nullptr) {
-		throw std::runtime_error("Epoll server not initialized");
+	if (this->m_running) {
+		this->stop();
 	}
-	return *this->m_epoll_system;
 }
 
 void EpollServer::epoll_main_loop()
@@ -117,6 +116,8 @@ void EpollServer::epoll_main_loop()
 	struct epoll_event events[MAX_EVENTS];
 	std::vector<int> new_fds;
 	std::future<long> new_fds_future;
+	// A list of futures that we delay until the end of the epoll loop
+	futures_t futures;
 
 	while (this->m_running)
 	{
@@ -151,18 +152,7 @@ void EpollServer::epoll_main_loop()
 					continue; /* Move to next event */
 				}
 				try {
-					const auto len = this->fd_readable(ev.data.fd);
-					if (len <= 0) {
-						/* Some errors are not fatal */
-						const bool non_fatal = (len == -1 && errno == EWOULDBLOCK);
-						if (!non_fatal) {
-							// Close immediately (???)
-							this->hangup(ev.data.fd, (len == 0) ? "Disconnected" : "Error");
-
-							// Skip over the remaining events for this fd
-							continue;
-						}
-					}
+					this->fd_readable(ev.data.fd, futures);
 				} catch (const std::exception& e) {
 					/* XXX: Implement me. */
 					fprintf(stderr, "epoll read exception: %s\n", e.what());
@@ -171,7 +161,7 @@ void EpollServer::epoll_main_loop()
 			if (ev.events & EPOLLOUT)
 			{
 				try {
-					this->fd_writable(ev.data.fd);
+					this->fd_writable(ev.data.fd, futures);
 				} catch (const std::exception& e) {
 					/* XXX: Implement me. */
 					fprintf(stderr, "epoll write exception: %s\n", e.what());
@@ -196,6 +186,18 @@ void EpollServer::epoll_main_loop()
 			new_fds_future = this->handle_new_connections(new_fds, nullptr);
 			new_fds.clear();
 		}
+		/* Wait for all futures to finish */
+		for (auto& f : futures) {
+			if (f.valid()) {
+				FdAndResult result;
+				result.whole = f.get();
+				if (result.result <= 0) {
+					// Close immediately (???)
+					this->hangup(result.fd, (result.result == 0) ? "Disconnected" : "Error");
+				}
+			}
+		}
+		futures.clear();
 	} // epoll_main_loop
 
 	/* Potentially wait for the last task to finish */
@@ -290,72 +292,82 @@ bool EpollServer::manage(const int fd, std::vector<int>& new_fds)
 	new_fds.push_back(fd);
 	return true;
 }
-long EpollServer::fd_readable(int fd)
+void EpollServer::fd_readable(int fd, futures_t& futures)
 {
 	/* Don't call on_data if the entry is 0x0. */
 	if (program().entry_at(ProgramEntryIndex::SOCKET_DATA) == 0x0) {
 		/* Let's not read anymore. */
 		shutdown(fd, SHUT_RD);
-		return 0;
+		return;
 	}
 
-	auto fut = program().m_storage_queue.enqueue(
-		[this, fd] () -> long
+	futures.emplace_back(program().m_storage_queue.enqueue(
+	[this, fd] () -> long
+	{
+		auto& storage = *this->program().storage().storage_vm;
+		auto func = program().
+			entry_at(ProgramEntryIndex::SOCKET_DATA);
+
+		if (this->m_read_vaddr == 0x0) {
+			this->m_read_vaddr = storage.machine().mmap_allocate(MAX_READ_BUFFER);
+		}
+		/* Gather buffers from writable area */
+		tinykvm::Machine::WrBuffer buffers[MAX_VM_WR_BUFFERS];
+		const auto n_buffers =
+			storage.machine().writable_buffers_from_range(MAX_VM_WR_BUFFERS,
+				buffers, this->m_read_vaddr, MAX_READ_BUFFER);
+
+		ssize_t len = MAX_READ_BUFFER;
+		ssize_t total = 0;
+		while (len > 0 && total < ssize_t(MAX_READ_BUFFER))
 		{
-			auto& storage = *this->program().storage().storage_vm;
-			auto func = program().
-				entry_at(ProgramEntryIndex::SOCKET_DATA);
+			len = readv(fd, (struct iovec *)&buffers[0], n_buffers);
+			/* XXX: Possibly very stupid reason to break. But we can always come back. */
+			if (len < 0)
+				break;
+			total += len;
 
-			if (this->m_read_vaddr == 0x0) {
-				this->m_read_vaddr = storage.machine().mmap_allocate(MAX_READ_BUFFER);
-			}
-			/* Gather buffers from writable area */
-			tinykvm::Machine::WrBuffer buffers[MAX_VM_WR_BUFFERS];
-			const auto n_buffers =
-				storage.machine().writable_buffers_from_range(MAX_VM_WR_BUFFERS,
-					buffers, this->m_read_vaddr, MAX_READ_BUFFER);
-
-			ssize_t len = MAX_READ_BUFFER;
-			while (len == MAX_READ_BUFFER)
-			{
-				len = readv(fd, (struct iovec *)&buffers[0], n_buffers);
-				/* XXX: Possibly very stupid reason to break. But we can always come back. */
-				if (len < 0)
-					break;
-
-				/* Call the storage VM on_data callback. */
-				const int virtual_fd = 0x1000 + fd;
-				storage.machine().timed_vmcall(
-					func, CALLBACK_TIMEOUT,
-					int(virtual_fd),
-					m_read_vaddr, ssize_t(len));
-			}
-			return len;
-		});
-	return fut.get();
+			/* Call the storage VM on_data callback. */
+			const int virtual_fd = 0x1000 + fd;
+			storage.machine().timed_vmcall(
+				func, CALLBACK_TIMEOUT,
+				int(virtual_fd),
+				m_read_vaddr, ssize_t(len));
+		}
+		FdAndResult result;
+		result.fd = fd;
+		result.result = len;
+		if (result.result < 0) {
+			const bool non_fatal = (len == -1 && errno == EWOULDBLOCK);
+			result.result = (non_fatal) ? 1 : -1;
+		}
+		return result.whole;
+	}));
 }
-void EpollServer::fd_writable(int fd)
+void EpollServer::fd_writable(int fd, futures_t& futures)
 {
 	/* Don't call on_data if the entry is 0x0. */
 	if (program().entry_at(ProgramEntryIndex::SOCKET_WRITABLE) == 0x0)
 		return;
 
-	auto fut = program().m_storage_queue.enqueue(
-		[this, fd] () -> long
-		{
-			auto& storage = *this->program().storage().storage_vm;
-			auto func = program().
-				entry_at(ProgramEntryIndex::SOCKET_WRITABLE);
+	futures.emplace_back(program().m_storage_queue.enqueue(
+	[this, fd] () -> long
+	{
+		auto& storage = *this->program().storage().storage_vm;
+		auto func = program().
+			entry_at(ProgramEntryIndex::SOCKET_WRITABLE);
 
-			const int virtual_fd = 0x1000 + fd;
+		const int virtual_fd = 0x1000 + fd;
 
-			/* Call the storage VM on_writable callback. */
-			storage.machine().timed_vmcall(
-				func, CALLBACK_TIMEOUT,
-				int(virtual_fd));
-			return 0;
-		});
-	fut.get();
+		/* Call the storage VM on_writable callback. */
+		storage.machine().timed_vmcall(
+			func, CALLBACK_TIMEOUT,
+			int(virtual_fd));
+		FdAndResult result;
+		result.fd = fd;
+		result.result = 0;
+		return result.whole;
+	}));
 }
 
 void EpollServer::hangup(int fd, const char *reason)
@@ -363,28 +375,28 @@ void EpollServer::hangup(int fd, const char *reason)
 	/* Preemptively close and remove the fd. */
 	epoll_ctl(this->m_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
 	close(fd);
-	program().storage().storage_vm->file_descriptors().free_byval(fd);
-
-	/* Don't call on_disconnect if the entry is 0x0. */
-	if (program().entry_at(ProgramEntryIndex::SOCKED_DISCONNECTED) == 0x0)
-		return;
 
 	auto fut = program().m_storage_queue.enqueue(
-		[this, fd, reason] () -> long
-		{
-			auto& storage = *this->program().storage().storage_vm;
-			auto func = program().
-				entry_at(ProgramEntryIndex::SOCKED_DISCONNECTED);
+	[this, fd, reason] () -> long
+	{
+		auto& storage = *this->program().storage().storage_vm;
+		storage.file_descriptors().free_byval(fd);
 
-			const int virtual_fd = 0x1000 + fd;
+		auto func = program().
+			entry_at(ProgramEntryIndex::SOCKED_DISCONNECTED);
+		/* Don't call on_disconnect if the entry is 0x0. */
+		if (func == 0x0)
+			return 1;
 
-			/* Call the storage VM on_disconnected callback. */
-			storage.machine().timed_vmcall(
-				func, CALLBACK_TIMEOUT,
-				int(virtual_fd), (const char *)reason);
+		const int virtual_fd = 0x1000 + fd;
 
-			return 0;
-		});
+		/* Call the storage VM on_disconnected callback. */
+		storage.machine().timed_vmcall(
+			func, CALLBACK_TIMEOUT,
+			int(virtual_fd), (const char *)reason);
+
+		return 1;
+	});
 	fut.get();
 }
 

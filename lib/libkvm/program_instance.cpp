@@ -258,8 +258,11 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 		main_vm->set_ctx(nullptr);
 
 		// If we are using an epoll server, we'll need to start it now
-		if (ten->config.group.server_port != 0 || !ten->config.group.server_address.empty()) {
-			this->m_epoll_system = std::make_unique<EpollServer>(ten, this);
+		if (ten->config.group.has_epoll_system()) {
+			const int num_systems = ten->config.group.epoll_systems;
+			for (int i = 0; i < num_systems; i++) {
+				m_epoll_systems.emplace_back(ten, this, i);
+			}
 		}
 
 		TIMING_LOCATION(t1);
@@ -340,6 +343,10 @@ ProgramInstance::~ProgramInstance()
 				vm.task_future.get();
 			} catch (...) {}
 		}
+	}
+
+	for (auto& sys : m_epoll_systems) {
+		sys.stop();
 	}
 
 	// NOTE: Thread pools need to wait on jobs here

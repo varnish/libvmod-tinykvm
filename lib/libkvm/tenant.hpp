@@ -47,6 +47,7 @@ struct TenantGroup {
 	/* When port is non-zero, start an epoll server to receive non-HTTP
 	   requests, which is forwarded to the current program. */
 	uint16_t server_port = 0;
+	uint16_t epoll_systems = 0;
 	std::string server_address;
 
 	std::vector<std::string> environ {
@@ -69,6 +70,10 @@ struct TenantGroup {
 	void set_max_workmem(uint64_t newmax_mb) { this->max_req_mem = newmax_mb * 1048576ul; }
 	void set_limit_workmem_after_req(uint64_t newmax_mb) { this->limit_req_mem = newmax_mb * 1048576ul; }
 	void set_shared_mem(uint64_t newmax_mb) { this->shared_memory = newmax_mb * 1048576ul; }
+	bool has_epoll_system() const noexcept {
+		return (this->server_port != 0 || !this->server_address.empty()) &&
+		       this->epoll_systems > 0;
+	}
 
 	/* Check that each value has meaning and is not impossibly high or low.
 	   Throws an exception with a message explaining the problem. */
