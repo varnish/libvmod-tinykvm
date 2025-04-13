@@ -376,6 +376,26 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	else if (obj.key() == "verbose_pagetables") {
 		group.verbose_pagetable = obj.value();
 	}
+	else if (obj.key() == "server") {
+		// Server is an object with path (UNIX socket) or port (TCP socket)
+		// and address. The address is optional.
+		if (obj.value().is_object()) {
+			auto& obj2 = obj.value();
+			if (obj2.contains("port")) {
+				group.server_port = obj2["port"];
+			} else if (obj2.contains("path")) {
+				group.server_port = 0;
+				group.server_address = obj2["path"];
+			} else {
+				throw std::runtime_error("Server must have a port or path");
+			}
+			if (obj2.contains("address")) {
+				group.server_address = obj2["address"];
+			}
+		} else {
+			throw std::runtime_error("Server must be an object with at least a port");
+		}
+	}
 	else if (obj.key() == "group") { /* Silently ignore. */ }
 	else if (obj.key() == "key")   { /* Silently ignore. */ }
 	else if (obj.key() == "uri")   { /* Silently ignore. */ }

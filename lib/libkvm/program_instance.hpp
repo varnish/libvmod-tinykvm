@@ -2,6 +2,7 @@
 #include "machine_instance.hpp"
 #include "instance_cache.hpp"
 #include "settings.hpp"
+#include "server/epoll.hpp"
 #include "utils/cpptime.hpp"
 #include <blockingconcurrentqueue.h>
 #include <tinykvm/util/threadpool.h>
@@ -54,6 +55,11 @@ enum class ProgramEntryIndex : uint8_t {
 	BACKEND_ERROR  = 5,
 	LIVEUPD_SERIALIZE = 6,
 	LIVEUPD_DESERIALIZE = 7,
+
+	SOCKET_CONNECTED = 8,
+	SOCKET_DATA = 9,
+	SOCKET_WRITABLE = 10,
+	SOCKED_DISCONNECTED = 11,
 
 	TOTAL_ENTRIES
 };
@@ -153,6 +159,10 @@ public:
 	long live_update_call(const vrt_ctx*,
 		gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc);
 
+	/* EpollServer is to allow WebSockets and other non-HTTP protocols
+	   to be used within the program. */
+	EpollServer& epoll_system();
+
 	std::vector<uint8_t> request_binary;
 	/* Ready-made *request* VM that can be forked into many small VMs */
 	std::unique_ptr<MachineInstance> main_vm;
@@ -215,6 +225,9 @@ private:
 	int8_t m_initialization_complete = 0;
 	bool m_binary_was_local = false;
 	bool m_binary_was_cached = false;
+	// EpollServer is to allow WebSockets and other non-HTTP protocols
+	// to be used within the program.
+	std::unique_ptr<EpollServer> m_epoll_system = nullptr;
 };
 
 inline bool ProgramInstance::wait_for_main_vm()

@@ -44,6 +44,10 @@ struct TenantGroup {
 	bool     print_stdout = false; /* Print directly to stdout */
 	bool     verbose = false;
 	bool     verbose_pagetable = false;
+	/* When port is non-zero, start an epoll server to receive non-HTTP
+	   requests, which is forwarded to the current program. */
+	uint16_t server_port = 0;
+	std::string server_address;
 
 	std::vector<std::string> environ {
 		"LC_TYPE=C", "LC_ALL=C", "USER=root"

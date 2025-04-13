@@ -257,6 +257,11 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 		// We do not need a VRT CTX after initialization.
 		main_vm->set_ctx(nullptr);
 
+		// If we are using an epoll server, we'll need to start it now
+		if (ten->config.group.server_port != 0 || !ten->config.group.server_address.empty()) {
+			this->m_epoll_system = std::make_unique<EpollServer>(ten, this);
+		}
+
 		TIMING_LOCATION(t1);
 
 		// Instantiate forked VMs on dedicated threads, in
