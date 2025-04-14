@@ -31,11 +31,23 @@ namespace kvm
 		void hangup(int fd, const char *);
 		bool epoll_add(int fd);
 
+		struct SocketEvent
+		{
+			int fd;
+			int event;
+			uint64_t remote = 0;
+			uint64_t arg    = 0;
+			uint64_t data = 0;
+			size_t data_len = 0;
+		};
+		void resume(const SocketEvent& se);
+
 		int m_epoll_fd = -1;
 		int m_listen_fd = -1;
 		int m_event_fd = -1;
 		int16_t m_system_id = -1;
 		bool m_running = true;
+		bool m_pause_resume = false;
 		/* We pre-allocate a reading area. */
 		uint64_t m_read_vaddr = 0x0;
 

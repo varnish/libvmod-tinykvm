@@ -136,6 +136,29 @@ EpollServer::EpollServer(const TenantInstance* tenant, ProgramInstance* prog, in
 		throw std::runtime_error("Failed to allocate read buffer");
 	}
 
+	// Set up the paused VM state if the pause-resume API is enabled
+	const auto pause_resume_entry = this->m_program->entry_at(ProgramEntryIndex::SOCKET_PAUSE_RESUME_API);
+	if (pause_resume_entry != 0x0)
+	{
+		// Call the pause-resume API to set up the VM state, which *must*
+		// report that the VM is waiting for requests.
+		this->m_vm->reset_wait_for_requests();
+
+		this->m_vm->machine().timed_vmcall(pause_resume_entry, CALLBACK_TIMEOUT, this->m_system_id);
+
+		if (this->m_vm->is_waiting_for_requests()) {
+			this->m_pause_resume = true;
+			// Skip over the OUT instruction (from waiting for requests)
+			auto& regs = this->m_vm->machine().registers();
+			regs.rip += 2;
+			this->m_vm->machine().set_registers(regs);
+			printf("epoll server: pause-resume API enabled\n");
+		} else {
+			fprintf(stderr, "EpollServer: VM is not waiting for requests\n");
+			throw std::runtime_error("VM is not waiting for requests");
+		}
+	}
+
 	// Start the epoll thread
 	this->m_epoll_thread = std::thread(&EpollServer::epoll_main_loop, this);
 }
@@ -290,13 +313,27 @@ bool EpollServer::manage(const int fd)
 			peer = "(unknown)";
 	}
 
-	/* Call the storage VM on_connected callback. */
-	vm().machine().timed_vmcall(
-		func, CALLBACK_TIMEOUT,
-		int(virtual_fd), peer, argument);
+	bool answer = false;
+	if (this->m_pause_resume)
+	{
+		SocketEvent se;
+		se.fd = virtual_fd;
+		se.event = 0; // SOCKET_CONNECTED
+		__u64 stack = this->m_read_vaddr + 0x1000;
+		se.remote = vm().machine().stack_push_cstr(stack, peer);
+		se.arg = vm().machine().stack_push_cstr(stack, argument);
+		this->resume(se);
+		// There is no good way to check if the VM accepted the fd.
+		answer = true;
+	} else {
+		/* Call the storage VM on_connected callback. */
+		vm().machine().timed_vmcall(
+			func, CALLBACK_TIMEOUT,
+			int(virtual_fd), peer, argument);
+		/* Get answer from VM, and unmanage the fd if no. */
+		answer = vm().machine().return_value();
+	}
 
-	/* Get answer from VM, and unmanage the fd if no. */
-	const bool answer = vm().machine().return_value();
 	if (!answer) {
 		vm().file_descriptors().free_byhash(virtual_fd);
 		return false;
@@ -329,16 +366,26 @@ long EpollServer::fd_readable(int fd)
 	{
 		len = readv(fd, (struct iovec *)&buffers[0], n_buffers);
 		/* XXX: Possibly very stupid reason to break. But we can always come back. */
-		if (len < 0)
+		if (len <= 0)
 			break;
 		total += len;
 
 		/* Call the storage VM on_data callback. */
 		const int virtual_fd = 0x1000 + fd;
-		vm().machine().timed_vmcall(
-			func, CALLBACK_TIMEOUT,
-			int(virtual_fd),
-			m_read_vaddr, ssize_t(len));
+		if (this->m_pause_resume)
+		{
+			SocketEvent se;
+			se.fd = virtual_fd;
+			se.event = 2; // SOCKET_WRITABLE
+			se.data = this->m_read_vaddr;
+			se.data_len = len;
+			this->resume(se);
+		} else {
+			vm().machine().timed_vmcall(
+				func, CALLBACK_TIMEOUT,
+				int(virtual_fd),
+				m_read_vaddr, ssize_t(len));
+		}
 	}
 	return len;
 }
@@ -352,6 +399,15 @@ void EpollServer::fd_writable(int fd)
 		entry_at(ProgramEntryIndex::SOCKET_WRITABLE);
 
 	const int virtual_fd = 0x1000 + fd;
+
+	if (this->m_pause_resume)
+	{
+		SocketEvent se;
+		se.fd = virtual_fd;
+		se.event = 2; // SOCKET_WRITABLE
+		this->resume(se);
+		return;
+	}
 
 	/* Call the storage VM on_writable callback. */
 	vm().machine().timed_vmcall(
@@ -367,17 +423,50 @@ void EpollServer::hangup(int fd, const char *reason)
 	vm().file_descriptors().free_byval(fd);
 
 	auto func = program().
-		entry_at(ProgramEntryIndex::SOCKED_DISCONNECTED);
+		entry_at(ProgramEntryIndex::SOCKET_DISCONNECTED);
 	/* Don't call on_disconnect if the entry is 0x0. */
 	if (func == 0x0)
 		return;
 
 	const int virtual_fd = 0x1000 + fd;
 
+	if (this->m_pause_resume)
+	{
+		SocketEvent se;
+		se.fd = virtual_fd;
+		se.event = 3; // SOCKET_DISCONNECTED
+		this->resume(se);
+		return;
+	}
+
 	/* Call the storage VM on_disconnected callback. */
 	vm().machine().timed_vmcall(
 		func, CALLBACK_TIMEOUT,
 		int(virtual_fd), (const char *)reason);
+}
+
+void EpollServer::resume(const SocketEvent& se)
+{
+	if (this->m_pause_resume == false) {
+		throw std::runtime_error("EpollServer: pause-resume API not enabled");
+	}
+
+	/* Copy the SocketEvent to the VM, address is already in RDI. */
+	auto& regs = vm().machine().registers();
+	vm().machine().copy_to_guest(regs.rdi, &se, sizeof(SocketEvent));
+	vm().machine().set_registers(regs);
+
+	/* Resume the VM */
+	vm().reset_wait_for_requests();
+	vm().machine().vmresume(CALLBACK_TIMEOUT);
+
+	/* Check if the VM is *again* waiting for requests */
+	if (!vm().is_waiting_for_requests()) {
+		throw std::runtime_error("EpollServer: VM is not waiting for requests");
+	}
+	/* Skip over the OUT instruction (from waiting for requests) */
+	regs.rip += 2;
+	vm().machine().set_registers(regs);
 }
 
 } // kvm
