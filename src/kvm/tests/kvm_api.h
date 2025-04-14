@@ -698,7 +698,7 @@ enum SocketEvent {
 };
 struct kvm_socket_event {
 	int fd;
-	SocketEvent event;
+	enum SocketEvent event;
 	const char *remote;
 	const char *arg;
 	const uint8_t *data;

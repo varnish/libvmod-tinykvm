@@ -9,6 +9,8 @@ namespace kvm
 
 	struct EpollServer
 	{
+		static constexpr size_t MAX_VM_WR_BUFFERS = 64;
+
 		EpollServer(const TenantInstance* tenant, ProgramInstance* program, int16_t id);
 		~EpollServer();
 
@@ -42,6 +44,9 @@ namespace kvm
 		};
 		void resume(const SocketEvent& se);
 
+		std::unique_ptr<MachineInstance> m_vm;
+		const TenantInstance* m_tenant;
+		ProgramInstance* m_program;
 		int m_epoll_fd = -1;
 		int m_listen_fd = -1;
 		int m_event_fd = -1;
@@ -50,10 +55,9 @@ namespace kvm
 		bool m_pause_resume = false;
 		/* We pre-allocate a reading area. */
 		uint64_t m_read_vaddr = 0x0;
+		size_t m_n_buffers = 0;
+		tinykvm::Machine::WrBuffer m_buffers[MAX_VM_WR_BUFFERS];
 
 		std::thread m_epoll_thread;
-		const TenantInstance* m_tenant;
-		ProgramInstance* m_program;
-		std::unique_ptr<MachineInstance> m_vm;
 	};
 }

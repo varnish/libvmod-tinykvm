@@ -16,7 +16,6 @@ namespace kvm {
 
 static constexpr int MAX_EVENTS = 8;
 static constexpr size_t MAX_READ_BUFFER = 1UL << 20; /* 1MB */
-static constexpr size_t MAX_VM_WR_BUFFERS = 64;
 static constexpr float CALLBACK_TIMEOUT = 8.0f; /* Seconds */
 
 EpollServer::EpollServer(const TenantInstance* tenant, ProgramInstance* prog, int16_t id)
@@ -135,6 +134,10 @@ EpollServer::EpollServer(const TenantInstance* tenant, ProgramInstance* prog, in
 	if (this->m_read_vaddr == 0) {
 		throw std::runtime_error("Failed to allocate read buffer");
 	}
+	/* Gather buffers from writable area */
+	this->m_n_buffers =
+		vm().machine().writable_buffers_from_range(MAX_VM_WR_BUFFERS,
+			this->m_buffers, this->m_read_vaddr, MAX_READ_BUFFER);
 
 	// Set up the paused VM state if the pause-resume API is enabled
 	const auto pause_resume_entry = this->m_program->entry_at(ProgramEntryIndex::SOCKET_PAUSE_RESUME_API);
@@ -152,7 +155,6 @@ EpollServer::EpollServer(const TenantInstance* tenant, ProgramInstance* prog, in
 			auto& regs = this->m_vm->machine().registers();
 			regs.rip += 2;
 			this->m_vm->machine().set_registers(regs);
-			printf("epoll server: pause-resume API enabled\n");
 		} else {
 			fprintf(stderr, "EpollServer: VM is not waiting for requests\n");
 			throw std::runtime_error("VM is not waiting for requests");
@@ -354,17 +356,11 @@ long EpollServer::fd_readable(int fd)
 	auto func = program().
 		entry_at(ProgramEntryIndex::SOCKET_DATA);
 
-	/* Gather buffers from writable area */
-	tinykvm::Machine::WrBuffer buffers[MAX_VM_WR_BUFFERS];
-	const auto n_buffers =
-		vm().machine().writable_buffers_from_range(MAX_VM_WR_BUFFERS,
-			buffers, this->m_read_vaddr, MAX_READ_BUFFER);
-
 	ssize_t len = MAX_READ_BUFFER;
 	ssize_t total = 0;
 	while (len > 0 && total < ssize_t(MAX_READ_BUFFER))
 	{
-		len = readv(fd, (struct iovec *)&buffers[0], n_buffers);
+		len = readv(fd, (struct iovec *)&this->m_buffers[0], this->m_n_buffers);
 		/* XXX: Possibly very stupid reason to break. But we can always come back. */
 		if (len <= 0)
 			break;
