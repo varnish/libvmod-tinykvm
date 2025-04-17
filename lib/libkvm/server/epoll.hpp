@@ -10,7 +10,7 @@ namespace kvm
 
 	struct EpollServer
 	{
-		static constexpr size_t MAX_READ_BUFFERS = 16;
+		static constexpr size_t MAX_READ_BUFFERS = 32;
 		static constexpr size_t MAX_VM_WR_BUFFERS = 64;
 
 		EpollServer(const TenantInstance* tenant, ProgramInstance* program, int16_t id);
@@ -45,7 +45,6 @@ namespace kvm
 		int m_event_fd = -1;
 		int16_t m_system_id = -1;
 		bool m_running = true;
-		bool m_pause_resume = false;
 		/* We pre-allocate a reading area. */
 		struct ReadBuffer
 		{

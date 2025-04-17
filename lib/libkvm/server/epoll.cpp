@@ -142,7 +142,6 @@ EpollServer::EpollServer(const TenantInstance* tenant, ProgramInstance* prog, in
 		this->m_vm->machine().timed_vmcall(pause_resume_entry, CALLBACK_TIMEOUT, this->m_system_id);
 
 		if (this->m_vm->is_waiting_for_requests()) {
-			this->m_pause_resume = true;
 			// Skip over the OUT instruction (from waiting for requests)
 			auto& regs = this->m_vm->machine().registers();
 			regs.rip += 2;
@@ -156,8 +155,9 @@ EpollServer::EpollServer(const TenantInstance* tenant, ProgramInstance* prog, in
 		// pause-resume API, which is in the rsi register.
 		needed_buffers = this->m_vm->machine().registers().rsi;
 		needed_buffers = std::clamp(needed_buffers, size_t(1), MAX_READ_BUFFERS);
+	} else {
+		throw std::runtime_error("EpollServer: Pause-resume API not waiting for requests");
 	}
-	printf("EpollServer: %zu buffers needed\n", needed_buffers);
 
 	// Allocate the buffers for the VM in a single chunk
 	const uint64_t allocation = this->m_vm->allocate_post_data(MAX_READ_BUFFER * needed_buffers);
@@ -317,12 +317,6 @@ bool EpollServer::manage(const int fd, std::vector<SocketEvent>& queue)
 	const int virtual_fd = 0x1000 + fd;
 	vm().file_descriptors().manage(fd, virtual_fd);
 
-	/* Don't call on_connect if the entry is 0x0. */
-	auto func = program().entry_at(ProgramEntryIndex::SOCKET_CONNECTED);
-	if (func == 0x0 && !this->m_pause_resume) {
-		return this->epoll_add(fd);
-	}
-
 	const char* argument = "";
 
 	const char* peer = "(unknown)";
@@ -340,29 +334,19 @@ bool EpollServer::manage(const int fd, std::vector<SocketEvent>& queue)
 	}
 
 	bool answer = false;
-	if (this->m_pause_resume)
-	{
-		/* Steal a read-buffer for argument and peer. */
-		auto& rb = this->m_read_buffers.at(m_current_read_buffer);
-		m_current_read_buffer++;
+	/* Steal a read-buffer for argument and peer. */
+	auto& rb = this->m_read_buffers.at(m_current_read_buffer);
+	m_current_read_buffer++;
 
-		SocketEvent se;
-		se.fd = virtual_fd;
-		se.event = 0; // SOCKET_CONNECTED
-		__u64 stack = rb.read_vaddr + 0x1000;
-		se.remote = vm().machine().stack_push_cstr(stack, peer);
-		se.arg = vm().machine().stack_push_cstr(stack, argument);
-		queue.push_back(se);
-		// There is no good way to check if the VM accepted the fd.
-		answer = true;
-	} else {
-		/* Call the storage VM on_connected callback. */
-		vm().machine().timed_vmcall(
-			func, CALLBACK_TIMEOUT,
-			int(virtual_fd), peer, argument);
-		/* Get answer from VM, and unmanage the fd if no. */
-		answer = vm().machine().return_value();
-	}
+	SocketEvent se;
+	se.fd = virtual_fd;
+	se.event = 0; // SOCKET_CONNECTED
+	__u64 stack = rb.read_vaddr + 0x1000;
+	se.remote = vm().machine().stack_push_cstr(stack, peer);
+	se.arg = vm().machine().stack_push_cstr(stack, argument);
+	queue.push_back(se);
+	// There is currently no good way to check if the VM accepted the fd.
+	answer = true;
 
 	if (!answer) {
 		vm().file_descriptors().free_byhash(virtual_fd);
@@ -374,14 +358,6 @@ bool EpollServer::manage(const int fd, std::vector<SocketEvent>& queue)
 }
 long EpollServer::fd_readable(int fd, std::vector<SocketEvent>& queue)
 {
-	auto func = program().entry_at(ProgramEntryIndex::SOCKET_DATA);
-	/* Don't call on_data if the entry is 0x0. */
-	if (func == 0x0 && !this->m_pause_resume) {
-		/* Let's not read anymore. */
-		shutdown(fd, SHUT_RD);
-		return 0;
-	}
-
 	ssize_t len = MAX_READ_BUFFER;
 	ssize_t total = 0;
 	while (len > 0 && total < ssize_t(MAX_READ_BUFFER))
@@ -399,22 +375,13 @@ long EpollServer::fd_readable(int fd, std::vector<SocketEvent>& queue)
 
 		/* Call the storage VM on_data callback. */
 		const int virtual_fd = 0x1000 + fd;
-		if (this->m_pause_resume)
-		{
-			SocketEvent se;
-			se.fd = virtual_fd;
-			se.event = 2; // SOCKET_WRITABLE
-			se.data = rb.read_vaddr;
-			se.data_len = len;
-			m_current_read_buffer++;
-			queue.push_back(se);
-		} else {
-			/* We always use a single read-buffer for callbacks. */
-			vm().machine().timed_vmcall(
-				func, CALLBACK_TIMEOUT,
-				int(virtual_fd),
-				rb.read_vaddr, ssize_t(len));
-		}
+		SocketEvent se;
+		se.fd = virtual_fd;
+		se.event = 2; // SOCKET_WRITABLE
+		se.data = rb.read_vaddr;
+		se.data_len = len;
+		m_current_read_buffer++;
+		queue.push_back(se);
 	}
 	return len;
 }
@@ -422,23 +389,10 @@ void EpollServer::fd_writable(int fd, std::vector<SocketEvent>& queue)
 {
 	const int virtual_fd = 0x1000 + fd;
 
-	if (this->m_pause_resume)
-	{
-		SocketEvent se;
-		se.fd = virtual_fd;
-		se.event = 2; // SOCKET_WRITABLE
-		queue.push_back(se);
-		return;
-	}
-
-	auto func = program().entry_at(ProgramEntryIndex::SOCKET_WRITABLE);
-	/* Don't call on_data if the entry is 0x0. */
-	if (func == 0x0)
-		return;
-	/* Call the storage VM on_writable callback. */
-	vm().machine().timed_vmcall(
-		func, CALLBACK_TIMEOUT,
-		int(virtual_fd));
+	SocketEvent se;
+	se.fd = virtual_fd;
+	se.event = 2; // SOCKET_WRITABLE
+	queue.push_back(se);
 }
 
 void EpollServer::hangup(int fd, const char *reason, std::vector<SocketEvent>& queue)
@@ -450,31 +404,14 @@ void EpollServer::hangup(int fd, const char *reason, std::vector<SocketEvent>& q
 
 	const int virtual_fd = 0x1000 + fd;
 
-	if (this->m_pause_resume)
-	{
-		SocketEvent se;
-		se.fd = virtual_fd;
-		se.event = 3; // SOCKET_DISCONNECTED
-		queue.push_back(se);
-		return;
-	}
-
-	/* Don't call on_disconnect if the entry is 0x0. */
-	auto func = program().entry_at(ProgramEntryIndex::SOCKET_DISCONNECTED);
-	if (func == 0x0)
-		return;
-	/* Call the storage VM on_disconnected callback. */
-	vm().machine().timed_vmcall(
-		func, CALLBACK_TIMEOUT,
-		int(virtual_fd), (const char *)reason);
+	SocketEvent se;
+	se.fd = virtual_fd;
+	se.event = 3; // SOCKET_DISCONNECTED
+	queue.push_back(se);
 }
 
 void EpollServer::resume(const std::vector<SocketEvent>& se)
 {
-	if (this->m_pause_resume == false) {
-		throw std::runtime_error("EpollServer: pause-resume API not enabled");
-	}
-
 	/* Copy the SocketEvent to the VM, address is already in RDI. */
 	auto& regs = vm().machine().registers();
 	vm().machine().copy_to_guest(regs.rdi, se.data(), se.size() * sizeof(SocketEvent));
