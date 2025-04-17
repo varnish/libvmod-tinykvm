@@ -11,6 +11,7 @@ namespace kvm
 	struct EpollServer
 	{
 		static constexpr size_t MAX_READ_BUFFERS = 32;
+		static constexpr size_t MAX_WRITE_BUFFERS = 32;
 		static constexpr size_t MAX_VM_WR_BUFFERS = 64;
 
 		EpollServer(const TenantInstance* tenant, ProgramInstance* program, int16_t id);

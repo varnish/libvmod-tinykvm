@@ -437,39 +437,38 @@ void syscall_sockets_write(tinykvm::vCPU& cpu, MachineInstance& inst)
 	const uint64_t g_evs = regs.rdi;
 	const size_t   g_cnt = regs.rsi;
 
-	std::array<SocketEvent, 8> events;
-	std::size_t cnt = std::clamp(g_cnt, size_t(1), events.size());
-	cpu.machine().copy_from_guest(events.data(), g_evs, cnt * sizeof(SocketEvent));
+	std::size_t cnt = std::clamp(g_cnt, size_t(1), EpollServer::MAX_WRITE_BUFFERS);
+	// Directly view the memory as an array of SocketEvent, or throw an exception
+	SocketEvent* events = cpu.machine().writable_memarray<SocketEvent>(g_evs, cnt);
 
 	// Process the write events efficiently using a single syscall
 	std::array<tinykvm::Machine::Buffer, 256> buffers;
-	ssize_t result = 0;
 
 	for (size_t i = 0; i < cnt; ++i)
 	{
-		const auto& se = events[i];
+		auto& se = events[i];
 		if (se.event == 2) // SOCKET_WRITABLE
 		{
 			// Gather buffers from guest memory. This call never fails (throws instead).
 			const size_t n = cpu.machine().gather_buffers_from_range(
 				buffers.size(), &buffers[0], se.data, se.data_len);
-			// Update the current write buffer index
-			// We will have to rewrite this to use sendmmsg() instead, so for now
-			// we just use a single buffer.
-			result += se.data_len;
 			// And then we can writev to the socket immediately
 			const int fd = inst.file_descriptors().translate(se.fd);
 			const ssize_t written = writev(fd, (struct iovec *)&buffers[0], n);
 			if (written < 0) {
+				const int error_val = errno;
+				if (error_val == EAGAIN || error_val == EWOULDBLOCK) {
+					continue;
+				}
+				se.fd = -error_val;
 				// Handle the error (e.g., log it, set an error code, etc.)
-				fprintf(stderr, "Error writing to socket %d: %s\n", fd, strerror(errno));
-				result = -errno; // Set the result to the error code
-				break;
+				fprintf(stderr, "Error writing to socket %d: %s\n", fd, strerror(error_val));
+				continue;
 			}
+			// Store the number of bytes written in the first member of SocketEvent
+			se.fd = written;
 		}
 	}
-	cpu.registers().rax = result;
-	cpu.set_registers(cpu.registers());
 }
 
 } // kvm
