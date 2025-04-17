@@ -1,14 +1,16 @@
 #pragma once
-#include <future>
 #include <thread>
+#include "socket_event.hpp"
 
 namespace kvm
 {
 	class MachineInstance;
 	class ProgramInstance;
+	class TenantInstance;
 
 	struct EpollServer
 	{
+		static constexpr size_t MAX_READ_BUFFERS = 16;
 		static constexpr size_t MAX_VM_WR_BUFFERS = 64;
 
 		EpollServer(const TenantInstance* tenant, ProgramInstance* program, int16_t id);
@@ -27,22 +29,13 @@ namespace kvm
 
 	private:
 		void epoll_main_loop();
-		bool manage(int fd);
-		long fd_readable(int fd);
-		void fd_writable(int fd);
-		void hangup(int fd, const char *);
+		bool manage(int fd, std::vector<SocketEvent>& queue);
+		long fd_readable(int fd, std::vector<SocketEvent>&);
+		void fd_writable(int fd, std::vector<SocketEvent>&);
+		void hangup(int fd, const char *, std::vector<SocketEvent>&);
 		bool epoll_add(int fd);
-
-		struct SocketEvent
-		{
-			int fd;
-			int event;
-			uint64_t remote = 0;
-			uint64_t arg    = 0;
-			uint64_t data = 0;
-			size_t data_len = 0;
-		};
-		void resume(const SocketEvent& se);
+		void resume(const std::vector<SocketEvent>& queue);
+		void flush(std::vector<SocketEvent>& queue);
 
 		std::unique_ptr<MachineInstance> m_vm;
 		const TenantInstance* m_tenant;
@@ -54,9 +47,14 @@ namespace kvm
 		bool m_running = true;
 		bool m_pause_resume = false;
 		/* We pre-allocate a reading area. */
-		uint64_t m_read_vaddr = 0x0;
-		size_t m_n_buffers = 0;
-		tinykvm::Machine::WrBuffer m_buffers[MAX_VM_WR_BUFFERS];
+		struct ReadBuffer
+		{
+			uint64_t read_vaddr = 0x0;
+			size_t n_buffers = 0;
+			std::array<tinykvm::Machine::WrBuffer, MAX_VM_WR_BUFFERS> buffers;
+		};
+		std::vector<ReadBuffer> m_read_buffers;
+		size_t m_current_read_buffer = 0;
 
 		std::thread m_epoll_thread;
 	};

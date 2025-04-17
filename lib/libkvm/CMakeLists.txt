@@ -21,6 +21,7 @@ set(KVM_SOURCES
 	tenant.cpp
 	tenant_instance.cpp
 	server/epoll.cpp
+	server/websocket.cpp
 	ext/tinykvm/src/functions.cpp  # setup_kvm_system_calls
 	utils/crc32.cpp
 	varnish_interface.c
@@ -32,12 +33,17 @@ add_subdirectory(ext/tinykvm/lib     tinykvm)
 add_subdirectory(ext/json            json)
 add_subdirectory(ext/concurrentqueue concurrentqueue)
 
+# Boost::beast is used for the websocket server
+#include(FindBoost)
+#find_package(Boost 1.74 REQUIRED COMPONENTS system thread)
+
 add_library(kvm STATIC ${KVM_SOURCES})
 target_include_directories(kvm PRIVATE ../../src/tinykvm ../../src/kvm)
 if (VARNISH_PLUS)
 	target_compile_definitions(kvm PUBLIC VARNISH_PLUS=1)
 endif()
 target_link_libraries(kvm PRIVATE tinykvm curl concurrentqueue nlohmann_json archive)
+#target_link_libraries(kvm PRIVATE Boost::system Boost::thread)
 
 if (SHARED_KVM)
 	set_property(TARGET tinykvm PROPERTY POSITION_INDEPENDENT_CODE 1)

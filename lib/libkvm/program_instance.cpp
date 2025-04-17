@@ -264,6 +264,11 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 				m_epoll_systems.emplace_back(ten, this, i);
 			}
 		}
+		// If we are using a websocket server, we'll need to start it now
+		if (ten->config.group.has_websocket_system()) {
+			const int num_systems = ten->config.group.websocket_systems;
+			m_websocket_systems = std::make_unique<WebSocketServer>(ten, this, num_systems);
+		}
 
 		TIMING_LOCATION(t1);
 
@@ -347,6 +352,9 @@ ProgramInstance::~ProgramInstance()
 
 	for (auto& sys : m_epoll_systems) {
 		sys.stop();
+	}
+	if (m_websocket_systems) {
+		m_websocket_systems->stop();
 	}
 
 	// NOTE: Thread pools need to wait on jobs here

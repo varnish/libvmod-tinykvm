@@ -49,6 +49,11 @@ struct TenantGroup {
 	uint16_t server_port = 0;
 	uint16_t epoll_systems = 0;
 	std::string server_address;
+	/* WebSocket systems explicitly use the WebSocket protocol, but otherwise
+	   are similar to the epoll systems. */
+	uint16_t ws_server_port = 0;
+	uint16_t websocket_systems = 0;
+	std::string ws_server_address;
 
 	std::vector<std::string> environ {
 		"LC_TYPE=C", "LC_ALL=C", "USER=root"
@@ -73,6 +78,10 @@ struct TenantGroup {
 	bool has_epoll_system() const noexcept {
 		return (this->server_port != 0 || !this->server_address.empty()) &&
 		       this->epoll_systems > 0;
+	}
+	bool has_websocket_system() const noexcept {
+		return (this->ws_server_port != 0 || !this->ws_server_address.empty()) &&
+		       this->websocket_systems > 0;
 	}
 
 	/* Check that each value has meaning and is not impossibly high or low.

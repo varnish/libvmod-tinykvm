@@ -401,6 +401,28 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 			throw std::runtime_error("Server must be an object with at least a port");
 		}
 	}
+	else if (obj.key() == "websocket_server") {
+		// Websocket server is an object with a TCP port and the number of
+		// websocket systems (threads) to create.
+		if (obj.value().is_object()) {
+			auto& obj2 = obj.value();
+			if (obj2.contains("port")) {
+				group.ws_server_port = obj2["port"];
+			} else {
+				throw std::runtime_error("Websocket server must have a TCP port");
+			}
+			if (obj2.contains("address")) {
+				group.ws_server_address = obj2["address"];
+			}
+			if (obj2.contains("systems")) {
+				group.websocket_systems = obj2["systems"];
+			} else {
+				group.websocket_systems = 1;
+			}
+		} else {
+			throw std::runtime_error("WebSocket server must be an object with at least a port");
+		}
+	}
 	else if (obj.key() == "group") { /* Silently ignore. */ }
 	else if (obj.key() == "key")   { /* Silently ignore. */ }
 	else if (obj.key() == "uri")   { /* Silently ignore. */ }

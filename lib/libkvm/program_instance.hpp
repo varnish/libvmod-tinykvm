@@ -3,6 +3,7 @@
 #include "instance_cache.hpp"
 #include "settings.hpp"
 #include "server/epoll.hpp"
+#include "server/websocket.hpp"
 #include "utils/cpptime.hpp"
 #include <blockingconcurrentqueue.h>
 #include <tinykvm/util/threadpool.h>
@@ -225,6 +226,8 @@ private:
 	// EpollServer is to allow WebSockets and other non-HTTP protocols
 	// to be used within the program.
 	std::deque<EpollServer> m_epoll_systems;
+	// WebSocketServer is to allow WebSocket protocol specifically.
+	std::unique_ptr<WebSocketServer> m_websocket_systems;
 };
 
 inline bool ProgramInstance::wait_for_main_vm()
