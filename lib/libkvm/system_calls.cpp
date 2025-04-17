@@ -23,6 +23,8 @@ using namespace tinykvm;
 #include "system_calls_api.cpp"
 
 namespace kvm {
+extern void syscall_sockets_write(tinykvm::vCPU& cpu, MachineInstance&);
+
 uint32_t crc32_kvm(vCPU& cpu, uint64_t vaddr, size_t rsize)
 {
     uint32_t hash = 0xFFFFFFFF;
@@ -145,6 +147,9 @@ void MachineInstance::setup_syscall_interface()
 				return;
 			case 0x10100:
 				//syscall_set_backend(cpu, inst);
+				return;
+			case 0x10500: // SOCKETS_WRITEV
+				syscall_sockets_write(cpu, inst);
 				return;
 			case 0x10700: // SHARED_MEMORY_AREA
 				syscall_shared_memory(cpu, inst);

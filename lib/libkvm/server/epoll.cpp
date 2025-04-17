@@ -431,4 +431,45 @@ void EpollServer::resume(const std::vector<SocketEvent>& se)
 	vm().machine().set_registers(regs);
 }
 
+void syscall_sockets_write(tinykvm::vCPU& cpu, MachineInstance& inst)
+{
+	auto& regs = cpu.registers();
+	const uint64_t g_evs = regs.rdi;
+	const size_t   g_cnt = regs.rsi;
+
+	std::array<SocketEvent, 8> events;
+	std::size_t cnt = std::clamp(g_cnt, size_t(1), events.size());
+	cpu.machine().copy_from_guest(events.data(), g_evs, cnt * sizeof(SocketEvent));
+
+	// Process the write events efficiently using a single syscall
+	std::array<tinykvm::Machine::Buffer, 256> buffers;
+	ssize_t result = 0;
+
+	for (size_t i = 0; i < cnt; ++i)
+	{
+		const auto& se = events[i];
+		if (se.event == 2) // SOCKET_WRITABLE
+		{
+			// Gather buffers from guest memory. This call never fails (throws instead).
+			const size_t n = cpu.machine().gather_buffers_from_range(
+				buffers.size(), &buffers[0], se.data, se.data_len);
+			// Update the current write buffer index
+			// We will have to rewrite this to use sendmmsg() instead, so for now
+			// we just use a single buffer.
+			result += se.data_len;
+			// And then we can writev to the socket immediately
+			const int fd = inst.file_descriptors().translate(se.fd);
+			const ssize_t written = writev(fd, (struct iovec *)&buffers[0], n);
+			if (written < 0) {
+				// Handle the error (e.g., log it, set an error code, etc.)
+				fprintf(stderr, "Error writing to socket %d: %s\n", fd, strerror(errno));
+				result = -errno; // Set the result to the error code
+				break;
+			}
+		}
+	}
+	cpu.registers().rax = result;
+	cpu.set_registers(cpu.registers());
+}
+
 } // kvm

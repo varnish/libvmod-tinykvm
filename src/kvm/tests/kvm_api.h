@@ -702,6 +702,7 @@ extern int wait_for_socket_events_paused(struct kvm_socket_event* events, size_t
 static inline void wait_for_socket_event_paused(struct kvm_socket_event* se) {
 	wait_for_socket_events_paused(se, 1);
 }
+extern long sys_sockets_write(const struct kvm_socket_event* se, size_t n);
 
 /**
  * Utility functions
@@ -842,6 +843,13 @@ asm(".global sys_regex_copyto\n"
 	"	mov $0x10035, %eax\n"
 	"	out %eax, $0\n"
 	"	ret\n");
+
+asm(".global sys_sockets_write\n"
+	".type sys_sockets_write, @function\n"
+	"sys_sockets_write:\n"
+	"	mov $0x10500, %eax\n"
+	"	out %eax, $0\n"
+	"   ret\n");
 
 asm(".global shared_memory_area\n"
 	".type shared_memory_area, @function\n"
