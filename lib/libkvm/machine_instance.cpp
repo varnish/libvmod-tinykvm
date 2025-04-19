@@ -21,15 +21,12 @@
 #include "varnish.hpp"
 #include <tinykvm/util/elf.h>
 extern "C" int close(int);
-extern void setup_kvm_system_calls();
-
 
 namespace kvm {
 
 void MachineInstance::kvm_initialize()
 {
 	tinykvm::Machine::init();
-	setup_kvm_system_calls();
 	setup_syscall_interface();
 }
 
@@ -69,13 +66,25 @@ MachineInstance::MachineInstance(
 	  m_is_debug(debug),
 	  m_is_storage(storage),
 	  m_print_stdout(ten->config.print_stdout()),
-	  m_fd        {ten->config.max_fd(), "File descriptors"},
 	  m_regex     {ten->config.max_regex(), "Regex handles"}
 {
 	// By default programs start out ephemeral, but it can be overridden
 	this->m_is_ephemeral = ten->config.group.ephemeral;
 	machine().set_userdata<MachineInstance> (this);
 	machine().set_printer(get_vsl_printer());
+	// Add all the allowed paths to the VMs file descriptor sub-system
+	for (auto& path : ten->config.group.allowed_paths)
+		machine().fds().add_readonly_file(path);
+	// Add a single writable file simply called 'state'
+	machine().fds().set_open_writable_callback(
+	[&] (std::string& path) -> bool {
+		if (path == "state") {
+			// Rewrite the path to the allowed file
+			path = tenant().config.allowed_file;
+			return true;
+		}
+		return false;
+	});
 }
 void MachineInstance::initialize()
 {
@@ -204,7 +213,6 @@ MachineInstance::MachineInstance(
 	  m_is_ephemeral(source.is_ephemeral()),
 	  m_waiting_for_requests(true), // If we got this far, we are waiting...
 	  m_sighandler{source.m_sighandler},
-	  m_fd        {ten->config.max_fd(), "File descriptors"},
 	  m_regex     {ten->config.max_regex(), "Regex handles"}
 {
 #ifdef ENABLE_TIMING
@@ -214,8 +222,6 @@ MachineInstance::MachineInstance(
 	machine().set_printer(get_vsl_printer());
 	/* vCPU request id */
 	machine().cpu().set_vcpu_table_at(1, reqid);
-	/* Load the fds of the source */
-	m_fd.reset_and_loan(source.m_fd);
 	/* Load the compiled regexes of the source */
 	m_regex.reset_and_loan(source.m_regex);
 #ifdef ENABLE_TIMING
@@ -226,11 +232,6 @@ MachineInstance::MachineInstance(
 
 void MachineInstance::tail_reset()
 {
-	/* Close any open files */
-	m_fd.foreach_owned(
-		[] (const auto& entry) {
-			close(entry.item);
-		});
 	/* Free any owned regex pointers */
 	m_regex.foreach_owned(
 		[] (auto& entry) {
@@ -269,8 +270,6 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 
 		m_sighandler = source.m_sighandler;
 
-		/* Load the fds of the source */
-		m_fd.reset_and_loan(source.m_fd);
 		/* Load the compiled regexes of the source */
 		m_regex.reset_and_loan(source.m_regex);
 		/* XXX: Todo: reset more stuff */

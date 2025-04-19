@@ -315,7 +315,7 @@ bool EpollServer::manage(const int fd, std::vector<SocketEvent>& queue)
 
 	/* Register the fd with the VM */
 	const int virtual_fd = 0x1000 + fd;
-	vm().file_descriptors().manage(fd, virtual_fd);
+	vm().machine().fds().manage(fd, virtual_fd);
 
 	const char* argument = "";
 
@@ -349,7 +349,7 @@ bool EpollServer::manage(const int fd, std::vector<SocketEvent>& queue)
 	answer = true;
 
 	if (!answer) {
-		vm().file_descriptors().free_byhash(virtual_fd);
+		vm().machine().fds().free(virtual_fd);
 		return false;
 	} else {
 		/* The virtual machine has final say, regarding managing the fd. */
@@ -400,9 +400,9 @@ void EpollServer::hangup(int fd, const char *reason, std::vector<SocketEvent>& q
 	/* Preemptively close and remove the fd. */
 	epoll_ctl(this->m_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
 	close(fd);
-	vm().file_descriptors().free_byval(fd);
 
 	const int virtual_fd = 0x1000 + fd;
+	vm().machine().fds().free(virtual_fd);
 
 	SocketEvent se;
 	se.fd = virtual_fd;
@@ -453,7 +453,7 @@ void syscall_sockets_write(tinykvm::vCPU& cpu, MachineInstance& inst)
 			const size_t n = cpu.machine().gather_buffers_from_range(
 				buffers.size(), &buffers[0], se.data, se.data_len);
 			// And then we can writev to the socket immediately
-			const int fd = inst.file_descriptors().translate(se.fd);
+			const int fd = cpu.machine().fds().translate(se.fd);
 			const ssize_t written = writev(fd, (struct iovec *)&buffers[0], n);
 			if (written < 0) {
 				const int error_val = errno;

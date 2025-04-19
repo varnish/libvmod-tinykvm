@@ -22,7 +22,6 @@ set(KVM_SOURCES
 	tenant_instance.cpp
 	server/epoll.cpp
 	server/websocket.cpp
-	ext/tinykvm/src/functions.cpp  # setup_kvm_system_calls
 	utils/crc32.cpp
 	varnish_interface.c
 	### cURL ###

@@ -82,7 +82,6 @@ public:
 	std::string symbol_name(gaddr_t address) const;
 	gaddr_t resolve_address(const char* name) const { return machine().address_of(name); }
 
-	auto& file_descriptors() { return this->m_fd; }
 	void set_sigaction(int sig, gaddr_t handler);
 	void print_backtrace();
 	void open_debugger(uint16_t, float timeout);
@@ -127,7 +126,6 @@ private:
 
 	MachineStats m_stats;
 
-	Cache<int> m_fd;
 	Cache<vre*> m_regex;
 };
 
