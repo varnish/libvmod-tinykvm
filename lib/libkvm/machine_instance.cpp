@@ -23,11 +23,16 @@
 extern "C" int close(int);
 
 namespace kvm {
+static std::vector<uint8_t> ld_linux_x86_64_so;
+extern std::vector<uint8_t> file_loader(const std::string &);
 
 void MachineInstance::kvm_initialize()
 {
 	tinykvm::Machine::init();
 	setup_syscall_interface();
+
+	// Load the dynamic linker
+	ld_linux_x86_64_so = file_loader("/lib64/ld-linux-x86-64.so.2");
 }
 
 static uint64_t detect_gigapage_from(const std::vector<uint8_t>& binary)
@@ -43,12 +48,23 @@ static uint64_t detect_gigapage_from(const std::vector<uint8_t>& binary)
 	return start_address_gigapage << 30U;
 }
 
+static const std::vector<uint8_t>& select_main_binary(const std::vector<uint8_t>& program_binary)
+{
+	const tinykvm::DynamicElf dyn_elf = tinykvm::is_dynamic_elf(
+		std::string_view{(const char *)program_binary.data(), program_binary.size()});
+	if (dyn_elf.has_interpreter()) {
+		// Add the dynamic linker as first argument
+		return ld_linux_x86_64_so;
+	}
+	return program_binary;
+}
+
 MachineInstance::MachineInstance(
 	const std::vector<uint8_t>& binary, const vrt_ctx* ctx,
 	const TenantInstance* ten, ProgramInstance* inst,
 	bool storage, bool debug)
 	: m_ctx(ctx),
-	  m_machine(binary, tinykvm::MachineOptions{
+	  m_machine(select_main_binary(binary), tinykvm::MachineOptions{
 		.max_mem = ten->config.max_address(),
 		.max_cow_mem = 0UL,
 		.vmem_base_address = detect_gigapage_from(binary),
@@ -63,6 +79,7 @@ MachineInstance::MachineInstance(
 		.hugepages_arena_size = ten->config.group.hugepage_arena_size,
 	  }),
 	  m_tenant(ten), m_inst(inst),
+	  m_original_binary(binary),
 	  m_is_debug(debug),
 	  m_is_storage(storage),
 	  m_print_stdout(ten->config.print_stdout()),
@@ -77,6 +94,15 @@ MachineInstance::MachineInstance(
 		machine().fds().add_readonly_file(path);
 	// Add a single writable file simply called 'state'
 	machine().fds().set_open_writable_callback(
+	[&] (std::string& path) -> bool {
+		if (path == "state") {
+			// Rewrite the path to the allowed file
+			path = tenant().config.allowed_file;
+			return true;
+		}
+		return false;
+	});
+	machine().fds().set_open_readable_callback(
 	[&] (std::string& path) -> bool {
 		if (path == "state") {
 			// Rewrite the path to the allowed file
@@ -113,10 +139,24 @@ void MachineInstance::initialize()
 		// Use constrained working memory
 		machine().prepare_copy_on_write(tenant().config.max_main_memory(), shm_boundary);
 
+		const tinykvm::DynamicElf dyn_elf =
+			tinykvm::is_dynamic_elf(std::string_view{
+				(const char *)m_original_binary.data(),
+				m_original_binary.size()});
+
 		// Main arguments: 3x mandatory + N configurable
-		std::vector<std::string> args {
-			name(), TenantConfig::guest_state_file, is_storage() ? "storage" : "request"
-		};
+		std::vector<std::string> args;
+		args.reserve(5);
+		if (dyn_elf.has_interpreter()) {
+			// The real program path (which must be guest-readable)
+			/// XXX: TODO: Use /proc/self/exe instead of this?
+			m_machine.fds().add_readonly_file(tenant().config.filename);
+			args.push_back("/lib64/ld-linux-x86-64.so.2");
+			args.push_back(tenant().config.filename);
+		}
+		args.push_back(name());
+		args.push_back(TenantConfig::guest_state_file);
+		args.push_back(is_storage() ? "storage" : "request");
 		std::shared_ptr<std::vector<std::string>> main_arguments =
 			std::atomic_load(&tenant().config.group.main_arguments);
 		if (main_arguments != nullptr) {
@@ -208,6 +248,7 @@ MachineInstance::MachineInstance(
 		.hugepages_arena_size = ten->config.group.hugepage_requests_arena,
 	  }),
 	  m_tenant(ten), m_inst(inst),
+	  m_original_binary(source.m_original_binary),
 	  m_is_debug(source.is_debug()),
 	  m_is_storage(false),
 	  m_is_ephemeral(source.is_ephemeral()),

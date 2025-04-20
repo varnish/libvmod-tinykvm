@@ -15,6 +15,10 @@ static void my_backend()
 	FILE *fp;
 	char buff[255];
 	fp = fopen("${tmpdir}/${testname}_secrets", "r");
+	if (fp == NULL) {
+		backend_response_str(500, "text/plain", "File not found");
+		return;
+	}
 	fscanf(fp, "%s", buff);
 	fclose(fp);
 	backend_response_str(200, "text/plain", buff);
@@ -37,18 +41,14 @@ vcl 4.1;
 
 	sub vcl_init {
 		kvm.embed_tenants("""{
-			"allow": {
-				"allowed_paths": [
-					"/tmp"
-				]
-			},
 			"deny.com": {
-				"filename": "${tmpdir}/${testname}",
-				"group": "test"
+				"filename": "${tmpdir}/${testname}"
 			},
 			"allow.com": {
 				"filename": "${tmpdir}/${testname}",
-				"group": "allow"
+				"allowed_paths": [
+					"${tmpdir}/${testname}_secrets"
+				]
 			}
 		}""");
 	}

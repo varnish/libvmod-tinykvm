@@ -110,6 +110,7 @@ private:
 	machine_t m_machine;
 	const TenantInstance* m_tenant = nullptr;
 	ProgramInstance* m_inst;
+	const std::vector<uint8_t>& m_original_binary;
 	bool        m_is_debug;
 	const bool  m_is_storage;
 	bool        m_is_ephemeral = true;
