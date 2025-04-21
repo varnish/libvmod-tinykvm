@@ -14,7 +14,6 @@ namespace kvm
 
     static constexpr uint32_t RESV_QUEUE_TIMEOUT = 60; /* Seconds */
     static constexpr size_t REQUEST_MEMORY_SIZE = 64; /* 64MB */
-    static constexpr size_t REQUEST_MEMORY_AFTER_RESET = 2; /* Reclaim after 2MB */
     static constexpr int    REQUEST_VM_NICE = 10;
     static constexpr float  REQUEST_VM_TIMEOUT = 8.0f;
     static constexpr float  STREAM_HANDLING_TIMEOUT = 2.0f;

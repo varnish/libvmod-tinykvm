@@ -40,7 +40,7 @@ struct TenantGroup {
 	bool     relocate_fixed_mmap = true;
 	bool     control_ephemeral = false;
 	bool     ephemeral = true;
-	bool     ephemeral_keep_working_memory = false;
+	bool     ephemeral_keep_working_memory = true;
 	bool     print_stdout = false; /* Print directly to stdout */
 	bool     verbose = false;
 	bool     verbose_pagetable = false;
@@ -97,7 +97,7 @@ struct TenantGroup {
 		  max_address_space(MAIN_MEMORY_SIZE * 1048576ul),
 		  max_main_memory(MAIN_MEMORY_SIZE * 1048576ul),
 		  max_req_mem(REQUEST_MEMORY_SIZE * 1048576ul),
-		  limit_req_mem(REQUEST_MEMORY_AFTER_RESET * 1048576ul),
+		  limit_req_mem(~0U),
 		  shared_memory(SHARED_MEMORY_SIZE)
 		{}
 };

@@ -227,6 +227,9 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		// Without a limit, the request memory is kept in order to make future
 		// requests faster due to not having to create memory banks.
 		group.set_limit_workmem_after_req(obj.value());
+		// Setting a memory limit implies that we want to reduce working memory
+		// after a request. Doing so is incompatible with "keep_working_memory"
+		group.ephemeral_keep_working_memory = false;
 	}
 	else if (obj.key() == "shared_memory")
 	{
