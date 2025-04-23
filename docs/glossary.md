@@ -222,9 +222,6 @@ An array of arguments that will get passed to the main() function during startup
 	]
 ```
 
-The guest program has 3 mandatory arguments: The program, a single writable state file and an argument indicating whether or not the instance is a storage or request VM. The `main_arguments` array is added after these arguments. Using the JSON above as example, one might see: `my_program state request --jitless`.
-
-
 * `environment`
 
 An array of environment variables appended to the programs environ, accessible with getenv().
@@ -234,6 +231,16 @@ An array of environment variables appended to the programs environ, accessible w
 		"VERBOSE=1"
 	]
 ```
+
+The guest program has 5 environment variables set at start:
+
+	- KVM_NAME=program_name
+	- KVM_GROUP=group_name
+	- KVM_TYPE=storage or request
+	- KVM_STATE=state.file
+	- KVM_DEBUG=0 or 1
+
+These variables are always present.
 
 * `allowed_paths`
 

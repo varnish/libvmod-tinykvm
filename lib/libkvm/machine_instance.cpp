@@ -163,10 +163,15 @@ void MachineInstance::initialize()
 			args.insert(args.end(), main_arguments->begin(), main_arguments->end());
 		}
 
+		std::vector<std::string> envp = tenant().config.environ();
+		envp.push_back("KVM_NAME=" + name());
+		envp.push_back("KVM_GROUP=" + group());
+		envp.push_back("KVM_TYPE=" + std::string(is_storage() ? "storage" : "request"));
+		envp.push_back("KVM_STATE=" + TenantConfig::guest_state_file);
+		envp.push_back("KVM_DEBUG=" + std::to_string(is_debug()));
+
 		// Build stack, auxvec, envp and program arguments
-		machine().setup_linux(
-			args,
-			tenant().config.environ());
+		machine().setup_linux(args, envp);
 
 		// If verbose pagetables, print them just before running
 		if (tenant().config.group.verbose_pagetable) {
