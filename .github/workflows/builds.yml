@@ -4,11 +4,13 @@ on: [push, pull_request, workflow_dispatch]
 jobs:
   build_ubuntu_22_04:
     uses: ./.github/workflows/build-ubuntu.yml
+  build_ubuntu_24_04:
+    uses: ./.github/workflows/build-ubuntu-2404.yml
 
   merge:
     runs-on: ubuntu-latest
     name: Merge
-    needs: [build_ubuntu_22_04]
+    needs: [build_ubuntu_22_04, build_ubuntu_24_04]
     steps:
       - uses: actions/upload-artifact/merge@v4
         with:
