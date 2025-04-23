@@ -8,11 +8,22 @@ cat >${tmpdir}/${testname}.c <<-EOF
 
 int main(int argc, char **argv)
 {
-	assert(argc == 3);
+	assert(argc >= 3);
 	assert(strcmp(argv[0], "xpizza.com") == 0);
 	assert(strlen(argv[1]) > 0);
 	assert(strcmp(argv[2], "request") == 0
 		|| strcmp(argv[2], "storage") == 0);
+	assert(strcmp(argv[3], "this") == 0);
+	assert(strcmp(argv[4], "is") == 0);
+	assert(strcmp(argv[5], "xpizza.com") == 0);
+	assert(strcmp(getenv("FOO"), "bar") == 0);
+	assert(strcmp(getenv("BAR"), "baz") == 0);
+	// There are a few fixed environment variables set by the VMOD
+	assert(strcmp(getenv("KVM_NAME"), "xpizza.com") == 0);
+	assert(getenv("KVM_GROUP") != NULL);
+	assert(getenv("KVM_TYPE") != NULL);
+	assert(getenv("KVM_STATE") != NULL);
+	assert(strcmp(getenv("KVM_DEBUG"), "0") == 0);
 	// We need to give the gucci signal
 	wait_for_requests();
 }
@@ -32,9 +43,15 @@ vcl 4.1;
 				/* Comments are enabled. */
 				"xpizza.com": {
 					"filename": "${tmpdir}/${testname}",
-					"key": "",
-					/* Comments are treated as whitespace. */
-					"group": "test"
+					"main_arguments": [
+						"this",
+						"is",
+						"xpizza.com"
+					],
+					"environment": [
+						"FOO=bar",
+						"BAR=baz"
+					]
 				}
 			}
 		""");
