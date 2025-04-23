@@ -1,21 +1,17 @@
-name: Ubuntu Linux 22.04
+name: Ubuntu Linux 24.04
 
 on:
   workflow_dispatch:
   workflow_call:
 
 concurrency:
-  group: ${{github.workflow}}-${{github.ref}}-ubuntu-22.04
+  group: ${{github.workflow}}-${{github.ref}}-ubuntu-24.04
   cancel-in-progress: true
 
 jobs:
   native:
-    strategy:
-      matrix:
-        compiler: [{cc: gcc, cxx: g++}, {cc: clang, cxx: clang++}]
-      fail-fast: true
-    name: Ubuntu Linux 22.04 ${{matrix.compiler.cc}}
-    runs-on: ubuntu-22.04
+    name: Ubuntu Linux 24.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Install Varnish Cache 7.6
@@ -34,13 +30,13 @@ jobs:
       - name: '🚧 CCache setup'
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: ubuntu-linux
+          key: ubuntu-linux-24.04
           max-size: 200M
 
       - name: Configure
         env:
-          CC: ccache ${{matrix.compiler.cc}}
-          CXX: ccache ${{matrix.compiler.cxx}}
+          CC: ccache clang
+          CXX: ccache clang++
         run: >
           cmake -S. -Bbuild
           -G Ninja
@@ -53,14 +49,14 @@ jobs:
           --config DebWithRelInfo
           --target all
           -v -j4
-          && mkdir -p ubuntu-linux-22.04
-          && mv build/libvmod_* ubuntu-linux-22.04
-          && tar -czf ubuntu-linux-22.04.tar.gz ubuntu-linux-22.04
+          && mkdir -p ubuntu-linux-24.04
+          && mv build/libvmod_* ubuntu-linux-24.04
+          && tar -czf ubuntu-linux-24.04.tar.gz ubuntu-linux-24.04
 
       - uses: actions/upload-artifact@v4
         with:
-          name: build-ubuntu-linux-22.04
-          path: ./ubuntu-linux-22.04.tar.gz
+          name: build-ubuntu-linux-24.04
+          path: ./ubuntu-linux-24.04.tar.gz
           overwrite: true
           if-no-files-found: error # 'warn' or 'ignore' are also available, defaults to `warn`
           retention-days: 1 # 90 days by default
