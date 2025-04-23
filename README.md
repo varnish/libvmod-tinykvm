@@ -58,9 +58,9 @@ If during building you are seeing errors with a Python script, try setting the P
 cmake .. -DCMAKE_BUILD_TYPE=Release -DVARNISH_PLUS=OFF -DPython3_EXECUTABLE=$(which python3)
 ```
 
-There is a build-merge-release CI system that currently only builds for Ubuntu 22.04:
+There is a build-merge-release CI system that currently only builds for Ubuntu 22.04 and 24.04:
 
-[Packages here](https://github.com/varnish/libvmod-tinykvm/releases/download/v0.1/artifacts.zip).
+[Packages here](https://github.com/varnish/libvmod-tinykvm/releases).
 
 ### Example VCL
 
