@@ -153,8 +153,10 @@ void MachineInstance::initialize()
 			m_machine.fds().add_readonly_file(tenant().config.filename);
 			args.push_back("/lib64/ld-linux-x86-64.so.2");
 			args.push_back(tenant().config.filename);
+		} else {
+			// Fake filename for the program using the name of the tenant
+			args.push_back(name());
 		}
-		args.push_back(name());
 		args.push_back(TenantConfig::guest_state_file);
 		args.push_back(is_storage() ? "storage" : "request");
 		std::shared_ptr<std::vector<std::string>> main_arguments =
