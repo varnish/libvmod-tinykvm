@@ -229,7 +229,13 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		group.set_limit_workmem_after_req(obj.value());
 		// Setting a memory limit implies that we want to reduce working memory
 		// after a request. Doing so is incompatible with "keep_working_memory"
-		group.ephemeral_keep_working_memory = false;
+		if (group.ephemeral_keep_working_memory) {
+			group.ephemeral_keep_working_memory = false;
+			fprintf(stderr,
+				"kvm: Setting 'req_mem_limit_after_reset' has disabled "
+				"'ephemeral_keep_working_memory' for group '%s'.\n",
+				name.c_str());
+		}
 	}
 	else if (obj.key() == "shared_memory")
 	{
