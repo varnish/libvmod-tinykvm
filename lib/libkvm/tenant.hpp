@@ -7,7 +7,6 @@
 #include <vector>
 #include "settings.hpp"
 #include <tinykvm/common.hpp>
-typedef struct vmod_priv * VCL_PRIV;
 namespace tinykvm {
 	struct vCPU;
 }

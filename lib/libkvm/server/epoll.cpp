@@ -314,8 +314,8 @@ bool EpollServer::manage(const int fd, std::vector<SocketEvent>& queue)
 	setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val));
 
 	/* Register the fd with the VM */
-	const int virtual_fd = 0x1000 + fd;
-	vm().machine().fds().manage(fd, virtual_fd);
+	const int virtual_fd =
+		vm().machine().fds().manage(fd, true, true);
 
 	const char* argument = "";
 
@@ -352,6 +352,8 @@ bool EpollServer::manage(const int fd, std::vector<SocketEvent>& queue)
 		vm().machine().fds().free(virtual_fd);
 		return false;
 	} else {
+		/* Add the fd->vfd translation entry to the map */
+		this->m_fd_to_vfd_map.insert_or_assign(fd, virtual_fd);
 		/* The virtual machine has final say, regarding managing the fd. */
 		return this->epoll_add(fd);
 	}
@@ -374,7 +376,7 @@ long EpollServer::fd_readable(int fd, std::vector<SocketEvent>& queue)
 		total += len;
 
 		/* Call the storage VM on_data callback. */
-		const int virtual_fd = 0x1000 + fd;
+		const int virtual_fd = this->m_fd_to_vfd_map.at(fd);
 		SocketEvent se;
 		se.fd = virtual_fd;
 		se.event = 2; // SOCKET_WRITABLE
@@ -387,7 +389,7 @@ long EpollServer::fd_readable(int fd, std::vector<SocketEvent>& queue)
 }
 void EpollServer::fd_writable(int fd, std::vector<SocketEvent>& queue)
 {
-	const int virtual_fd = 0x1000 + fd;
+	const int virtual_fd = this->m_fd_to_vfd_map.at(fd);
 
 	SocketEvent se;
 	se.fd = virtual_fd;
@@ -401,8 +403,9 @@ void EpollServer::hangup(int fd, const char *reason, std::vector<SocketEvent>& q
 	epoll_ctl(this->m_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
 	close(fd);
 
-	const int virtual_fd = 0x1000 + fd;
+	const int virtual_fd = this->m_fd_to_vfd_map.at(fd);
 	vm().machine().fds().free(virtual_fd);
+	this->m_fd_to_vfd_map.erase(fd);
 
 	SocketEvent se;
 	se.fd = virtual_fd;

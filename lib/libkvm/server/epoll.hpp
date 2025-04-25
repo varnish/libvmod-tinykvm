@@ -55,6 +55,8 @@ namespace kvm
 		};
 		std::vector<ReadBuffer> m_read_buffers;
 		size_t m_current_read_buffer = 0;
+		// Translate fd to virtual fd
+		std::unordered_map<int, int> m_fd_to_vfd_map;
 
 		std::thread m_epoll_thread;
 	};
