@@ -157,8 +157,6 @@ void MachineInstance::initialize()
 			// Fake filename for the program using the name of the tenant
 			args.push_back(name());
 		}
-		args.push_back(TenantConfig::guest_state_file);
-		args.push_back(is_storage() ? "storage" : "request");
 		std::shared_ptr<std::vector<std::string>> main_arguments =
 			std::atomic_load(&tenant().config.group.main_arguments);
 		if (main_arguments != nullptr) {
@@ -452,8 +450,11 @@ tinykvm::Machine::printer_func MachineInstance::get_vsl_printer() const
 	/* NOTE: Guests will "always" end with newlines */
 	return [this] (const char* buffer, size_t len) {
 		/* Avoid wrap-around and empty log */
-		if (buffer + len < buffer || len == 0)
+		if (len == 0 || len > 1UL << 20) {
+			if (len > 0)
+				this->print("Invalid log buffer length");
 			return;
+		}
 		/* Logging with $PROGRAM says: ... */
 		this->logprint(std::string_view(buffer, len), this->m_last_newline);
 		/* Print to stdout if enabled */

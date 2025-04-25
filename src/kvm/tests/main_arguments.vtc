@@ -10,12 +10,9 @@ int main(int argc, char **argv)
 {
 	assert(argc >= 3);
 	assert(strcmp(argv[0], "xpizza.com") == 0);
-	assert(strlen(argv[1]) > 0);
-	assert(strcmp(argv[2], "request") == 0
-		|| strcmp(argv[2], "storage") == 0);
-	assert(strcmp(argv[3], "this") == 0);
-	assert(strcmp(argv[4], "is") == 0);
-	assert(strcmp(argv[5], "xpizza.com") == 0);
+	assert(strcmp(argv[1], "this") == 0);
+	assert(strcmp(argv[2], "is") == 0);
+	assert(strcmp(argv[3], "xpizza.com") == 0);
 	assert(strcmp(getenv("FOO"), "bar") == 0);
 	assert(strcmp(getenv("BAR"), "baz") == 0);
 	// There are a few fixed environment variables set by the VMOD
