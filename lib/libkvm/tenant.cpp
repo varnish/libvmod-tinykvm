@@ -231,10 +231,6 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		// after a request. Doing so is incompatible with "keep_working_memory"
 		if (group.ephemeral_keep_working_memory) {
 			group.ephemeral_keep_working_memory = false;
-			fprintf(stderr,
-				"kvm: Setting 'req_mem_limit_after_reset' has disabled "
-				"'ephemeral_keep_working_memory' for group '%s'.\n",
-				name.c_str());
 		}
 	}
 	else if (obj.key() == "shared_memory")
@@ -518,7 +514,7 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 				throw std::runtime_error("Could not find group " + grname + " for '" + it.key() + "'");
 			}
 			// Make a copy of the selected group
-			auto group = grit->second;
+			TenantGroup group = grit->second;
 
 			// Override both group and tenant settings in one place
 			for (auto it = obj.begin(); it != obj.end(); ++it) {
@@ -537,6 +533,14 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			/* Verify: No filename and no key is an unreachable program. */
 			if (filename.empty() && uri.empty())
 				throw std::runtime_error("kvm: Unreachable program " + it.key() + " has no URI or filename");
+
+			/* Find contradictions in the configuration. */
+			if (obj.contains("ephemeral_keep_working_memory") &&
+			    obj.contains("req_mem_limit_after_reset") &&
+				obj["ephemeral_keep_working_memory"].get<bool>())
+			{
+				throw std::runtime_error("Cannot set req_mem_limit_after_reset and enable ephemeral_keep_working_memory at the same time");
+			}
 
 			/* Use the group data except filename */
 			kvm::load_tenant(ctx, task, kvm::TenantConfig{
