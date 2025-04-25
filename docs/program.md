@@ -56,27 +56,12 @@ Hello Linux World!
 
 ## Building
 
-When building a program for the TinyKVM VMOD there are two requirements:
-
-1. Use the API that comes with the VMOD. The API allows you to hook into events that you care about for your program, such as handling GET and POST.
-
-2. The program must be built statically.
-
-The simplest check to see if a program is statically built is to use ldd:
-```sh
-$ ldd .build/thumbnails 
-	not a dynamic executable
-```
-Because this program is not dynamic, it is statically built, and so we can now use this program with the TinyKVM VMOD.
+When building a program for the TinyKVM VMOD you should use the API that comes with the VMOD. The API allows you to hook into events that you care about for your program, such as handling GET and POST.
 
 Example:
 ```sh
 $ gcc -O2 -Wall -static hello_world.c -o hello
-$ ldd hello
-	not a dynamic executable
 ```
-
-The compiler argument `-static` ensures the final executable is static and uses absolute addresses internally.
 
 ## Using it locally in Varnish
 
@@ -174,7 +159,10 @@ The script will upload `myprogram.tar.xz` to the given bin. If you set your prog
 
 ## Live-updating
 
-It's possible to send a program directly to a Varnish instance, where it will be reloaded and keep any previous state. A so-called live update. In order to do this, you will need a live update end-point in your VCL:
+It's possible to send a program directly to a Varnish instance, where it will be reloaded and keep any previous state. A so-called live update. In order to do this, you will need two things:
+
+1. A live update end-point in your VCL.
+2. Set the 'key' field in the JSON configuration of the program.
 
 ```
 	if (bereq.url == "/update") {
@@ -206,4 +194,4 @@ host="127.0.0.1:8080"
 curl -H "X-LiveUpdate: $key" -H "Host: $tenant" --data-binary "@$file" -X POST http://$host/update
 ```
 
-When working on a program that is nearly there, this will save a lot of time!
+When working on a program that needs adjustments, this will save a lot of time!

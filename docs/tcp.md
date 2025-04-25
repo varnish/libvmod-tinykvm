@@ -4,34 +4,33 @@ WARNING: This feature is _experimental_ and should not be used in a setting wher
 
 ## Upgrading a connection
 
-On HTTP it is possible to upgrade a connection in order to start serving using a different protocol on top of TCP.
-
-Using tinykvm.steal() and providing a program and an optional argument we can take over the TCP stream used by Varnish in order to serve another purpose. This is an experimental feature.
-
-## Limitations
-
-It is not currently possible to inherit the OpenSSL session for encrypted endpoints. As a workaround one may handshake again.
-
-WARNING: This feature is _experimental_.
-
-## Example
+On HTTP it is possible to upgrade a connection in order to start serving using a different protocol on top of TCP. In VCL `return (pipe)` should be used to forward the request to eg. `127.0.0.1:8081` where the epoll system is listening:
 
 ```vcl
+backend default {
+	.host = "127.0.0.1";
+	.port = "8081";
+	.connect_timeout = 1s;
+}
+
+sub vcl_init {
+	tinykvm.library("https://filebin.varnish-software.com/tinykvm_programs/compute.json");
+	# Start the TCP example
+	tinykvm.start("hello");
+}
+
 sub vcl_recv {
-	if (req.url == "/tcp") {
-		if (tinykvm.steal("hello", req.url)) {
-			return (synth(123));
-		}
-		return (synth(500));
+	if (req.http.Upgrade) {
+		# Use KVM epoll backend
+		return (pipe);
 	}
 }
 ```
+In order for this to work the program must also be started. You can use `tinykvm.start("program")` in `vcl_init`.
 
-Here we take over the connection and forward it to the `hello` program for the `/tcp` URL. The argument we pass to the program is optional and can be any string depending on the what the program expects.
+## Example program
 
-In the program itself we can implement the socket callbacks like so:
-
-```C++
+```cpp
 static const char response[] =
 	"HTTP/1.1 200 OK\r\n"
 	"Server: Varnish Cache Edgerprise\r\n"
@@ -41,57 +40,64 @@ static const char response[] =
 	"\r\n"
 	"Hello World!\n";
 
-static int
-on_connected(int fd, const char *remote, const char *argument)
-{
-	Print("* FD %d connected. Remote: %s Arg: %s\n",
-		fd, remote, argument);
-
-	write(fd, response, sizeof(response)-1);
-	return 1;
-}
 static void
-on_read(int fd, const uint8_t *data, size_t bytes)
+on_socket_prepare(int thread)
 {
-	Print("* FD %d data: %p, %zu bytes\n", fd, data, bytes);
-
-	/* Assume request */
-	write(fd, response, sizeof(response)-1);
-}
-/*static void
-on_writable(int fd)
-{
-	Print("* FD %d writable (again)\n", fd);
-
-	write(fd, "Last bit\n", 9);
-	shutdown(fd, SHUT_RDWR);
-}*/
-static void
-on_disconnect(int fd, const char *reason)
-{
-	Print("* FD %d disconnected: %s\n", fd, reason);
+	std::vector<kvm_socket_event> write_events;
+	while (true) {
+		std::array<kvm_socket_event, 16> events;
+		int cnt = wait_for_socket_events_paused(events.data(), events.size());
+		for (int i = 0; i < cnt; ++i) {
+			auto& se = events[i];
+			switch (se.event) {
+			case SOCKET_CONNECT:
+				//Print("Socket %d connected: %s\n", se.fd, se.remote);
+				break;
+			case SOCKET_READ:
+				//Print("Socket %d read: %zu bytes\n", se.fd, se.data_len);
+				break;
+			case SOCKET_WRITABLE:
+				//Print("Socket %d writable\n", se.fd);
+				/* Write to the socket. */
+				write_events.push_back({
+					.fd = se.fd,
+					.event = SOCKET_WRITABLE,
+					.remote = nullptr,
+					.arg = nullptr,
+					.data = (const uint8_t *)response,
+					.data_len = sizeof(response) - 1
+				});
+				break;
+			case SOCKET_DISCONNECT:
+				//Print("Socket %d disconnected: %s\n", se.fd, se.remote);
+				break;
+			}
+		}
+		if (!write_events.empty()) {
+			/* Write to the socket. */
+			sys_sockets_write(write_events.data(), write_events.size());
+			write_events.clear();
+		}
+		/* Continue waiting for events. */
+	}
 }
 
 int main(int argc, char **argv)
 {
-	Print("Hello Compute World!\n");
+	Print("Hello Compute %s World!\n", getenv("KVM_TYPE"));
 
 	set_backend_get(on_get);
-	set_socket_on_connect(on_connected);
-	set_socket_on_read(on_read);
-	//set_socket_on_writable(on_writable);
-	set_socket_on_disconnect(on_disconnect);
+
+	set_socket_prepare_for_pause(on_socket_prepare);
 	wait_for_requests();
 }
 ```
 
-By hooking up the socket callbacks we can read and write data to the remotely connected party, using the underlying TCP connection.
+By hooking up the socket prepare callback we can receive events on connected TCP sockets.
 
 ## Demo
 
-[Inspect the response in your browser](http://89.162.68.187:8080/tcp) 
-
-_NOTE: Uses port 80, which may be closed._
+[Inspect the response in your browser](http://127.0.0.1:8081)
 
 ## Verification
 
@@ -106,3 +112,19 @@ Hello World!
 ```
 
 Fetching the URL with curl, we can see that something different happened. An unusual server named `Varnish Cache Edgerprise` responded.
+
+## Benchmarks
+
+```sh
+$ ./wrk -c128 -t128 http://127.0.0.1:8081
+Running 10s test @ http://127.0.0.1:8081
+  128 threads and 128 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    55.62us  112.62us   8.43ms   99.34%
+    Req/Sec    19.64k     6.07k   53.80k    70.65%
+  25264695 requests in 10.10s, 2.64GB read
+Requests/sec: 2500897.32
+Transfer/sec:    267.12MB
+```
+
+The TCP feature is the fastest networking possible, reaching 2.5M req/s on my machine.

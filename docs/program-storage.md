@@ -42,8 +42,8 @@ on_get(const char *url, const char *arg)
 
 int main(int argc, char **argv)
 {
-	/* argv[2] tells us if we are on storage */ 
-	if (strcmp(argv[2], "storage") == 0) {
+	/* IS_STORAGE() macro tells us if we are currently in the storage VM */ 
+	if (IS_STORAGE()) {
 		puts("Hello Storage World!");
 		fflush(stdout);
 	}
