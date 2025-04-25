@@ -61,6 +61,13 @@ public:
 	gaddr_t shared_memory_boundary() const noexcept;
 	gaddr_t shared_memory_size() const noexcept;
 	void set_ephemeral(bool e) noexcept { m_is_ephemeral = e; }
+	enum class BinaryType : uint8_t {
+		Static,
+		StaticPie,
+		Dynamic,
+	};
+	BinaryType binary_type() const noexcept { return m_binary_type; }
+	std::string binary_type_string() const noexcept;
 
 	void reset_wait_for_requests() { m_waiting_for_requests = false; }
 	void wait_for_requests() { m_waiting_for_requests = true; }
@@ -119,6 +126,7 @@ private:
 	bool        m_reset_needed = false;
 	bool        m_print_stdout = false;
 	mutable bool m_last_newline = true;
+	BinaryType m_binary_type = BinaryType::Static;
 	gaddr_t     m_sighandler = 0x0;
 
 	gaddr_t     m_post_data = 0x0;

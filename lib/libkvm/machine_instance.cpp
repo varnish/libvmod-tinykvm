@@ -143,6 +143,10 @@ void MachineInstance::initialize()
 			tinykvm::is_dynamic_elf(std::string_view{
 				(const char *)m_original_binary.data(),
 				m_original_binary.size()});
+		this->m_binary_type = dyn_elf.has_interpreter() ?
+			BinaryType::Dynamic :
+			(dyn_elf.is_dynamic ? BinaryType::StaticPie :
+			 BinaryType::Static);
 
 		// Main arguments: 3x mandatory + N configurable
 		std::vector<std::string> args;
@@ -258,6 +262,7 @@ MachineInstance::MachineInstance(
 	  m_is_storage(false),
 	  m_is_ephemeral(source.is_ephemeral()),
 	  m_waiting_for_requests(true), // If we got this far, we are waiting...
+	  m_binary_type(source.binary_type()),
 	  m_sighandler{source.m_sighandler},
 	  m_regex     {ten->config.max_regex(), "Regex handles"}
 {
@@ -351,6 +356,15 @@ const std::string& MachineInstance::name() const noexcept {
 }
 const std::string& MachineInstance::group() const noexcept {
 	return tenant().config.group.name;
+}
+
+std::string MachineInstance::binary_type_string() const noexcept {
+	switch (m_binary_type) {
+	case BinaryType::Static:     return "static";
+	case BinaryType::StaticPie:  return "static-pie";
+	case BinaryType::Dynamic:    return "dynamic";
+	default:                     return "unknown";
+	}
 }
 
 uint64_t MachineInstance::shared_memory_boundary() const noexcept

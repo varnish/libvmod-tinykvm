@@ -134,6 +134,19 @@ static void gather_stats(VRT_CTX,
 	}});
 
 	obj["program"] = {
+		{"binary_type",  prog->main_vm->binary_type_string()},
+		{"binary_size",  prog->request_binary.size()},
+		{"entry_points", {
+			{"on_recv", prog->entry_address[(size_t)ProgramEntryIndex::ON_RECV]},
+			{"backend_get", prog->entry_address[(size_t)ProgramEntryIndex::BACKEND_GET]},
+			{"backend_post", prog->entry_address[(size_t)ProgramEntryIndex::BACKEND_POST]},
+			{"backend_method", prog->entry_address[(size_t)ProgramEntryIndex::BACKEND_METHOD]},
+			{"backend_stream", prog->entry_address[(size_t)ProgramEntryIndex::BACKEND_STREAM]},
+			{"backend_error", prog->entry_address[(size_t)ProgramEntryIndex::BACKEND_ERROR]},
+			{"live_update_serialize", prog->entry_address[(size_t)ProgramEntryIndex::LIVEUPD_SERIALIZE]},
+			{"live_update_deserialize", prog->entry_address[(size_t)ProgramEntryIndex::LIVEUPD_DESERIALIZE]},
+			{"socket_pause_resume_api", prog->entry_address[(size_t)ProgramEntryIndex::SOCKET_PAUSE_RESUME_API]}
+		}},
 		{"live_updates", prog->stats.live_updates},
 		{"live_update_transfer_bytes", prog->stats.live_update_transfer_bytes},
 		{"reservation_time",     total_resv_time},

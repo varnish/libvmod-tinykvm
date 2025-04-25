@@ -72,6 +72,10 @@ The JSON information may seem a bit over-engineered, however the reason behind s
 
 ## Program object
 
+- `binary_size`
+	- The size of the currently loaded ELF program
+- `binary_type`
+	- The type of the currently loaded ELF program: static, static-pie or dynamic
 - `live_updates`
 	- The number of times this program has been live-updated.
 - `live_update_transfer_bytes`
