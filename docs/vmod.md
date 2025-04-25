@@ -91,8 +91,8 @@ Add `import tinykvm;` at the top of your VCL to load the TinyKVM VMOD.
 
 - Hotswap the current program with a new one from a POST request. If the program fails to
   load, the old program will be kept.
-- The key is used to decide whether the poster is allowed to POST programs. It does not
-  have to be used, but it has to match 'key' in the JSON configuration.
+- The key is used to decide whether the poster is allowed to POST programs. It must be used, and it has to match 'key' in the JSON configuration.
+- If key isn't set or is empty, live-updating is disallowed.
 - If the old and new programs have registered live-update state serialization callbacks,
   they will be called on both the old and the new programs.
 - Example:
