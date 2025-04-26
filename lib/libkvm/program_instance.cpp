@@ -51,7 +51,7 @@ VMPoolItem::VMPoolItem(unsigned reqid, const MachineInstance& main_vm,
 	// Spawn forked VM on dedicated thread, blocking.
 	// XXX: We are deliberately not catching exceptions here.
 	this->task_future = tp.enqueue(
-	[=, &main_vm] () -> long {
+	[this, reqid, &main_vm, ten, prog] () -> long {
 		this->mi = std::make_unique<MachineInstance> (
 			reqid, main_vm, ten, prog);
 		return 0;
@@ -80,7 +80,7 @@ ProgramInstance::ProgramInstance(
 	this->m_binary_was_local = true;
 	this->m_binary_was_cached = false;
 	this->m_future = m_storage_queue.enqueue(
-	[=] () -> long {
+	[this, ctx, ten, debug] () -> long {
 		begin_initialization(ctx, ten, debug);
 		return 0;
 	});
@@ -100,7 +100,7 @@ ProgramInstance::ProgramInstance(
 
 	this->m_binary_was_local = false;
 	this->m_future = m_storage_queue.enqueue(
-	[=] () -> long {
+	[=, this] () -> long {
 		try {
 			/* Avoid invalid URI, we need to check protocols */
 			if (UNLIKELY(uri.size() < 5)) {
@@ -574,7 +574,7 @@ long ProgramInstance::storage_task(gaddr_t func, std::string argument)
 	// Block and finish previous async tasks
 	storage().m_async_tasks.push_back(
 		m_storage_queue.enqueue(
-	[=, data_arg = std::move(argument)] () -> long
+	[=, this, data_arg = std::move(argument)] () -> long
 	{
 		if constexpr (VERBOSE_STORAGE_TASK) {
 			printf("-> Async task on main queue\n");

@@ -671,7 +671,6 @@ void backend_warmup_pause_resume(MachineInstance& machine,
 			invoc->inputs.url, invoc->inputs.argument);
 	}
 	const auto timeout = machine.max_req_time();
-	const auto& prog = machine.program();
 	auto& vm = machine.machine();
 
 	/* Enforce that guest program calls the backend_response system call. */
