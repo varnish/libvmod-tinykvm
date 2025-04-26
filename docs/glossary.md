@@ -285,3 +285,18 @@ Unmap the specified area with similar rules to `remapping`. Example:
 	},
 ```
 This will unmap 8-64GB memory areas, making them unavailable. Blacking out unused areas can improve performance and reset times, but must be done carefully. If the guest tries to use the area it will cause a CPU exception. It's usually better to have a small address space with remappings.
+
+* `warmup`
+
+Send mock requests to the VM before forking it, allowing run-times to warm up.
+
+```json
+	"warmup": {
+		"num_requests": 50,
+		"url": "/warmup",
+		"headers": [
+			"Host: localhost",
+			"X-Request-Id: warmup"
+		]
+	}
+```

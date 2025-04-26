@@ -101,6 +101,7 @@ public:
 	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool storage, bool dbg);
 	MachineInstance(unsigned reqid, const MachineInstance&, const TenantInstance*, ProgramInstance*);
 	void initialize();
+	void warmup();
 	~MachineInstance();
 	void tail_reset();
 	void reset_to(const vrt_ctx*, MachineInstance&);
@@ -122,6 +123,7 @@ private:
 	const bool  m_is_storage;
 	bool        m_is_ephemeral = true;
 	bool        m_waiting_for_requests = false;
+	bool        m_is_warming_up = false;
 	uint8_t     m_response_called = 0;
 	bool        m_reset_needed = false;
 	bool        m_print_stdout = false;

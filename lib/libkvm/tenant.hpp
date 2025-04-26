@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 #include "settings.hpp"
 #include <tinykvm/common.hpp>
@@ -43,6 +44,16 @@ struct TenantGroup {
 	bool     print_stdout = false; /* Print directly to stdout */
 	bool     verbose = false;
 	bool     verbose_pagetable = false;
+	/* Warmup the VM before starting 'real' request handling. */
+	struct Warmup {
+		uint16_t num_requests = 0;
+		std::string url = "/";
+		std::string method = "GET";
+		std::unordered_set<std::string> headers {
+			"User-Agent: tinykvm"
+		};
+	};
+	std::shared_ptr<Warmup> warmup = nullptr;
 	/* When port is non-zero, start an epoll server to receive non-HTTP
 	   requests, which is forwarded to the current program. */
 	uint16_t server_port = 0;

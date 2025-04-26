@@ -427,6 +427,33 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		} else {
 			throw std::runtime_error("WebSocket server must be an object with at least a port");
 		}
+	} else if (obj.key() == "warmup") {
+		// Warmup is a designed HTTP request that will be called a given
+		// number of times mocking a real request. This is used to warm up the
+		// VM before forks are created and it enters real request handling.
+		if (obj.value().is_object()) {
+			auto& obj2 = obj.value();
+			group.warmup = std::make_shared<kvm::TenantGroup::Warmup>();
+			if (obj2.contains("num_requests")) {
+				group.warmup->num_requests = obj2["num_requests"];
+			} else {
+				group.warmup->num_requests = 20;
+			}
+			if (obj2.contains("url")) {
+				group.warmup->url = obj2["url"];
+			}
+			if (obj2.contains("method")) {
+				group.warmup->method = obj2["method"];
+			}
+			if (obj2.contains("headers")) {
+				auto& headers = obj2["headers"];
+				for (const auto& header : headers) {
+					group.warmup->headers.insert(header);
+				}
+			}
+		} else {
+			throw std::runtime_error("Warmup must be an object");
+		}
 	}
 	else if (obj.key() == "group") { /* Silently ignore. */ }
 	else if (obj.key() == "key")   { /* Silently ignore. */ }

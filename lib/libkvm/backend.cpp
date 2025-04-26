@@ -55,6 +55,7 @@ namespace kvm {
 }
 using namespace kvm;
 static constexpr bool VERBOSE_BACKEND = false;
+static constexpr size_t BACKEND_INPUTS_SIZE = 16384;
 struct backend_inputs {
 	uint64_t method;
 	uint64_t url;
@@ -445,7 +446,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				/* Allocate 16KB space for struct backend_inputs */
 				struct backend_inputs inputs {};
 				if (machine.get_inputs_allocation() == 0) {
-					machine.get_inputs_allocation() = vm.mmap_allocate(16384) + 16384;
+					machine.get_inputs_allocation() = vm.mmap_allocate(BACKEND_INPUTS_SIZE) + BACKEND_INPUTS_SIZE;
 				}
 				__u64 stack = machine.get_inputs_allocation();
 				fill_backend_inputs(machine, stack, invoc, post, inputs);
@@ -460,7 +461,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 					machine.name().c_str(), regs.rip);
 
 				/* Resume execution */
-				vm.vmresume();
+				vm.vmresume(timeout);
 				/* Verify response and fill out result struct. */
 				fetch_result(slot, machine, result);
 				/* Ephemeral VMs are reset and don't need to run until halt. */
@@ -655,3 +656,61 @@ ssize_t kvm_backend_streaming_delivery(
 	/* An error result */
 	return -1;
 }
+
+namespace kvm {
+
+void backend_warmup_pause_resume(MachineInstance& machine,
+	const struct kvm_chain_item *invoc)
+{
+	/* This is a mock call to the backend. It makes a call to the
+	   backend to warm up the VM, but does not actually fetch the
+	   result. This is used to eg. warm up JIT caches, or to
+	   pre-allocate buffers. */
+	if constexpr (VERBOSE_BACKEND) {
+		printf("Begin backend %s %s (arg=%s)\n", invoc->inputs.method,
+			invoc->inputs.url, invoc->inputs.argument);
+	}
+	const auto timeout = machine.max_req_time();
+	const auto& prog = machine.program();
+	auto& vm = machine.machine();
+
+	/* Enforce that guest program calls the backend_response system call. */
+	machine.begin_call();
+
+	/* Allocate 16KB space for struct backend_inputs */
+	struct backend_inputs inputs {};
+	if (machine.get_inputs_allocation() == 0) {
+		machine.get_inputs_allocation() = vm.mmap_allocate(BACKEND_INPUTS_SIZE) + BACKEND_INPUTS_SIZE;
+	}
+	__u64 stack = machine.get_inputs_allocation();
+	struct backend_post *post = nullptr;
+	fill_backend_inputs(machine, stack, invoc, post, inputs);
+
+	auto& regs = vm.registers();
+	/* RDI is address of struct backend_inputs */
+	const uint64_t g_struct_addr = regs.rdi;
+	vm.copy_to_guest(g_struct_addr, &inputs, sizeof(inputs));
+
+	/* Resume execution */
+	vm.vmresume(timeout);
+
+	/* Skip fetching the result, verify that the VM has created a response */
+	const bool regular_response = machine.response_called(1);
+	const bool streaming_response = machine.response_called(10);
+	if (UNLIKELY(!regular_response && !streaming_response)) {
+		throw std::runtime_error("HTTP response not set. Program crashed? Check logs!");
+	}
+
+	/* Run the VM until it halts again, and it should be waiting for requests. */
+	machine.reset_wait_for_requests();
+	vm.run_in_usermode(1.0f);
+	if (!machine.is_waiting_for_requests()) {
+		throw std::runtime_error("VM did not wait for requests after backend request");
+	}
+
+	// Skip the OUT instruction (again)
+	regs.rip += 2;
+	vm.set_registers(regs);
+}
+
+} // namespace kvm

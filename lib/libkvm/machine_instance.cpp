@@ -20,11 +20,16 @@
 #include "timing.hpp"
 #include "varnish.hpp"
 #include <tinykvm/util/elf.h>
-extern "C" int close(int);
+extern "C" {
+#include "kvm_backend.h"
+int close(int);
+}
 
 namespace kvm {
 static std::vector<uint8_t> ld_linux_x86_64_so;
 extern std::vector<uint8_t> file_loader(const std::string &);
+extern void backend_warmup_pause_resume(MachineInstance& machine,
+	const struct kvm_chain_item *invoc);
 
 void MachineInstance::kvm_initialize()
 {
@@ -206,6 +211,11 @@ void MachineInstance::initialize()
 		// Only request VMs need the copy-on-write mechanism enabled
 		if (!is_storage())
 		{
+			// Perform warmup, if requested
+			if (m_tenant->config.group.warmup) {
+				this->warmup();
+			}
+
 			// Make forkable (with *NO* working memory)
 			machine().prepare_copy_on_write(0UL, shm_boundary);
 		}
@@ -242,6 +252,40 @@ void MachineInstance::initialize()
 		}
 		throw; /* IMPORTANT: Re-throw */
 	}
+}
+
+void MachineInstance::warmup()
+{
+	if (!tenant().config.group.warmup)
+		throw std::runtime_error("Warmup has not been enabled");
+	auto& w = *tenant().config.group.warmup;
+	if (w.url.empty())
+		throw std::runtime_error("Warmup URL is empty");
+	if (w.method.empty())
+		throw std::runtime_error("Warmup method is empty");
+
+	kvm_chain_item invoc;
+	invoc.tenant = (struct vmod_kvm_tenant *)this->m_tenant;
+	invoc.inputs.method = w.method.c_str();
+	invoc.inputs.url = w.url.c_str();
+	invoc.inputs.argument = "";
+	invoc.inputs.content_type = "";
+	printf("Warmup URL: %s\n", invoc.inputs.url);
+	printf("Warmup method: %s\n", invoc.inputs.method);
+
+	this->m_is_warming_up = true;
+	try {
+		for (size_t i = 0; i < w.num_requests; i++) {
+			backend_warmup_pause_resume(*this, &invoc);
+		}
+	} catch (const std::exception& e) {
+		this->m_is_warming_up = false;
+		fprintf(stderr,
+			"Warmup failed: %s\n", e.what());
+		this->print_backtrace();
+		throw; /* IMPORTANT: Re-throw */
+	}
+	this->m_is_warming_up = false;
 }
 
 MachineInstance::MachineInstance(
