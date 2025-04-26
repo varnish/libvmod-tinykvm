@@ -17,7 +17,7 @@ add_vmod_tests(vmod_kvm vmod_kvm
 	tests/async_task.vtc
 	tests/backend_request.vtc
 	tests/cached_post_backend.vtc
-	#tests/curl_fetch.vtc
+	tests/curl_fetch.vtc
 	tests/empty.vtc
 	tests/error_handling.vtc
 	tests/failing_program.vtc
@@ -36,10 +36,15 @@ add_vmod_tests(vmod_kvm vmod_kvm
 	tests/post_backend.vtc
 	tests/program_not_ready.vtc
 	tests/regex.vtc
-	#tests/rotate_vcl.vtc
 	tests/shared_counter.vtc
 	tests/stateful_buffered_storage.vtc
 	tests/stateful_storage.vtc
 	tests/storage_failure.vtc
 	tests/tenant_init.vtc
 )
+
+if (VARNISH_PLUS)
+	add_vmod_tests(vmod_kvm vmod_kvm
+		tests/rotate_vcl.vtc
+	)
+endif()

@@ -133,15 +133,11 @@ varnish v1 -vcl+backend {
 	}
 } -start
 
-define m1 make_auto_request {
+client c1 -repeat 10 {
 	txreq -url "/fetch" -hdr "Host: test.com" -hdr "X-Port: ${v1_port}"
 	rxresp
 	expect resp.body == "Hello Example World"
 	expect resp.status == 200
-}
-
-client c1 -repeat 10 {
-	${m1_make_auto_request}
 
 	txreq -url "/alloc_fetch" -hdr "Host: test.com" -hdr "X-Port: ${v1_port}"
 	rxresp
