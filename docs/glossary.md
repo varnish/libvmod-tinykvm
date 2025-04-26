@@ -184,13 +184,13 @@ Default: Enabled
 
 * `ephemeral`
 
-An ephemeral VM is reset after each request concludes, regardless of reason. Ephemeral VMs are reset back to their initialized state, erasing all changes that happened during the request. A non-ephemeral VM will not be reset, which increases performance but without the security and stability guarantees of ephemeralness. If a non-ephemeral VM crashes, runs out of memory or times out, it will be reset. This can also be referred to as _per-request isolation_.
+An ephemeral VM is reset after each request concludes, regardless of reason. Ephemeral VMs are reset back to their initialized state, erasing all changes that happened during the request. A non-ephemeral VM will not be reset, which increases performance but without the security and stability guarantees of ephemeralness. If a non-ephemeral VM crashes, runs out of memory or times out, it will be reset. This can also be referred to as _per-request isolation_. If a working memory limit is set and it has been exceeded after the request concludes, a full reset will be executed which reduces memory down to the limit. The freed memory will be given back to the system.
 
 Default: Enabled
 
 * `ephemeral_keep_working_memory`
 
-Keep working memory when resetting the VM after a request completes. This is slower than the regular reset mechanism for _small programs_, however for bigger programs it scales much better. Enabling this also enables `ephemeral`.
+Keep working memory when resetting the VM after a request completes. This is slower than the regular reset mechanism for _small programs_, however for bigger programs it scales much better. Enabling this also enables `ephemeral`. If a working memory limit is set and it has been exceeded after the request concludes, a full reset will be executed which reduces memory down to the limit. The freed memory will be given back to the system.
 
 Default: Disabled
 
