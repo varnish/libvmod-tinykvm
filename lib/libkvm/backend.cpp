@@ -41,6 +41,7 @@
 #include "settings.hpp"
 #include "varnish.hpp"
 #include <stdexcept>
+#include <span>
 extern "C" {
 #include "kvm_backend.h"
 void kvm_varnishstat_program_exception();
@@ -48,14 +49,24 @@ void kvm_varnishstat_program_timeout();
 void kvm_varnishstat_program_status(uint16_t status);
 void kvm_SetCacheable(VRT_CTX, bool c);
 void kvm_SetTTLs(VRT_CTX, float ttl, float grace, float keep);
+struct easy_txt {
+	const char* begin;
+	const char* end;
+};
 }
 namespace kvm {
 	extern int kvm_http_set(tinykvm::vCPU& cpu, MachineInstance& inst,
 		int where, uint64_t g_what, uint32_t g_wlen);
+	extern std::span<const struct easy_txt> http_get_request_headers(const vrt_ctx* ctx);
 }
 using namespace kvm;
 static constexpr bool VERBOSE_BACKEND = false;
-static constexpr size_t BACKEND_INPUTS_SIZE = 16384;
+static constexpr size_t BACKEND_INPUTS_SIZE = 64UL << 10; // 64KB
+struct backend_header {
+	uint64_t field_ptr;
+	uint32_t field_colon;
+	uint32_t field_len;
+};
 struct backend_inputs {
 	uint64_t method;
 	uint64_t url;
@@ -67,6 +78,12 @@ struct backend_inputs {
 	uint16_t ctype_len;
 	uint64_t data; /* Content: Can be NULL. */
 	uint64_t data_len;
+	/* HTTP headers */
+	uint64_t g_headers;
+	uint16_t num_headers;
+	uint16_t info_flags; /* 0x1 = request is a warmup request. */
+	uint32_t reserved0;    /* Reserved for future use. */
+	uint64_t reserved1[2]; /* Reserved for future use. */
 };
 
 static void memory_error_handling(struct vsl_log *vsl, const tinykvm::MemoryException& e)
@@ -355,6 +372,44 @@ static void fill_backend_inputs(
 		inputs.data_len = 0;
 	}
 }
+static size_t fill_backend_headers(
+	MachineInstance& machine, __u64& stack,
+	const vrt_ctx* ctx,
+	backend_inputs& inputs)
+{
+	auto& vm = machine.machine();
+	if (ctx == nullptr) {
+		inputs.g_headers = 0x0;
+		inputs.num_headers = 0;
+		return 0;
+	}
+	/* Allocate space for headers */
+	std::span<const struct easy_txt> headers = http_get_request_headers(ctx);
+	if (headers.size() < 1) {
+		inputs.g_headers = 0x0;
+		inputs.num_headers = 0;
+		return 0;
+	}
+	/* Allocate space for headers on the stack */
+	const size_t num_headers = headers.size();
+	std::array<backend_header, 64> header_array;
+	if (num_headers > header_array.size()) {
+		throw std::runtime_error("Too many headers in backend inputs");
+	}
+	/* Push each header field to the stack */
+	for (size_t i = 0; i < num_headers; i++) {
+		auto& header = header_array.at(i);
+		header.field_ptr = vm.stack_push(stack, headers[i].begin, headers[i].end - headers[i].begin);
+		header.field_colon = 0;
+		header.field_len = headers[i].end - headers[i].begin;
+	}
+	/* Push the header array to the stack using stack_push_std_array */
+	const auto header_array_addr = vm.stack_push_std_array(stack, header_array, num_headers);
+	/* Set the header array address and number of headers */
+	inputs.g_headers = header_array_addr;
+	inputs.num_headers = num_headers;
+	return num_headers;
+}
 
 extern "C"
 void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
@@ -399,6 +454,9 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				struct backend_inputs inputs {};
 				__u64 stack = vm.stack_address();
 				fill_backend_inputs(machine, stack, invoc, post, inputs);
+				if (machine.has_ctx()) {
+					fill_backend_headers(machine, stack, machine.ctx(), inputs);
+				}
 				uint64_t struct_addr = vm.stack_push(stack, inputs);
 
 				VSLb(machine.ctx()->vsl, SLT_VCL_Log,
@@ -450,6 +508,9 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 				}
 				__u64 stack = machine.get_inputs_allocation();
 				fill_backend_inputs(machine, stack, invoc, post, inputs);
+				if (machine.has_ctx()) {
+					fill_backend_headers(machine, stack, machine.ctx(), inputs);
+				}
 
 				auto& regs = vm.registers();
 				/* RDI is address of struct backend_inputs */
@@ -660,7 +721,8 @@ ssize_t kvm_backend_streaming_delivery(
 namespace kvm {
 
 void backend_warmup_pause_resume(MachineInstance& machine,
-	const struct kvm_chain_item *invoc)
+	const struct kvm_chain_item *invoc,
+	const std::unordered_set<std::string>& headers)
 {
 	/* This is a mock call to the backend. It makes a call to the
 	   backend to warm up the VM, but does not actually fetch the
@@ -684,6 +746,23 @@ void backend_warmup_pause_resume(MachineInstance& machine,
 	__u64 stack = machine.get_inputs_allocation();
 	struct backend_post *post = nullptr;
 	fill_backend_inputs(machine, stack, invoc, post, inputs);
+	/* We are not using a VRT_CTX here, so we will manually fill headers */
+	std::vector<backend_header> header_array;
+	/* Push each header field to the stack */
+	for (const auto& header : headers) {
+		if (header.find(':') == std::string::npos) {
+			throw std::runtime_error("Invalid header in warmup: " + header);
+		}
+		uint64_t header_ptr = vm.stack_push(stack, header.c_str(), header.size());
+		uint32_t header_colon = header.find(':');
+		uint32_t header_len = header.size();
+		header_array.push_back({header_ptr, header_colon, header_len});
+	}
+	/* Push the header array to the stack using stack_push_std_array */
+	const auto header_array_addr = vm.stack_push_std_array(stack, header_array, header_array.size());
+	inputs.g_headers = header_array_addr;
+	inputs.num_headers = headers.size();
+	inputs.info_flags = 0x1; // Warmup request
 
 	auto& regs = vm.registers();
 	/* RDI is address of struct backend_inputs */

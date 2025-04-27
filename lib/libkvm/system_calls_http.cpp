@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <span>
 extern "C" {
 	void http_SetH(struct http *to, unsigned n, const char *fm);
 	void http_UnsetIdx(struct http *hp, unsigned idx);
@@ -39,6 +40,8 @@ struct guest_header_field {
 	bool     deleted = false;
 	bool     foreach = false;
 };
+
+
 
 inline void foreach(http* hp, const std::function<void(http*, easy_txt&, size_t)>& cb)
 {
@@ -82,6 +85,17 @@ get_http(VRT_CTX, int where)
 	if (UNLIKELY(hp == nullptr))
 		throw std::runtime_error("Selected HTTP not available at this time: " + std::to_string(where));
 	return hp;
+}
+std::span<const struct easy_txt> http_get_request_headers(const vrt_ctx* ctx)
+{
+	auto* hp = get_http(ctx, 0);
+	if (hp->field_count < HDR_FIRST)
+	{
+		throw std::out_of_range("No HTTP request headers available");
+	}
+	const easy_txt* first = hp->field_array + HDR_FIRST;
+	const easy_txt* last  = hp->field_array + hp->field_count;
+	return std::span<const struct easy_txt>(first, size_t(last - first));
 }
 inline std::tuple<http*, easy_txt&>
 get_field(VRT_CTX, int where, uint32_t index)

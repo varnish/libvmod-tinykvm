@@ -29,7 +29,8 @@ namespace kvm {
 static std::vector<uint8_t> ld_linux_x86_64_so;
 extern std::vector<uint8_t> file_loader(const std::string &);
 extern void backend_warmup_pause_resume(MachineInstance& machine,
-	const struct kvm_chain_item *invoc);
+	const struct kvm_chain_item *invoc,
+	const std::unordered_set<std::string>& headers);
 
 void MachineInstance::kvm_initialize()
 {
@@ -276,7 +277,7 @@ void MachineInstance::warmup()
 	this->m_is_warming_up = true;
 	try {
 		for (size_t i = 0; i < w.num_requests; i++) {
-			backend_warmup_pause_resume(*this, &invoc);
+			backend_warmup_pause_resume(*this, &invoc, w.headers);
 		}
 	} catch (const std::exception& e) {
 		this->m_is_warming_up = false;

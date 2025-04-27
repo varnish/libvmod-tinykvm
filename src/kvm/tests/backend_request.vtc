@@ -6,12 +6,22 @@ cat >${tmpdir}/${testname}.c <<-EOF
 #include <assert.h>
 #include <string.h>
 
-static void on_request(const struct backend_request *req)
+static void on_request(const struct kvm_request *req)
 {
 	assert(req->url_len == 2);
 
 	assert(strcmp(req->arg, "argument") == 0);
 	assert(req->arg_len == 8);
+
+	int found_host = 0;
+	for (int i = 0; i < req->num_headers; i++) {
+		if (strcmp(req->headers[i].field, "Host: test.com") == 0) {
+			found_host = 1;
+			break;
+		}
+	}
+	assert(found_host == 1);
+	assert(req->num_headers >= 1);
 
 	if (strcmp(req->url, "/1") == 0)
 	{

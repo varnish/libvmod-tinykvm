@@ -6,11 +6,12 @@ shell {
 cat >hello.c <<-EOF
 #include "kvm_api.h"
 #include <assert.h>
+#include <string.h>
 static int counter = 0;
 
 int main(int argc, char **argv)
 {
-	struct backend_request req;
+	struct kvm_request req;
 	while (1) {
 		wait_for_requests_paused(&req);
 
@@ -19,6 +20,20 @@ int main(int argc, char **argv)
 		} else {
 			assert(strcmp(req.url, "/1") == 0);
 		}
+
+		int found_xkey = 0;
+		int found_xkey2 = 0;
+		for (int i = 0; i < req.num_headers; i++) {
+			if (strcmp(req.headers[i].field, "X-Key: value") == 0) {
+				found_xkey = 1;
+			}
+			if (strcmp(req.headers[i].field, "X-Key2: value2") == 0) {
+				found_xkey2 = 1;
+			}
+		}
+		assert(found_xkey == 1);
+		assert(found_xkey2 == 1);
+		assert(req.num_headers >= 2);
 
 		char buffer[256];
 		counter++;
@@ -44,7 +59,8 @@ vcl 4.1;
 				"url": "/warmup",
 				"headers": [
 					"Host: localhost",
-					"X-Request-Id: warmup"
+					"X-Key: value",
+					"X-Key2: value2"
 				]
 			}
 		}""");
@@ -56,17 +72,17 @@ vcl 4.1;
 } -start
 
 client c1 {
-	txreq -url "/1"
+	txreq -url "/1" -hdr "X-Key: value" -hdr "X-Key2: value2"
 	rxresp
 	expect resp.body == "Hello Compute World 16"
 	expect resp.status == 200
 
-	txreq -url "/1"
+	txreq -url "/1" -hdr "X-Key: value" -hdr "X-Key2: value2"
 	rxresp
 	expect resp.body == "Hello Compute World 16"
 	expect resp.status == 200
 
-	txreq -url "/1"
+	txreq -url "/1" -hdr "X-Key: value" -hdr "X-Key2: value2"
 	rxresp
 	expect resp.body == "Hello Compute World 16"
 	expect resp.status == 200
