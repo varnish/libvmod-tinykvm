@@ -271,8 +271,14 @@ void MachineInstance::warmup()
 	invoc.inputs.url = w.url.c_str();
 	invoc.inputs.argument = "";
 	invoc.inputs.content_type = "";
-	printf("Warmup URL: %s\n", invoc.inputs.url);
-	printf("Warmup method: %s\n", invoc.inputs.method);
+	if (this->tenant().config.group.verbose) {
+		printf("Warmup request: HTTP/1.1 %s %s\n",
+			invoc.inputs.method, invoc.inputs.url);
+		printf("Warmup headers:\n");
+		for (const auto& header : w.headers) {
+			printf("- %s\n", header.c_str());
+		}
+	}
 
 	this->m_is_warming_up = true;
 	try {
