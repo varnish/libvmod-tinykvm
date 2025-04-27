@@ -15,4 +15,5 @@ add_vmod_tests(vmod_tinykvm vmod_tinykvm
 	tests/minimal_example.vtc
 	tests/remote_archive.vtc
 	tests/synth.vtc
+	tests/warmup.vtc
 )

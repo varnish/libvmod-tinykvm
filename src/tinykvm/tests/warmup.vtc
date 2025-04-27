@@ -1,0 +1,73 @@
+varnishtest "KVM: Minimal program example"
+
+feature cmd "ls /dev/kvm"
+
+shell {
+cat >hello.c <<-EOF
+#include "kvm_api.h"
+#include <assert.h>
+static int counter = 0;
+
+int main(int argc, char **argv)
+{
+	struct backend_request req;
+	while (1) {
+		wait_for_requests_paused(&req);
+
+		if (counter < 15) {
+			assert(strcmp(req.url, "/warmup") == 0);
+		} else {
+			assert(strcmp(req.url, "/1") == 0);
+		}
+
+		char buffer[256];
+		counter++;
+		snprintf(buffer, sizeof(buffer), "Hello Compute World %d", counter);
+		backend_response_str(200, "text/plain", buffer);
+	}
+}
+EOF
+gcc -static -O2 hello.c -I${testdir} -o hello
+}
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import tinykvm;
+	backend default none;
+
+	sub vcl_init {
+		tinykvm.configure("my_program",
+		"""{
+			"filename": "${tmpdir}/hello",
+			"warmup": {
+				"num_requests": 15,
+				"url": "/warmup",
+				"headers": [
+					"Host: localhost",
+					"X-Request-Id: warmup"
+				]
+			}
+		}""");
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = tinykvm.program("my_program", bereq.url);
+	}
+} -start
+
+client c1 {
+	txreq -url "/1"
+	rxresp
+	expect resp.body == "Hello Compute World 16"
+	expect resp.status == 200
+
+	txreq -url "/1"
+	rxresp
+	expect resp.body == "Hello Compute World 16"
+	expect resp.status == 200
+
+	txreq -url "/1"
+	rxresp
+	expect resp.body == "Hello Compute World 16"
+	expect resp.status == 200
+} -run
