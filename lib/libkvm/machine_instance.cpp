@@ -324,6 +324,11 @@ MachineInstance::MachineInstance(
 	machine().set_printer(get_vsl_printer());
 	/* vCPU request id */
 	machine().cpu().set_vcpu_table_at(1, reqid);
+	/* Allow duplicating read-only FDs from the source */
+	machine().fds().set_find_readonly_master_vm_fd_callback(
+		[&] (int vfd) -> std::optional<const tinykvm::FileDescriptors::Entry*> {
+			return source.machine().fds().entry_for_vfd(vfd);
+		});
 	/* Load the compiled regexes of the source */
 	m_regex.reset_and_loan(source.m_regex);
 #ifdef ENABLE_TIMING
