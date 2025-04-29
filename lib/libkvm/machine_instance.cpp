@@ -96,8 +96,9 @@ MachineInstance::MachineInstance(
 	machine().set_userdata<MachineInstance> (this);
 	machine().set_printer(get_vsl_printer());
 	// Add all the allowed paths to the VMs file descriptor sub-system
-	for (auto& path : ten->config.group.allowed_paths)
-		machine().fds().add_readonly_file(path);
+	for (auto& path : ten->config.group.allowed_paths) {
+		machine().fds().add_readonly_file(path.virtual_path);
+	}
 	// Add a single writable file simply called 'state'
 	machine().fds().set_open_writable_callback(
 	[&] (std::string& path) -> bool {
@@ -116,14 +117,13 @@ MachineInstance::MachineInstance(
 			return true;
 		}
 		// Rewrite the path if it's in the rewrite paths
-		auto it = tenant().config.group.rewrite_paths.find(path);
-		if (it != tenant().config.group.rewrite_paths.end()) {
-			path = it->second;
-			/// NOTE: We still don't allow the program to open a rewritten
-			/// path, but it can still be allowed in allowed_files. Eg.
-			/// if you have / -> /tmp/allowed_path, then /tmp/allowed_path
-			/// must be in allowed_files in order to be opened.
-			return false;
+		// It's also allowed to be opened (read-only)
+		auto it = tenant().config.group.rewrite_path_indices.find(path);
+		if (it != tenant().config.group.rewrite_path_indices.end()) {
+			const size_t index = it->second;
+			// Rewrite the path to the allowed file
+			path = tenant().config.group.allowed_paths.at(index).real_path;
+			return true;
 		}
 		return false;
 	});

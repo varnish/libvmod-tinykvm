@@ -255,12 +255,11 @@ An array of paths specifying each individual file that a program is allowed to r
 
 Example paths for the espeak-ng text-to-speech generator.
 
-* `rewrite_paths`
-
-An array of objects that each can rewrite one exact path to another. No prefix support.
-
 ```json
-	"rewrite_paths": [
+	"allowed_paths": [
+		"/dev/urandom",
+		"/lib/x86_64-linux-gnu/libz.so.1",
+		"$/home/deno",
 		{
 			"virtual": "/main.ts",
 			"real": "/home/deno/main.ts"
@@ -271,7 +270,7 @@ An array of objects that each can rewrite one exact path to another. No prefix s
 	],
 ```
 
-Example paths for a Deno program.
+Example paths for a Deno program. It will rewrite `/main.ts` to `/home/deno/main.ts` hiding the real path.
 
 * `verbose`
 
