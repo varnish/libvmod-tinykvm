@@ -161,10 +161,15 @@ VCL_BOOL vmod_configure(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_STRING j
 	if (tenant != NULL) {
 		return (kvm_tenant_configure(ctx, tenant, json));
 	} else {
-		char pjson[1024];
+		char pjson[4096];
 		const int pjson_len = snprintf(pjson, sizeof(pjson),
 			"{\"%s\": %s}",
 			program, json);
+		if (pjson_len < 0 || pjson_len >= sizeof(pjson)) {
+			VRT_fail(ctx,
+				"compute: Failed to create JSON for '%s'", program);
+			return (0);
+		}
 		return (kvm_init_tenants_str(ctx, task,
 			"compute::configure()", pjson, pjson_len, NO_INIT_PROGRAMS));
 	}
