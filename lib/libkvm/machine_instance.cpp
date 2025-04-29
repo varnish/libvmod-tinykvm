@@ -115,6 +115,16 @@ MachineInstance::MachineInstance(
 			path = tenant().config.allowed_file;
 			return true;
 		}
+		// Rewrite the path if it's in the rewrite paths
+		auto it = tenant().config.group.rewrite_paths.find(path);
+		if (it != tenant().config.group.rewrite_paths.end()) {
+			path = it->second;
+			/// NOTE: We still don't allow the program to open a rewritten
+			/// path, but it can still be allowed in allowed_files. Eg.
+			/// if you have / -> /tmp/allowed_path, then /tmp/allowed_path
+			/// must be in allowed_files in order to be opened.
+			return false;
+		}
 		return false;
 	});
 }

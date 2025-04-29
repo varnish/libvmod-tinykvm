@@ -370,6 +370,31 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	{
 		group.allowed_paths = obj.value().template get<std::vector<std::string>>();
 	}
+	else if (obj.key() == "rewrite_paths")
+	{
+		// Rewrite paths is a JSON array of objects of virtual path to real paths
+		if (!obj.value().is_array()) {
+			throw std::runtime_error("Rewrite paths must be an array of objects");
+		}
+		auto& arr = obj.value();
+		for (const auto& it : arr) {
+			if (!it.is_object()) {
+				throw std::runtime_error("Rewrite paths must be an array of objects");
+			}
+			// Objects have "virtual" and "real" keys
+			if (!it.contains("virtual") || !it.contains("real")) {
+				throw std::runtime_error("Rewrite paths must have virtual and real keys");
+			}
+			auto virtual_path = it["virtual"].template get<std::string>();
+			auto real_path = it["real"].template get<std::string>();
+			if (virtual_path.empty() || real_path.empty()) {
+				throw std::runtime_error("Rewrite paths must have non-empty virtual and real keys");
+			}
+			// Add to the rewrite paths
+			group.rewrite_paths.insert_or_assign(
+				std::move(virtual_path), std::move(real_path));
+		}
+	}
 	else if (obj.key() == "verbose") {
 		group.verbose = obj.value();
 	}

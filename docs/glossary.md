@@ -255,6 +255,24 @@ An array of paths specifying each individual file that a program is allowed to r
 
 Example paths for the espeak-ng text-to-speech generator.
 
+* `rewrite_paths`
+
+An array of objects that each can rewrite one exact path to another. No prefix support.
+
+```json
+	"rewrite_paths": [
+		{
+			"virtual": "/main.ts",
+			"real": "/home/deno/main.ts"
+		}, {
+			"virtual": "/",
+			"real": "/home/deno"
+		}
+	],
+```
+
+Example paths for a Deno program.
+
 * `verbose`
 
 Enable verbose output from program loading, as well as from certain system calls. For example, inaccessible file paths will be printed to console.
