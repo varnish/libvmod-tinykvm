@@ -399,9 +399,10 @@ static size_t fill_backend_headers(
 	/* Push each header field to the stack */
 	for (size_t i = 0; i < num_headers; i++) {
 		auto& header = header_array.at(i);
-		header.field_ptr = vm.stack_push_cstr(stack, headers[i].begin, headers[i].end - headers[i].begin);
-		header.field_colon = 0;
-		header.field_len = headers[i].end - headers[i].begin;
+		std::string_view field(headers[i].begin, headers[i].end - headers[i].begin);
+		header.field_ptr = vm.stack_push_cstr(stack, field.data(), field.size());
+		header.field_colon = field.find(':');
+		header.field_len = field.size();
 	}
 	/* Push the header array to the stack using stack_push_std_array */
 	const auto header_array_addr = vm.stack_push_std_array(stack, header_array, num_headers);
