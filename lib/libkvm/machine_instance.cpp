@@ -107,6 +107,13 @@ MachineInstance::MachineInstance(
 			path = tenant().config.allowed_file;
 			return true;
 		}
+		for (auto& tpath : tenant().config.group.allowed_paths) {
+			if (tpath.virtual_path == path && tpath.writable) {
+				// Rewrite the path to the allowed file
+				path = tpath.real_path;
+				return true;
+			}
+		}
 		return false;
 	});
 	machine().fds().set_open_readable_callback(

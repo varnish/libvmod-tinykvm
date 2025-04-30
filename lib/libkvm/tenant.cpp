@@ -380,13 +380,15 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 				path.virtual_path = path.real_path;
 			} else if (it.is_object()) {
 				// Objects have "virtual" and "real" keys
-				if (!it.contains("virtual") || !it.contains("real")) {
-					throw std::runtime_error("Allowed paths must have virtual and real keys");
+				if (!it.contains("real")) {
+					throw std::runtime_error("Allowed paths must have a real path");
 				}
 				path.real_path = it["real"].template get<std::string>();
-				path.virtual_path = it["virtual"].template get<std::string>();
 				if (path.real_path.empty()) {
 					throw std::runtime_error("Allowed paths must have a non-empty real path");
+				}
+				if (it.contains("virtual")) {
+					path.virtual_path = it["virtual"].template get<std::string>();
 				}
 				if (!path.virtual_path.empty()) {
 					// Record the index of the virtual path in the allowed paths
