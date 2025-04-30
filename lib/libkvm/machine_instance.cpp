@@ -103,6 +103,11 @@ MachineInstance::MachineInstance(
 		ten->config.group.verbose_syscalls);
 	// Add all the allowed paths to the VMs file descriptor sub-system
 	for (auto& path : ten->config.group.allowed_paths) {
+		if (path.prefix && path.writable) {
+			// Add as a prefix path
+			machine().fds().add_writable_prefix(path.virtual_path);
+			continue;
+		}
 		machine().fds().add_readonly_file(path.virtual_path);
 	}
 	// Add a single writable file simply called 'state'
@@ -141,7 +146,7 @@ MachineInstance::MachineInstance(
 		return false;
 	});
 	machine().fds().set_connect_socket_callback(
-	[&] (int fd, struct sockaddr& addr) -> bool {
+	[&] (int fd, struct sockaddr_storage& addr) -> bool {
 		(void)fd;
 		(void)addr;
 		return true;

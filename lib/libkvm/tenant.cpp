@@ -399,6 +399,9 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 					// If the virtual path is empty, we will use 1:1 mapping
 					path.virtual_path = path.real_path;
 				}
+				if (it.contains("prefix")) {
+					path.prefix = it["prefix"].template get<bool>();
+				}
 				if (it.contains("writable")) {
 					path.writable = it["writable"].template get<bool>();
 				}

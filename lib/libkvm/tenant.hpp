@@ -80,6 +80,7 @@ struct TenantGroup {
 		std::string virtual_path; /* Path inside the VM, optional */
 		bool writable = false;
 		bool usable_in_fork = false;
+		bool prefix = false;
 	};
 	std::vector<VirtualPath> allowed_paths;
 	std::unordered_map<std::string, size_t> rewrite_path_indices;
