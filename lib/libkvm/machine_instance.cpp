@@ -95,6 +95,12 @@ MachineInstance::MachineInstance(
 	this->m_is_ephemeral = ten->config.group.ephemeral;
 	machine().set_userdata<MachineInstance> (this);
 	machine().set_printer(get_vsl_printer());
+	machine().set_verbose_system_calls(
+		ten->config.group.verbose_syscalls);
+	machine().set_verbose_mmap_syscalls(
+		ten->config.group.verbose_syscalls);
+	machine().set_verbose_thread_syscalls(
+		ten->config.group.verbose_syscalls);
 	// Add all the allowed paths to the VMs file descriptor sub-system
 	for (auto& path : ten->config.group.allowed_paths) {
 		machine().fds().add_readonly_file(path.virtual_path);

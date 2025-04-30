@@ -43,6 +43,7 @@ struct TenantGroup {
 	bool     ephemeral_keep_working_memory = true;
 	bool     print_stdout = false; /* Print directly to stdout */
 	bool     verbose = false;
+	bool     verbose_syscalls = false;
 	bool     verbose_pagetable = false;
 	/* Warmup the VM before starting 'real' request handling. */
 	struct Warmup {

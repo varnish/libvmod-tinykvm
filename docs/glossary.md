@@ -276,6 +276,10 @@ Example paths for a Deno program. It will rewrite `/main.ts` to `/home/deno/main
 
 Enable verbose output from program loading, as well as from certain system calls. For example, inaccessible file paths will be printed to console.
 
+* `verbose_syscalls`
+
+Enable verbose output from all system calls. This creates quite a bit of logging and is only useful when debugging complex issues in programs. Only enabled for the main VM, and disabled on request VMs.
+
 * `verbose_pagetables`
 
 Print the main VMs pagetable state after initialization.

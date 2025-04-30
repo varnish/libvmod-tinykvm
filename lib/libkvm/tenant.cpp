@@ -411,6 +411,9 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	else if (obj.key() == "verbose") {
 		group.verbose = obj.value();
 	}
+	else if (obj.key() == "verbose_syscalls") {
+		group.verbose_syscalls = obj.value();
+	}
 	else if (obj.key() == "verbose_pagetables") {
 		group.verbose_pagetable = obj.value();
 	}
