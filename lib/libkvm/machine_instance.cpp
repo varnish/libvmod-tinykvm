@@ -127,6 +127,12 @@ MachineInstance::MachineInstance(
 		}
 		return false;
 	});
+	machine().fds().set_connect_socket_callback(
+	[&] (int fd, struct sockaddr& addr) -> bool {
+		(void)fd;
+		(void)addr;
+		return true;
+	});
 }
 void MachineInstance::initialize()
 {
