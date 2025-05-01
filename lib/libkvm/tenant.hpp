@@ -29,7 +29,6 @@ struct TenantGroup {
 	uint64_t hugepage_requests_arena = 0; /* Megabytes */
 	size_t   max_concurrency = 2; /* Request VMs */
 	size_t   max_smp         = 0; /* Multi-processing per VM */
-	size_t   max_fd       = 32;
 	size_t   max_regex    = 64;
 	bool     has_storage  = false;
 	bool     hugepages    = false;
@@ -145,7 +144,6 @@ struct TenantConfig
 	uint32_t max_req_memory() const noexcept { return group.max_req_mem; }
 	uint32_t limit_req_memory() const noexcept { return group.limit_req_mem; }
 	uint32_t shared_memory() const noexcept { return group.shared_memory; }
-	size_t   max_fd() const noexcept { return group.max_fd; }
 	size_t   max_regex() const noexcept { return group.max_regex; }
 	bool     print_stdout() const noexcept { return group.print_stdout; }
 	bool     has_storage() const noexcept { return group.has_storage; }

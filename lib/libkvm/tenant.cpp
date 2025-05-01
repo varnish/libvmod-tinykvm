@@ -261,9 +261,6 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		if (group.hugepage_arena_size % 0x200000L != 0) {
 			throw std::runtime_error("Hugepage arena size must be a multiple of 2MB");
 		}
-		if (group.hugepage_arena_size > group.max_main_memory) {
-			throw std::runtime_error("Hugepage arena size cannot be larger than max memory");
-		}
 		// Enable hugepages if arena size is set
 		group.hugepages = group.hugepage_arena_size != 0;
 	}
@@ -278,9 +275,6 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		}
 		if (group.hugepage_requests_arena % 0x200000L != 0) {
 			throw std::runtime_error("Hugepage requests arena size must be a multiple of 2MB");
-		}
-		if (group.hugepage_requests_arena > group.max_main_memory) {
-			throw std::runtime_error("Hugepage requests arena size cannot be larger than max memory");
 		}
 	}
 	else if (obj.key() == "split_hugepages")
@@ -325,10 +319,6 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		// is a common mode for larger programs. Ephemeral can only
 		// be set to true. Only 'ephemeral_keep_working_memory' can be toggled.
 		group.ephemeral = group.ephemeral || obj.value();
-		group.ephemeral_keep_working_memory = obj.value();
-	}
-	else if (obj.key() == "experimental_keep_working_memory")
-	{
 		group.ephemeral_keep_working_memory = obj.value();
 	}
 	else if (obj.key() == "relocate_fixed_mmap")
