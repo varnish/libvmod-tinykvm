@@ -101,6 +101,9 @@ MachineInstance::MachineInstance(
 		ten->config.group.verbose_syscalls);
 	machine().set_verbose_thread_syscalls(
 		ten->config.group.verbose_syscalls);
+	// Set the current working directory
+	machine().fds().set_current_working_directory(
+		ten->config.group.current_working_directory);
 	// Add all the allowed paths to the VMs file descriptor sub-system
 	for (auto& path : ten->config.group.allowed_paths) {
 		if (path.prefix && path.writable) {

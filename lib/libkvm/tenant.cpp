@@ -411,6 +411,9 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 			group.allowed_paths.push_back(std::move(path));
 		}
 	}
+	else if (obj.key() == "current_working_directory") {
+		group.current_working_directory = obj.value();
+	}
 	else if (obj.key() == "verbose") {
 		group.verbose = obj.value();
 	}

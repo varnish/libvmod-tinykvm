@@ -272,6 +272,10 @@ Example paths for the espeak-ng text-to-speech generator.
 
 Example paths for a Deno program. It will rewrite `/main.ts` to `/home/deno/main.ts` hiding the real path.
 
+* `current_working_directory`
+
+Sets the current working directory used by `getcwd` in guest programs.
+
 * `verbose`
 
 Enable verbose output from program loading, as well as from certain system calls. For example, inaccessible file paths will be printed to console.
