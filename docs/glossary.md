@@ -92,6 +92,10 @@ Specify the number of concurrent/simultaneous requests available for processing.
 
 There is a queue with a 60 second timeout for extranous requests.
 
+* `start`
+
+When enabled, immediately start the program regardless of other initialization settings.
+
 * `storage`
 
 Specify whether or not this program has access to shared mutable storage. Programs that need to remember things across requests will need storage. Programs designed to use storage need to have this enabled in order to function correctly.

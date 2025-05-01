@@ -504,6 +504,7 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	else if (obj.key() == "key")   { /* Silently ignore. */ }
 	else if (obj.key() == "uri")   { /* Silently ignore. */ }
 	else if (obj.key() == "filename") { /* Silently ignore. */ }
+	else if (obj.key() == "start") { /* Silently ignore. */ }
 	else
 	{
 		VSL(SLT_Error, 0,
@@ -605,6 +606,12 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			/* Verify: No filename and no key is an unreachable program. */
 			if (filename.empty() && uri.empty())
 				throw std::runtime_error("kvm: Unreachable program " + it.key() + " has no URI or filename");
+			/* A program can be configured to start immediately, overriding
+			   the default behavior. */
+			bool initialize_or_configured_to_start = initialize;
+			if (obj.contains("start") && obj["start"].is_boolean()) {
+				initialize_or_configured_to_start = obj["start"];
+			}
 
 			/* Use the group data except filename */
 			kvm::load_tenant(ctx, task, kvm::TenantConfig{
@@ -613,7 +620,7 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 				std::move(lvu_key),
 				std::move(group),
 				std::move(uri)
-			}, initialize);
+			}, initialize_or_configured_to_start);
 		}
 	}
 
