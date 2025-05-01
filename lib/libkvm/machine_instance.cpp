@@ -154,6 +154,17 @@ MachineInstance::MachineInstance(
 		(void)addr;
 		return true;
 	});
+	machine().fds().set_resolve_symlink_callback(
+	[&] (std::string& path) -> bool {
+		for (auto& tpath : tenant().config.group.allowed_paths) {
+			if (tpath.virtual_path == path && tpath.symlink) {
+				// Rewrite the path to where the symlink points
+				path = tpath.real_path;
+				return true;
+			}
+		}
+		return false;
+	});
 }
 void MachineInstance::initialize()
 {

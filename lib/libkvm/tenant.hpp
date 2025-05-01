@@ -78,6 +78,7 @@ struct TenantGroup {
 		std::string real_path;
 		std::string virtual_path; /* Path inside the VM, optional */
 		bool writable = false;
+		bool symlink = false; /* Treated as a symlink path, to be resolved */
 		bool usable_in_fork = false;
 		bool prefix = false;
 	};

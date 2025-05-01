@@ -394,6 +394,19 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 				}
 				if (it.contains("writable")) {
 					path.writable = it["writable"].template get<bool>();
+				} else if (it.contains("symlink")) {
+					// A symlink must contain both a real and a virtual path
+					if (path.virtual_path.empty()) {
+						throw std::runtime_error("Symlink must have a virtual path");
+					}
+					if (path.real_path.empty()) {
+						throw std::runtime_error("Symlink must have a real path");
+					}
+					// If both real and virtual are the same, it's an error
+					if (path.real_path == path.virtual_path) {
+						throw std::runtime_error("Symlink must have different real and virtual paths");
+					}
+					path.symlink = it["symlink"].template get<bool>();
 				}
 			} else {
 				throw std::runtime_error("Allowed paths must be an array of strings/objects");
