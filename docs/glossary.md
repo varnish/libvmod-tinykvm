@@ -264,17 +264,25 @@ Example paths for the espeak-ng text-to-speech generator.
 			"virtual": "/main.ts",
 			"real": "/home/deno/main.ts"
 		}, {
+			"real": "/home/gonzo/.cache/deno/remote",
+			"writable": true,
+			"prefix": true
+		}, {
 			"virtual": "/",
 			"real": "/home/deno"
+		}, {
+			"virtual": "/proc/self/exe",
+			"real": "/home/user/myprogram.elf",
+			"symlink": true
 		}
 	],
 ```
 
-Example paths for a Deno program. It will rewrite `/main.ts` to `/home/deno/main.ts` hiding the real path.
+Example paths for a Deno program. It will rewrite `/main.ts` to `/home/deno/main.ts` hiding the real path. Prefixes are paths that start with the given string, and any string that starts with the prefix, but is longer will still match. Writable prefixes are dangerous. Symlinks are resolved by matching against the virtual path and returning the real path as the answer.
 
 * `current_working_directory`
 
-Sets the current working directory used by `getcwd` in guest programs.
+Sets the current working directory used by `getcwd` and other system calls in guest programs. The path must exist and be accessible such that AT_CWDFD can be used as relative to it.
 
 * `verbose`
 
