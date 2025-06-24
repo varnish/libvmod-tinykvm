@@ -105,45 +105,43 @@ MachineInstance::MachineInstance(
 	machine().fds().set_current_working_directory(
 		ten->config.group.current_working_directory);
 	// Add all the allowed paths to the VMs file descriptor sub-system
-	for (auto& path : ten->config.group.allowed_paths) {
-		if (path.prefix && path.writable) {
-			// Add as a prefix path
-			machine().fds().add_writable_prefix(path.virtual_path);
-			continue;
-		}
-		machine().fds().add_readonly_file(path.virtual_path);
-	}
-	// Add a single writable file simply called 'state'
-	machine().fds().set_open_writable_callback(
+	machine().fds().set_open_readable_callback(
 	[&] (std::string& path) -> bool {
-		if (path == "state") {
-			// Rewrite the path to the allowed file
-			path = tenant().config.allowed_file;
-			return true;
-		}
+		// Check if the path is allowed
 		for (auto& tpath : tenant().config.group.allowed_paths) {
-			if (tpath.virtual_path == path && tpath.writable) {
+			if (!tpath.prefix && tpath.virtual_path == path) {
 				// Rewrite the path to the allowed file
 				path = tpath.real_path;
 				return true;
+			} else if (tpath.prefix && path.find(tpath.virtual_path) == 0) {
+				// If the path starts with the prefix, rewrite it
+				path = tpath.real_path + path.substr(tpath.virtual_path.size());
+				return true;
 			}
 		}
-		return false;
-	});
-	machine().fds().set_open_readable_callback(
-	[&] (std::string& path) -> bool {
 		if (path == "state") {
 			// Rewrite the path to the allowed file
 			path = tenant().config.allowed_file;
 			return true;
 		}
-		// Rewrite the path if it's in the rewrite paths
-		// It's also allowed to be opened (read-only)
-		auto it = tenant().config.group.rewrite_path_indices.find(path);
-		if (it != tenant().config.group.rewrite_path_indices.end()) {
-			const size_t index = it->second;
+		return false;
+	});
+	machine().fds().set_open_writable_callback(
+	[&] (std::string& path) -> bool {
+		for (auto& tpath : tenant().config.group.allowed_paths) {
+			if (!tpath.prefix && tpath.writable && tpath.virtual_path == path) {
+				// Rewrite the path to the allowed file
+				path = tpath.real_path;
+				return true;
+			} else if (tpath.prefix && tpath.writable && path.find(tpath.virtual_path) == 0) {
+				// If the path starts with the prefix, rewrite it
+				path = tpath.real_path + path.substr(tpath.virtual_path.size());
+				return true;
+			}
+		}
+		if (path == "state") {
 			// Rewrite the path to the allowed file
-			path = tenant().config.group.allowed_paths.at(index).real_path;
+			path = tenant().config.allowed_file;
 			return true;
 		}
 		return false;
@@ -206,9 +204,6 @@ void MachineInstance::initialize()
 		std::vector<std::string> args;
 		args.reserve(5);
 		if (dyn_elf.has_interpreter()) {
-			// The real program path (which must be guest-readable)
-			/// XXX: TODO: Use /proc/self/exe instead of this?
-			m_machine.fds().add_readonly_file(tenant().config.filename);
 			args.push_back("/lib64/ld-linux-x86-64.so.2");
 			args.push_back(tenant().config.filename);
 		} else {
@@ -377,6 +372,13 @@ MachineInstance::MachineInstance(
 		[&] (int vfd) -> std::optional<const tinykvm::FileDescriptors::Entry*> {
 			return source.machine().fds().entry_for_vfd(vfd);
 		});
+	/* Allow network connections in forked VMs */
+	machine().fds().set_connect_socket_callback(
+	[this] (int fd, struct sockaddr_storage& addr) -> bool {
+		(void)fd;
+		(void)addr;
+		return true;
+	});
 	/* Load the compiled regexes of the source */
 	m_regex.reset_and_loan(source.m_regex);
 #ifdef ENABLE_TIMING
