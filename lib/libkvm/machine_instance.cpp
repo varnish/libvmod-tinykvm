@@ -380,6 +380,28 @@ MachineInstance::MachineInstance(
 		(void)addr;
 		return true;
 	});
+	// Allow forks to read files from the allowed paths
+	machine().fds().set_open_readable_callback(
+	[&] (std::string& path) -> bool {
+		// Check if the path is allowed
+		for (auto& tpath : tenant().config.group.allowed_paths) {
+			if (!tpath.prefix && tpath.virtual_path == path) {
+				// Rewrite the path to the allowed file
+				path = tpath.real_path;
+				return true;
+			} else if (tpath.prefix && path.find(tpath.virtual_path) == 0) {
+				// If the path starts with the prefix, rewrite it
+				path = tpath.real_path + path.substr(tpath.virtual_path.size());
+				return true;
+			}
+		}
+		if (path == "state") {
+			// Rewrite the path to the allowed file
+			path = tenant().config.allowed_file;
+			return true;
+		}
+		return false;
+	});
 	/* Load the compiled regexes of the source */
 	m_regex.reset_and_loan(source.m_regex);
 #ifdef ENABLE_TIMING
