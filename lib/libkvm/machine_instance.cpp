@@ -101,6 +101,7 @@ MachineInstance::MachineInstance(
 		ten->config.group.verbose_syscalls);
 	machine().set_verbose_thread_syscalls(
 		ten->config.group.verbose_syscalls);
+	machine().fds().set_preempt_epoll_wait(true);
 	// Set the current working directory
 	machine().fds().set_current_working_directory(
 		ten->config.group.current_working_directory);
