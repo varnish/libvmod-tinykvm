@@ -133,8 +133,15 @@ static void gather_stats(VRT_CTX,
 		{"status_5xx",  totals.status_5xx},
 	}});
 
+	std::string binary_type;
+	if (prog->main_vm != nullptr) {
+		binary_type = prog->main_vm->binary_type_string();
+	} else {
+		binary_type = "(not present)";
+	}
+
 	obj["program"] = {
-		{"binary_type",  prog->main_vm->binary_type_string()},
+		{"binary_type",  binary_type},
 		{"binary_size",  prog->request_binary.size()},
 		{"entry_points", {
 			{"on_recv", prog->entry_address[(size_t)ProgramEntryIndex::ON_RECV]},
