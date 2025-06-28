@@ -51,7 +51,7 @@ namespace kvm
 		/* We pre-allocate a reading area. */
 		uint64_t m_read_vaddr = 0x0;
 		size_t m_n_buffers = 0;
-		tinykvm::Machine::WrBuffer m_buffers[MAX_VM_WR_BUFFERS];
+		std::vector<tinykvm::Machine::WrBuffer> m_buffers;
 
 		std::thread m_io_thread;
 		io_context_t& m_io_context;

@@ -51,7 +51,7 @@ namespace kvm
 		{
 			uint64_t read_vaddr = 0x0;
 			size_t n_buffers = 0;
-			std::array<tinykvm::Machine::WrBuffer, MAX_VM_WR_BUFFERS> buffers;
+			std::vector<tinykvm::Machine::WrBuffer> buffers;
 		};
 		std::vector<ReadBuffer> m_read_buffers;
 		size_t m_current_read_buffer = 0;

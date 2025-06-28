@@ -171,8 +171,8 @@ EpollServer::EpollServer(const TenantInstance* tenant, ProgramInstance* prog, in
 		rb.read_vaddr = allocation + (i * MAX_READ_BUFFER);
 		/* Gather buffers from writable area */
 		rb.n_buffers =
-			vm().machine().writable_buffers_from_range(rb.buffers.size(),
-				rb.buffers.data(), rb.read_vaddr, MAX_READ_BUFFER);
+			vm().machine().writable_buffers_from_range(
+				rb.buffers, rb.read_vaddr, MAX_READ_BUFFER);
 	}
 
 	// Start the epoll thread

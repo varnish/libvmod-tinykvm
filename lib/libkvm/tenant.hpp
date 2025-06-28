@@ -83,7 +83,6 @@ struct TenantGroup {
 		bool prefix = false;
 	};
 	std::vector<VirtualPath> allowed_paths;
-	std::unordered_map<std::string, size_t> rewrite_path_indices;
 	std::string current_working_directory = "/";
 
 	void set_max_address(uint64_t newmax_mb) { this->max_address_space = newmax_mb * 1048576ul; }

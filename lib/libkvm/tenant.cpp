@@ -380,12 +380,7 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 				if (it.contains("virtual")) {
 					path.virtual_path = it["virtual"].template get<std::string>();
 				}
-				if (!path.virtual_path.empty()) {
-					// Record the index of the virtual path in the allowed paths
-					// that contains a specific virtual path.
-					group.rewrite_path_indices.insert_or_assign(
-						path.virtual_path, group.allowed_paths.size());
-				} else {
+				if (path.virtual_path.empty()) {
 					// If the virtual path is empty, we will use 1:1 mapping
 					path.virtual_path = path.real_path;
 				}

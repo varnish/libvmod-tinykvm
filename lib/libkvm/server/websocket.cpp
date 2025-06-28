@@ -246,7 +246,7 @@ WebSocketThread::WebSocketThread(const TenantInstance* tenant, ProgramInstance* 
 	}
 	/* Gather buffers from writable area */
 	this->m_n_buffers =
-		vm().machine().writable_buffers_from_range(MAX_VM_WR_BUFFERS,
+		vm().machine().writable_buffers_from_range(
 			this->m_buffers, this->m_read_vaddr, MAX_READ_BUFFER);
 
 	// Set up the paused VM state if the pause-resume API is enabled
