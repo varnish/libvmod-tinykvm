@@ -162,6 +162,11 @@ MachineInstance::MachineInstance(
 				return true;
 			}
 		}
+		// Allow reading symlink to the program binary (when filename is present)
+		if (path == "/proc/self/exe" && !tenant().config.request_program_filename().empty()) {
+			path = tenant().config.request_program_filename();
+			return true;
+		}
 		return false;
 	});
 }
