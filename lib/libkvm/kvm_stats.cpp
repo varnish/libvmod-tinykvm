@@ -30,6 +30,8 @@ static auto gather_stats(const MachineInstance& mi, TT& taskq)
 		{"invocations", stats.invocations},
 		{"resets",      stats.resets},
 		{"exceptions",  stats.exceptions},
+		{"exception_oom", stats.exception_oom},
+		{"exception_mem", stats.exception_mem},
 		{"timeouts",    stats.timeouts},
 		{"reservation_time",   stats.reservation_time},
 		{"reset_time",         stats.vm_reset_time},
@@ -93,7 +95,7 @@ static void gather_stats(VRT_CTX,
 		machines.push_back(gather_stats(mi, prog->m_vms[i].tp));
 
 		totals.invocations += mi.stats().invocations;
-		totals.exceptions += mi.stats().exceptions;
+		totals.exceptions += mi.stats().exceptions + mi.stats().exception_oom + mi.stats().exception_mem;
 		totals.resets += mi.stats().resets;
 		totals.timeouts += mi.stats().timeouts;
 

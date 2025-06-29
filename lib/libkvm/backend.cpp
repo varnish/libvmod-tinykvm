@@ -97,6 +97,11 @@ static void memory_error_handling(struct vsl_log *vsl, const tinykvm::MemoryExce
 			"Backend VM memory exception: Null-pointer access (%s, addr: 0x%lX, size: 0x%lX)",
 			e.what(), e.addr(), e.size());
 	}
+	if constexpr (VERBOSE_BACKEND) {
+		fprintf(stderr,
+			"Backend VM memory exception: %s (addr: 0x%lX, size: 0x%lX)\n",
+			e.what(), e.addr(), e.size());
+	}
 }
 
 static int16_t sanitize_status_code(int16_t code)
@@ -256,7 +261,6 @@ static void error_handling(kvm::VMPoolItem* slot,
 	kvm_varnishstat_program_exception();
 
 	auto& machine = *slot->mi;
-	machine.stats().exceptions++;
 	/* The machine should be reset (after request). */
 	machine.reset_needed_now();
 	/* Print sane backtrace (faulting RIP) */
@@ -559,6 +563,11 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 		/* Try again if on_error has been set, otherwise 500. */
 		error_handling(slot, invoc, result, mte.what());
 	} catch (const tinykvm::MemoryException& e) {
+		if (e.is_oom()) {
+			machine.stats().exception_oom++;
+		} else {
+			machine.stats().exception_mem++;
+		}
 		memory_error_handling(ctx->vsl, e);
 		/* Try again if on_error has been set, otherwise 500. */
 		error_handling(slot, invoc, result, e.what());
@@ -566,10 +575,12 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 		VSLb(ctx->vsl, SLT_Error,
 			"%s: Backend VM exception: %s (data: 0x%lX)",
 			machine.name().c_str(), e.what(), e.data());
+		machine.stats().exceptions++;
 		/* Try again if on_error has been set, otherwise 500. */
 		error_handling(slot, invoc, result, e.what());
 	} catch (const std::exception& e) {
 		VSLb(ctx->vsl, SLT_Error, "VM call exception: %s", e.what());
+		machine.stats().exceptions++;
 		/* Try again if on_error has been set, otherwise 500. */
 		error_handling(slot, invoc, result, e.what());
 	}
@@ -637,7 +648,11 @@ int kvm_backend_streaming_post(struct backend_post *post,
 		return 0;
 
 	} catch (const tinykvm::MemoryException& e) {
-		mi.stats().exceptions++;
+		if (e.is_oom()) {
+			mi.stats().exception_oom++;
+		} else {
+			mi.stats().exception_mem++;
+		}
 		memory_error_handling(post->ctx->vsl, e);
 	} catch (const tinykvm::MachineTimeoutException& e) {
 		mi.stats().timeouts++;
@@ -696,7 +711,11 @@ ssize_t kvm_backend_streaming_delivery(
 		return len;
 
 	} catch (const tinykvm::MemoryException& e) {
-		mi.stats().exceptions++;
+		if (e.is_oom()) {
+			mi.stats().exception_oom++;
+		} else {
+			mi.stats().exception_mem++;
+		}
 		memory_error_handling(result->stream_vsl, e);
 	} catch (const tinykvm::MachineTimeoutException& e) {
 		mi.stats().timeouts++;
