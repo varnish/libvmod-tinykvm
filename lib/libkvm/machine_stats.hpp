@@ -6,6 +6,7 @@ struct MachineStats
 {
 	uint64_t invocations = 0;
 	uint64_t resets      = 0;
+	uint64_t full_resets = 0;
 	uint64_t timeouts    = 0;
 	uint32_t exceptions  = 0;
 	uint32_t exception_oom = 0;

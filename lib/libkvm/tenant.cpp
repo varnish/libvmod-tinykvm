@@ -221,7 +221,7 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		// off of the bigger Main VMs which use "max_memory" (and are identity-mapped).
 		group.set_max_workmem(obj.value());
 	}
-	else if (obj.key() == "req_mem_limit_after_reset")
+	else if (obj.key() == "req_mem_limit_after_reset" || obj.key() == "limit_workmem_after_req")
 	{
 		// Limits the memory of an ephemeral VM after request completion.
 		// Without a limit, the request memory is kept in order to make future

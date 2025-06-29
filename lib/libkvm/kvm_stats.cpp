@@ -29,6 +29,7 @@ static auto gather_stats(const MachineInstance& mi, TT& taskq)
 	return nlohmann::json::object({
 		{"invocations", stats.invocations},
 		{"resets",      stats.resets},
+		{"resets_full", stats.full_resets},
 		{"exceptions",  stats.exceptions},
 		{"exception_oom", stats.exception_oom},
 		{"exception_mem", stats.exception_mem},
@@ -97,6 +98,7 @@ static void gather_stats(VRT_CTX,
 		totals.invocations += mi.stats().invocations;
 		totals.exceptions += mi.stats().exceptions + mi.stats().exception_oom + mi.stats().exception_mem;
 		totals.resets += mi.stats().resets;
+		totals.full_resets += mi.stats().full_resets;
 		totals.timeouts += mi.stats().timeouts;
 
 		total_resv_time += mi.stats().reservation_time;
@@ -121,6 +123,7 @@ static void gather_stats(VRT_CTX,
 	requests.push_back({"totals", {
 		{"invocations", totals.invocations},
 		{"resets",      totals.resets},
+		{"resets_full", totals.full_resets},
 		{"exceptions",  totals.exceptions},
 		{"timeouts",    totals.timeouts},
 		{"reservation_time",   totals.reservation_time},

@@ -142,9 +142,9 @@ This limit is measuring the memory it takes to make the layered changes. If you 
 
 Granularity: megabytes
 
-* `req_mem_limit_after_reset`
+* `limit_workmem_after_req`
 
-Request handling operates with 2MB-sized memory banks that are kept after request handling finishes. We can force-free memory back to the system by lowering the number of remaining memory banks.
+Request handling operates with 2MB-sized memory banks that are kept after request handling finishes. We can force-free memory back to the system by lowering the number of remaining memory banks. When doing light-weight resets, the limit is used to conditionally perform a full reset in order to keep working memory below a limit. This limit is only active when non-zero and lower than `max_request_memory`.
 
 Granularity: 2 megabytes
 
