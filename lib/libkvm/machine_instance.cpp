@@ -41,6 +41,15 @@ void MachineInstance::kvm_initialize()
 	ld_linux_x86_64_so = file_loader("/lib64/ld-linux-x86-64.so.2");
 }
 
+static bool is_interpreted_binary(const std::vector<uint8_t>& binary)
+{
+	if (binary.size() < 128U)
+		throw std::runtime_error("Invalid ELF program (binary too small)");
+
+	const tinykvm::DynamicElf dyn_elf = tinykvm::is_dynamic_elf(
+		std::string_view{(const char *)binary.data(), binary.size()});
+	return dyn_elf.has_interpreter();
+}
 static uint64_t detect_gigapage_from(const std::vector<uint8_t>& binary)
 {
 	if (binary.size() < 128U)
@@ -56,10 +65,12 @@ static uint64_t detect_gigapage_from(const std::vector<uint8_t>& binary)
 
 static const std::vector<uint8_t>& select_main_binary(const std::vector<uint8_t>& program_binary)
 {
-	const tinykvm::DynamicElf dyn_elf = tinykvm::is_dynamic_elf(
-		std::string_view{(const char *)program_binary.data(), program_binary.size()});
-	if (dyn_elf.has_interpreter()) {
-		// Add the dynamic linker as first argument
+	if (is_interpreted_binary(program_binary)) {
+		// If the program is interpreted, we need to use the dynamic linker
+		// as the main binary.
+		if (ld_linux_x86_64_so.empty()) {
+			throw std::runtime_error("Dynamic linker not loaded");
+		}
 		return ld_linux_x86_64_so;
 	}
 	return program_binary;
@@ -81,7 +92,7 @@ MachineInstance::MachineInstance(
 		.master_direct_memory_writes = true,
 		.split_hugepages = false,
 		.relocate_fixed_mmap = ten->config.group.relocate_fixed_mmap,
-		.executable_heap = ten->config.group.vmem_heap_executable,
+		.executable_heap = ten->config.group.vmem_heap_executable || is_interpreted_binary(binary),
 		.hugepages_arena_size = ten->config.group.hugepage_arena_size,
 	  }),
 	  m_tenant(ten), m_inst(inst),
