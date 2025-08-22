@@ -40,6 +40,12 @@ This VMOD does not have an installation procedure. Simply build it from source, 
 ```sh
 ./build.sh
 ```
+
+With Varnish Enterprise:
+```sh
+./build.sh --enterprise
+```
+
 Or manually:
 ```sh
 # Create a .build folder and build the VMOD in it
