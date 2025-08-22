@@ -288,6 +288,12 @@ Example paths for a Deno program. It will rewrite `/main.ts` to `/home/deno/main
 
 Sets the current working directory used by `getcwd` and other system calls in guest programs. The path must exist and be accessible such that AT_CWDFD can be used as relative to it.
 
+* `mmap_backed_files`
+
+Whenever the guest maps a file, map the file into VM guest memory without copying. When disabled, the file will be copied into guest memory, increasing RSS, but avoiding extra mappings.
+
+Default: Disabled
+
 * `verbose`
 
 Enable verbose output from program loading, as well as from certain system calls. For example, inaccessible file paths will be printed to console.

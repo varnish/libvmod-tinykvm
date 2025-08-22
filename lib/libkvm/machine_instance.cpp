@@ -91,6 +91,7 @@ MachineInstance::MachineInstance(
 		.transparent_hugepages = ten->config.group.transparent_hugepages,
 		.master_direct_memory_writes = true,
 		.split_hugepages = false,
+		.mmap_backed_files = ten->config.group.mmap_backed_files,
 		.relocate_fixed_mmap = ten->config.group.relocate_fixed_mmap,
 		.executable_heap = ten->config.group.vmem_heap_executable || is_interpreted_binary(binary),
 		.hugepages_arena_size = ten->config.group.hugepage_arena_size,

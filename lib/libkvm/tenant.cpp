@@ -321,6 +321,10 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		group.ephemeral = group.ephemeral || obj.value();
 		group.ephemeral_keep_working_memory = obj.value();
 	}
+	else if (obj.key() == "mmap_backed_files")
+	{
+		group.mmap_backed_files = obj.value();
+	}
 	else if (obj.key() == "relocate_fixed_mmap")
 	{
 		// Force fixed mmap to be relocated to current mmap address
