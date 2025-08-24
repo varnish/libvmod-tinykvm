@@ -26,7 +26,7 @@ int close(int);
 }
 
 namespace kvm {
-static std::vector<uint8_t> ld_linux_x86_64_so;
+static BinaryStorage ld_linux_x86_64_so;
 extern std::vector<uint8_t> file_loader(const std::string &);
 extern void backend_warmup_pause_resume(MachineInstance& machine,
 	const struct kvm_chain_item *invoc,
@@ -41,7 +41,7 @@ void MachineInstance::kvm_initialize()
 	ld_linux_x86_64_so = file_loader("/lib64/ld-linux-x86-64.so.2");
 }
 
-static bool is_interpreted_binary(const std::vector<uint8_t>& binary)
+static bool is_interpreted_binary(const BinaryStorage& binary)
 {
 	if (binary.size() < 128U)
 		throw std::runtime_error("Invalid ELF program (binary too small)");
@@ -50,7 +50,7 @@ static bool is_interpreted_binary(const std::vector<uint8_t>& binary)
 		std::string_view{(const char *)binary.data(), binary.size()});
 	return dyn_elf.has_interpreter();
 }
-static uint64_t detect_gigapage_from(const std::vector<uint8_t>& binary)
+static uint64_t detect_gigapage_from(const BinaryStorage& binary)
 {
 	if (binary.size() < 128U)
 		throw std::runtime_error("Invalid ELF program (binary too small)");
@@ -63,7 +63,7 @@ static uint64_t detect_gigapage_from(const std::vector<uint8_t>& binary)
 	return start_address_gigapage << 30U;
 }
 
-static const std::vector<uint8_t>& select_main_binary(const std::vector<uint8_t>& program_binary)
+static std::span<const uint8_t> select_main_binary(const BinaryStorage& program_binary)
 {
 	if (is_interpreted_binary(program_binary)) {
 		// If the program is interpreted, we need to use the dynamic linker
@@ -71,13 +71,13 @@ static const std::vector<uint8_t>& select_main_binary(const std::vector<uint8_t>
 		if (ld_linux_x86_64_so.empty()) {
 			throw std::runtime_error("Dynamic linker not loaded");
 		}
-		return ld_linux_x86_64_so;
+		return ld_linux_x86_64_so.binary();
 	}
-	return program_binary;
+	return program_binary.binary();
 }
 
 MachineInstance::MachineInstance(
-	const std::vector<uint8_t>& binary, const vrt_ctx* ctx,
+	const BinaryStorage& binary, const vrt_ctx* ctx,
 	const TenantInstance* ten, ProgramInstance* inst,
 	bool storage, bool debug)
 	: m_ctx(ctx),

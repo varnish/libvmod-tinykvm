@@ -117,7 +117,9 @@ void TenantInstance::begin_initialize(VRT_CTX, bool debug)
 
 	/* 4. Load the program from filesystem now. */
 	try {
-		auto elf = file_loader(config.request_program_filename());
+		// file_loader(config.request_program_filename());
+		BinaryStorage elf;
+		elf.set_binary(config.request_program_filename());
 		std::shared_ptr<ProgramInstance> prog;
 		/* Check for a storage program */
 		if (access(config.storage_program_filename().c_str(), R_OK) == 0)
@@ -129,7 +131,7 @@ void TenantInstance::begin_initialize(VRT_CTX, bool debug)
 		else
 		{
 			prog =
-				std::make_shared<ProgramInstance> (elf, elf, ctx, this);
+				std::make_shared<ProgramInstance> (std::move(elf), elf, ctx, this);
 		}
 		std::atomic_store(&this->program, std::move(prog));
 

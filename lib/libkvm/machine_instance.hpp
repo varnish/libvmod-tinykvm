@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cstdarg>
 #include <tinykvm/machine.hpp>
+#include "binary_storage.hpp"
 #include "instance_cache.hpp"
 #include "machine_stats.hpp"
 
@@ -98,7 +99,7 @@ public:
 	gaddr_t& get_inputs_allocation() { return m_inputs_allocation; }
 
 	static void kvm_initialize();
-	MachineInstance(const std::vector<uint8_t>&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool storage, bool dbg);
+	MachineInstance(const BinaryStorage&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool storage, bool dbg);
 	MachineInstance(unsigned reqid, const MachineInstance&, const TenantInstance*, ProgramInstance*);
 	void initialize();
 	void warmup();
@@ -118,7 +119,7 @@ private:
 	machine_t m_machine;
 	const TenantInstance* m_tenant = nullptr;
 	ProgramInstance* m_inst;
-	const std::vector<uint8_t>& m_original_binary;
+	const BinaryStorage& m_original_binary;
 	bool        m_is_debug;
 	const bool  m_is_storage;
 	bool        m_is_ephemeral = true;

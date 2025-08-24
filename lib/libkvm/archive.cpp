@@ -38,7 +38,7 @@ namespace kvm
 		if (tinykvm::validate_header(elf))
 		{
 			// If it's a single binary, use the same binary for both request and storage
-			program.request_binary = std::vector<uint8_t>(chunk, chunk + chunk_size);
+			program.request_binary.set_binary(std::vector<uint8_t>(chunk, chunk + chunk_size));
 			if (program.has_storage()) {
 				program.storage().storage_binary = program.request_binary;
 			}
@@ -78,7 +78,7 @@ namespace kvm
 				if (endsWith(name, "storage"))
 				{
 					if (program.has_storage()) {
-						program.storage().storage_binary = to_vector(a, entry);
+						program.storage().storage_binary.set_binary(to_vector(a, entry));
 						if constexpr (VERBOSE_ARCHIVE) {
 							printf("Found '%s' size=%zu, used as storage program\n",
 								name.c_str(), program.storage().storage_binary.size());
@@ -95,7 +95,7 @@ namespace kvm
 					if (!program.request_binary.empty())
 						throw std::runtime_error("Confusing archive with more than one request program");
 
-					program.request_binary = to_vector(a, entry);
+					program.request_binary.set_binary(to_vector(a, entry));
 					if constexpr (VERBOSE_ARCHIVE) {
 						printf("Found '%s' size=%zu, used as request program\n",
 							name.c_str(), program.request_binary.size());

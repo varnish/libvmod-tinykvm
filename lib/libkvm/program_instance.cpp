@@ -58,14 +58,14 @@ VMPoolItem::VMPoolItem(unsigned reqid, const MachineInstance& main_vm,
 	});
 }
 
-Storage::Storage(std::vector<uint8_t> storage_elf)
+Storage::Storage(BinaryStorage storage_elf)
 	: storage_binary{std::move(storage_elf)}
 {
 }
 
 ProgramInstance::ProgramInstance(
-	std::vector<uint8_t> request_elf,
-	std::vector<uint8_t> storage_elf,
+	BinaryStorage request_elf,
+	BinaryStorage storage_elf,
 	const vrt_ctx* ctx, TenantInstance* ten,
 	bool debug)
 	: request_binary{std::move(request_elf)},
@@ -199,12 +199,12 @@ ProgramInstance::ProgramInstance(
 			if (!this->binary_was_local() && data.status == 200 && !ten->config.filename.empty()) {
 				/* Cannot throw, but reports true/false on write success.
 					We *DO NOT* care if the write failed. Only a cached binary. */
-				file_writer(ten->config.request_program_filename(), this->request_binary);
+				file_writer(ten->config.request_program_filename(), this->request_binary.to_vector());
 				/* Also, write storage binary, if it exists. */
 				if (has_storage()) {
 					if (!this->storage().storage_binary.empty())
 						file_writer(ten->config.storage_program_filename(),
-							this->storage().storage_binary);
+							this->storage().storage_binary.to_vector());
 				}
 			}
 

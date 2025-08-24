@@ -1,6 +1,7 @@
 #pragma once
-#include "machine_instance.hpp"
+#include "binary_storage.hpp"
 #include "instance_cache.hpp"
+#include "machine_instance.hpp"
 #include "settings.hpp"
 #include "server/epoll.hpp"
 #include "server/websocket.hpp"
@@ -9,6 +10,7 @@
 #include <tinykvm/util/threadpool.h>
 #include <tinykvm/util/threadtask.hpp>
 #include <unordered_set>
+#include <variant>
 struct vcl;
 struct vsl_log;
 #ifdef VARNISH_PLUS
@@ -64,12 +66,12 @@ enum class ProgramEntryIndex : uint8_t {
 
 class Storage {
 public:
-	Storage(std::vector<uint8_t> storage_elf);
+	Storage(BinaryStorage storage_elf);
 
 	/* Ready-made *storage* VM that provides a shared mutable storage */
 	std::unique_ptr<MachineInstance> storage_vm;
 
-	std::vector<uint8_t> storage_binary;
+	BinaryStorage storage_binary;
 
 	/* Tasks executed in storage outside an active request. */
 	std::deque<std::future<long>> m_async_tasks;
@@ -101,8 +103,8 @@ public:
 	using gaddr_t = MachineInstance::gaddr_t;
 
 	ProgramInstance(
-		std::vector<uint8_t> request_binary,
-		std::vector<uint8_t> storage_binary,
+		BinaryStorage request_binary,
+		BinaryStorage storage_binary,
 		const vrt_ctx*, TenantInstance*, bool debug = false);
 	ProgramInstance(const std::string& uri, std::string ifmodsince,
 		const vrt_ctx*, TenantInstance*, bool debug = false);
@@ -157,7 +159,9 @@ public:
 	long live_update_call(const vrt_ctx*,
 		gaddr_t func, ProgramInstance& new_prog, gaddr_t newfunc);
 
-	std::vector<uint8_t> request_binary;
+	/* Binary storage, either in-memory or mmap'ed file */
+	BinaryStorage request_binary;
+
 	/* Ready-made *request* VM that can be forked into many small VMs */
 	std::unique_ptr<MachineInstance> main_vm;
 
