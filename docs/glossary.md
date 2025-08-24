@@ -292,7 +292,7 @@ Sets the current working directory used by `getcwd` and other system calls in gu
 
 Whenever the guest maps a file, map the file into VM guest memory without copying. When disabled, the file will be copied into guest memory, increasing RSS, but avoiding extra mappings.
 
-Default: Disabled
+Default: Enabled
 
 * `verbose`
 

@@ -237,8 +237,8 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	else if (obj.key() == "concurrency")
 	{
 		group.max_concurrency = obj.value();
-		if (group.max_concurrency > 128) {
-			throw std::runtime_error("VM concurrency cannot be larger than 128");
+		if (group.max_concurrency > 255) {
+			throw std::runtime_error("VM concurrency cannot be larger than 255");
 		}
 	}
 	else if (obj.key() == "storage")
