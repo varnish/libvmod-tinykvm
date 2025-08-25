@@ -119,20 +119,15 @@ void TenantInstance::begin_initialize(VRT_CTX, bool debug)
 	try {
 		// file_loader(config.request_program_filename());
 		BinaryStorage elf;
+		BinaryStorage storage_elf;
 		elf.set_binary(config.request_program_filename());
-		std::shared_ptr<ProgramInstance> prog;
 		/* Check for a storage program */
 		if (access(config.storage_program_filename().c_str(), R_OK) == 0)
 		{
-			auto storage_elf = file_loader(config.storage_program_filename());
-			prog =
-				std::make_shared<ProgramInstance> (std::move(elf), std::move(storage_elf), ctx, this);
+			storage_elf.set_binary(config.storage_program_filename());
 		}
-		else
-		{
-			prog =
-				std::make_shared<ProgramInstance> (std::move(elf), elf, ctx, this);
-		}
+		std::shared_ptr<ProgramInstance> prog =
+			std::make_shared<ProgramInstance> (std::move(elf), std::move(storage_elf), ctx, this);
 		std::atomic_store(&this->program, std::move(prog));
 
 	} catch (const std::exception& e) {

@@ -90,6 +90,8 @@ ProgramInstance::ProgramInstance(
 		});
 	}
 	if (ten->config.has_storage()) {
+		if (storage_elf.empty())
+			storage_elf = request_binary;
 		m_storage.reset(new Storage(std::move(storage_elf)));
 	}
 	mtx_future_init.lock();
