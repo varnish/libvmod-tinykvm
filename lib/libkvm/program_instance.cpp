@@ -249,6 +249,8 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 			storage().storage_vm->initialize();
 			// We do not need a VRT CTX after initialization.
 			storage().storage_vm->set_ctx(nullptr);
+			// Make most memory pages unneeded, lowering RSS
+			storage().storage_binary.dontneed();
 		}
 
 		// 2. Create the master VM, forked later for request concurrency.
@@ -288,6 +290,8 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 			const int num_systems = ten->config.group.websocket_systems;
 			m_websocket_systems = std::make_unique<WebSocketServer>(ten, this, num_systems);
 		}
+		// Make most memory pages unneeded, lowering RSS
+		request_binary.dontneed();
 
 		TIMING_LOCATION(t1);
 

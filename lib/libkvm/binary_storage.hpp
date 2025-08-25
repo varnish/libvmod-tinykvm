@@ -15,6 +15,7 @@ struct BinaryStorage
 
 	std::span<const uint8_t> binary() const;
 	std::vector<uint8_t> to_vector() const;
+	void dontneed();
 
 	BinaryStorage();
 	BinaryStorage(std::vector<uint8_t> binary)
@@ -80,6 +81,13 @@ inline std::vector<uint8_t> BinaryStorage::to_vector() const
 		return std::vector<uint8_t>(mmap.data(), mmap.data() + mmap.size());
 	}
 	default: return {};
+	}
+}
+inline void BinaryStorage::dontneed()
+{
+	switch (m_binary.index()) {
+	case 0: break; // No-op for vector
+	case 1: std::get<MmapFile>(m_binary).dontneed(); break;
 	}
 }
 

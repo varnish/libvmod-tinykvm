@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -13,60 +14,69 @@ struct MmapFile
 {
 	const uint8_t* data() const
 	{
-		if (m_mmap == nullptr) {
+		if (m_mapping == nullptr) {
 			throw std::runtime_error("MmapFile is not mapped: " + m_filename);
 		}
-		return (uint8_t *)m_mmap;
+		return (const uint8_t *)m_mapping->m_mmap;
 	}
 	size_t size() const
 	{
-		if (m_mmap == nullptr) {
+		if (m_mapping == nullptr) {
 			throw std::runtime_error("MmapFile is not mapped: " + m_filename);
 		}
-		return m_size;
+		return m_mapping->m_size;
 	}
 	bool empty() const noexcept
 	{
-		return m_mmap == nullptr || m_size == 0;
+		return m_mapping == nullptr || m_mapping->m_size == 0;
 	}
 	std::string_view view() const
 	{
-		if (m_mmap == nullptr) {
+		if (m_mapping == nullptr) {
 			throw std::runtime_error("MmapFile is not mapped: " + m_filename);
 		}
-		return std::string_view(static_cast<const char*>(m_mmap), m_size);
+		return std::string_view(static_cast<const char*>(m_mapping->m_mmap), m_mapping->m_size);
 	}
 
 	void dontneed()
 	{
 		// Turn the file into a lazily loaded file
-		if (m_mmap != nullptr) {
-			if (madvise(m_mmap, m_size, MADV_DONTNEED) < 0) {
+		if (m_mapping != nullptr) {
+			if (madvise(m_mapping->m_mmap, m_mapping->m_size, MADV_DONTNEED) < 0) {
 				throw std::runtime_error("Failed to advise MADV_DONTNEED on mmap: " + m_filename);
 			}
-			m_mmap = nullptr;
-			m_size = 0;
 		}
 	}
 
-	std::string filename() const
+	const std::string& filename() const
 	{
 		return m_filename;
 	}
 
 	MmapFile(const std::string& filename);
-	MmapFile(const MmapFile& other)
-		: MmapFile(other.m_filename) {}
-	~MmapFile();
+	MmapFile(const MmapFile& other) = default;
+	MmapFile& operator=(const MmapFile& other) = default;
+	~MmapFile() = default;
 
 private:
+	struct SharedMapping {
+		SharedMapping(void* mmap, size_t size)
+			: m_mmap(mmap), m_size(size) {}
+		~SharedMapping() {
+			if (m_mmap != nullptr) {
+				munmap(m_mmap, m_size);
+			}
+		}
+		void* m_mmap;
+		size_t m_size;
+	};
+	mutable std::shared_ptr<SharedMapping> m_mapping;
 	std::string m_filename;
-	void* m_mmap;
-	size_t m_size;
 };
 
 inline MmapFile::MmapFile(const std::string& filename)
-	: m_filename(filename), m_mmap(nullptr), m_size(0)
+	: m_mapping(nullptr),
+	  m_filename(filename)
 {
 	if (filename.empty()) {
 		throw std::invalid_argument("Filename cannot be empty");
@@ -77,24 +87,18 @@ inline MmapFile::MmapFile(const std::string& filename)
 		throw std::runtime_error("File does not exist: " + filename);
 	}
 
-	m_size = std::filesystem::file_size(path);
+	const size_t size = std::filesystem::file_size(path);
 	int fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0) {
 		throw std::runtime_error("Failed to open file: " + filename);
 	}
 
-	m_mmap = mmap(nullptr, m_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	void *addr = mmap(nullptr, size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd);
 
-	if (m_mmap == MAP_FAILED) {
+	if (addr == MAP_FAILED) {
 		throw std::runtime_error("Failed to mmap file: " + filename);
 	}
-}
-inline MmapFile::~MmapFile()
-{
-	if (m_mmap != nullptr) {
-		if (munmap(m_mmap, m_size) < 0) {
-			perror("Failed to munmap file");
-		}
-	}
+
+	this->m_mapping = std::make_shared<SharedMapping>(addr, size);
 }
