@@ -76,17 +76,17 @@ ProgramInstance::ProgramInstance(
 	   allowed paths of the tenant group. This allows the program
 	   to access its own binary, which is useful for debugging and
 	   dynamic linking. */
-	   printf("Initializing program instance for '%s' with filename '%s'\n",
-		   ten->config.name.c_str(),
-		   ten->config.request_program_filename().c_str());
-	   if (!ten->config.request_program_filename().empty()) {
-			ten->config.group.allowed_paths.push_back(TenantGroup::VirtualPath{
-				.real_path = ten->config.request_program_filename(),
-				.virtual_path = ten->config.request_program_filename(),
-				.writable = false, // We can *NOT* write to this file.
-				.symlink = false, // This is not a symlink.
-				.usable_in_fork = true, // This is usable in forked VMs
-				.prefix = false // This is not a prefix path.
+	printf("Initializing program instance for '%s' with filename '%s'\n",
+		ten->config.name.c_str(),
+		ten->config.request_program_filename().c_str());
+	if (!ten->config.request_program_filename().empty()) {
+		ten->config.group.allowed_paths.push_back(TenantGroup::VirtualPath{
+			.real_path = ten->config.request_program_filename(),
+			.virtual_path = ten->config.request_program_filename(),
+			.writable = false, // We can *NOT* write to this file.
+			.symlink = false, // This is not a symlink.
+			.usable_in_fork = true, // This is usable in forked VMs
+			.prefix = false // This is not a prefix path.
 		});
 	}
 	if (ten->config.has_storage()) {

@@ -506,7 +506,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 						}
 					}
 				}
-				/* Allocate 16KB space for struct backend_inputs */
+				/* Allocate 64KB space for struct backend_inputs */
 				struct backend_inputs inputs {};
 				if (machine.get_inputs_allocation() == 0) {
 					machine.get_inputs_allocation() = vm.mmap_allocate(BACKEND_INPUTS_SIZE) + BACKEND_INPUTS_SIZE;
