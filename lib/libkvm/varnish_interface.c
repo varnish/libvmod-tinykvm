@@ -1,9 +1,31 @@
+#include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 #include <cache/cache.h>
 #include <vsb.h>
 #include <vcl.h>
 #include <vsha256.h>
+
+struct ws *kvm_CreateWorkspace(const char *id, unsigned size)
+{
+	void *mem = malloc(size);
+	if (mem == NULL)
+		return NULL;
+	struct ws *ws = malloc(sizeof(*ws));
+	if (ws == NULL) {
+		free(mem);
+		return NULL;
+	}
+	WS_Init(ws, id, mem, size);
+	return ws;
+}
+void kvm_FreeWorkspace(struct ws *ws)
+{
+	if (ws == NULL)
+		return;
+	free(ws->s);
+	free(ws);
+}
 
 long kvm_SetBackend(VRT_CTX, VCL_BACKEND dir)
 {

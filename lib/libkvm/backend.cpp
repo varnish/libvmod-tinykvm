@@ -40,6 +40,8 @@
 #include "scoped_duration.hpp"
 #include "settings.hpp"
 #include "varnish.hpp"
+#include "varnish_http.hpp"
+#include <cstring>
 #include <stdexcept>
 #include <span>
 extern "C" {
@@ -49,10 +51,6 @@ void kvm_varnishstat_program_timeout();
 void kvm_varnishstat_program_status(uint16_t status);
 void kvm_SetCacheable(VRT_CTX, bool c);
 void kvm_SetTTLs(VRT_CTX, float ttl, float grace, float keep);
-struct easy_txt {
-	const char* begin;
-	const char* end;
-};
 }
 namespace kvm {
 	extern int kvm_http_set(tinykvm::vCPU& cpu, MachineInstance& inst,
@@ -230,6 +228,17 @@ static void fetch_result(kvm::VMPoolItem* slot,
 		if (UNLIKELY(headers == nullptr)) {
 			throw std::runtime_error("Out of workspace for backend VM response headers");
 		}
+		// Pick a good default for where headers go. Default = response-side
+		int where = 1;
+		if (mi.ctx() != nullptr) {
+			// If it's a backend request, always choose response side,
+			// otherwise pick the request side (in order to forward it to backend)
+			if (mi.ctx()->http_bereq != nullptr || mi.ctx()->http_resp != nullptr) {
+				where = 1; // RESP
+			} else {
+				where = 0; // REQ
+			}
+		}
 		for (uint16_t i = 0; i < extra.num_headers; i++) {
 			ResponseHeader header;
 			const auto header_ptr = extra.headers_ptr + i * sizeof(ResponseHeader);
@@ -237,7 +246,7 @@ static void fetch_result(kvm::VMPoolItem* slot,
 			// This will extract the header field from the guest into the current workspace
 			// and set it in the Varnish HTTP response
 			kvm_http_set(mi.machine().cpu(), mi,
-				1, header.field_ptr, header.field_len); // 1 = HDR_RESP and HDR_BERESP
+				where, header.field_ptr, header.field_len); // 1 = HDR_RESP and HDR_BERESP
 		}
 
 		/* Set the cache settings */
@@ -740,7 +749,7 @@ ssize_t kvm_backend_streaming_delivery(
 
 namespace kvm {
 
-void backend_warmup_pause_resume(MachineInstance& machine,
+bool backend_warmup_pause_resume(MachineInstance& machine,
 	const struct kvm_chain_item *invoc,
 	const std::unordered_set<std::string>& headers)
 {
@@ -754,61 +763,90 @@ void backend_warmup_pause_resume(MachineInstance& machine,
 	}
 	const auto timeout = machine.max_req_time();
 	auto& vm = machine.machine();
+	const struct vrt_ctx* previous_ctx = machine.ctx();
 
-	/* Enforce that guest program calls the backend_response system call. */
-	machine.begin_call();
+	// Create a fake VRT CTX for the warmup
+	struct vrt_ctx ctx;
+	std::memset(&ctx, 0, sizeof(ctx));
+	struct http http_req;
+	std::memset(&http_req, 0, sizeof(http_req));
+	struct ws* ws = kvm_CreateWorkspace("kvm", 65536u);
+	ctx.magic = VRT_CTX_MAGIC;
+	ctx.http_req = &http_req;
+	ctx.ws       = ws;
+	machine.set_ctx(&ctx);
 
-	/* Allocate 16KB space for struct backend_inputs */
-	struct backend_inputs inputs {};
-	if (machine.get_inputs_allocation() == 0) {
-		machine.get_inputs_allocation() = vm.mmap_allocate(BACKEND_INPUTS_SIZE) + BACKEND_INPUTS_SIZE;
-	}
-	__u64 stack = machine.get_inputs_allocation();
-	struct backend_post *post = nullptr;
-	fill_backend_inputs(machine, stack, invoc, post, inputs);
-	/* We are not using a VRT_CTX here, so we will manually fill headers */
-	std::vector<backend_header> header_array;
-	/* Push each header field to the stack */
-	for (const auto& header : headers) {
-		if (header.find(':') == std::string::npos) {
-			throw std::runtime_error("Invalid header in warmup: " + header);
+	// Allocate space for 4 HTTP fields
+	static constexpr int HTTP_FIELDS = 4;
+	http_req.field_array = (easy_txt*)WS_Alloc(ws, sizeof(struct easy_txt) * HTTP_FIELDS);
+	http_req.fields_max  = HTTP_FIELDS;
+	http_req.field_flags = (unsigned char*)WS_Alloc(ws, sizeof(unsigned char) * HTTP_FIELDS);
+	std::memset(http_req.field_array, 0, sizeof(struct easy_txt) * HTTP_FIELDS);
+
+	try {
+		/* Enforce that guest program calls the backend_response system call. */
+		machine.begin_call();
+
+		/* Allocate 16KB space for struct backend_inputs */
+		struct backend_inputs inputs {};
+		if (machine.get_inputs_allocation() == 0) {
+			machine.get_inputs_allocation() = vm.mmap_allocate(BACKEND_INPUTS_SIZE) + BACKEND_INPUTS_SIZE;
 		}
-		uint64_t header_ptr = vm.stack_push(stack, header.c_str(), header.size());
-		uint32_t header_colon = header.find(':');
-		uint32_t header_len = header.size();
-		header_array.push_back({header_ptr, header_colon, header_len});
+		__u64 stack = machine.get_inputs_allocation();
+		struct backend_post *post = nullptr;
+		fill_backend_inputs(machine, stack, invoc, post, inputs);
+		/* We are not using a VRT_CTX here, so we will manually fill headers */
+		std::vector<backend_header> header_array;
+		/* Push each header field to the stack */
+		for (const auto& header : headers) {
+			if (header.find(':') == std::string::npos) {
+				throw std::runtime_error("Invalid header in warmup: " + header);
+			}
+			uint64_t header_ptr = vm.stack_push(stack, header.c_str(), header.size());
+			uint32_t header_colon = header.find(':');
+			uint32_t header_len = header.size();
+			header_array.push_back({header_ptr, header_colon, header_len});
+		}
+		/* Push the header array to the stack using stack_push_std_array */
+		const auto header_array_addr = vm.stack_push_std_array(stack, header_array, header_array.size());
+		inputs.g_headers = header_array_addr;
+		inputs.num_headers = headers.size();
+		inputs.info_flags = 0x1; // Warmup request
+
+		auto& regs = vm.registers();
+		/* RDI is address of struct backend_inputs */
+		const uint64_t g_struct_addr = regs.rdi;
+		vm.copy_to_guest(g_struct_addr, &inputs, sizeof(inputs));
+
+		/* Resume execution */
+		vm.vmresume(timeout);
+
+		/* Skip fetching the result, verify that the VM has created a response */
+		const bool regular_response = machine.response_called(1);
+		const bool streaming_response = machine.response_called(10);
+		if (UNLIKELY(!regular_response && !streaming_response)) {
+			throw std::runtime_error("HTTP response not set. Program crashed? Check logs!");
+		}
+
+		/* Run the VM until it halts again, and it should be waiting for requests. */
+		machine.reset_wait_for_requests();
+		vm.run_in_usermode(1.0f);
+		if (!machine.is_waiting_for_requests()) {
+			throw std::runtime_error("VM did not wait for requests after backend request");
+		}
+
+		// Skip the OUT instruction (again)
+		regs.rip += 2;
+		vm.set_registers(regs);
+		machine.set_ctx(previous_ctx);
+		kvm_FreeWorkspace(ws);
+		return true;
+	} catch (const std::exception& e) {
+		fprintf(stderr, "Error warming up backend: %s\n", e.what());
+		machine.set_ctx(previous_ctx);
+		kvm_FreeWorkspace(ws);
+		return false;
 	}
-	/* Push the header array to the stack using stack_push_std_array */
-	const auto header_array_addr = vm.stack_push_std_array(stack, header_array, header_array.size());
-	inputs.g_headers = header_array_addr;
-	inputs.num_headers = headers.size();
-	inputs.info_flags = 0x1; // Warmup request
-
-	auto& regs = vm.registers();
-	/* RDI is address of struct backend_inputs */
-	const uint64_t g_struct_addr = regs.rdi;
-	vm.copy_to_guest(g_struct_addr, &inputs, sizeof(inputs));
-
-	/* Resume execution */
-	vm.vmresume(timeout);
-
-	/* Skip fetching the result, verify that the VM has created a response */
-	const bool regular_response = machine.response_called(1);
-	const bool streaming_response = machine.response_called(10);
-	if (UNLIKELY(!regular_response && !streaming_response)) {
-		throw std::runtime_error("HTTP response not set. Program crashed? Check logs!");
-	}
-
-	/* Run the VM until it halts again, and it should be waiting for requests. */
-	machine.reset_wait_for_requests();
-	vm.run_in_usermode(1.0f);
-	if (!machine.is_waiting_for_requests()) {
-		throw std::runtime_error("VM did not wait for requests after backend request");
-	}
-
-	// Skip the OUT instruction (again)
-	regs.rip += 2;
-	vm.set_registers(regs);
 }
 
 } // namespace kvm

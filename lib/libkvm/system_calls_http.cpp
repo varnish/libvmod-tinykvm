@@ -1,36 +1,4 @@
-#include <cstdint>
-#include <span>
-extern "C" {
-	void http_SetH(struct http *to, unsigned n, const char *fm);
-	void http_UnsetIdx(struct http *hp, unsigned idx);
-	void http_PrintfHeader(struct http *to, const char *fmt, ...);
-enum {
-#define SLTH(tag, ind, req, resp, sdesc, ldesc)	ind,
-#include "tbl/vsl_tags_http.h"
-};
-struct easy_txt {
-	const char* begin;
-	const char* end;
-};
-void VSLbt(struct vsl_log *vsl, enum VSL_tag_e tag, easy_txt t);
-}
-struct http {
-	unsigned       magic;
-	uint16_t       fields_max;
-	easy_txt*      field_array;
-	unsigned char* field_flags;
-	uint16_t       field_count;
-	int            logtag;
-	struct vsl_log*vsl;
-	void*          ws;
-	uint16_t       status;
-	uint8_t        protover;
-	uint8_t        conds;
-};
-
-
-#define HDR_FIRST     5
-#define HDR_INVALID   UINT32_MAX
+#include "varnish_http.hpp"
 
 namespace kvm {
 
@@ -72,7 +40,7 @@ get_http(VRT_CTX, int where)
 			hp = ctx->http_beresp;
 			break;
 		}
-	} else if (ctx->req) {
+	} else {
 		switch (where) {
 		case 0:
 			hp = ctx->http_req;
@@ -188,7 +156,9 @@ static unsigned
 http_header_append(struct http* hp, const char* val, uint32_t len)
 {
 	if (UNLIKELY(hp->field_count >= hp->fields_max)) {
-		VSLb(hp->vsl, SLT_LostHeader, "%.*s", (int) len, val);
+		if (hp->vsl != nullptr) {
+			VSLb(hp->vsl, SLT_LostHeader, "%.*s", (int) len, val);
+		}
 		return HDR_INVALID;
 	}
 	validate_guest_field(val, len);
@@ -203,8 +173,13 @@ static void syscall_http_append(vCPU& cpu, MachineInstance& inst)
 	auto& regs = cpu.registers();
 	auto *hp = get_http(inst.ctx(), (gethdr_e)regs.rdi);
 	const uint64_t addr = regs.rsi;
-	if (regs.rdx > 0xFFFF)
+	if (regs.rdx > 0xFFFF) {
 		throw std::runtime_error("HTTP header field too large");
+	} else if (inst.ctx()->ws == nullptr) {
+		regs.rax = 0;
+		cpu.set_registers(regs);
+		return; // Must be warmup
+	}
 	const uint32_t len = regs.rdx & 0xFFFF;
 
 	auto *val = (char *)WS_Alloc(inst.ctx()->ws, len + 1);
