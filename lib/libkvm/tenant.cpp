@@ -143,7 +143,7 @@ static inline bool load_tenant(VRT_CTX, VCL_PRIV task,
 }
 
 template <typename It>
-static void add_remapping(kvm::TenantGroup& group, const It& obj)
+static void add_remapping(kvm::TenantGroup& group, const std::string& key, const It& obj)
 {
 	if (!obj.value().is_array() || obj.value().size() != 2) {
 		throw std::runtime_error("Remapping must be an array of two elements");
@@ -181,8 +181,8 @@ static void add_remapping(kvm::TenantGroup& group, const It& obj)
 		.virt = address,
 		.size = size << 20U,
 		.writable   = true,
-		.executable = obj.key() == "executable_remapping",
-		.blackout   = obj.key() == "blackout_area"
+		.executable = key == "executable_remapping",
+		.blackout   = key == "blackout_area"
 	};
 	group.vmem_remappings.push_back(vmem);
 }
@@ -347,10 +347,10 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	else if (obj.key() == "remapping" || obj.key() == "executable_remapping" || obj.key() == "blackout_area")
 	{
 		if (obj.value().is_array() && obj.value().size() == 2) {
-			add_remapping(group, obj);
+			add_remapping(group, obj.key(), obj);
 		} else if (obj.value().is_object()) {
 			for (const auto& it : obj.value().items()) {
-				add_remapping(group, it);
+				add_remapping(group, obj.key(), it);
 			}
 		} else {
 			throw std::runtime_error("Remapping must be an array of two elements or an object");
