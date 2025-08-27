@@ -100,7 +100,6 @@ MachineInstance::MachineInstance(
 	  m_original_binary(binary),
 	  m_is_debug(debug),
 	  m_is_storage(storage),
-	  m_print_stdout(ten->config.print_stdout()),
 	  m_regex     {ten->config.max_regex(), "Regex handles"}
 {
 	// By default programs start out ephemeral, but it can be overridden
@@ -588,9 +587,9 @@ void MachineInstance::print(std::string_view text) const
 		return;
 
 	if (this->m_last_newline) {
-		printf(">>> [%s] %.*s", name().c_str(), (int)text.size(), text.begin());
+		printf(">>> [%s] %.*s\n", name().c_str(), (int)text.size(), text.begin());
 	} else {
-		printf("%.*s", (int)text.size(), text.begin());
+		printf("%.*s\n", (int)text.size(), text.begin());
 	}
 	this->m_last_newline = (text.back() == '\n');
 }
@@ -608,11 +607,7 @@ void MachineInstance::logprint(std::string_view text, bool says) const
 				"%.*s", (int)text.size(), text.begin());
 		}
 	} else {
-		if (says) {
-			printf(">>> [%s] %.*s", name().c_str(), (int)text.size(), text.begin());
-		} else {
-			printf("%.*s", (int)text.size(), text.begin());
-		}
+		this->print(text);
 	}
 }
 tinykvm::Machine::printer_func MachineInstance::get_vsl_printer() const
@@ -625,13 +620,19 @@ tinykvm::Machine::printer_func MachineInstance::get_vsl_printer() const
 				this->print("Invalid log buffer length");
 			return;
 		}
-		/* Logging with $PROGRAM says: ... */
-		this->logprint(std::string_view(buffer, len), this->m_last_newline);
-		/* Print to stdout if enabled */
-		if (this->m_print_stdout) {
-			this->print({buffer, len});
+		std::string_view view(buffer, len);
+		const bool has_newline = view.back() == '\n';
+		if (has_newline) {
+			view.remove_suffix(1);
 		}
-		this->m_last_newline = (buffer[len-1] == '\n');
+
+		/* Logging with $PROGRAM says: ... */
+		this->logprint(view, this->m_last_newline);
+		/* Print to stdout if enabled */
+		if (tenant().config.print_stdout()) {
+			this->print(view);
+		}
+		this->m_last_newline = has_newline;
 	};
 }
 

@@ -127,7 +127,6 @@ private:
 	bool        m_is_warming_up = false;
 	uint8_t     m_response_called = 0;
 	bool        m_reset_needed = false;
-	bool        m_print_stdout = false;
 	mutable bool m_last_newline = true;
 	BinaryType m_binary_type = BinaryType::Static;
 	gaddr_t     m_sighandler = 0x0;
