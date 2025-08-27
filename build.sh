@@ -3,8 +3,8 @@ set -e
 
 #!/bin/bash
 set -e
-export CC="ccache $CC"
-export CXX="ccache $CXX"
+#export CC="ccache $CC"
+#export CXX="ccache $CXX"
 cmake_extra=""
 build_type="Release"
 varnish_plus="OFF"
