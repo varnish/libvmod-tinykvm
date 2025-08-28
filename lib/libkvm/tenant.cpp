@@ -142,6 +142,27 @@ static inline bool load_tenant(VRT_CTX, VCL_PRIV task,
 	}
 }
 
+static std::string apply_dollar_vars(std::string str)
+{
+	// Replace $HOME with the home directory
+	auto find_home = str.find("$HOME");
+	if (find_home != std::string::npos) {
+		const char* home = getenv("HOME");
+		if (home != nullptr) {
+			str.replace(find_home, 5, std::string(home));
+		}
+	}
+	// Replace $PWD with the current working directory
+	auto find_pwd = str.find("$PWD");
+	if (find_pwd != std::string::npos) {
+		char cwd[PATH_MAX];
+		if (getcwd(cwd, sizeof(cwd)) != nullptr) {
+			str.replace(find_pwd, 4, std::string(cwd));
+		}
+	}
+	return str;
+}
+
 template <typename It>
 static void add_remapping(kvm::TenantGroup& group, const std::string& key, const It& obj)
 {
@@ -335,13 +356,16 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		auto& vec = group.main_arguments;
 		vec = std::make_shared<std::vector<std::string>>();
 		for (const auto& arg : obj.value()) {
-			vec->push_back(arg);
+			vec->push_back(apply_dollar_vars(arg));
 		}
 	}
 	else if (obj.key() == "environment")
 	{
 		// Append environment variables (NOTE: unable to overwrite defaults)
 		auto vec = obj.value().template get<std::vector<std::string>>();
+		for (auto& var : vec) {
+			var = apply_dollar_vars(var);
+		}
 		group.environ.insert(group.environ.end(), vec.begin(), vec.end());
 	}
 	else if (obj.key() == "remapping" || obj.key() == "executable_remapping" || obj.key() == "blackout_area")
@@ -370,14 +394,14 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		for (const auto& it : arr) {
 			TenantGroup::VirtualPath path;
 			if (it.is_string()) {
-				path.real_path = it.template get<std::string>();
+				path.real_path = apply_dollar_vars(it.template get<std::string>());
 				path.virtual_path = path.real_path;
 			} else if (it.is_object()) {
 				// Objects have "virtual" and "real" keys
 				if (!it.contains("real")) {
 					throw std::runtime_error("Allowed paths must have a real path");
 				}
-				path.real_path = it["real"].template get<std::string>();
+				path.real_path = apply_dollar_vars(it["real"].template get<std::string>());
 				if (path.real_path.empty()) {
 					throw std::runtime_error("Allowed paths must have a non-empty real path");
 				}
@@ -414,7 +438,7 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		}
 	}
 	else if (obj.key() == "current_working_directory") {
-		group.current_working_directory = obj.value();
+		group.current_working_directory = apply_dollar_vars(obj.value());
 	}
 	else if (obj.key() == "verbose") {
 		group.verbose = obj.value();
@@ -595,7 +619,7 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 
 			/* Filenames are optional. */
 			std::string filename = "";
-			if (obj.contains("filename")) filename = obj["filename"];
+			if (obj.contains("filename")) filename = apply_dollar_vars(obj["filename"]);
 			/* Keys are optional. No/empty key = no live update. */
 			std::string lvu_key = "";
 			if (obj.contains("key")) lvu_key = obj["key"];
