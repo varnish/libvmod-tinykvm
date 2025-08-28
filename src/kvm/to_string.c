@@ -264,21 +264,27 @@ static void to_synth_callback(const struct backend_result *result, struct kvm_ht
 
 #ifdef VARNISH_PLUS
 	const size_t len = result->content_length;
+	const int dynstruct = vsb->s_flags & VSB_DYNSTRUCT;
+	vsb->s_flags &= ~VSB_DYNSTRUCT;
+	if (vsb->s_flags & VSB_DYNAMIC)
+		VSB_delete(vsb);
 	// Attempted fast-path when the total length is < 16KB
 	if (vsb->s_size < len && len < kvm_settings.backend_early_release_size) {
 		//printf("KVM: Synth fast-path for small length (size=%zu bytes)\n", len);
 		char* buffer = WS_Alloc(ws, len + 1);
 		if (buffer != NULL) {
-			VSB_delete(vsb);
 			VSB_new(vsb, buffer, len + 1, VSB_FIXEDLEN);
-			for (size_t i = 0; i < result->bufcount; i++) {
-				VSB_bcat(vsb, result->buffers[i].data, result->buffers[i].size);
-			}
-			return;
+			vsb->s_flags |= dynstruct;
+			goto fill_synth_vsb;
 		}
 	}
-#endif
+	VSB_new(vsb, NULL, len + 1, VSB_FIXEDLEN);
+	vsb->s_flags |= dynstruct;
+#else
+	// There is no VSB_new in open-source Varnish
 	VSB_clear(vsb);
+#endif
+fill_synth_vsb:
 	for (size_t i = 0; i < result->bufcount; i++) {
 		VSB_bcat(vsb, result->buffers[i].data, result->buffers[i].size);
 	}
