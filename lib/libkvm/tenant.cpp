@@ -440,6 +440,26 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	else if (obj.key() == "current_working_directory") {
 		group.current_working_directory = apply_dollar_vars(obj.value());
 	}
+	else if (obj.key() == "download") {
+		// Download is an array of objects with "uri" and "filepath"
+		if (!obj.value().is_array()) {
+			throw std::runtime_error("Download must be an array");
+		}
+		auto& arr = obj.value();
+		for (const auto& it : arr) {
+			if (!it.is_object()) {
+				throw std::runtime_error("Download items must be objects");
+			}
+			TenantGroup::DownloadItem item;
+			if (it.contains("uri")) {
+				item.uri = it["uri"].template get<std::string>();
+			}
+			if (it.contains("filepath")) {
+				item.filepath = it["filepath"].template get<std::string>();
+			}
+			group.downloads.push_back(std::move(item));
+		}
+	}
 	else if (obj.key() == "verbose") {
 		group.verbose = obj.value();
 	}

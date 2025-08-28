@@ -94,6 +94,18 @@ ProgramInstance::ProgramInstance(
 			storage_elf = request_binary;
 		m_storage.reset(new Storage(std::move(storage_elf)));
 	}
+	// Download all the required files
+	for (const auto& item : ten->config.group.downloads) {
+		// Start the download using kvm_curl_fetch()
+		if (kvm_curl_fetch_into_file(item.uri.c_str(), item.filepath.c_str()) == 0) {
+			if (ten->config.group.verbose) {
+				printf("TinyKVM: Fetched '%s' to '%s'\n",
+					item.uri.c_str(), item.filepath.c_str());
+			}
+		}
+	}
+
+	// Lock the future mutex while we are initializing.
 	mtx_future_init.lock();
 
 	this->m_binary_was_local = true;
@@ -194,9 +206,6 @@ ProgramInstance::ProgramInstance(
 			this->m_binary_was_cached = (data.status == 304);
 			this->m_binary_was_local = this->m_binary_was_cached || was_file;
 
-			/* Initialization phase and request VM forking. */
-			begin_initialization(ctx, ten, debug);
-
 			/* Store binary to disk when file was remote and cURL reports 200 OK. */
 			if (!this->binary_was_local() && data.status == 200 && !ten->config.filename.empty()) {
 				/* Cannot throw, but reports true/false on write success.
@@ -209,6 +218,9 @@ ProgramInstance::ProgramInstance(
 							this->storage().storage_binary.to_vector());
 				}
 			}
+
+			/* Initialization phase and request VM forking. */
+			begin_initialization(ctx, ten, debug);
 
 			return 0;
 		}

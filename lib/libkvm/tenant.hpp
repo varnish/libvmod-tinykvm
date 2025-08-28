@@ -86,6 +86,12 @@ struct TenantGroup {
 	std::vector<VirtualPath> allowed_paths;
 	std::string current_working_directory = "/";
 
+	struct DownloadItem {
+		std::string uri;
+		std::string filepath;
+	};
+	std::vector<DownloadItem> downloads;
+
 	void set_max_address(uint64_t newmax_mb) { this->max_address_space = newmax_mb * 1048576ul; }
 	void set_max_memory(uint64_t newmax_mb) {
 		this->max_main_memory = newmax_mb * 1048576ul;

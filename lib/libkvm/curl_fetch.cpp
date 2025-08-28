@@ -2,10 +2,21 @@
 
 #include <curl/curl.h>
 #include <cstring>
-#include <exception>
 #include <malloc.h>
+#include <stdexcept>
+#include <string>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <vector>
 #include "varnish.hpp"
+extern "C" {
+#include "vtim.h"
+}
 typedef size_t (*write_callback)(char *, size_t, size_t, void *);
+namespace kvm {
+extern std::vector<uint8_t> file_loader(const std::string&);
+}
+static const bool VERBOSE_CURL_FETCH = false;
 
 extern "C" size_t
 kvm_WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
@@ -100,4 +111,63 @@ int kvm_curl_fetch(
 	free(chunk.memory);
 
 	return (retvalue);
+}
+
+extern "C"
+int kvm_curl_fetch_into_file(const char *url, const char *filepath)
+{
+	std::string filename_mtime = "";
+	if (access(filepath, R_OK) == 0)
+	{
+		struct stat st;
+		if (stat(filepath, &st) == 0) {
+			char buf[32];
+			VTIM_format(st.st_mtim.tv_sec, buf);
+			filename_mtime = "If-Modified-Since: " + std::string(buf);
+		}
+	}
+
+	struct CurlData {
+		std::string uri;
+		std::string filepath;
+		int status;
+	} data {
+		.uri = url,
+		.filepath = filepath,
+		.status = 0
+	};
+
+	return kvm_curl_fetch(url,
+	[] (void* usr, long status, MemoryStruct* chunk) {
+		auto* data = (CurlData *)usr;
+		data->status = status;
+		if (status == 304) {
+			if constexpr (VERBOSE_CURL_FETCH) {
+				printf("kvm_curl_fetch: Newer '%s' on disk\n",
+					data->filepath.c_str());
+			}
+			return;
+
+		} else if (status == 200) {
+			if constexpr (VERBOSE_CURL_FETCH) {
+				printf("kvm_curl_fetch: Downloading to '%s' from %s\n",
+					data->filepath.c_str(), data->uri.c_str());
+			}
+
+			FILE *f = fopen(data->filepath.c_str(), "wb");
+			if (!f) {
+				throw std::runtime_error("Failed to open file for writing: " + data->filepath);
+			}
+			if (fwrite(chunk->memory, 1, chunk->size, f) != chunk->size) {
+				fclose(f);
+				throw std::runtime_error("Failed to write to file: " + data->filepath);
+			}
+			fclose(f);
+
+		} else {
+			// Unhandled HTTP status?
+			throw std::runtime_error("Fetching program '" + data->filepath + "' failed. URL: " + data->uri);
+		}
+
+	}, &data, filename_mtime.c_str());
 }
