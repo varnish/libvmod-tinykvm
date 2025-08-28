@@ -210,6 +210,7 @@ public:
 
 private:
 	void begin_initialization(const vrt_ctx *, TenantInstance *, bool debug);
+	void download_dependencies(const TenantInstance* ten);
 	/* Wait for Varnish to listen and this program to complete initialization. */
 	void try_wait_for_startup_and_initialization();
 	void unlock_and_initialized(bool success) {

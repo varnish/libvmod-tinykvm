@@ -94,16 +94,6 @@ ProgramInstance::ProgramInstance(
 			storage_elf = request_binary;
 		m_storage.reset(new Storage(std::move(storage_elf)));
 	}
-	// Download all the required files
-	for (const auto& item : ten->config.group.downloads) {
-		// Start the download using kvm_curl_fetch()
-		if (kvm_curl_fetch_into_file(item.uri.c_str(), item.filepath.c_str()) == 0) {
-			if (ten->config.group.verbose) {
-				printf("TinyKVM: Fetched '%s' to '%s'\n",
-					item.uri.c_str(), item.filepath.c_str());
-			}
-		}
-	}
 
 	// Lock the future mutex while we are initializing.
 	mtx_future_init.lock();
@@ -112,6 +102,7 @@ ProgramInstance::ProgramInstance(
 	this->m_binary_was_cached = false;
 	this->m_future = m_storage_queue.enqueue(
 	[this, ctx, ten, debug] () -> long {
+		this->download_dependencies(ten);
 		begin_initialization(ctx, ten, debug);
 		return 0;
 	});
@@ -218,6 +209,9 @@ ProgramInstance::ProgramInstance(
 							this->storage().storage_binary.to_vector());
 				}
 			}
+
+			/* Download any dependencies required by the program */
+			this->download_dependencies(ten);
 
 			/* Initialization phase and request VM forking. */
 			begin_initialization(ctx, ten, debug);
@@ -416,6 +410,19 @@ long ProgramInstance::wait_for_initialization()
 	}
 
 	return code;
+}
+
+void ProgramInstance::download_dependencies(const TenantInstance* ten)
+{
+	for (const auto& item : ten->config.group.downloads) {
+		// Start the download using kvm_curl_fetch()
+		if (kvm_curl_fetch_into_file(item.uri.c_str(), item.filepath.c_str()) == 0) {
+			if (ten->config.group.verbose) {
+				printf("TinyKVM: Fetched '%s' to '%s'\n",
+					item.uri.c_str(), item.filepath.c_str());
+			}
+		}
+	}
 }
 
 uint64_t ProgramInstance::lookup(const char* name) const
