@@ -102,7 +102,6 @@ ProgramInstance::ProgramInstance(
 	this->m_binary_was_cached = false;
 	this->m_future = m_storage_queue.enqueue(
 	[this, ctx, ten, debug] () -> long {
-		this->download_dependencies(ten);
 		begin_initialization(ctx, ten, debug);
 		return 0;
 	});
@@ -210,9 +209,6 @@ ProgramInstance::ProgramInstance(
 				}
 			}
 
-			/* Download any dependencies required by the program */
-			this->download_dependencies(ten);
-
 			/* Initialization phase and request VM forking. */
 			begin_initialization(ctx, ten, debug);
 
@@ -242,6 +238,9 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 		const size_t max_vms = ten->config.group.max_concurrency;
 		if (max_vms < 1)
 			throw std::runtime_error("Concurrency must be at least 1");
+
+		/* Download any dependencies required by the program */
+		const uint64_t dl_millis = this->download_dependencies(ten) / 1e6;
 
 		TIMING_LOCATION(t0);
 
@@ -348,13 +347,17 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 		}
 
 		(void) t1;
-		printf("Program '%s' is loaded (%s, %s, vm=%zu%s, nodes=%d, huge=%d/%d, ready=%.2fms%s)\n",
+		std::string download_time = "";
+		if (dl_millis > 0)
+			download_time = "downloads=" + std::to_string(dl_millis) + "ms, ";
+		printf("Program '%s' is loaded (%s, %s, vm=%zu%s, nodes=%d, huge=%d/%d, %sready=%.2fms%s)\n",
 			main_vm->name().c_str(),
 			this->binary_was_local() ? "local" : "remote",
 			this->binary_was_cached() ? "cached" : "not cached",
 			initialized,
 			ten->config.group.ephemeral ? (ten->config.group.ephemeral_keep_working_memory ? " ephemeral-kwm" : " ephemeral") : "",
 			n_nodes, ten->config.hugepages(), ten->config.request_hugepages(),
+			download_time.c_str(),
 			nanodiff(t0, t2) / 1e6,
 			debug ? ", remote debug" : "");
 
@@ -412,8 +415,11 @@ long ProgramInstance::wait_for_initialization()
 	return code;
 }
 
-void ProgramInstance::download_dependencies(const TenantInstance* ten)
+uint64_t ProgramInstance::download_dependencies(const TenantInstance* ten)
 {
+	if (ten->config.group.downloads.empty())
+		return 0;
+	TIMING_LOCATION(t0);
 	for (const auto& item : ten->config.group.downloads) {
 		// Start the download using kvm_curl_fetch()
 		if (kvm_curl_fetch_into_file(item.uri.c_str(), item.filepath.c_str()) == 0) {
@@ -423,6 +429,8 @@ void ProgramInstance::download_dependencies(const TenantInstance* ten)
 			}
 		}
 	}
+	TIMING_LOCATION(t1);
+	return nanodiff(t0, t1);
 }
 
 uint64_t ProgramInstance::lookup(const char* name) const
