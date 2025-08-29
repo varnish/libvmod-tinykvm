@@ -420,14 +420,17 @@ uint64_t ProgramInstance::download_dependencies(const TenantInstance* ten)
 	if (ten->config.group.downloads.empty())
 		return 0;
 	TIMING_LOCATION(t0);
+	std::vector<std::thread> threads;
+	threads.reserve(ten->config.group.downloads.size());
+	// Download each dependency in parallel
 	for (const auto& item : ten->config.group.downloads) {
 		// Start the download using kvm_curl_fetch()
-		if (kvm_curl_fetch_into_file(item.uri.c_str(), item.filepath.c_str()) == 0) {
-			if (ten->config.group.verbose) {
-				printf("TinyKVM: Fetched '%s' to '%s'\n",
-					item.uri.c_str(), item.filepath.c_str());
-			}
-		}
+		threads.emplace_back([item]() {
+			kvm_curl_fetch_into_file(item.uri.c_str(), item.filepath.c_str());
+		});
+	}
+	for (auto& thread : threads) {
+		thread.join();
 	}
 	TIMING_LOCATION(t1);
 	return nanodiff(t0, t1);
