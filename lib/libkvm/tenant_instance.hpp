@@ -14,7 +14,7 @@ struct VMPoolItem;
 class TenantInstance {
 public:
 	VMPoolItem* vmreserve(const vrt_ctx*, bool debug);
-	VMPoolItem* temporary_vmreserve(const vrt_ctx*, bool debug);
+	VMPoolItem* temporary_vmreserve(const vrt_ctx*, bool debug, bool soft_reset);
 	static void temporary_vmreserve_free(const vrt_ctx*, void* reservation);
 
 	std::shared_ptr<ProgramInstance> ref(const vrt_ctx *, bool debug);

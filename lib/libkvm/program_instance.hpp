@@ -139,7 +139,7 @@ public:
 
 	/* Reserve VM from blocking queue. */
 	Reservation reserve_vm(const vrt_ctx*,
-		TenantInstance*, std::shared_ptr<ProgramInstance>);
+		TenantInstance*, std::shared_ptr<ProgramInstance>, bool soft_reset = false);
 	/* Free a reserved VM. This can potentially finish a program. */
 #ifdef VARNISH_PLUS
 	static void vm_free_function(void*);

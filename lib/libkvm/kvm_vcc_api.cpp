@@ -73,13 +73,13 @@ kvm::VMPoolItem* kvm_reserve_machine(const vrt_ctx *ctx, kvm::TenantInstance* te
 }
 
 extern "C"
-kvm::VMPoolItem* kvm_temporarily_reserve_machine(const vrt_ctx *ctx, kvm::TenantInstance* tenant, bool debug)
+kvm::VMPoolItem* kvm_temporarily_reserve_machine(const vrt_ctx *ctx, kvm::TenantInstance* tenant, bool debug, bool soft_reset)
 {
 	if (UNLIKELY(tenant == nullptr || ctx == nullptr))
 		return nullptr;
 
 	/* Can block for a while until program is fetched and initialized. */
-	return tenant->temporary_vmreserve(ctx, debug);
+	return tenant->temporary_vmreserve(ctx, debug, soft_reset);
 }
 extern "C"
 void kvm_free_reserved_machine(const vrt_ctx *ctx, void* slot)

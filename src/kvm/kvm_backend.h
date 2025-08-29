@@ -24,6 +24,7 @@ struct kvm_chain_item
 	const char *special_function;
 	struct vmod_kvm_inputs inputs;
 	uint16_t break_status;
+	int16_t  soft_reset;
 };
 struct kvm_program_chain
 {

@@ -97,7 +97,7 @@ to_string(VRT_CTX, struct kvm_program_chain *chain, content_func_f content_callb
 		waiting for a free VM, and then getting exclusive access until
 		the end of the request. */
 		struct vmod_kvm_slot *slot =
-			kvm_temporarily_reserve_machine(ctx, invocation->tenant, false);
+			kvm_temporarily_reserve_machine(ctx, invocation->tenant, false, invocation->soft_reset);
 		if (slot == NULL) {
 			/* Global program cpu-time statistic. */
 			kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
@@ -212,7 +212,7 @@ static void to_string_callback(const struct backend_result *result, struct kvm_h
 
 VCL_STRING kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
 	VCL_STRING program, VCL_STRING url, VCL_STRING arg, VCL_STRING on_error,
-	VCL_INT error_treshold)
+	VCL_INT error_treshold, VCL_INT soft_reset)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	AN(task);
@@ -236,6 +236,7 @@ VCL_STRING kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
 	invocation->inputs.method = "GET"; /* Convenience */
 	invocation->inputs.content_type = "";
 	invocation->break_status = error_treshold;
+	invocation->soft_reset = soft_reset;
 
 	/* XXX: Immediately reset it. It's a thread_local! */
 	struct kvm_program_chain chain = *kvm_chain_get_queue();
@@ -264,6 +265,7 @@ static void to_synth_callback(const struct backend_result *result, struct kvm_ht
 
 #ifdef VARNISH_PLUS
 	const size_t len = result->content_length;
+	const size_t alloc_len = (len == 0) ? 2 : len + 1; // Buggy VSB_new() assert
 	const int dynstruct = vsb->s_flags & VSB_DYNSTRUCT;
 	vsb->s_flags &= ~VSB_DYNSTRUCT;
 	if (vsb->s_flags & VSB_DYNAMIC)
@@ -271,14 +273,14 @@ static void to_synth_callback(const struct backend_result *result, struct kvm_ht
 	// Attempted fast-path when the total length is < 16KB
 	if (vsb->s_size < len && len < kvm_settings.backend_early_release_size) {
 		//printf("KVM: Synth fast-path for small length (size=%zu bytes)\n", len);
-		char* buffer = WS_Alloc(ws, len + 1);
+		char* buffer = WS_Alloc(ws, alloc_len);
 		if (buffer != NULL) {
-			VSB_new(vsb, buffer, len + 1, VSB_FIXEDLEN);
+			VSB_new(vsb, buffer, alloc_len, VSB_FIXEDLEN);
 			vsb->s_flags |= dynstruct;
 			goto fill_synth_vsb;
 		}
 	}
-	VSB_new(vsb, NULL, len + 1, VSB_FIXEDLEN);
+	VSB_new(vsb, NULL, alloc_len, VSB_FIXEDLEN);
 	vsb->s_flags |= dynstruct;
 #else
 	// There is no VSB_new in open-source Varnish
@@ -291,7 +293,7 @@ fill_synth_vsb:
 }
 
 VCL_INT kvm_vm_synth(VRT_CTX, VCL_PRIV task, VCL_INT status,
-	VCL_STRING program, VCL_STRING url, VCL_STRING arg)
+	VCL_STRING program, VCL_STRING url, VCL_STRING arg, VCL_INT soft_reset)
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	AN(task);
@@ -320,6 +322,7 @@ VCL_INT kvm_vm_synth(VRT_CTX, VCL_PRIV task, VCL_INT status,
 	invocation->inputs.method = "GET"; /* Convenience */
 	invocation->inputs.content_type = "";
 	invocation->break_status = 999;
+	invocation->soft_reset = soft_reset;
 
 	/* XXX: Immediately reset it. It's a thread_local! */
 	struct kvm_program_chain chain = *kvm_chain_get_queue();

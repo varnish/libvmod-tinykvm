@@ -175,7 +175,7 @@ Example:
 	}
 
 
-$Function STRING to_string(PRIV_VCL, STRING program, STRING url = "", STRING arg = "", STRING on_error = "", INT error_treshold = 400)
+$Function STRING to_string(PRIV_VCL, STRING program, STRING url = "", STRING arg = "", STRING on_error = "", INT error_treshold = 400, INT soft_reset = 0)
 
 - Returns a string of the response produced by the given program.
 - Supports GET, POST and other HTTP requests.
@@ -184,7 +184,7 @@ $Function STRING to_string(PRIV_VCL, STRING program, STRING url = "", STRING arg
 - A final status >= error_treshold will produce the error string.
 - NOTE: Uses extra workspace for each call. See: man varnishd.
 
-$Function INT synth(PRIV_VCL, INT status, STRING program, STRING url = "", STRING arg = "")
+$Function INT synth(PRIV_VCL, INT status, STRING program, STRING url = "", STRING arg = "", INT soft_reset = 0)
 
 - Directly delivers a synthetic response. If status is non-zero, the HTTP status will be overridden.
 - Generates a synthetic response from the given program and arguments.

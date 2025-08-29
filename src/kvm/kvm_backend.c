@@ -415,7 +415,7 @@ kvmbe_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
 			}
 		} else if (is_temporary) {
 			/* This is in the middle of a chain, temporary reservation. */
-			slot = kvm_temporarily_reserve_machine(&ctx, invocation->tenant, kvmr->debug);
+			slot = kvm_temporarily_reserve_machine(&ctx, invocation->tenant, kvmr->debug, false);
 		} else {
 			/* The last in the chain is a full reservation. */
 			slot = kvm_reserve_machine(&ctx, invocation->tenant, kvmr->debug);
@@ -624,6 +624,7 @@ kvm_init_chain(VRT_CTX, struct vmod_kvm_tenant *tenant, const char *url, const c
 	item->inputs.url = url ? url : "";
 	item->inputs.argument = arg ? arg : "";
 	item->break_status = 1000; /* No breaking for last program. */
+	item->soft_reset = 0;
 
 	if (kqueue->count == 0) {
 		struct http *hp;

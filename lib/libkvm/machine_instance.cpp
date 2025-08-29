@@ -438,13 +438,17 @@ void MachineInstance::tail_reset()
 		//this->stop_debugger();
 	}
 }
+bool MachineInstance::is_reset_needed() const
+{
+	return m_reset_needed || m_soft_reset_needed || m_is_ephemeral;
+}
 void MachineInstance::reset_to(const vrt_ctx* ctx,
 	MachineInstance& source)
 {
 	this->m_ctx = ctx;
 
 	/* If it crashed, or reset is always needed, then reset now. */
-	const bool reset_needed = this->m_reset_needed || this->m_is_ephemeral;
+	const bool reset_needed = this->is_reset_needed();
 
 	/* We only reset ephemeral VMs. */
 	if (reset_needed) {
@@ -480,6 +484,7 @@ void MachineInstance::reset_to(const vrt_ctx* ctx,
 		m_regex.reset_and_loan(source.m_regex);
 		/* XXX: Todo: reset more stuff */
 		this->m_reset_needed = false;
+		this->m_soft_reset_needed = false;
 	}
 }
 

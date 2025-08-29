@@ -239,7 +239,7 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 	return (VMPoolItem*) priv_task->priv;
 }
 
-VMPoolItem* TenantInstance::temporary_vmreserve(const vrt_ctx* ctx, bool debug)
+VMPoolItem* TenantInstance::temporary_vmreserve(const vrt_ctx* ctx, bool debug, bool soft_reset)
 {
 	try
 	{
@@ -249,7 +249,7 @@ VMPoolItem* TenantInstance::temporary_vmreserve(const vrt_ctx* ctx, bool debug)
 
 		// Reserve a machine through blocking queue.
 		// May throw if dequeue from the queue times out.
-		auto resv = prog->reserve_vm(ctx, this, std::move(prog));
+		auto resv = prog->reserve_vm(ctx, this, std::move(prog), soft_reset);
 		// prog is nullptr after this ^
 
 		return resv.slot;

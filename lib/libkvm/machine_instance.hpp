@@ -82,6 +82,8 @@ public:
 	void finish_call(uint8_t n) { m_response_called = n; }
 	bool response_called(uint8_t n) const noexcept { return m_response_called == n; }
 	void reset_needed_now() { m_reset_needed = true; }
+	void set_soft_reset(bool needed) { m_soft_reset_needed = needed; }
+	bool is_reset_needed() const;
 
 	void init_sha256();
 	void hash_buffer(const char* buffer, int len);
@@ -127,6 +129,7 @@ private:
 	bool        m_is_warming_up = false;
 	uint8_t     m_response_called = 0;
 	bool        m_reset_needed = false;
+	bool        m_soft_reset_needed = false;
 	mutable bool m_last_newline = true;
 	BinaryType m_binary_type = BinaryType::Static;
 	gaddr_t     m_sighandler = 0x0;

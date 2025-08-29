@@ -450,7 +450,8 @@ void ProgramInstance::set_entry_at(const int idx, gaddr_t addr)
 }
 
 Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
-	TenantInstance* ten, std::shared_ptr<ProgramInstance> prog)
+	TenantInstance* ten, std::shared_ptr<ProgramInstance> prog,
+	bool soft_reset)
 {
 	const auto tmo = std::chrono::seconds(ten->config.group.max_queue_time);
 	VMPoolItem* slot = nullptr;
@@ -469,6 +470,7 @@ Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 
 	/* Set the new active VRT CTX. */
 	slot->mi->set_ctx(ctx);
+	slot->mi->set_soft_reset(soft_reset);
 
 	/* This creates a self-reference, which ensures that open
 	   Machine instances will keep the program instance alive. */
@@ -486,20 +488,40 @@ void ProgramInstance::vm_free_function(VRT_CTX, void* slotv)
 	(void)ctx;
 #endif
 	auto* slot = (VMPoolItem *)slotv;
-	auto& mi = *slot->mi;
 
-	// Free regexes, file descriptors etc.
-	mi.tail_reset();
+	const bool is_reset_needed = slot->mi->is_reset_needed();
+	if (!is_reset_needed) {
+		auto& mi = *slot->mi;
 
-	// Reset to the current program (even though it might die before next req).
-	mi.reset_to(nullptr, *mi.program().main_vm);
+		// Free regexes, file descriptors etc.
+		mi.tail_reset();
 
-	// XXX: Is this racy? We want to enq the slot with the ref.
-	// We are the sole owner of the slot, so no need for atomics here.
-	auto ref = std::move(slot->prog_ref);
-	// Signal waiters that slot is ready again
-	// If there any waiters, they keep the program referenced (atomically)
-	ref->m_vmqueue[numa_node()].enqueue(slot);
+		// Reset to the current program (even though it might die before next req).
+		mi.reset_to(nullptr, *mi.program().main_vm);
+
+		auto ref = std::move(slot->prog_ref);
+		// Signal waiters that slot is ready again
+		// If there any waiters, they keep the program referenced (atomically)
+		ref->m_vmqueue[numa_node()].enqueue(slot);
+	} else {
+		// Defer reset by executing it as a thread task
+		slot->task_future = slot->tp.enqueue(
+		[slot]() -> long {
+			auto& mi = *slot->mi;
+
+			// Free regexes, file descriptors etc.
+			mi.tail_reset();
+
+			// Reset to the current program (even though it might die before next req).
+			mi.reset_to(nullptr, *mi.program().main_vm);
+
+			auto ref = std::move(slot->prog_ref);
+			// Signal waiters that slot is ready again
+			// If there any waiters, they keep the program referenced (atomically)
+			ref->m_vmqueue[numa_node()].enqueue(slot);
+			return 0;
+		});
+	}
 }
 
 long ProgramInstance::storage_call(tinykvm::Machine& src, gaddr_t func,

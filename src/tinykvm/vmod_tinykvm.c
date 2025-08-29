@@ -218,9 +218,9 @@ VCL_BOOL vmod_start(VRT_CTX, VCL_PRIV task, VCL_STRING program, VCL_BOOL async, 
 extern struct director *vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg);
 extern const char *kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
-	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg, VCL_STRING on_error, VCL_INT);
+	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg, VCL_STRING on_error, VCL_INT, VCL_INT);
 extern int kvm_vm_synth(VRT_CTX, VCL_PRIV task, VCL_INT status,
-	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg);
+	VCL_STRING tenant, VCL_STRING url, VCL_STRING arg, VCL_INT soft_reset);
 extern VCL_BOOL kvm_vm_begin_epoll(VRT_CTX, VCL_PRIV, VCL_STRING program,
 	int fd, const char *arg);
 
@@ -241,14 +241,14 @@ VCL_BACKEND vmod_program(VRT_CTX, VCL_PRIV task,
 /* Create a string response from given program and arguments. */
 VCL_STRING vmod_to_string(VRT_CTX, VCL_PRIV task,
 	VCL_STRING program, VCL_STRING url, VCL_STRING argument,
-	VCL_STRING on_error, VCL_INT error_treshold)
+	VCL_STRING on_error, VCL_INT error_treshold, VCL_INT soft_reset)
 {
-	return (kvm_vm_to_string(ctx, task, program, url, argument, on_error, error_treshold));
+	return (kvm_vm_to_string(ctx, task, program, url, argument, on_error, error_treshold, soft_reset));
 }
 
 /* Create a synthetic response from given program and arguments. */
 VCL_INT vmod_synth(VRT_CTX, VCL_PRIV task, VCL_INT status,
-	VCL_STRING program, VCL_STRING url, VCL_STRING argument)
+	VCL_STRING program, VCL_STRING url, VCL_STRING argument, VCL_INT soft_reset)
 {
-	return (kvm_vm_synth(ctx, task, status, program, url, argument));
+	return (kvm_vm_synth(ctx, task, status, program, url, argument, soft_reset));
 }
