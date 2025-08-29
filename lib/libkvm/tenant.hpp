@@ -36,7 +36,7 @@ struct TenantGroup {
 	bool     transparent_hugepages = false;
 	bool     allow_debug = false;
 	bool     remote_debug_on_exception = false;
-	bool     mmap_backed_files = false;
+	bool     mmap_backed_files = true;
 	bool     relocate_fixed_mmap = true;
 	bool     control_ephemeral = false;
 	bool     ephemeral = true;
