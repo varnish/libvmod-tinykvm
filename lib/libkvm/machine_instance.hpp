@@ -5,6 +5,7 @@
 #include "binary_storage.hpp"
 #include "instance_cache.hpp"
 #include "machine_stats.hpp"
+#include "utils/xorshift.hpp"
 
 struct vrt_ctx;
 struct vre;
@@ -99,6 +100,7 @@ public:
 
 	uint64_t allocate_post_data(size_t size);
 	gaddr_t& get_inputs_allocation() { return m_inputs_allocation; }
+	uint64_t rand_uint64() { return m_prng.randU64(); }
 
 	static void kvm_initialize();
 	MachineInstance(const BinaryStorage&, const vrt_ctx*, const TenantInstance*, ProgramInstance*, bool storage, bool dbg);
@@ -141,6 +143,7 @@ private:
 	MachineStats m_stats;
 
 	Cache<vre*> m_regex;
+	XorPRNG m_prng;
 };
 
 inline void MachineInstance::logf(const char *fmt, ...) const

@@ -76,6 +76,22 @@ static std::span<const uint8_t> select_main_binary(const BinaryStorage& program_
 	return program_binary.binary();
 }
 
+static std::pair<uint64_t, uint64_t> get_urandom_state()
+{
+	FILE* urandom = fopen("/dev/urandom", "rb");
+	if (!urandom) {
+		throw std::runtime_error("Failed to open /dev/urandom");
+	}
+
+	std::pair<uint64_t, uint64_t> state;
+	if (fread(&state, sizeof(state), 1, urandom) != 1) {
+		fclose(urandom);
+		throw std::runtime_error("Failed to read /dev/urandom");
+	}
+	fclose(urandom);
+	return state;
+}
+
 MachineInstance::MachineInstance(
 	const BinaryStorage& binary, const vrt_ctx* ctx,
 	const TenantInstance* ten, ProgramInstance* inst,
@@ -100,7 +116,8 @@ MachineInstance::MachineInstance(
 	  m_original_binary(binary),
 	  m_is_debug(debug),
 	  m_is_storage(storage),
-	  m_regex     {ten->config.max_regex(), "Regex handles"}
+	  m_regex     {ten->config.max_regex(), "Regex handles"},
+	  m_prng(get_urandom_state())
 {
 	// By default programs start out ephemeral, but it can be overridden
 	this->m_is_ephemeral = ten->config.group.ephemeral;
@@ -376,7 +393,8 @@ MachineInstance::MachineInstance(
 	  m_waiting_for_requests(true), // If we got this far, we are waiting...
 	  m_binary_type(source.binary_type()),
 	  m_sighandler{source.m_sighandler},
-	  m_regex     {ten->config.max_regex(), "Regex handles"}
+	  m_regex     {ten->config.max_regex(), "Regex handles"},
+	  m_prng(source.m_prng)
 {
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t0);

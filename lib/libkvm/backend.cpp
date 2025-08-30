@@ -81,6 +81,7 @@ struct backend_inputs {
 	uint16_t num_headers;
 	uint16_t info_flags; /* 0x1 = request is a warmup request. */
 	uint32_t reserved0;    /* Reserved for future use. */
+	uint64_t prng[2];      /* Pseudo-random number generator state. */
 	uint64_t reserved1[2]; /* Reserved for future use. */
 };
 
@@ -384,6 +385,8 @@ static void fill_backend_inputs(
 		inputs.data  = 0;
 		inputs.data_len = 0;
 	}
+	inputs.prng[0] = machine.rand_uint64();
+	inputs.prng[1] = machine.rand_uint64();
 }
 static size_t fill_backend_headers(
 	MachineInstance& machine, __u64& stack,
