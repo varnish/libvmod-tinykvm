@@ -17,6 +17,13 @@ struct BinaryStorage
 	std::vector<uint8_t> to_vector() const;
 	void dontneed();
 
+	bool is_mapping() const noexcept {
+		return std::holds_alternative<MmapFile>(m_binary);
+	}
+	bool is_vector() const noexcept {
+		return std::holds_alternative<std::vector<uint8_t>>(m_binary);
+	}
+
 	BinaryStorage();
 	BinaryStorage(std::vector<uint8_t> binary)
 		: m_binary(std::move(binary)) {}

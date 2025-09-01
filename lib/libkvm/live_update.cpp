@@ -3,6 +3,7 @@
 #include "varnish.hpp"
 #include <atomic>
 #include <cstring>
+#include <filesystem>
 extern "C" {
 #  include "kvm_live_update.h"
 }
@@ -88,6 +89,9 @@ namespace kvm
 {
 	bool file_writer(const std::string &filename, const std::vector<uint8_t> &binary)
 	{
+		std::filesystem::path dir = std::filesystem::path(filename).parent_path();
+		std::filesystem::create_directories(dir);
+
 		FILE *f = fopen(filename.c_str(), "wb");
 		if (f == NULL)
 			return false;

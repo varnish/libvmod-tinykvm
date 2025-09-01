@@ -28,6 +28,7 @@
 #include "timing.hpp"
 #include "varnish.hpp"
 #include <cstring>
+#include <filesystem>
 #include <tinykvm/rsp_client.hpp>
 #include <sched.h>
 #include <unistd.h>
@@ -153,14 +154,14 @@ ProgramInstance::ProgramInstance(
 					if constexpr (VERBOSE_PROGRAM_STARTUP) {
 						printf("Loading '%s' from disk\n", data->ten->config.name.c_str());
 					}
-					data->prog->request_binary = file_loader(data->ten->config.request_program_filename());
+					data->prog->request_binary = BinaryStorage(data->ten->config.request_program_filename());
 					if (data->prog->has_storage())
 					{
 						// If the storage binary exists, use it
 						if (access(data->ten->config.storage_program_filename().c_str(), R_OK) == 0)
 						{
 							data->prog->storage().storage_binary =
-								file_loader(data->ten->config.storage_program_filename());
+								BinaryStorage(data->ten->config.storage_program_filename());
 						}
 						else // Otherwise, use the request program
 						{
@@ -201,6 +202,9 @@ ProgramInstance::ProgramInstance(
 				/* Cannot throw, but reports true/false on write success.
 					We *DO NOT* care if the write failed. Only a cached binary. */
 				file_writer(ten->config.request_program_filename(), this->request_binary.to_vector());
+				/* Reload with file-mapping */
+				if (!this->request_binary.is_mapping())
+					this->request_binary = BinaryStorage(ten->config.request_program_filename());
 				/* Also, write storage binary, if it exists. */
 				if (has_storage()) {
 					if (!this->storage().storage_binary.empty())
@@ -424,6 +428,9 @@ uint64_t ProgramInstance::download_dependencies(const TenantInstance* ten)
 	threads.reserve(ten->config.group.downloads.size());
 	// Download each dependency in parallel
 	for (const auto& item : ten->config.group.downloads) {
+		// Figure out the absolute path and then create the directory
+		std::filesystem::path dir = std::filesystem::path(item.filepath).parent_path();
+		std::filesystem::create_directories(dir);
 		// Start the download using kvm_curl_fetch()
 		threads.emplace_back([item]() {
 			kvm_curl_fetch_into_file(item.uri.c_str(), item.filepath.c_str());
