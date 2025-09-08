@@ -28,9 +28,9 @@ int close(int);
 namespace kvm {
 static BinaryStorage ld_linux_x86_64_so;
 extern std::vector<uint8_t> file_loader(const std::string &);
-extern bool backend_warmup_pause_resume(MachineInstance& machine,
+extern void backend_warmup_pause_resume(MachineInstance& machine,
 	const struct kvm_chain_item *invoc,
-	const std::unordered_set<std::string>& headers);
+	const TenantGroup::Warmup& warmup);
 
 void MachineInstance::kvm_initialize()
 {
@@ -359,10 +359,7 @@ void MachineInstance::warmup()
 
 	this->m_is_warming_up = true;
 	try {
-		for (size_t i = 0; i < w.num_requests; i++) {
-			if (!backend_warmup_pause_resume(*this, &invoc, w.headers))
-				break;
-		}
+		backend_warmup_pause_resume(*this, &invoc, w);
 	} catch (const std::exception& e) {
 		this->m_is_warming_up = false;
 		fprintf(stderr,

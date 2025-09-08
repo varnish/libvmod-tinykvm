@@ -44,6 +44,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <span>
+#include <tinykvm/util/scoped_profiler.hpp>
 extern "C" {
 #include "kvm_backend.h"
 void kvm_varnishstat_program_exception();
@@ -752,41 +753,14 @@ ssize_t kvm_backend_streaming_delivery(
 
 namespace kvm {
 
-bool backend_warmup_pause_resume(MachineInstance& machine,
+static bool perform_warmup_request(
+	MachineInstance& machine,
 	const struct kvm_chain_item *invoc,
 	const std::unordered_set<std::string>& headers)
 {
-	/* This is a mock call to the backend. It makes a call to the
-	   backend to warm up the VM, but does not actually fetch the
-	   result. This is used to eg. warm up JIT caches, or to
-	   pre-allocate buffers. */
-	if constexpr (VERBOSE_BACKEND) {
-		printf("Begin backend %s %s (arg=%s)\n", invoc->inputs.method,
-			invoc->inputs.url, invoc->inputs.argument);
-	}
-	const auto timeout = machine.max_req_time();
-	auto& vm = machine.machine();
-	const struct vrt_ctx* previous_ctx = machine.ctx();
-
-	// Create a fake VRT CTX for the warmup
-	struct vrt_ctx ctx;
-	std::memset(&ctx, 0, sizeof(ctx));
-	struct http http_req;
-	std::memset(&http_req, 0, sizeof(http_req));
-	struct ws* ws = kvm_CreateWorkspace("kvm", 65536u);
-	ctx.magic = VRT_CTX_MAGIC;
-	ctx.http_req = &http_req;
-	ctx.ws       = ws;
-	machine.set_ctx(&ctx);
-
-	// Allocate space for 4 HTTP fields
-	static constexpr int HTTP_FIELDS = 4;
-	http_req.field_array = (easy_txt*)WS_Alloc(ws, sizeof(struct easy_txt) * HTTP_FIELDS);
-	http_req.fields_max  = HTTP_FIELDS;
-	http_req.field_flags = (unsigned char*)WS_Alloc(ws, sizeof(unsigned char) * HTTP_FIELDS);
-	std::memset(http_req.field_array, 0, sizeof(struct easy_txt) * HTTP_FIELDS);
-
 	try {
+		auto& vm = machine.machine();
+		const auto timeout = machine.max_req_time();
 		/* Enforce that guest program calls the backend_response system call. */
 		machine.begin_call();
 
@@ -841,14 +815,91 @@ bool backend_warmup_pause_resume(MachineInstance& machine,
 		// Skip the OUT instruction (again)
 		regs.rip += 2;
 		vm.set_registers(regs);
-		machine.set_ctx(previous_ctx);
-		kvm_FreeWorkspace(ws);
 		return true;
 	} catch (const std::exception& e) {
 		fprintf(stderr, "Error warming up backend: %s\n", e.what());
-		machine.set_ctx(previous_ctx);
-		kvm_FreeWorkspace(ws);
 		return false;
+	}
+}
+
+void backend_warmup_pause_resume(MachineInstance& machine,
+	const struct kvm_chain_item *invoc,
+	const TenantGroup::Warmup& warmup)
+{
+	/* This is a mock call to the backend. It makes a call to the
+	   backend to warm up the VM, but does not actually fetch the
+	   result. This is used to eg. warm up JIT caches, or to
+	   pre-allocate buffers. */
+	if constexpr (VERBOSE_BACKEND) {
+		printf("Begin backend %s %s (arg=%s)\n", invoc->inputs.method,
+			invoc->inputs.url, invoc->inputs.argument);
+	}
+	auto& vm = machine.machine();
+	const struct vrt_ctx* previous_ctx = machine.ctx();
+	const bool had_profiling = vm.is_profiling();
+	if (!had_profiling) {
+		vm.set_profiling(true); // Enable profiling for warmup
+	}
+	vm.profiling()->clear(); // Clear previous profiling data
+
+	// Create a fake VRT CTX for the warmup
+	struct vrt_ctx ctx;
+	std::memset(&ctx, 0, sizeof(ctx));
+	struct http http_req;
+	std::memset(&http_req, 0, sizeof(http_req));
+	struct ws* ws = kvm_CreateWorkspace("kvm", 65536u);
+	ctx.magic = VRT_CTX_MAGIC;
+	ctx.http_req  = &http_req;
+	ctx.http_resp = &http_req;
+	ctx.ws       = ws;
+	machine.set_ctx(&ctx);
+
+	// Allocate space for 4 HTTP fields
+	static constexpr int HTTP_FIELDS = 4;
+	http_req.field_array = (easy_txt*)WS_Alloc(ws, sizeof(struct easy_txt) * HTTP_FIELDS);
+	http_req.fields_max  = HTTP_FIELDS;
+	http_req.field_flags = (unsigned char*)WS_Alloc(ws, sizeof(unsigned char) * HTTP_FIELDS);
+	std::memset(http_req.field_array, 0, sizeof(struct easy_txt) * HTTP_FIELDS);
+
+	const int MAX_BAILOUT = warmup.num_requests;
+	int improvement_bailout = MAX_BAILOUT; // Stop if no improvement after N tries
+	uint64_t best_time = UINT64_MAX;
+	for (int i = 0;; i++) {
+		{
+			tinykvm::ScopedProfiler<tinykvm::MachineProfiling::UserDefined> prof(vm.profiling());
+			if (!perform_warmup_request(machine, invoc, warmup.headers))
+				break;
+		}
+		/* Check if this was an improvement */
+		if (const auto* profiler = vm.profiling(); profiler != nullptr) {
+			const auto& samples = profiler->times[tinykvm::MachineProfiling::UserDefined];
+			const bool is_improvement = (samples.back() < best_time);
+			if (is_improvement) {
+				best_time = samples.back();
+				improvement_bailout = MAX_BAILOUT; // Reset bailout counter
+				if (machine.tenant().config.group.verbose) {
+					printf("Warmup: New best time: %lu ns (iteration %d)\n", best_time, i);
+				}
+			} else {
+				// Not an improvement, so we can stop here
+				if (--improvement_bailout == 0) {
+					if (machine.tenant().config.group.verbose) {
+						printf("Warmup: No improvement after %d tries, stopping warmup. Iterations: %d\n", MAX_BAILOUT, i);
+					}
+					break;
+				}
+			}
+		}
+	}
+
+	machine.set_ctx(previous_ctx);
+	kvm_FreeWorkspace(ws);
+	/* Disable profiling again if it was disabled before */
+	if (!had_profiling) {
+		vm.set_profiling(false);
+	}
+	if constexpr (VERBOSE_BACKEND) {
+		printf("Finish backend %s %s\n", invoc->inputs.method, invoc->inputs.url);
 	}
 }
 
