@@ -1,4 +1,5 @@
 #include "program_instance.hpp"
+#include "tenant_instance.hpp"
 #include <tinykvm/rsp_client.hpp>
 
 namespace kvm {
@@ -14,7 +15,7 @@ void MachineInstance::open_debugger(uint16_t port, float timeout)
 		program().rsp_mtx.unlock();
 
 		// Listener activated
-		tinykvm::RSP server { machine(), port };
+		tinykvm::RSP server { tenant().config.request_program_filename(), machine(), port };
 		printf(">>> Remote debugger waiting on a breakpoint... (port %d)\n", port);
 		program().rspclient = server.accept();
 
