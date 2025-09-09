@@ -331,7 +331,9 @@ This will unmap 8-64GB memory areas, making them unavailable. Blacking out unuse
 
 * `warmup`
 
-Send mock requests to the VM before forking it, allowing run-times to warm up.
+Send mock requests to the VM before forking it, allowing run-times to warm up. `num_requests` to warmup is a heuristic value, which determines how many requests to transmit where the total request-time has not improved before giving up. Warmup is most often used to warm a runtime that uses a JIT-compiler for performance.
+
+Unexpectedly, sending too many requests could result in the guest dirtying too many pages that contain objects that aren't used after the request ends. Internally TinyKVM can zero pages that aren't dirty but must duplicate pages that are, and so a guest address space with more dirty pages could be slightly less performant than one that isn't. This always has to be measured, but it is recommended to not warm more than strictly necessary to warm the JIT.
 
 ```json
 	"warmup": {
