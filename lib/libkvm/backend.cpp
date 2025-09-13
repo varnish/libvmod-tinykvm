@@ -870,8 +870,17 @@ void backend_warmup_pause_resume(MachineInstance& machine,
 			if (!perform_warmup_request(machine, invoc, warmup.headers))
 				break;
 		}
-		/* Check if this was an improvement */
-		if (const auto* profiler = vm.profiling(); profiler != nullptr) {
+		if (warmup.exact) {
+			// Exact number of warmup requests, so just do that many
+			if (i+1 >= warmup.num_requests) {
+				if (machine.tenant().config.group.verbose) {
+					printf("Warmup: Completed %d exact warmup requests\n", warmup.num_requests);
+				}
+				break;
+			}
+		}
+		else if (const auto* profiler = vm.profiling(); profiler != nullptr) {
+			/* Heuristic: Check if this was an improvement */
 			const auto& samples = profiler->times[tinykvm::MachineProfiling::UserDefined];
 			const bool is_improvement = (samples.back() < best_time);
 			if (is_improvement) {

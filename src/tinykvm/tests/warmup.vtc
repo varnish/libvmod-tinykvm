@@ -15,7 +15,7 @@ int main(int argc, char **argv)
 	while (1) {
 		wait_for_requests_paused(&req);
 
-		if (counter < 15) {
+		if (IS_WARMUP_REQUEST(&req)) {
 			assert(strcmp(req.url, "/warmup") == 0);
 		} else {
 			assert(strcmp(req.url, "/1") == 0);
@@ -56,6 +56,7 @@ vcl 4.1;
 			"filename": "${tmpdir}/hello",
 			"warmup": {
 				"num_requests": 15,
+				"exact": true,
 				"url": "/warmup",
 				"headers": [
 					"Host: localhost",

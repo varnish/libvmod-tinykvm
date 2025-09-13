@@ -48,6 +48,7 @@ struct TenantGroup {
 	/* Warmup the VM before starting 'real' request handling. */
 	struct Warmup {
 		uint16_t num_requests = 0;
+		bool exact = false; /* Use exact number of requests, otherwise heuristic */
 		std::string url = "/";
 		std::string method = "GET";
 		std::unordered_set<std::string> headers {

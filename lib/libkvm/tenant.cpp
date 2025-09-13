@@ -527,6 +527,9 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 			} else {
 				group.warmup->num_requests = 20;
 			}
+			if (obj2.contains("exact")) {
+				group.warmup->exact = obj2["exact"];
+			}
 			if (obj2.contains("url")) {
 				group.warmup->url = obj2["url"];
 			}
