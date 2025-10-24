@@ -449,11 +449,11 @@ uint64_t ProgramInstance::lookup(const char* name) const
 }
 ProgramInstance::gaddr_t ProgramInstance::entry_at(const int idx) const
 {
-	return entry_address.at(idx);
+	return state.entry_address.at(idx);
 }
 void ProgramInstance::set_entry_at(const int idx, gaddr_t addr)
 {
-	entry_address.at(idx) = addr;
+	state.entry_address.at(idx) = addr;
 }
 
 Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
@@ -797,6 +797,25 @@ void ProgramInstance::try_wait_for_startup_and_initialization()
 	if constexpr (VERBOSE_STORAGE_TASK) {
 		printf("Storage: Waited %d times...\n", MAX_RETRIES - retries);
 	}
+}
+
+void ProgramInstance::save_state(void* state_area) const
+{
+	// Save the serialized state to a memory area
+	if (!state_area) {
+		throw std::runtime_error("Invalid state area");
+	}
+	memcpy(state_area, &state, sizeof(state));
+}
+bool ProgramInstance::load_state(void* state_area)
+{
+	// Load the serialized state from a memory area
+	if (!state_area) {
+		fprintf(stderr, "Invalid state area\n");
+		return false;
+	}
+	memcpy(&state, state_area, sizeof(state));
+	return true;
 }
 
 int ProgramInstance::numa_node()

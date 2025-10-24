@@ -255,6 +255,10 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 		// Cannot be larger than half of max memory.
 		group.set_shared_mem(obj.value());
 	}
+	else if (obj.key() == "cold_start_file")
+	{
+		group.cold_start_snapshot_file = apply_dollar_vars(obj.value());
+	}
 	else if (obj.key() == "concurrency")
 	{
 		group.max_concurrency = obj.value();

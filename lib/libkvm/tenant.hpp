@@ -45,6 +45,8 @@ struct TenantGroup {
 	bool     verbose = false;
 	bool     verbose_syscalls = false;
 	bool     verbose_pagetable = false;
+	std::string cold_start_snapshot_file; /* Path to cold start snapshot file */
+
 	/* Warmup the VM before starting 'real' request handling. */
 	struct Warmup {
 		uint16_t num_requests = 0;

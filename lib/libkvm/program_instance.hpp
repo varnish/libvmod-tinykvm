@@ -5,6 +5,7 @@
 #include "settings.hpp"
 #include "server/epoll.hpp"
 #include "server/websocket.hpp"
+#include "serialized_state.hpp"
 #include "utils/cpptime.hpp"
 #include <blockingconcurrentqueue.h>
 #include <tinykvm/util/threadpool.h>
@@ -47,21 +48,6 @@ struct VMPoolItem {
 struct Reservation {
 	VMPoolItem* slot;
 	priv_task_free_func_t free;
-};
-
-enum class ProgramEntryIndex : uint8_t {
-	ON_RECV = 0,
-	BACKEND_GET  = 1,
-	BACKEND_POST = 2,
-	BACKEND_METHOD = 3,
-	BACKEND_STREAM = 4,
-	BACKEND_ERROR  = 5,
-	LIVEUPD_SERIALIZE = 6,
-	LIVEUPD_DESERIALIZE = 7,
-
-	SOCKET_PAUSE_RESUME_API = 12,
-
-	TOTAL_ENTRIES
 };
 
 class Storage {
@@ -179,10 +165,10 @@ public:
 	/* Queue of work to happen on storage VM. Serialized access. */
 	tinykvm::ThreadTask<std::function<long()>> m_storage_queue;
 
-	/* Entry points in the tenants program. Handlers for all types of
-	   requests, serialization mechanisms and related functionality.
-	   NOTE: Limiting the entries to lower 32-bits, for now. */
-	std::array<uint32_t, (size_t)ProgramEntryIndex::TOTAL_ENTRIES> entry_address {};
+	/* Serialized state for the program instance. */
+	SerializedState state;
+	bool load_state(void* state_area);
+	void save_state(void* state_area) const;
 
 	/* The timer system needs to be destroyed before any of the other
 	   things, like the storage and request VMs. Timers carry capture

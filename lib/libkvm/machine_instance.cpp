@@ -100,6 +100,7 @@ MachineInstance::MachineInstance(
 	  m_machine(select_main_binary(binary), tinykvm::MachineOptions{
 		.max_mem = ten->config.max_address(),
 		.max_cow_mem = 0UL,
+		.stack_size = MAIN_STACK_SIZE,
 		.vmem_base_address = detect_gigapage_from(binary),
 		.remappings {ten->config.group.vmem_remappings},
 		.verbose_loader = ten->config.group.verbose,
@@ -109,7 +110,8 @@ MachineInstance::MachineInstance(
 		.split_hugepages = false,
 		.relocate_fixed_mmap = ten->config.group.relocate_fixed_mmap,
 		.executable_heap = ten->config.group.vmem_heap_executable || is_interpreted_binary(binary),
-		.mmap_backed_files = ten->config.group.mmap_backed_files,
+		.mmap_backed_files = ten->config.group.mmap_backed_files && (storage || ten->config.group.cold_start_snapshot_file.empty()),
+		.snapshot_file = ten->config.group.cold_start_snapshot_file,
 		.hugepages_arena_size = ten->config.group.hugepage_arena_size,
 	  }),
 	  m_tenant(ten), m_inst(inst),
@@ -201,22 +203,23 @@ MachineInstance::MachineInstance(
 void MachineInstance::initialize()
 {
 	try {
-		/* Some run-times are quite buggy. Zig makes a calculation on
-		   RSP and the loadable segments in order to find img_base.
-		   This calculation results in a panic when the stack is
-		   below the program and heap. Workaround: Move above.
-		   TOOD: Make sure we have room for it, using memory limits. */
-		const auto stack = machine().mmap_allocate(MAIN_STACK_SIZE);
-		const auto stack_end = stack + MAIN_STACK_SIZE;
-		machine().set_stack_address(stack_end);
-		//printf("Heap BRK: 0x%lX -> 0x%lX\n", machine().heap_address(), machine().heap_address() + tinykvm::Machine::BRK_MAX);
-		//printf("Stack: 0x%lX -> 0x%lX\n", stack, stack + MAIN_STACK_SIZE);
-
 		// This can probably be solved later, but for now they are incompatible
 		if (shared_memory_size() > 0 && !tenant().config.group.vmem_remappings.empty())
 		{
 			throw std::runtime_error("Shared memory is currently incompatible with vmem remappings");
 		}
+
+		// Check if fast cold start file is used, and if so load the state
+		if (!is_storage() && machine().has_snapshot_state()) {
+			printf("Loaded cold start state from: %s\n",
+				tenant().config.group.cold_start_snapshot_file.c_str());
+			// Load the programs state as well
+			program().load_state(machine().get_snapshot_state_user_area());
+			// Set as waiting for requests
+			this->wait_for_requests();
+			return;
+		}
+
 		// Global shared memory boundary
 		const uint64_t shm_boundary = shared_memory_boundary();
 		//printf("Shared memory boundary: 0x%lX Max addr: 0x%lX\n",
@@ -298,12 +301,13 @@ void MachineInstance::initialize()
 			machine().prepare_copy_on_write(0UL, shm_boundary);
 		}
 
-		// Set new vmcall stack base lower than current RSP, in
-		// order to avoid trampling stack-allocated things in main.
-		auto rsp = machine().registers().rsp;
-		if (rsp >= stack && rsp < stack_end) {
-			rsp = (rsp - 128UL) & ~0xFLL; // Avoid red-zone if main is leaf
-			machine().set_stack_address(rsp);
+		// If fast cold start file is used, we should store the VM state as well
+		if (!is_storage() && !tenant().config.group.cold_start_snapshot_file.empty()) {
+			machine().save_snapshot_state_now();
+			// Save program state as well
+			program().save_state(machine().get_snapshot_state_user_area());
+			printf("Saved cold start state to '%s'\n",
+				tenant().config.group.cold_start_snapshot_file.c_str());
 		}
 	}
 	catch (const tinykvm::MachineException& me)
