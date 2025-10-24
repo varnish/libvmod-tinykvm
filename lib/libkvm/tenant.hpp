@@ -93,6 +93,7 @@ struct TenantGroup {
 		std::string uri;
 		std::string filepath;
 		std::string sha256; /* Optional SHA256 checksum */
+		std::string md5;    /* Optional MD5 checksum */
 	};
 	std::vector<DownloadItem> downloads;
 
@@ -141,6 +142,7 @@ struct TenantConfig
 	std::string    key;
 	std::string    uri;       /* Can be fetched here (program URI archive). */
 	std::string    sha256;    /* Optional SHA256 checksum of the program binary. */
+	std::string    md5;       /* Optional MD5 checksum of the program binary. */
 
 	std::string request_program_filename() const noexcept { return this->filename; }
 	std::string storage_program_filename() const noexcept { return this->filename + "_storage"; }
@@ -167,7 +169,7 @@ struct TenantConfig
 	auto&    environ() const noexcept { return group.environ; }
 
 	TenantConfig(std::string nm, std::string fname, std::string key,
-		TenantGroup grp, std::string uri, std::string sha256_str);
+		TenantGroup grp, std::string uri, std::string sha256_str, std::string md5_str);
 	~TenantConfig();
 
 	/* One allowed file for persistence / state-keeping */

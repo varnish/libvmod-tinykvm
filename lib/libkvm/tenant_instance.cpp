@@ -19,6 +19,8 @@
 #include "common_defs.hpp"
 #include "program_instance.hpp"
 #include "varnish.hpp"
+//#include <openssl/sha.h>
+#include <openssl/md5.h>
 #include <sys/stat.h>
 #include <unistd.h>
 extern "C" void VTIM_format(double, char[32]);
@@ -26,6 +28,7 @@ extern "C" void VTIM_format(double, char[32]);
 namespace kvm {
 extern std::vector<uint8_t> file_loader(const std::string&);
 extern std::string create_sha256_from_file(const std::string&);
+extern std::string create_md5_from_file(const std::string&);
 
 TenantInstance::TenantInstance(const TenantConfig& conf)
 	: config{conf}
@@ -65,28 +68,28 @@ void TenantInstance::begin_initialize(VRT_CTX, bool debug)
 
 	bool filename_accessible = false;
 	bool file_verified = false;
-	std::string filename_mtime = "";
 
 	if (!config.filename.empty()) {
 		if (access(config.filename.c_str(), R_OK) == 0)
 		{
 			filename_accessible = true;
-			struct stat st;
-			if (stat(config.filename.c_str(), &st) == 0) {
-				char buf[32];
-				VTIM_format(st.st_mtim.tv_sec, buf);
-				filename_mtime = "If-Modified-Since: " + std::string(buf);
-			}
-			// If SHA256 is specified, verify the file
 			if (!config.sha256.empty()) {
+				// If SHA256 is specified, verify the file
 				std::string hash_hex = create_sha256_from_file(config.filename);
 				if (hash_hex == config.sha256) {
 					file_verified = true;
-				} else {
-					if (config.group.verbose) {
-						printf("Local file '%s' exists but hash mismatch: %s vs %s, will re-download if URI is given\n",
-							config.filename.c_str(), hash_hex.c_str(), config.sha256.c_str());
-					}
+				} else if (config.group.verbose) {
+					printf("Local file '%s' exists but hash mismatch: %s vs %s, will re-download if URI is given\n",
+						config.filename.c_str(), hash_hex.c_str(), config.sha256.c_str());
+				}
+			} else if (!config.md5.empty()) {
+				// If MD5 is specified, verify the file
+				std::string hash_hex = create_md5_from_file(config.filename);
+				if (hash_hex == config.md5) {
+					file_verified = true;
+				} else if (config.group.verbose) {
+					printf("Local file '%s' exists but MD5 mismatch: %s vs %s, will re-download if URI is given\n",
+						config.filename.c_str(), hash_hex.c_str(), config.md5.c_str());
 				}
 			}
 		}
@@ -97,6 +100,13 @@ void TenantInstance::begin_initialize(VRT_CTX, bool debug)
 	{
 		/* Load the program from cURL fetch. */
 		try {
+			std::string filename_mtime;
+			struct stat st;
+			if (stat(config.filename.c_str(), &st) == 0) {
+				char buf[32];
+				VTIM_format(st.st_mtim.tv_sec, buf);
+				filename_mtime = "If-Modified-Since: " + std::string(buf);
+			}
 			auto prog = std::make_shared<ProgramInstance> (
 				config.uri, std::move(filename_mtime), ctx, this, debug);
 			std::atomic_store(&this->program, std::move(prog));
@@ -346,16 +356,65 @@ std::vector<uint8_t> file_loader(const std::string& filename)
 }
 std::string create_sha256_from_file(const std::string& filename)
 {
-	auto filedata = file_loader(filename);
+	const int fd = open(filename.c_str(), O_RDONLY);
+	if (fd < 0) {
+		throw std::runtime_error("Could not open file for SHA256: " + filename);
+	}
+	struct stat st;
+	if (fstat(fd, &st) != 0) {
+		close(fd);
+		throw std::runtime_error("Could not stat file for SHA256: " + filename);
+	}
+	void* mapped = mmap(nullptr, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	close(fd); // Close immediately after mmap
+	if (mapped == MAP_FAILED) {
+		throw std::runtime_error("Could not mmap file for SHA256: " + filename);
+	}
+
 	unsigned char hash[SHA256_DIGEST_LENGTH];
 	SHA256_CTX sha256;
 	SHA256_Init(&sha256);
-	SHA256_Update(&sha256, filedata.data(), filedata.size());
+	SHA256_Update(&sha256, mapped, st.st_size);
 	SHA256_Final(hash, &sha256);
+	munmap(mapped, st.st_size);
 
-	std::string hash_hex(64, 0);
+	static constexpr char lut[] = "0123456789abcdef";
+	std::string hash_hex(SHA256_DIGEST_LENGTH * 2, 0);
 	for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
-		sprintf(&hash_hex[i * 2], "%02x", hash[i]);
+		hash_hex[i * 2]     = lut[(hash[i] >> 4) & 0x0F];
+		hash_hex[i * 2 + 1] = lut[hash[i] & 0x0F];
+	}
+	return hash_hex;
+}
+std::string create_md5_from_file(const std::string& filename)
+{
+	const int fd = open(filename.c_str(), O_RDONLY);
+	if (fd < 0) {
+		throw std::runtime_error("Could not open file for MD5: " + filename);
+	}
+	struct stat st;
+	if (fstat(fd, &st) != 0) {
+		close(fd);
+		throw std::runtime_error("Could not stat file for MD5: " + filename);
+	}
+	void* mapped = mmap(nullptr, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	close(fd); // Close immediately after mmap
+	if (mapped == MAP_FAILED) {
+		throw std::runtime_error("Could not mmap file for MD5: " + filename);
+	}
+
+	unsigned char hash[MD5_DIGEST_LENGTH];
+	MD5_CTX md5;
+	MD5_Init(&md5);
+	MD5_Update(&md5, mapped, st.st_size);
+	MD5_Final(hash, &md5);
+	munmap(mapped, st.st_size);
+
+	static constexpr char lut[] = "0123456789abcdef";
+	std::string hash_hex(MD5_DIGEST_LENGTH * 2, 0);
+	for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
+		hash_hex[i * 2]     = lut[(hash[i] >> 4) & 0x0F];
+		hash_hex[i * 2 + 1] = lut[hash[i] & 0x0F];
 	}
 	return hash_hex;
 }

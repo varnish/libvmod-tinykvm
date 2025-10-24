@@ -40,6 +40,7 @@ extern int numa_max_node();
 namespace kvm {
 extern std::vector<uint8_t> file_loader(const std::string&);
 extern std::string create_sha256_from_file(const std::string&);
+extern std::string create_md5_from_file(const std::string&);
 extern bool file_writer(const std::string& file, const std::vector<uint8_t>&);
 extern void extract_programs_to(kvm::ProgramInstance&, const char *, size_t);
 static constexpr bool VERBOSE_STORAGE_TASK = false;
@@ -436,19 +437,21 @@ uint64_t ProgramInstance::download_dependencies(const TenantInstance* ten)
 		if (!item.sha256.empty() && std::filesystem::exists(item.filepath)) {
 			// Calculate SHA256 of existing file
 			std::string hash_hex = create_sha256_from_file(item.filepath);
-			if (ten->config.group.verbose) {
-				printf("Calculated SHA256 for '%s': %s vs %s\n", item.filepath.c_str(), hash_hex.c_str(), item.sha256.c_str());
-			}
-			// Compare with expected hash
 			if (hash_hex == item.sha256) {
-				// File is already downloaded and verified
-				if (ten->config.group.verbose) {
-					printf("Dependency '%s' already exists and verified\n", item.filepath.c_str());
-				}
 				continue;
 			} else {
 				if (ten->config.group.verbose) {
 					printf("Dependency '%s' exists but hash mismatch, re-downloading\n", item.filepath.c_str());
+				}
+			}
+		} else if (!item.md5.empty() && std::filesystem::exists(item.filepath)) {
+			// Calculate MD5 of existing file
+			std::string hash_hex = create_md5_from_file(item.filepath);
+			if (hash_hex == item.md5) {
+				continue;
+			} else {
+				if (ten->config.group.verbose) {
+					printf("Dependency '%s' exists but MD5 mismatch, re-downloading\n", item.filepath.c_str());
 				}
 			}
 		}

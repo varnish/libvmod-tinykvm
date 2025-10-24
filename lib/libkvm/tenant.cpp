@@ -70,10 +70,10 @@ const std::string TenantConfig::guest_state_file = "state";
 
 TenantConfig::TenantConfig(
 	std::string n, std::string f, std::string k,
-	TenantGroup grp, std::string uri, std::string sha256_str)
+	TenantGroup grp, std::string uri, std::string sha256_str, std::string md5_str)
 	: name(std::move(n)), hash{crc32c_hw(n)}, group{std::move(grp)},
 	  filename(std::move(f)), key(std::move(k)),
-	  uri(std::move(uri)), sha256(std::move(sha256_str))
+	  uri(std::move(uri)), sha256(std::move(sha256_str)), md5(std::move(md5_str))
 {
 	this->allowed_file = filename + ".state";
 }
@@ -464,6 +464,9 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 			if (it.contains("sha256")) {
 				item.sha256 = it["sha256"].template get<std::string>();
 			}
+			if (it.contains("md5")) {
+				item.md5 = it["md5"].template get<std::string>();
+			}
 			group.downloads.push_back(std::move(item));
 		}
 	}
@@ -558,6 +561,7 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	else if (obj.key() == "uri")   { /* Silently ignore. */ }
 	else if (obj.key() == "filename") { /* Silently ignore. */ }
 	else if (obj.key() == "sha256") { /* Silently ignore. */ }
+	else if (obj.key() == "md5") { /* Silently ignore. */ }
 	else if (obj.key() == "start") { /* Silently ignore. */ }
 	else
 	{
@@ -656,6 +660,11 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 			if (obj.contains("sha256")) {
 				sha256_str = obj["sha256"];
 			}
+			/* MD5 is optional. */
+			std::string md5_str = "";
+			if (obj.contains("md5")) {
+				md5_str = obj["md5"];
+			}
 			/* Keys are optional. No/empty key = no live update. */
 			std::string lvu_key = "";
 			if (obj.contains("key")) lvu_key = obj["key"];
@@ -679,7 +688,8 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 				std::move(lvu_key),
 				std::move(group),
 				std::move(uri),
-				std::move(sha256_str)
+				std::move(sha256_str),
+				std::move(md5_str)
 			}, initialize_or_configured_to_start);
 		}
 	}
