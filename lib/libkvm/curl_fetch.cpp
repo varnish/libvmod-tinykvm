@@ -117,14 +117,11 @@ extern "C"
 int kvm_curl_fetch_into_file(const char *url, const char *filepath)
 {
 	std::string filename_mtime = "";
-	if (access(filepath, R_OK) == 0)
-	{
-		struct stat st;
-		if (stat(filepath, &st) == 0) {
-			char buf[32];
-			VTIM_format(st.st_mtim.tv_sec, buf);
-			filename_mtime = "If-Modified-Since: " + std::string(buf);
-		}
+	struct stat st;
+	if (stat(filepath, &st) == 0) {
+		char buf[32];
+		VTIM_format(st.st_mtim.tv_sec, buf);
+		filename_mtime = "If-Modified-Since: " + std::string(buf);
 	}
 
 	struct CurlData {

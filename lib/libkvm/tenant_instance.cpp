@@ -24,7 +24,8 @@
 extern "C" void VTIM_format(double, char[32]);
 
 namespace kvm {
-	extern std::vector<uint8_t> file_loader(const std::string&);
+extern std::vector<uint8_t> file_loader(const std::string&);
+extern std::string create_sha256_from_file(const std::string&);
 
 TenantInstance::TenantInstance(const TenantConfig& conf)
 	: config{conf}
@@ -63,6 +64,7 @@ void TenantInstance::begin_initialize(VRT_CTX, bool debug)
 	this->m_started_init = true;
 
 	bool filename_accessible = false;
+	bool file_verified = false;
 	std::string filename_mtime = "";
 
 	if (!config.filename.empty()) {
@@ -75,11 +77,23 @@ void TenantInstance::begin_initialize(VRT_CTX, bool debug)
 				VTIM_format(st.st_mtim.tv_sec, buf);
 				filename_mtime = "If-Modified-Since: " + std::string(buf);
 			}
+			// If SHA256 is specified, verify the file
+			if (!config.sha256.empty()) {
+				std::string hash_hex = create_sha256_from_file(config.filename);
+				if (hash_hex == config.sha256) {
+					file_verified = true;
+				} else {
+					if (config.group.verbose) {
+						printf("Local file '%s' exists but hash mismatch: %s vs %s, will re-download if URI is given\n",
+							config.filename.c_str(), hash_hex.c_str(), config.sha256.c_str());
+					}
+				}
+			}
 		}
 	}
 
-	/* 1. If program has an URI, use cURL. */
-	if (!config.uri.empty())
+	/* 1. If program has an URI, use cURL (unless SHA256 is verified). */
+	if (!config.uri.empty() && !file_verified)
 	{
 		/* Load the program from cURL fetch. */
 		try {
@@ -329,6 +343,21 @@ std::vector<uint8_t> file_loader(const std::string& filename)
     }
     fclose(f);
     return result;
+}
+std::string create_sha256_from_file(const std::string& filename)
+{
+	auto filedata = file_loader(filename);
+	unsigned char hash[SHA256_DIGEST_LENGTH];
+	SHA256_CTX sha256;
+	SHA256_Init(&sha256);
+	SHA256_Update(&sha256, filedata.data(), filedata.size());
+	SHA256_Final(hash, &sha256);
+
+	std::string hash_hex(64, 0);
+	for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+		sprintf(&hash_hex[i * 2], "%02x", hash[i]);
+	}
+	return hash_hex;
 }
 
 void TenantInstance::serialize_storage_state(

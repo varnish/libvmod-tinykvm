@@ -39,6 +39,7 @@ extern int numa_max_node();
 }
 namespace kvm {
 extern std::vector<uint8_t> file_loader(const std::string&);
+extern std::string create_sha256_from_file(const std::string&);
 extern bool file_writer(const std::string& file, const std::vector<uint8_t>&);
 extern void extract_programs_to(kvm::ProgramInstance&, const char *, size_t);
 static constexpr bool VERBOSE_STORAGE_TASK = false;
@@ -431,9 +432,38 @@ uint64_t ProgramInstance::download_dependencies(const TenantInstance* ten)
 		// Figure out the absolute path and then create the directory
 		std::filesystem::path dir = std::filesystem::path(item.filepath).parent_path();
 		std::filesystem::create_directories(dir);
+		// Check if the file already exists with correct hash
+		if (!item.sha256.empty() && std::filesystem::exists(item.filepath)) {
+			// Calculate SHA256 of existing file
+			std::string hash_hex = create_sha256_from_file(item.filepath);
+			if (ten->config.group.verbose) {
+				printf("Calculated SHA256 for '%s': %s vs %s\n", item.filepath.c_str(), hash_hex.c_str(), item.sha256.c_str());
+			}
+			// Compare with expected hash
+			if (hash_hex == item.sha256) {
+				// File is already downloaded and verified
+				if (ten->config.group.verbose) {
+					printf("Dependency '%s' already exists and verified\n", item.filepath.c_str());
+				}
+				continue;
+			} else {
+				if (ten->config.group.verbose) {
+					printf("Dependency '%s' exists but hash mismatch, re-downloading\n", item.filepath.c_str());
+				}
+			}
+		}
 		// Start the download using kvm_curl_fetch()
 		threads.emplace_back([item]() {
 			kvm_curl_fetch_into_file(item.uri.c_str(), item.filepath.c_str());
+			// Optionally, verify the downloaded file's SHA256 hash
+			if (!item.sha256.empty()) {
+				std::string hash_hex = create_sha256_from_file(item.filepath);
+				if (hash_hex != item.sha256) {
+					// Print a warning
+					fprintf(stderr, "Warning: Downloaded file '%s' hash mismatch: %s vs %s\n",
+						item.filepath.c_str(), hash_hex.c_str(), item.sha256.c_str());
+				}
+			}
 		});
 	}
 	for (auto& thread : threads) {
