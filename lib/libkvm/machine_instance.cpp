@@ -217,6 +217,9 @@ void MachineInstance::initialize()
 			program().load_state(machine().get_snapshot_state_user_area());
 			// Set as waiting for requests
 			this->wait_for_requests();
+			if (tenant().config.group.verbose_pagetable) {
+				machine().print_pagetables();
+			}
 			return;
 		}
 
@@ -263,11 +266,6 @@ void MachineInstance::initialize()
 		// Build stack, auxvec, envp and program arguments
 		machine().setup_linux(args, envp);
 
-		// If verbose pagetables, print them just before running
-		if (tenant().config.group.verbose_pagetable) {
-			machine().print_pagetables();
-		}
-
 		if (this->is_debug()) {
 			this->open_debugger(2159, 120.0f);
 		}
@@ -308,6 +306,11 @@ void MachineInstance::initialize()
 			program().save_state(machine().get_snapshot_state_user_area());
 			printf("Saved cold start state to '%s'\n",
 				tenant().config.group.cold_start_snapshot_file.c_str());
+		}
+
+		// If verbose pagetables, print them after running
+		if (tenant().config.group.verbose_pagetable) {
+			machine().print_pagetables();
 		}
 	}
 	catch (const tinykvm::MachineException& me)
