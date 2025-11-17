@@ -4,8 +4,8 @@ project (kvm_sandbox C CXX)
 option(SHARED_KVM "Build the KVM sandbox PIC" ON)
 
 # WARNING: everything!
-set(CMAKE_C_FLAGS "-Wall -Wextra -std=c11 -O2 -g")
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++17 -O2 -g")
+set(CMAKE_C_FLAGS "-Wall -Wextra -Wno-deprecated-copy -Wno-deprecated-declarations -Wno-unused-parameter -std=c11 -O2 -g")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-deprecated-copy -Wno-deprecated-declarations -Wno-unused-parameter -std=c++17 -O2 -g")
 
 set(KVM_SOURCES
 	archive.cpp

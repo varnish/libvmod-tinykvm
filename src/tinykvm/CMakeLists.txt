@@ -7,6 +7,10 @@ add_vmod(vmod_tinykvm vmod_tinykvm.vcc "High-Performance Compute VMOD"
 	vmod_tinykvm_event.c
 )
 target_link_libraries(vmod_tinykvm kvm)
+target_compile_options(vmod_tinykvm PRIVATE
+	-Wno-unused-parameter
+	-Wno-deprecated-declarations
+)
 add_vmod_vsc(vmod_tinykvm VSC_vmod_kvm.vsc)
 
 # Compute tests

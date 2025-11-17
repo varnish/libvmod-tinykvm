@@ -30,6 +30,7 @@ KVM_GID=$(getent group kvm | cut -d: -f3) docker compose up
 The build dependencies for this VMOD can be found in CI, but briefly:
 ```
 varnish-dev
+libssl-dev
 libcurl4-openssl-dev
 libpcre3-dev
 libarchive-dev
