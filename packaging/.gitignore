@@ -1,0 +1,11 @@
+**/usr
+**/debian/varnish-lambda*
+**/debian/.debhelper/
+*.buildinfo
+*.changes
+*.dsc
+*.deb
+*.udeb
+*.tar.xz
+*.tar.gz
+debhelper-build-stamp

@@ -6,7 +6,7 @@ backend default none;
 sub vcl_init {
 	# Download and activate a Varnish-provided library of compute programs.
 	# A full list of programs and how they can be used would be on the docs site.
-	tinykvm.library("https://filebin.varnish-software.com/tinykvm_programs/compute.json");
+	tinykvm.library("https://filebin.varnish-software.com/4wbvu68xy1epbuzv/compute.json");
 
 	# Tell VMOD compute how to contact Varnish (Unix Socket *ONLY*)
 	tinykvm.init_self_requests("/tmp/tinykvm.sock");
@@ -58,7 +58,7 @@ sub vcl_backend_fetch {
 		set bereq.backend = tinykvm.program("avif");
 	}
 	else if (bereq.url == "/avif/image") {
-		set bereq.backend = tinykvm.program("fetch", "https://filebin.varnish-software.com/tinykvm_programs/rose.jpg",
+		set bereq.backend = tinykvm.program("fetch", "https://filebin.varnish-software.com/4wbvu68xy1epbuzv/rose.jpg",
 			"""{
 				"headers": ["Host: filebin.varnish-software.com"]
 			}""");
@@ -100,7 +100,7 @@ sub vcl_backend_fetch {
 	}
 	else if (bereq.url == "/zstd") {
 		# Compress data using zstandard
-		tinykvm.chain("zstd", "https://filebin.varnish-software.com/tinykvm_programs/waterfall.avif",
+		tinykvm.chain("zstd", "https://filebin.varnish-software.com/4wbvu68xy1epbuzv/waterfall.avif",
 			"""{
 				"action": "compress",
 				"level": 6,
@@ -127,13 +127,13 @@ sub vcl_backend_fetch {
 			"""{ "json": "value" }""");
 	}
 	else if (bereq.url == "/minify.json") {
-		set bereq.backend = tinykvm.program("fetch", "https://filebin.varnish-software.com/tinykvm_programs/compute.json",
+		set bereq.backend = tinykvm.program("fetch", "https://filebin.varnish-software.com/4wbvu68xy1epbuzv/compute.json",
 			"""{
 				"headers": ["Host: filebin.varnish-software.com"]
 			}""");
 	}
 	else if (bereq.url == "/chain") {
-		set bereq.backend = tinykvm.program("fetch", "https://filebin.varnish-software.com/tinykvm_programs/723-1200x1200.jpg",
+		set bereq.backend = tinykvm.program("fetch", "https://filebin.varnish-software.com/4wbvu68xy1epbuzv/723-1200x1200.jpg",
 			"""{
 				"headers": ["Host: filebin.varnish-software.com"]
 			}""");

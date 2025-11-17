@@ -1,0 +1,5 @@
+varnish-lambda (1.0-1) UNRELEASED; urgency=medium
+
+  * Initial release (Closes: #nnnn)  <nnnn is the bug number of your ITP>
+
+ -- Gonzo <gonzo@unknown>  Wed, 05 Oct 2022 21:52:19 +0200
