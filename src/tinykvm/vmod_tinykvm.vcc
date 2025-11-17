@@ -1,4 +1,5 @@
 $Module tinykvm 3 "High-Performance Compute For Varnish Cache"
+$Addon
 
 DESCRIPTION
 ===========
