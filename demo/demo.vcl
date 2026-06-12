@@ -5,8 +5,8 @@ backend default none;
 sub vcl_init {
 	# Download and activate a Varnish-provided library of compute programs.
 	# A full list of programs and how they can be used would be on the docs site.
-	tinykvm.library("https://filebin.varnish-software.com/tinykvm_programs/compute.json");
-	#tinykvm.library("file:///home/gonzo/github/kvm_demo/compute.json");
+	#tinykvm.library("https://filebin.varnish-software.com/tinykvm_programs/compute.json");
+	tinykvm.library("file:///home/gonzo/github/kvm_demo/compute.json");
 
 	# Tell VMOD compute how to contact Varnish (Unix Socket *ONLY*)
 	tinykvm.init_self_requests("/tmp/tinykvm.sock");
