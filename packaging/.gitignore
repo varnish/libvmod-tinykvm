@@ -1,11 +1,10 @@
-**/usr
-**/debian/varnish-lambda*
-**/debian/.debhelper/
+# Build artifacts produced by packaging/ci/build-package.sh and dpkg-buildpackage.
+packages/
 *.buildinfo
 *.changes
 *.dsc
 *.deb
 *.udeb
+*.rpm
 *.tar.xz
 *.tar.gz
-debhelper-build-stamp

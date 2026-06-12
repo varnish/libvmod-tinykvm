@@ -1,0 +1,3 @@
+usr/lib/varnish*/vmods/libvmod_kvm.so
+usr/lib/varnish*/vmods/libvmod_tinykvm.so
+usr/share/man/man3/*

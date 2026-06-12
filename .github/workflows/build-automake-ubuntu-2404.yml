@@ -1,0 +1,75 @@
+name: Automake + Varnish Enterprise (Ubuntu Linux 24.04)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-automake-vcp-ubuntu-24.04
+  cancel-in-progress: true
+
+jobs:
+  automake:
+    name: Automake + Varnish Enterprise (Ubuntu Linux 24.04)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Varnish Enterprise (Varnish Plus)
+        run: |
+          # The 60-enterprise packagecloud repo is publicly installable.
+          # varnish-plus-dev pulls in varnish-plus and provides varnish-dev,
+          # vmodtool, varnish.m4 and the varnishapi pkg-config files. Because it
+          # installs libs under $libdir/varnish-plus, configure auto-enables
+          # BUILD_FOR_VCP and builds the VMODs with -DVARNISH_PLUS=1.
+          sudo apt-get update
+          sudo apt-get install -y apt-transport-https
+          curl -s https://packagecloud.io/install/repositories/varnishplus/60-enterprise/script.deb.sh | sudo bash
+          sudo apt-get update
+          sudo apt-get install -y varnish-plus varnish-plus-dev
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get install -y \
+            g++ \
+            clang \
+            autoconf \
+            automake \
+            libtool \
+            cmake \
+            python3 \
+            python3-docutils \
+            pkg-config \
+            libcurl4-openssl-dev \
+            libarchive-dev \
+            ccache
+
+      - name: '🚧 CCache setup'
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: automake-ubuntu-linux-24.04
+          max-size: 200M
+
+      - name: Bootstrap (autogen + configure)
+        env:
+          CC: ccache clang
+          CXX: ccache clang++
+        run: ./bootstrap
+
+      - name: Build
+        run: make -j4
+
+      - name: Test
+        run: make check VERBOSE=1
+
+      - name: Show test logs on failure
+        if: failure()
+        run: |
+          for log in src/kvm/test-suite.log src/tinykvm/test-suite.log; do
+            [ -f "$log" ] && { echo "===== $log ====="; cat "$log"; }
+          done
+          true

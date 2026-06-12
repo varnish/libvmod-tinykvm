@@ -1,0 +1,5 @@
+libvmod-compute (@SRCVER@-@PKGVER@~@DISTVER@) UNRELEASED; urgency=medium
+
+  * This changelog is not in use.
+
+ -- Varnish Software <support@varnish-software.com>  Mon, 02 Jun 2025 12:00:00 +0100

@@ -1,0 +1,42 @@
+#!/usr/bin/make -f
+export DH_VERBOSE=1
+
+LOCAL_CONFIGURE_FLAGS = --localstatedir=/var/lib --libdir=/usr/lib
+export DEB_BUILD_MAINT_OPTIONS=optimize=-lto,-stackclash
+export DEB_BUILD_OPTIONS=noautodbgsym
+
+# Let dh-autoreconf's aclocal find varnish.m4 (shipped by varnish-plus-dev).
+export ACLOCAL_PATH = $(shell pkg-config --variable=datarootdir varnishapi)/aclocal
+
+VARNISH_INCLUDES = $(shell pkg-config --variable=pkgincludedir varnishapi)
+
+VARNISHD_VRT = $(shell \
+	printf '\n%s.%s\n' \
+		VRT_MAJOR_VERSION VRT_MINOR_VERSION | \
+	cpp --include $(VARNISH_INCLUDES)/vdef.h --include $(VARNISH_INCLUDES)/vrt.h - | \
+	tail -1 | \
+	tr -c -d '[0-9.]')
+
+# Force the autoconf buildsystem: the source tree also ships a top-level
+# CMakeLists.txt (the developer build), which debhelper would otherwise
+# auto-detect and drive instead of ./configure.
+%:
+	dh $@ --parallel --buildsystem=autoconf
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(LOCAL_CONFIGURE_FLAGS)
+
+override_dh_auto_install:
+	dh_auto_install --destdir=$(CURDIR)/debian/tmp
+
+override_dh_auto_test:
+	echo "Skipping tests."
+
+override_dh_gencontrol:
+	echo "varnishd:VRT=varnishd-vrt (=$(VARNISHD_VRT))" >> debian/substvars
+
+	if [ -n "$$DEBIAN_OVERRIDE_BINARY_VERSION" ]; then \
+		dh_gencontrol -- -Tdebian/substvars -v$$DEBIAN_OVERRIDE_BINARY_VERSION; \
+	else \
+		dh_gencontrol -- -Tdebian/substvars; \
+	fi

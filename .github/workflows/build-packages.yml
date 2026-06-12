@@ -1,0 +1,129 @@
+name: Packages (Varnish Enterprise)
+
+# Builds native libvmod-compute packages for every distro/architecture where
+# Varnish Enterprise (varnish-plus) is published, in the same naming format as
+# the enterprise sledge packages, e.g.
+#   libvmod-compute_1.0~6.0.18r2-1~noble_amd64.deb
+#   libvmod-compute-1.0~6.0.18r2-1.el9.x86_64.rpm
+# Packages are uploaded as CI artifacts.
+
+# Manual-only: this builds against Varnish Enterprise (varnish-plus) and is not
+# meant to run on every push/PR. Trigger it from the Actions tab ("Run
+# workflow") and pick the Varnish Enterprise version to build against.
+on:
+  workflow_dispatch:
+    inputs:
+      vcp_version:
+        description: "Varnish Enterprise version"
+        type: choice
+        default: latest
+        options:
+          - latest
+          - 6.0.18r2
+          - 6.0.17r4
+          - 6.0.16r13
+      vcp_version_custom:
+        description: "Custom version override (e.g. 6.0.15r1). Takes precedence over the dropdown when set."
+        type: string
+        default: ""
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The custom free-text field wins when non-empty, otherwise use the dropdown.
+  VCP_VERSION: ${{ inputs.vcp_version_custom != '' && inputs.vcp_version_custom || inputs.vcp_version }}
+
+jobs:
+  package:
+    name: ${{ matrix.target.label }} (${{ matrix.arch.name }})
+    runs-on: ${{ matrix.arch.runner }}
+    container: ${{ matrix.target.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - { name: amd64, runner: ubuntu-24.04 }
+          - { name: arm64, runner: ubuntu-24.04-arm }
+        target:
+          # The distro set mirrors upstream varnish/varnish check.yml, narrowed
+          # to where varnish-plus / varnish-plus-dev(el) actually ships.
+          - { label: ubuntu-jammy,    family: deb, codename: jammy,    image: "ubuntu:22.04" }
+          - { label: ubuntu-noble,    family: deb, codename: noble,    image: "ubuntu:24.04" }
+          - { label: debian-bookworm, family: deb, codename: bookworm, image: "debian:bookworm" }
+          - { label: debian-trixie,   family: deb, codename: trixie,   image: "debian:trixie" }
+          - { label: almalinux-8,     family: rpm, dist: el8,          image: "almalinux:8" }
+          - { label: almalinux-9,     family: rpm, dist: el9,          image: "almalinux:9" }
+          - { label: almalinux-10,    family: rpm, dist: el10,         image: "almalinux:10" }
+          - { label: amazonlinux-2023, family: rpm, dist: amzn2023,    image: "amazonlinux:2023" }
+        exclude:
+          # varnish-plus / varnish-plus-devel is not published for el8 on
+          # aarch64 (only amd64), so the arm64 alma-8 build cannot resolve its
+          # build dependencies. amd64 alma-8 still builds.
+          - { arch: { name: arm64, runner: ubuntu-24.04-arm }, target: { label: almalinux-8, family: rpm, dist: el8, image: "almalinux:8" } }
+    steps:
+      # actions/checkout (and submodule fetch) needs git + certs present in the
+      # bare distro images before it can run.
+      - name: Install checkout prerequisites
+        run: |
+          if command -v apt-get >/dev/null 2>&1; then
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y --no-install-recommends git ca-certificates
+          else
+            (command -v dnf >/dev/null 2>&1 && dnf install -y git ca-certificates) \
+              || yum install -y git ca-certificates
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build package
+        env:
+          PKG_FAMILY: ${{ matrix.target.family }}
+          PKG_CODENAME: ${{ matrix.target.codename }}
+          PKG_DIST: ${{ matrix.target.dist }}
+          VCP_VERSION: ${{ env.VCP_VERSION }}
+          OUTDIR: ${{ github.workspace }}/packages
+        run: packaging/ci/build-package.sh
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: libvmod-compute-${{ matrix.target.label }}-${{ matrix.arch.name }}
+          path: packages/*
+          if-no-files-found: error
+
+  # Collect every distro/arch artifact into a single draft GitHub release so the
+  # full set of .deb/.rpm packages can be reviewed and published in one place.
+  release:
+    name: Draft release
+    needs: package
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download all package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: libvmod-compute-*
+          merge-multiple: true
+
+      - name: List collected packages
+        run: ls -l artifacts
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: packages-build-${{ github.run_number }}
+        run: |
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --title "libvmod-compute packages (build ${{ github.run_number }}, VE ${{ env.VCP_VERSION }})" \
+            --target "$GITHUB_SHA" \
+            --notes "Draft release with native libvmod-compute packages for all supported Varnish Enterprise distros/architectures, built against Varnish Enterprise \`${{ env.VCP_VERSION }}\` from ${GITHUB_SHA}." \
+            artifacts/*
