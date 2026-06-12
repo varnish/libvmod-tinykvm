@@ -1,0 +1,4 @@
+#!/bin/sh
+
+DIR=$(dirname $0)
+$DIR/configure --version | awk 'NR == 1 {print $NF}'
