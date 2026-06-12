@@ -1,5 +1,6 @@
 varnishtest "KVM: Max work memory"
 
+feature cmd "test -r /dev/kvm && test -w /dev/kvm"
 shell {
 cat >${tmpdir}/${testname}.c <<-EOF
 #include <stdio.h>

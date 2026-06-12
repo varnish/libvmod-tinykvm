@@ -1,0 +1,13 @@
+varnishtest "KVM: VMOD loads and VCL compiles (no VM required)"
+
+# Deliberately ungated: this test does not create a tenant or open /dev/kvm,
+# so it runs everywhere (including CI runners without KVM access) and verifies
+# that libvmod_kvm.so loads, links and its VCL interface compiles.
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import kvm;
+	backend default none;
+} -start
+
+varnish v1 -cliok "vcl.list"

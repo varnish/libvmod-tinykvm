@@ -1,5 +1,6 @@
 varnishtest "KVM Backend: Shared memory test"
 
+feature cmd "test -r /dev/kvm && test -w /dev/kvm"
 shell {
 cat >${tmpdir}/${testname}.c <<-EOF
 #include <stdio.h>

@@ -74,7 +74,7 @@ A typical TinyKVM VMOD test will compile a static program from a simple C progra
 ```vtc
 varnishtest "Compute: Synthetic response"
 
-feature cmd "ls /dev/kvm"
+feature cmd "test -r /dev/kvm && test -w /dev/kvm"
 
 shell {
 cat >synth.c <<-EOF
@@ -136,6 +136,6 @@ client c1 {
 } -run
 ```
 
-The test makes use of a feature test to enable it only when `/dev/kvm` is present.
+The test makes use of a feature test to enable it only when `/dev/kvm` is both readable and writable by the current user. Note that the device node merely *existing* (e.g. `ls /dev/kvm`) is not enough: KVM opens it with `O_RDWR`, so a runner where `/dev/kvm` is present but not accessible (a common CI situation) would still fail. Testing `-r` and `-w` skips the test in that case instead.
 
 The program `test1` is defined inline through the use of `tinykvm.configure(name, config)`. A program only needs one way for the Compute loader to find a program. So you will need to specify either a filename or a URI where the program can be found.

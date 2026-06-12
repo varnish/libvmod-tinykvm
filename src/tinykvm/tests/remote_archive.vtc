@@ -1,6 +1,6 @@
 varnishtest "KVM: Program from remote archive"
 
-feature cmd "ls /dev/kvm"
+feature cmd "test -r /dev/kvm && test -w /dev/kvm"
 
 shell {
 cat >${tmpdir}/test.json <<-EOF

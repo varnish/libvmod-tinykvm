@@ -1,6 +1,6 @@
 varnishtest "KVM: Minimal program example"
 
-feature cmd "ls /dev/kvm"
+feature cmd "test -r /dev/kvm && test -w /dev/kvm"
 
 shell {
 cat >hello.c <<-EOF

@@ -1,5 +1,6 @@
 varnishtest "KVM: Allowed paths"
 
+feature cmd "test -r /dev/kvm && test -w /dev/kvm"
 shell {
 cat >${tmpdir}/${testname}_secrets <<-EOF
 super_secret!

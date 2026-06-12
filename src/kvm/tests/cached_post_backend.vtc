@@ -1,5 +1,6 @@
 varnishtest "KVM Backend: Cached request body test"
 
+feature cmd "test -r /dev/kvm && test -w /dev/kvm"
 shell {
 cat >${tmpdir}/${testname}.c <<-EOF
 #include "kvm_api.h"

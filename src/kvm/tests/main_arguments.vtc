@@ -1,5 +1,6 @@
 varnishtest "KVM: Verify arguments passed to programs"
 
+feature cmd "test -r /dev/kvm && test -w /dev/kvm"
 shell {
 cat >${tmpdir}/${testname}.c <<-EOF
 #include <assert.h>

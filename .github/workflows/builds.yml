@@ -6,21 +6,3 @@ jobs:
     uses: ./.github/workflows/build-ubuntu.yml
   build_ubuntu_24_04:
     uses: ./.github/workflows/build-ubuntu-2404.yml
-
-  merge:
-    runs-on: ubuntu-latest
-    name: Merge
-    needs: [build_ubuntu_22_04, build_ubuntu_24_04]
-    steps:
-      - uses: actions/upload-artifact/merge@v4
-        with:
-          name: artifacts
-          pattern: build-*
-
-  release:
-    name: Create Release
-    permissions:
-      contents: write
-    needs: [merge]
-    uses: ./.github/workflows/release.yml
-    if: github.ref == 'refs/heads/main'

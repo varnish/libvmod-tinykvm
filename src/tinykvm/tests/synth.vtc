@@ -1,6 +1,6 @@
 varnishtest "KVM: Synthetic response"
 
-feature cmd "ls /dev/kvm"
+feature cmd "test -r /dev/kvm && test -w /dev/kvm"
 
 shell {
 cat >synth.c <<-EOF

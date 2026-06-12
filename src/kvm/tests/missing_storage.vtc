@@ -1,5 +1,6 @@
 varnishtest "KVM Backend: Missing storage and storage calls"
 
+feature cmd "test -r /dev/kvm && test -w /dev/kvm"
 shell {
 cat >${tmpdir}/${testname}.c <<-EOF
 #include <assert.h>

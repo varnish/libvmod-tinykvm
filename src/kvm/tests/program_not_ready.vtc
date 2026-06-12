@@ -1,5 +1,6 @@
 varnishtest "KVM: Failing program should not be ready"
 
+feature cmd "test -r /dev/kvm && test -w /dev/kvm"
 shell {
 cat >${tmpdir}/${testname}.c <<-EOF
 int main()

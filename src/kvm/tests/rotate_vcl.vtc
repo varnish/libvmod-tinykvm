@@ -4,6 +4,8 @@ varnishtest "KVM: Rotate VCLs"
 # The goal is to find VCL-switching bugs, usually
 # related to globals that should be a VCL_TASK instead.
 
+feature cmd "test -r /dev/kvm && test -w /dev/kvm"
+
 shell {
 cat >${tmpdir}/program.c <<-EOF
 #include "kvm_api.h"

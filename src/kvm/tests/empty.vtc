@@ -1,5 +1,6 @@
 varnishtest "KVM Backend: Empty or missing program returns 503"
 
+feature cmd "test -r /dev/kvm && test -w /dev/kvm"
 varnish v1 -vcl+backend {
 vcl 4.1;
 	import kvm;
