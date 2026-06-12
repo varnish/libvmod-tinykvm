@@ -71,7 +71,7 @@ build_deb() {
 	apt-get install -y --no-install-recommends \
 		build-essential debhelper dh-autoreconf devscripts fakeroot \
 		autoconf automake libtool pkg-config cmake make \
-		libcurl4-openssl-dev libarchive-dev python3 python3-docutils \
+		libcurl4-openssl-dev libssl-dev libarchive-dev python3 python3-docutils \
 		"$vcp_pkg" "$vcp_dev"
 
 	# Ensure a C++20-capable compiler (the bundled tinykvm engine requires
@@ -168,7 +168,7 @@ build_rpm() {
 	# tar/gzip are needed by `make dist' and rpmbuild and are not preinstalled on
 	# the Amazon Linux 2023 base image.
 	$PM install -y \
-		rpm-build make cmake python3 pkgconfig libcurl-devel libarchive-devel \
+		rpm-build make cmake python3 pkgconfig libcurl-devel openssl-devel libarchive-devel \
 		tar gzip autoconf automake libtool \
 		"$vcp_pkg" "$vcp_dev"
 
