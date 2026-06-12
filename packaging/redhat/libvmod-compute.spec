@@ -17,6 +17,7 @@ BuildRequires: cmake
 BuildRequires: gcc-c++
 BuildRequires: pkgconfig(libcurl)
 BuildRequires: pkgconfig(libarchive)
+BuildRequires: openssl-devel
 
 %if 0%{?rhel} >= 8
 BuildRequires: python3-docutils

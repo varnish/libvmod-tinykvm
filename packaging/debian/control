@@ -13,6 +13,7 @@ Build-Depends:
  dh-autoreconf,
  varnish-plus-dev,
  libcurl4-openssl-dev,
+ libssl-dev,
  libarchive-dev,
  cmake,
  g++

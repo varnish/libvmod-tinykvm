@@ -45,7 +45,10 @@ jobs:
       matrix:
         arch:
           - { name: amd64, runner: ubuntu-24.04 }
-          - { name: arm64, runner: ubuntu-24.04-arm }
+          # arm64 is temporarily disabled: TinyKVM does not support aarch64
+          # yet, so the libkvm engine fails to build there. Re-enable once
+          # TinyKVM gains ARM support.
+          # - { name: arm64, runner: ubuntu-24.04-arm }
         target:
           # The distro set mirrors upstream varnish/varnish check.yml, narrowed
           # to where varnish-plus / varnish-plus-dev(el) actually ships.
@@ -58,6 +61,7 @@ jobs:
           - { label: almalinux-10,    family: rpm, dist: el10,         image: "almalinux:10" }
           - { label: amazonlinux-2023, family: rpm, dist: amzn2023,    image: "amazonlinux:2023" }
         exclude:
+          # Moot while arm64 is disabled above, but kept for when ARM returns:
           # varnish-plus / varnish-plus-devel is not published for el8 on
           # aarch64 (only amd64), so the arm64 alma-8 build cannot resolve its
           # build dependencies. amd64 alma-8 still builds.
