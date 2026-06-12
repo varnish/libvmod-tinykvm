@@ -1,10 +1,10 @@
 name: Packages (Varnish Enterprise)
 
-# Builds native libvmod-compute packages for every distro/architecture where
+# Builds native libvmod-tinykvm packages for every distro/architecture where
 # Varnish Enterprise (varnish-plus) is published, in the same naming format as
 # the enterprise sledge packages, e.g.
-#   libvmod-compute_1.0~6.0.18r2-1~noble_amd64.deb
-#   libvmod-compute-1.0~6.0.18r2-1.el9.x86_64.rpm
+#   libvmod-tinykvm_1.0~6.0.18r2-1~noble_amd64.deb
+#   libvmod-tinykvm-1.0~6.0.18r2-1.el9.x86_64.rpm
 # Packages are uploaded as CI artifacts.
 
 # Manual-only: this builds against Varnish Enterprise (varnish-plus) and is not
@@ -96,7 +96,7 @@ jobs:
       - name: Upload packages
         uses: actions/upload-artifact@v4
         with:
-          name: libvmod-compute-${{ matrix.target.label }}-${{ matrix.arch.name }}
+          name: libvmod-tinykvm-${{ matrix.target.label }}-${{ matrix.arch.name }}
           path: packages/*
           if-no-files-found: error
 
@@ -113,7 +113,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          pattern: libvmod-compute-*
+          pattern: libvmod-tinykvm-*
           merge-multiple: true
 
       - name: List collected packages
@@ -127,7 +127,7 @@ jobs:
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --draft \
-            --title "libvmod-compute packages (build ${{ github.run_number }}, VE ${{ env.VCP_VERSION }})" \
+            --title "libvmod-tinykvm packages (build ${{ github.run_number }}, VE ${{ env.VCP_VERSION }})" \
             --target "$GITHUB_SHA" \
-            --notes "Draft release with native libvmod-compute packages for all supported Varnish Enterprise distros/architectures, built against Varnish Enterprise \`${{ env.VCP_VERSION }}\` from ${GITHUB_SHA}." \
+            --notes "Draft release with native libvmod-tinykvm packages for all supported Varnish Enterprise distros/architectures, built against Varnish Enterprise \`${{ env.VCP_VERSION }}\` from ${GITHUB_SHA}." \
             artifacts/*

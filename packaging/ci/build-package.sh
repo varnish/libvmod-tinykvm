@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# Build a native libvmod-compute package (.deb or .rpm) for Varnish Enterprise,
+# Build a native libvmod-tinykvm package (.deb or .rpm) for Varnish Enterprise,
 # matching the enterprise package naming used by e.g. libvmod-sledge:
 #
-#   libvmod-compute_1.0~6.0.18r2-1~noble_amd64.deb
-#   libvmod-compute-1.0~6.0.18r2-1.el9.x86_64.rpm
+#   libvmod-tinykvm_1.0~6.0.18r2-1~noble_amd64.deb
+#   libvmod-tinykvm-1.0~6.0.18r2-1.el9.x86_64.rpm
 #
 # The version embeds the *installed* Varnish Enterprise version (varnish-plus),
 # so the package always tracks the ABI it was linked against. The 60-enterprise
@@ -119,7 +119,7 @@ build_deb() {
 	dpkg-buildpackage -us -uc -b
 
 	mkdir -p "$OUTDIR"
-	cp ../libvmod-compute_*.deb "$OUTDIR"/
+	cp ../libvmod-tinykvm_*.deb "$OUTDIR"/
 	log "Built:"; ls -1 "$OUTDIR"/*.deb
 }
 
@@ -217,7 +217,7 @@ build_rpm() {
 		--define "versiontag ${srcver}" \
 		--define "releasetag ${vcp_rel}" \
 		--define "srcname ${srcname}" \
-		packaging/redhat/libvmod-compute.spec
+		packaging/redhat/libvmod-tinykvm.spec
 
 	mkdir -p "$OUTDIR"
 	find "$rpmtop/RPMS" -name '*.rpm' -exec cp {} "$OUTDIR"/ \;

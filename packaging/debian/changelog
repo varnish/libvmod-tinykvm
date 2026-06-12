@@ -1,4 +1,4 @@
-libvmod-compute (@SRCVER@-@PKGVER@~@DISTVER@) UNRELEASED; urgency=medium
+libvmod-tinykvm (@SRCVER@-@PKGVER@~@DISTVER@) UNRELEASED; urgency=medium
 
   * This changelog is not in use.
 

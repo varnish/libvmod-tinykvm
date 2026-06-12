@@ -1,4 +1,4 @@
-Source: libvmod-compute
+Source: libvmod-tinykvm
 Section: web
 Priority: extra
 Maintainer: Varnish Software <support@varnish-software.com>
@@ -19,7 +19,7 @@ Build-Depends:
  g++
 Standards-Version: 3.9.6
 
-Package: libvmod-compute
+Package: libvmod-tinykvm
 Architecture: any
 Depends:
   varnish,
