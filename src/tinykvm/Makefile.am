@@ -56,7 +56,8 @@ libvmod_tinykvm_la_LIBADD = \
 	$(CURL_LIBS) \
 	$(LIBARCHIVE_LIBS) \
 	$(PTHREAD_LIBS) \
-	-lrt
+	-lrt \
+	-lstdc++
 
 noinst_HEADERS = \
 	vmod_tinykvm.h
