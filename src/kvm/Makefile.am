@@ -55,7 +55,8 @@ libvmod_kvm_la_LIBADD = \
 	$(CURL_LIBS) \
 	$(LIBARCHIVE_LIBS) \
 	$(PTHREAD_LIBS) \
-	-lrt
+	-lrt \
+	-lstdc++
 
 noinst_HEADERS = \
 	kvm_backend.h \
