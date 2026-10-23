@@ -220,7 +220,6 @@ WebSocketThread::WebSocketThread(const TenantInstance* tenant, ProgramInstance* 
 	}
 
 	std::string address = "127.0.0.1";
-	const uint16_t port = tenant->config.group.ws_server_port;
 	if (!tenant->config.group.ws_server_address.empty()) {
 		// Use the address from the configuration
 		address = tenant->config.group.ws_server_address;

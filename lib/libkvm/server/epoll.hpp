@@ -36,6 +36,7 @@ namespace kvm
 		void hangup(int fd, const char *, std::vector<SocketEvent>&);
 		bool epoll_add(int fd);
 		void resume(const std::vector<SocketEvent>& queue);
+		void resume(const SocketEvent* events, size_t count);
 		void flush(std::vector<SocketEvent>& queue);
 
 		std::unique_ptr<MachineInstance> m_vm;

@@ -99,7 +99,7 @@ static void syscall_make_ephemeral(vCPU& cpu, MachineInstance& inst)
 		} else {
 			const auto& grname = inst.tenant().config.group.name;
 			// XXX: We *really* need a wrapper for this.
-			if (inst.ctx() && inst.ctx()->vsl) {
+			if (inst.has_ctx() && inst.ctx()->vsl) {
 				VSLb(inst.ctx()->vsl, SLT_VCL_Log,
 					"%s: Cannot change ephemeralness. Option 'control_ephemeral' not enabled (group: %s)",
 					inst.name().c_str(), grname.c_str());
@@ -236,7 +236,7 @@ static void syscall_multiprocess_array(vCPU& cpu, MachineInstance& inst)
 			printf("SMP active count: %d\n", cpu.machine().smp_active_count());
 			throw std::runtime_error("Multiprocessing: Already active");
 		} else if (UNLIKELY(regs.rdi < 2)) {
-			throw std::runtime_error("Multiprocessing: Must request at least one vCPU");
+			throw std::runtime_error("Multiprocessing: Must request at least 2 vCPUs");
 		} else if (UNLIKELY(regs.rdi > inst.tenant().config.max_smp())) {
 			/* TODO: Tenant-property */
 			throw std::runtime_error("Multiprocessing: Too many vCPUs requested");
@@ -325,7 +325,7 @@ static void syscall_is_debug(vCPU& cpu, MachineInstance& inst)
 static void syscall_breakpoint(vCPU& cpu, MachineInstance& inst)
 {
 	auto& regs = cpu.registers();
-	if (inst.ctx() && inst.ctx()->vsl) {
+	if (inst.has_ctx() && inst.ctx()->vsl) {
 		if (inst.is_debug() || inst.allows_debugging()) {
 			VSLb(inst.ctx()->vsl, SLT_VCL_Log,
 				"VM breakpoint at 0x%lX", (long) regs.rip);

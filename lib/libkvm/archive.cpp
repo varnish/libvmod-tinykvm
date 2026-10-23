@@ -58,6 +58,7 @@ namespace kvm
 		if (archive_read_open_memory(a, chunk, chunk_size) != ARCHIVE_OK)
 		{
 			fprintf(stderr, "%s\n", archive_error_string(a));
+			archive_read_free(a);
 			throw std::runtime_error("Could not decipher the program type, neither archive nor binary");
 		}
 		try { while (true)
@@ -106,6 +107,7 @@ namespace kvm
 			archive_read_free(a);
 			throw;
 		}
+		archive_read_free(a);
 		if (program.has_storage()) {
 			// Use the same program for both request and storage, as a fallback
 			if (program.storage().storage_binary.empty())

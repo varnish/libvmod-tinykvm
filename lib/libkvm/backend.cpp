@@ -222,13 +222,8 @@ static void fetch_result(kvm::VMPoolItem* slot,
 		if (UNLIKELY(extra.num_headers > 64)) {
 			throw std::runtime_error("Too many headers in BackendResponseExtra");
 		}
-		if (UNLIKELY(extra.headers_ptr < 0x1000)) {
+		if (UNLIKELY(extra.num_headers > 0 && extra.headers_ptr < 0x1000)) {
 			throw std::runtime_error("Invalid BackendResponseExtra headers pointer");
-		}
-		auto* headers = (ResponseHeader *)WS_Alloc(mi.ctx()->ws,
-			sizeof(ResponseHeader) * extra.num_headers);
-		if (UNLIKELY(headers == nullptr)) {
-			throw std::runtime_error("Out of workspace for backend VM response headers");
 		}
 		// Pick a good default for where headers go. Default = response-side
 		int where = 1;
@@ -774,12 +769,15 @@ static bool perform_warmup_request(
 		fill_backend_inputs(machine, stack, invoc, post, inputs);
 		/* We are not using a VRT_CTX here, so we will manually fill headers */
 		std::vector<backend_header> header_array;
+		if (headers.size() > 64) {
+			throw std::runtime_error("Too many headers in warmup");
+		}
 		/* Push each header field to the stack */
 		for (const auto& header : headers) {
 			if (header.find(':') == std::string::npos) {
 				throw std::runtime_error("Invalid header in warmup: " + header);
 			}
-			uint64_t header_ptr = vm.stack_push(stack, header.c_str(), header.size());
+			uint64_t header_ptr = vm.stack_push_cstr(stack, header.c_str(), header.size());
 			uint32_t header_colon = header.find(':');
 			uint32_t header_len = header.size();
 			header_array.push_back({header_ptr, header_colon, header_len});
@@ -891,7 +889,7 @@ void backend_warmup_pause_resume(MachineInstance& machine,
 				}
 			} else {
 				// Not an improvement, so we can stop here
-				if (--improvement_bailout == 0) {
+				if (--improvement_bailout <= 0) {
 					if (machine.tenant().config.group.verbose) {
 						printf("Warmup: No improvement after %d tries, stopping warmup. Iterations: %d\n", MAX_BAILOUT, i);
 					}

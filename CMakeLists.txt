@@ -29,6 +29,7 @@ set(VSCTOOL  "${VSCTOOLDIR}/vsctool.py")
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBVARNISH REQUIRED IMPORTED_TARGET varnishapi)
+pkg_get_variable(VARNISH_VMODDIR varnishapi vmoddir)
 find_program(VARNISHD    "varnishd")
 find_program(VARNISHTEST "varnishtest")
 
@@ -38,6 +39,21 @@ function(add_vmod LIBNAME VCCNAME comment)
 	configure_file(${CMAKE_SOURCE_DIR}/src/config.h.in ${CMAKE_BINARY_DIR}/config.h)
 	# generate VCC .c and .h
 	set(VCCFILE "${CMAKE_CURRENT_SOURCE_DIR}/${VCCNAME}")
+	if (NOT VARNISH_PLUS)
+		# The open-source vmodtool does not know the $Addon stanza
+		file(READ ${VCCFILE} VCC_CONTENT)
+		string(REGEX REPLACE "\\$Addon[^\n]*\n" "" VCC_CONTENT "${VCC_CONTENT}")
+		set(VCCFILE "${CMAKE_CURRENT_BINARY_DIR}/${VCCNAME}")
+		set(VCC_OLD_CONTENT "")
+		if (EXISTS ${VCCFILE})
+			file(READ ${VCCFILE} VCC_OLD_CONTENT)
+		endif()
+		if (NOT VCC_CONTENT STREQUAL VCC_OLD_CONTENT)
+			file(WRITE ${VCCFILE} "${VCC_CONTENT}")
+		endif()
+		set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+			"${CMAKE_CURRENT_SOURCE_DIR}/${VCCNAME}")
+	endif()
 	set(OUTFILES vcc_if.c vcc_if.h)
 	# for compatibility with automake naming
 	# NOTE: this will *NOT* work on Windows
@@ -104,7 +120,7 @@ function(add_vmod_tests LIBNAME IMPORT_NAME)
 		foreach (FILENAME ${ARGN})
 		get_filename_component(TEST ${FILENAME} NAME_WE)
 		add_test(NAME ${LIBNAME}_${TEST}
-			COMMAND ${VARNISHTEST} -l "-Dvarnishd=${VARNISHD}" "-DVMOD_SO=\"${LIBPATH}\"" "-Dtestname=${TEST}" "-Dtopsrc=${VARNISH_SOURCE_DIR}" ${FILENAME}
+			COMMAND ${VARNISHTEST} -l "-Dvarnishd=${VARNISHD}" "-pvmod_path=${CMAKE_BINARY_DIR}:${VARNISH_VMODDIR}" "-DVMOD_SO=\"${LIBPATH}\"" "-Dtestname=${TEST}" "-Dtopsrc=${VARNISH_SOURCE_DIR}" ${FILENAME}
 			WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 		)
 		set_tests_properties(${LIBNAME}_${TEST}

@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-#!/bin/bash
-set -e
 #export CC="ccache $CC"
 #export CXX="ccache $CXX"
 cmake_extra=""
@@ -10,7 +8,7 @@ build_type="Release"
 varnish_plus="OFF"
 
 usage() {
-	echo "Usage: $0 [-v] [--enterprise]"
+	echo "Usage: $0 [-v] [--enterprise] [--debug|--release|--sanitize|--no-sanitize]"
 	echo "  -v            verbose build"
 	echo "  --enterprise  build for Varnish Enterprise"
 	exit 1

@@ -67,8 +67,8 @@ static void syscall_curl_fetch_helper(
 	const std::string& unix_path)
 {
 	auto& regs = vcpu.registers();
-	const int CONN_TIMEOUT = 5;
-	const int READ_TIMEOUT = 8;
+	const long CONN_TIMEOUT = 5;
+	const long READ_TIMEOUT = 8;
 	bool is_self_request = false;
 
 	opresult opres;
@@ -136,27 +136,23 @@ static void syscall_curl_fetch_helper(
 
 		if (!unix_path.empty())
 		{
-			is_self_request = true;
-
 			if (kvm::self_request_concurrency++ >= kvm_settings.self_request_max_concurrency)
 			{
 				kvm::self_request_concurrency--;
 				throw std::runtime_error("Max self-request concurrency reached");
 			}
+			/* Decremented at the end, after the counter was incremented. */
+			is_self_request = true;
 
-			if (int err = curl_easy_setopt(curl, CURLOPT_UNIX_SOCKET_PATH, unix_path.c_str()) != CURLE_OK) {
+			if (CURLcode err = curl_easy_setopt(curl, CURLOPT_UNIX_SOCKET_PATH, unix_path.c_str()); err != CURLE_OK) {
 				inst.logf("Fetch: UDS path error %d for: %s", err, url.c_str());
-				regs.rax = -err;
-				vcpu.set_registers(regs);
-				return;
+				throw std::runtime_error("Fetch: UDS path error");
 			}
 		}
 
-		if (int err = curl_easy_setopt(curl, CURLOPT_URL, url.c_str()) != CURLE_OK) {
+		if (CURLcode err = curl_easy_setopt(curl, CURLOPT_URL, url.c_str()); err != CURLE_OK) {
 			inst.logf("Fetch: URL error %d for URL: %s", err, url.c_str());
-			regs.rax = -err;
-			vcpu.set_registers(regs);
-			return;
+			throw std::runtime_error("Fetch: URL error");
 		}
 
 		curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, CONN_TIMEOUT);
@@ -230,7 +226,8 @@ static void syscall_curl_fetch_helper(
 		if (!fields.empty()) {
 			for (const auto& field : fields) {
 				if (!field.empty()) {
-					inst.logf("Fetch: ReqHdr  %s", field.c_str());
+					inst.logf("Fetch: ReqHdr  %.*s",
+						(int)std::min(field.size(), size_t(256)), field.c_str());
 					req_list = curl_slist_append(req_list, field.c_str());
 				}
 				else break;
@@ -255,7 +252,7 @@ static void syscall_curl_fetch_helper(
 		if (is_post)
 		{
 			curl_easy_setopt(curl, CURLOPT_POST, 1);
-			curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, opres.post_buflen);
+			curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)opres.post_buflen);
 			rop = readop {
 				.machine = &inst.machine(),
 				.src = opres.post_addr,
@@ -268,6 +265,7 @@ static void syscall_curl_fetch_helper(
 				try {
 					rop.machine->copy_from_guest(ptr, rop.src, total);
 					rop.src += total;
+					rop.bytes -= total;
 					return total;
 				} catch (...) {
 					return 0;
@@ -285,7 +283,7 @@ static void syscall_curl_fetch_helper(
 				vcpu.machine().mmap_relax(opres.content_addr, CURL_BUFFER_MAX, opres.content_length);
 			}
 			/* Get response status and Content-Type */
-			long status;
+			long status = 0;
 			res = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
 			opres.status = status;
 			const char* ctype = nullptr;
@@ -320,7 +318,7 @@ static void syscall_curl_fetch_helper(
 			vcpu.machine().copy_to_guest(op_buffer, &opres, sizeof(opres));
 
 			inst.logf("Fetch: transfer complete, status=%ld (%s) %u bytes",
-				status, ctype, opres.content_length);
+				status, ctype ? ctype : "-", opres.content_length);
 			regs.rax = 0;
 		} else {
 			inst.logf("Fetch error: %s (%d)", curl_easy_strerror(res), res);

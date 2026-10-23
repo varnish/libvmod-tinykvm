@@ -217,6 +217,7 @@ kvm_updater_be_gethdrs(const struct vrt_ctx *other_ctx, const struct director *d
 	if (bo->htc->priv == NULL) {
 		http_PutResponse(bo->beresp, "HTTP/1.1", 503, NULL);
 		VSB_destroy(&vsb);
+		bo->htc = NULL;
 		return (-1);
 	}
 
@@ -327,6 +328,11 @@ VCL_BOOL vmod_live_update_file(
 		return (0);
 	}
 
+	if (filename == NULL || filename[0] == 0) {
+		VRT_fail(ctx, "Live update requires a filename");
+		return (0);
+	}
+
 	FILE* f = fopen(filename, "rb");
     if (f == NULL) {
 		/* NOTE: It is OK to not VRT_fail here as most likely the file
@@ -335,8 +341,13 @@ VCL_BOOL vmod_live_update_file(
 	}
 
     fseek(f, 0, SEEK_END);
-	const size_t size = ftell(f);
+	const long fsize = ftell(f);
     fseek(f, 0, SEEK_SET);
+	if (fsize <= 0) {
+		fclose(f);
+		return (0);
+	}
+	const size_t size = fsize;
 
     uint8_t* data = (uint8_t *)malloc(size);
 	if (data == NULL) {
@@ -364,5 +375,8 @@ VCL_BOOL vmod_live_update_file(
 		kvm_live_update(ctx, tenptr, &uparams);
 
 	free(data);
-	return (result.success);
+	const int success = result.success;
+	if (result.destructor)
+		result.destructor(&result);
+	return (success);
 }

@@ -12,7 +12,7 @@ static void my_backend(const char *arg)
 {
 	char *string;
 	int n = atol(arg + 1);
-	string = malloc(sizeof(char) * n);
+	string = malloc(sizeof(char) * (n + 1));
 
 	int i;
 	for (i=0;i<n;i++) {
@@ -58,7 +58,6 @@ vcl 4.1;
 				"tenant_failure.com": {
 					"filename": "${tmpdir}/${testname}",
 					"key": "",
-					"group": "tenant_failure",
 					"max_request_memory": 1
 				},
 				"group_failure": {

@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/signal.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/uio.h>
 #include <sys/un.h>
 #include <cstring>
@@ -47,16 +48,20 @@ EpollServer::EpollServer(const TenantInstance* tenant, ProgramInstance* prog, in
 	if (is_unix)
 	{
 		address = tenant->config.group.server_address;
-		if (address.empty()) {
+		struct sockaddr_un addr;
+		if (address.empty() || address.size() >= sizeof(addr.sun_path)) {
+			close(this->m_listen_fd);
 			throw std::runtime_error("Invalid server address: '" + address + "'");
 		}
 
-		// Set up the server address (default to "/tmp/kvm.sock")
-		struct sockaddr_un addr;
+		// Set up the server address
 		memset(&addr, 0, sizeof(addr));
 		addr.sun_family = AF_UNIX;
-		strcpy(addr.sun_path, "/tmp/kvm.sock");
-		unlink(addr.sun_path); // Remove any existing socket
+		memcpy(addr.sun_path, address.c_str(), address.size() + 1);
+		// Remove any existing socket (but never a regular file)
+		struct stat st;
+		if (lstat(addr.sun_path, &st) == 0 && S_ISSOCK(st.st_mode))
+			unlink(addr.sun_path);
 		// Bind the socket to the address
 		if (bind(this->m_listen_fd, (const struct sockaddr*)&addr, sizeof(addr)) < 0) {
 			close(this->m_listen_fd);
@@ -222,9 +227,15 @@ void EpollServer::epoll_main_loop()
 							//fprintf(stderr, "epoll accept error: %s\n", strerror(errno));
 							break;
 						}
-						if (!this->manage(fd, queue)) {
-							fprintf(stderr, "epoll manage error: %s\n", strerror(errno));
-							close(fd);
+						try {
+							if (!this->manage(fd, queue)) {
+								fprintf(stderr, "epoll manage error: %s\n", strerror(errno));
+								close(fd);
+							}
+						} catch (const std::exception& e) {
+							fprintf(stderr, "epoll manage exception: %s\n", e.what());
+							queue.clear();
+							this->m_current_read_buffer = 0;
 						}
 					}
 					continue; /* Move to next event */
@@ -273,7 +284,13 @@ void EpollServer::epoll_main_loop()
 				}
 			}
 		} // nfds
-		this->flush(queue);
+		try {
+			this->flush(queue);
+		} catch (const std::exception& e) {
+			fprintf(stderr, "epoll resume exception: %s\n", e.what());
+			queue.clear();
+			this->m_current_read_buffer = 0;
+		}
 	} // epoll_main_loop
 }
 void EpollServer::flush(std::vector<SocketEvent>& queue)
@@ -335,6 +352,10 @@ bool EpollServer::manage(const int fd, std::vector<SocketEvent>& queue)
 
 	bool answer = false;
 	/* Steal a read-buffer for argument and peer. */
+	if (this->m_current_read_buffer >= this->m_read_buffers.size())
+	{
+		this->flush(queue);
+	}
 	auto& rb = this->m_read_buffers.at(m_current_read_buffer);
 	m_current_read_buffer++;
 
@@ -379,7 +400,7 @@ long EpollServer::fd_readable(int fd, std::vector<SocketEvent>& queue)
 		const int virtual_fd = this->m_fd_to_vfd_map.at(fd);
 		SocketEvent se;
 		se.fd = virtual_fd;
-		se.event = 2; // SOCKET_WRITABLE
+		se.event = 1; // SOCKET_READ
 		se.data = rb.read_vaddr;
 		se.data_len = len;
 		m_current_read_buffer++;
@@ -415,10 +436,19 @@ void EpollServer::hangup(int fd, const char *reason, std::vector<SocketEvent>& q
 
 void EpollServer::resume(const std::vector<SocketEvent>& se)
 {
+	/* The guest event array has room for one event per read buffer. */
+	const size_t max_events = this->m_read_buffers.size();
+	for (size_t i = 0; i < se.size(); i += max_events)
+	{
+		this->resume(&se[i], std::min(max_events, se.size() - i));
+	}
+}
+void EpollServer::resume(const SocketEvent* se, size_t count)
+{
 	/* Copy the SocketEvent to the VM, address is already in RDI. */
 	auto& regs = vm().machine().registers();
-	vm().machine().copy_to_guest(regs.rdi, se.data(), se.size() * sizeof(SocketEvent));
-	regs.rax = se.size();
+	vm().machine().copy_to_guest(regs.rdi, se, count * sizeof(SocketEvent));
+	regs.rax = count;
 	vm().machine().set_registers(regs);
 
 	/* Resume the VM */

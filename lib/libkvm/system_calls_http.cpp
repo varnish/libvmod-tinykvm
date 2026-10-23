@@ -137,6 +137,9 @@ static void validate_guest_field(const char* buffer, uint32_t len)
 		throw std::runtime_error("HTTP header field begins with space");
 	if (UNLIKELY(buffer[len-1] == ' '))
 		throw std::runtime_error("HTTP header field ends with space");
+	/* Varnish treats fields as C-strings, and CR/LF would allow header injection. */
+	if (UNLIKELY(std::memchr(buffer, '\0', len) || std::memchr(buffer, '\r', len) || std::memchr(buffer, '\n', len)))
+		throw std::runtime_error("HTTP header field had an illegal character");
 }
 static void validate_guest_field_key(const char* buffer, uint32_t len)
 {
@@ -145,9 +148,9 @@ static void validate_guest_field_key(const char* buffer, uint32_t len)
 	if (UNLIKELY(len >= 0x10000)) // 64kB limit
 		throw std::runtime_error("HTTP header field name was too large");
 	/* XXX: Todo do an exhaustive check of the field key/name. */
-	const char* illegal_chars = ": \x00\b\e\f\t\r\n";
+	static constexpr char illegal_chars[] = ": \0\b\e\f\t\r\n";
 	for (size_t i = 0; i < len; i++) {
-		if (UNLIKELY(strchr(illegal_chars, buffer[i]) != nullptr))
+		if (UNLIKELY(std::memchr(illegal_chars, buffer[i], sizeof(illegal_chars)-1) != nullptr))
 			throw std::runtime_error("HTTP header field name had an illegal character");
 	}
 }
@@ -327,7 +330,7 @@ static void syscall_regex_copyto(vCPU& cpu, MachineInstance& inst)
 	const uint32_t srchp_idx = regs.rsi;
 	const uint32_t dsthp_idx = regs.rdx;
 
-	auto& entry = inst.regex().get(re_idx);
+	auto& entry = inst.regex().get_used(re_idx);
 	auto* srchp = get_http(inst.ctx(), srchp_idx);
 	auto* dsthp = get_http(inst.ctx(), dsthp_idx);
 	unsigned appended = 0;

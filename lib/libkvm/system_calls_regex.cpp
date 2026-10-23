@@ -55,7 +55,10 @@ static void syscall_regex_compile(vCPU& cpu, MachineInstance& inst)
 static void syscall_regex_free(vCPU& cpu, MachineInstance& inst)
 {
     const auto& regs = cpu.registers();
-    inst.regex().free(regs.rdi);
+    auto& entry = inst.regex().get_used(regs.rdi);
+    if (!entry.non_owned)
+        VRE_free(&entry.item);
+    entry.free();
 }
 
 static void syscall_regex_match(vCPU& cpu, MachineInstance& inst)
@@ -65,7 +68,7 @@ static void syscall_regex_match(vCPU& cpu, MachineInstance& inst)
     const uint64_t vaddr = regs.rsi;
     const uint32_t size  = regs.rdx;
 
-    auto& entry = inst.regex().get(idx);
+    auto& entry = inst.regex().get_used(idx);
 
     auto subject = cpu.machine().string_or_view(vaddr, size);
 #ifdef VARNISH_PLUS
@@ -89,12 +92,12 @@ static void syscall_regex_subst(vCPU& cpu, MachineInstance& inst)
     auto& regs = cpu.registers();
     const uint32_t idx   = regs.rdi;
     const uint64_t vbuffer = regs.rsi;
-    const uint32_t vsubst = regs.rdx;
+    const uint64_t vsubst = regs.rdx;
     const uint64_t dstaddr = regs.rcx;
     const uint32_t dstsize = regs.r8;
     const uint32_t flags   = regs.r9;
 
-    auto& entry = inst.regex().get(idx);
+    auto& entry = inst.regex().get_used(idx);
     const auto buffer = cpu.machine().copy_from_cstring(vbuffer);
     const auto subst  = cpu.machine().copy_from_cstring(vsubst);
     const bool all = (flags & 1) == 1;

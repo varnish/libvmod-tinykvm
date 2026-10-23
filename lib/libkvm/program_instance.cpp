@@ -230,10 +230,12 @@ ProgramInstance::ProgramInstance(
 				"kvm: Program '%s' failed initialization: %s\n",
 					ten->config.name.c_str(), e.what());
 			// XXX: Reset binary when it fails.
-			this->request_binary = {};
-			this->main_vm = nullptr;
-			this->m_storage = nullptr;
-			this->unlock_and_initialized(false);
+			if (!this->is_initialized()) {
+				this->request_binary = {};
+				this->main_vm = nullptr;
+				this->m_storage = nullptr;
+				this->unlock_and_initialized(false);
+			}
 			return -1;
 		}
 	});
@@ -312,6 +314,14 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 		// requests, while we continously add more concurrency
 		// to the queue.
 
+#ifdef VARNISH_PLUS
+		// Every queue in use must have at least one VM.
+		const unsigned n_nodes = std::min({size_t(1) + numa_max_node(), m_vmqueue.size(), max_vms});
+#else
+		constexpr unsigned n_nodes = 1;
+#endif
+		this->m_num_nodes = n_nodes;
+
 		// Instantiate first forked VM
 		// XXX: This can fail and throw an exception,
 		// think *long and hard* about the consequences!
@@ -331,11 +341,6 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 			m_vms.emplace_back(i, *main_vm, ten, this);
 		}
 
-#ifdef VARNISH_PLUS
-		const unsigned n_nodes = std::min(size_t(1) + numa_max_node(), m_vmqueue.size());
-#else
-		constexpr unsigned n_nodes = 1;
-#endif
 		size_t initialized = 1;
 		// Wait for all the VMs to start running
 		for (size_t i = 1; i < m_vms.size(); i++) {
@@ -345,7 +350,7 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 				m_vmqueue[i % n_nodes].enqueue(&vm);
 				initialized ++;
 			} catch (const std::exception& e) {
-				if (ctx->vsl != nullptr)
+				if (ctx != nullptr && ctx->vsl != nullptr)
 				VSLb(ctx->vsl, SLT_VCL_Error,
 					"%s: Failed to create all request machines, init=%zu",
 					ten->config.name.c_str(), initialized);
@@ -369,10 +374,13 @@ void ProgramInstance::begin_initialization(const vrt_ctx *ctx, TenantInstance *t
 
 	} catch (const std::exception& e) {
 		// Make sure we signal that there is no program, if the
-		// program fails to intialize.
-		main_vm = nullptr;
-		m_storage = nullptr;
-		this->unlock_and_initialized(false);
+		// program fails to intialize. Once initialized, request VMs
+		// are already in use, so the main VM must be kept.
+		if (!this->is_initialized()) {
+			main_vm = nullptr;
+			m_storage = nullptr;
+			this->unlock_and_initialized(false);
+		}
 		throw;
 	}
 }
@@ -498,8 +506,7 @@ Reservation ProgramInstance::reserve_vm(const vrt_ctx* ctx,
 	auto t0 = ScopedDuration<CLOCK_MONOTONIC>::nanos_now();
 	{
 		// Fixate on current NUMA node, for performance reasons.
-		int node = numa_node();
-		if (UNLIKELY(!m_vmqueue[node].wait_dequeue_timed(slot, tmo))) {
+		if (UNLIKELY(!numa_vmqueue().wait_dequeue_timed(slot, tmo))) {
 			prog->stats.reservation_timeouts ++; /* Racy, but uncontended */
 			throw std::runtime_error("Queue timeout");
 		}
@@ -542,7 +549,7 @@ void ProgramInstance::vm_free_function(VRT_CTX, void* slotv)
 		auto ref = std::move(slot->prog_ref);
 		// Signal waiters that slot is ready again
 		// If there any waiters, they keep the program referenced (atomically)
-		ref->m_vmqueue[numa_node()].enqueue(slot);
+		ref->numa_vmqueue().enqueue(slot);
 	} else {
 		// Defer reset by executing it as a thread task
 		slot->task_future = slot->tp.enqueue(
@@ -558,7 +565,7 @@ void ProgramInstance::vm_free_function(VRT_CTX, void* slotv)
 			auto ref = std::move(slot->prog_ref);
 			// Signal waiters that slot is ready again
 			// If there any waiters, they keep the program referenced (atomically)
-			ref->m_vmqueue[numa_node()].enqueue(slot);
+			ref->numa_vmqueue().enqueue(slot);
 			return 0;
 		});
 	}

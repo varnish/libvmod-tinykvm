@@ -311,9 +311,11 @@ namespace cpptime
                         // Remove time event
                         time_events.erase(time_events.begin());
 
-                        // Invoke the handler
+                        // Invoke a copy of the handler, as remove() and add()
+                        // may modify events while the lock is not held
+                        auto handler = events[te.ref].handler;
                         lock.unlock();
-                        events[te.ref].handler(te.ref);
+                        if (handler) handler(te.ref);
                         lock.lock();
 
                         if (events[te.ref].valid && events[te.ref].period.count() > 0)

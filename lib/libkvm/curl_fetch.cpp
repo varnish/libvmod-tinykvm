@@ -54,10 +54,15 @@ int kvm_curl_fetch(
 		.size = 0
 	};
 	if (chunk.memory == NULL || url_len < 8u) {
+		free(chunk.memory);
 		return (-1);
 	}
 
 	CURL *curl = curl_easy_init();
+	if (curl == NULL) {
+		free(chunk.memory);
+		return (-1);
+	}
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, (write_callback)kvm_WriteMemoryCallback);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &chunk);
@@ -77,7 +82,7 @@ int kvm_curl_fetch(
 
 	CURLcode res = curl_easy_perform(curl);
 
-	long status;
+	long status = 0;
 	if (is_http) {
 		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
 	} else {

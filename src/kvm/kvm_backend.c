@@ -64,6 +64,8 @@ static int
 kvm_release_after_request(VRT_CTX, KVM_SLOT slot)
 {
 	struct vmod_priv* priv_task = kvm_get_priv_task(ctx);
+	if (priv_task == NULL)
+		return (0);
 	priv_task->priv = slot;
 	priv_task->len  = 0;
 #ifdef VARNISH_PLUS
@@ -74,7 +76,7 @@ kvm_release_after_request(VRT_CTX, KVM_SLOT slot)
 	return (1);
 }
 static void
-kvm_early_slot_release(struct vmod_priv *priv_task)
+kvm_early_slot_release(VRT_CTX, struct vmod_priv *priv_task)
 {
 	AN(priv_task);
 #ifdef VARNISH_PLUS
@@ -83,7 +85,7 @@ kvm_early_slot_release(struct vmod_priv *priv_task)
 	priv_task->free = NULL;
 #else
 	if (priv_task->methods)
-		priv_task->methods->fini(NULL, priv_task->priv);
+		priv_task->methods->fini(ctx, priv_task->priv);
 	priv_task->methods = NULL;
 #endif
 	priv_task->priv = NULL;
@@ -389,8 +391,21 @@ kvmbe_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
 				invocation->inputs.url, invocation->inputs.argument, result);
 			self_request_time = VTIM_real() - srt0;
 
-			if (res < 0 || result->status >= 400)
+			if (res < 0 || result->status >= 400) {
+				if (res == 0) {
+					/* Move the error body to the workspace, as the
+					   self-request chunk must be freed. */
+					char *chunk = TRUST_ME(result->buffers[0].data);
+					char *cnt = (result->content_length > 0) ?
+						WS_Copy(ctx.ws, chunk, result->content_length) : NULL;
+					free(chunk);
+					result->buffers[0].data = cnt;
+					result->buffers[0].size = (cnt != NULL) ? result->content_length : 0;
+					result->content_length  = result->buffers[0].size;
+					result->bufcount = (cnt != NULL) ? 1 : 0;
+				}
 				break;
+			}
 			/* Only used to free the chunk after usage. */
 			must_free_chunk = TRUST_ME(result->buffers[0].data);
 			/* Straight to next in chain. */
@@ -495,8 +510,14 @@ kvmbe_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
 			VSLb(ctx.vsl, SLT_Error,
 				"KVM: Error status %u from call to %s at index %d in chain",
 				result->status, kvm_tenant_name(invocation->tenant), index);
-			if (is_temporary)
+			/* The result still points into the temporary VM, so keep
+			   it reserved until the end of the request. */
+			if (is_temporary && !kvm_release_after_request(&ctx, slot)) {
 				kvm_free_reserved_machine(&ctx, slot);
+				last_slot = NULL;
+				result->content_length = 0;
+				result->bufcount = 0;
+			}
 			break;
 		}
 	}
@@ -520,8 +541,11 @@ kvmbe_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
 	 * It is possible to release the VM early if we can store the
 	 * result on the workspace directly. Only for short responses.
 	*/
-	if (last_slot != NULL && result->content_length < kvm_settings.backend_early_release_size)
+	const bool is_streaming = result->content_length > 0 && result->bufcount == 0;
+	if (last_slot != NULL && !is_streaming &&
+		result->content_length < kvm_settings.backend_early_release_size)
 	{
+		bool copied = true;
 		if (result->content_length == 0)
 		{
 			result->bufcount = 1;
@@ -543,11 +567,16 @@ kvmbe_gethdrs(const struct vrt_ctx *other_ctx, const struct director *dir)
 				result->bufcount = 1;
 				result->buffers[0].data = cnt;
 				result->buffers[0].size = len;
+			} else {
+				/* Out of workspace: The result still points into the VM. */
+				copied = false;
 			}
 		}
 		/* We don't need to hold the VM reservation anymore.
 		NOTE: result is already on the workspace */
-		kvm_early_slot_release(kvm_get_priv_task(&ctx));
+		struct vmod_priv *priv_task = kvm_get_priv_task(&ctx);
+		if (copied && priv_task != NULL)
+			kvm_early_slot_release(&ctx, priv_task);
 	}
 
 	free(must_free_chunk);
@@ -577,7 +606,7 @@ static const struct vdi_methods kvm_director_methods[1] = {{
 static void init_director(VRT_CTX, struct vmod_kvm_backend *kvmr)
 {
 	struct director *dir =
-		WS_Alloc(ctx->ws, sizeof(struct vmod_kvm_backend));
+		WS_Alloc(ctx->ws, sizeof(struct director));
 	if (dir == NULL) {
 		VRT_fail(ctx, "KVM: Out of workspace for director");
 		return;
@@ -700,11 +729,13 @@ VCL_BACKEND vmod_vm_backend(VRT_CTX, VCL_PRIV task,
 	if (tenant == NULL) {
 		VRT_fail(ctx, "KVM: Program not found: %s", program);
 		__sync_fetch_and_add(&vsc_vmod_kvm->program_notfound, 1);
+		kqueue.count = 0;
 		return (NULL);
 	}
 
-	/* Cannot fail at this point, add to chain */
 	if (!kvm_init_chain(ctx, tenant, url, arg)) {
+		VRT_fail(ctx, "KVM: Unable to add '%s' to program chain", program);
+		kqueue.count = 0;
 		return (NULL);
 	}
 
@@ -741,15 +772,18 @@ VCL_BACKEND vmod_vm_debug_backend(VRT_CTX, VCL_PRIV task,
 	if (tenant == NULL) {
 		VRT_fail(ctx, "KVM: Program not found: %s", program);
 		__sync_fetch_and_add(&vsc_vmod_kvm->program_notfound, 1);
+		kqueue.count = 0;
 		return (NULL);
 	}
 	if (!kvm_tenant_debug_allowed(tenant)) {
 		VRT_fail(ctx, "KVM: Program not allowed to live-debug: %s", program);
+		kqueue.count = 0;
 		return (NULL);
 	}
 
-	/* Cannot fail at this point, add to chain */
 	if (!kvm_init_chain(ctx, tenant, url, arg)) {
+		VRT_fail(ctx, "KVM: Unable to add '%s' to program chain", program);
+		kqueue.count = 0;
 		return (NULL);
 	}
 
@@ -770,6 +804,13 @@ VCL_BOOL vmod_chain(VRT_CTX, VCL_PRIV task,
 		VRT_fail(ctx, "compute: chain() should only be called from vcl_backend_fetch");
 		return (0);
 	}
+	if (program == NULL) {
+		VRT_fail(ctx, "compute: chain() requires a program name");
+		kqueue.count = 0;
+		return (0);
+	}
+	if (break_status < 0 || break_status > 1000)
+		break_status = 1000;
 
 	/**
 	 * Use automatic non-VM self-request when:
@@ -781,6 +822,7 @@ VCL_BOOL vmod_chain(VRT_CTX, VCL_PRIV task,
 		if (kvm_init_fetch(ctx, url, arg) == NULL) {
 			VRT_fail(ctx,
 				"KVM: 'fetch' must be first program, and '%s' should be a self-request", url);
+			kqueue.count = 0;
 			return (0);
 		}
 		return (1);
@@ -792,10 +834,10 @@ VCL_BOOL vmod_chain(VRT_CTX, VCL_PRIV task,
 	if (tenant == NULL) {
 		VRT_fail(ctx, "KVM: Program not found: %s", program);
 		__sync_fetch_and_add(&vsc_vmod_kvm->program_notfound, 1);
+		kqueue.count = 0;
 		return (0);
 	}
 
-	/* Cannot fail at this point, add to chain */
 	struct kvm_chain_item *item =
 		kvm_init_chain(ctx, tenant, url, arg);
 	if (item != NULL) {

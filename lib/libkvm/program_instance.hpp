@@ -153,6 +153,7 @@ public:
 
 	/* Ticket-machine that gives access rights to VMs. */
 	std::array<moodycamel::BlockingConcurrentQueue<VMPoolItem*>, 4> m_vmqueue;
+	unsigned m_num_nodes = 1; /* Number of VM queues in use */
 	/* Simple container for VMs. */
 	std::deque<VMPoolItem> m_vms;
 
@@ -193,6 +194,8 @@ public:
 	} stats;
 
 	static int numa_node();
+	/* The VM queue for the current NUMA node, among the queues in use. */
+	auto& numa_vmqueue() { return m_vmqueue[numa_node() % m_num_nodes]; }
 
 private:
 	void begin_initialization(const vrt_ctx *, TenantInstance *, bool debug);
@@ -200,6 +203,9 @@ private:
 	/* Wait for Varnish to listen and this program to complete initialization. */
 	void try_wait_for_startup_and_initialization();
 	void unlock_and_initialized(bool success) {
+		/* Only unlock once, as unlocking an unlocked mutex is UB. */
+		if (this->m_initialization_complete != 0)
+			return;
 		this->m_initialization_complete = success ? 1 : -1;
 		this->mtx_future_init.unlock();
 	}

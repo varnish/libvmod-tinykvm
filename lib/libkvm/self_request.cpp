@@ -85,7 +85,7 @@ int kvm_self_request(VRT_CTX, const char *c_path,  const char *arg, backend_resu
 			(int)c_path_len,
 			c_path);
 
-	if (UNLIKELY(url_res <= 0)) {
+	if (UNLIKELY(url_res <= 0 || url_res >= (int)sizeof(url_buffer))) {
 		kvm::self_request_concurrency--;
 		set_error_result(result, 500);
 		free(chunk.memory);
@@ -95,19 +95,34 @@ int kvm_self_request(VRT_CTX, const char *c_path,  const char *arg, backend_resu
 	std::vector<std::string> headers;
 
 	/* Optional JSON document */
-	const auto arglen = strlen(arg);
+	const auto arglen = (arg != nullptr) ? strlen(arg) : 0;
 	if (arglen > 0)
 	{
-		const auto j = nlohmann::json::parse(arg, arg + arglen, nullptr, true, true);
+		try {
+			const auto j = nlohmann::json::parse(arg, arg + arglen, nullptr, true, true);
 
-		if (j.contains("headers"))
-		{
-			headers = j["headers"].get<std::vector<std::string>>();
+			if (j.contains("headers"))
+			{
+				headers = j["headers"].get<std::vector<std::string>>();
+			}
+		} catch (const std::exception& e) {
+			VSLb(ctx->vsl, SLT_Error,
+				"kvm: Invalid self-request JSON argument: %s", e.what());
+			kvm::self_request_concurrency--;
+			set_error_result(result, 500);
+			free(chunk.memory);
+			return (-1);
 		}
 	}
 
 	/* Initialize cURL fetch */
 	CURL *curl = curl_easy_init();
+	if (UNLIKELY(curl == nullptr)) {
+		kvm::self_request_concurrency--;
+		set_error_result(result, 500);
+		free(chunk.memory);
+		return (-1);
+	}
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, (write_callback)kvm_SelfRequestCallback);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &chunk);
@@ -135,7 +150,7 @@ int kvm_self_request(VRT_CTX, const char *c_path,  const char *arg, backend_resu
 	/* Execute cURL fetch */
 	CURLcode res = curl_easy_perform(curl);
 
-	long status;
+	long status = 500;
 	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
 
 	if (res != CURLE_OK) {

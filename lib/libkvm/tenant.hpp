@@ -3,6 +3,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -22,9 +23,9 @@ struct TenantGroup {
 	uint32_t max_queue_time; /* Seconds */
 	uint64_t max_address_space; /* Megabytes */
 	uint64_t max_main_memory; /* Megabytes */
-	uint32_t max_req_mem; /* Megabytes */
-	uint32_t limit_req_mem; /* Megabytes of memory banks to keep after request completion */
-	uint32_t shared_memory; /* Megabytes */
+	uint32_t max_req_mem; /* Bytes */
+	uint32_t limit_req_mem; /* Bytes of memory banks to keep after request completion */
+	uint32_t shared_memory; /* Bytes */
 	uint64_t hugepage_arena_size = 0; /* Megabytes */
 	uint64_t hugepage_requests_arena = 0; /* Megabytes */
 	size_t   max_concurrency = 2; /* Request VMs */
@@ -103,9 +104,15 @@ struct TenantGroup {
 		// The address space should be at least as large as the memory.
 		this->max_address_space = std::max(this->max_address_space, this->max_main_memory);
 	}
-	void set_max_workmem(uint64_t newmax_mb) { this->max_req_mem = newmax_mb * 1048576ul; }
-	void set_limit_workmem_after_req(uint64_t newmax_mb) { this->limit_req_mem = newmax_mb * 1048576ul; }
-	void set_shared_mem(uint64_t newmax_mb) { this->shared_memory = newmax_mb * 1048576ul; }
+	/* These are stored as 32-bit byte counts, so they must be below 4GB. */
+	static uint32_t mb_to_u32_bytes(uint64_t mb, const char* what) {
+		if (mb >= 4096)
+			throw std::runtime_error(std::string(what) + " must be less than 4096 MB");
+		return mb * 1048576ul;
+	}
+	void set_max_workmem(uint64_t newmax_mb) { this->max_req_mem = mb_to_u32_bytes(newmax_mb, "max_request_memory"); }
+	void set_limit_workmem_after_req(uint64_t newmax_mb) { this->limit_req_mem = mb_to_u32_bytes(newmax_mb, "req_mem_limit_after_reset"); }
+	void set_shared_mem(uint64_t newmax_mb) { this->shared_memory = mb_to_u32_bytes(newmax_mb, "shared_memory"); }
 	bool has_epoll_system() const noexcept {
 		return (this->server_port != 0 || !this->server_address.empty()) &&
 		       this->epoll_systems > 0;

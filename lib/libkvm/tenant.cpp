@@ -71,7 +71,7 @@ const std::string TenantConfig::guest_state_file = "state";
 TenantConfig::TenantConfig(
 	std::string n, std::string f, std::string k,
 	TenantGroup grp, std::string uri, std::string sha256_str, std::string md5_str)
-	: name(std::move(n)), hash{crc32c_hw(n)}, group{std::move(grp)},
+	: name(std::move(n)), hash{crc32c_hw(name)}, group{std::move(grp)},
 	  filename(std::move(f)), key(std::move(k)),
 	  uri(std::move(uri)), sha256(std::move(sha256_str)), md5(std::move(md5_str))
 {
@@ -223,7 +223,7 @@ static void configure_group(const std::string& name, kvm::TenantGroup& group, co
 	}
 	else if (obj.key() == "max_storage_time")
 	{
-		group.max_req_time = obj.value();
+		group.max_storage_time = obj.value();
 	}
 	else if (obj.key() == "max_memory")
 	{
@@ -715,7 +715,7 @@ static void init_tenants(VRT_CTX, VCL_PRIV task,
 				tenant.config.name.c_str(), tenant.config.filename.c_str(), e.what());
 			/* XXX: This can be racy if the same tenant is specified
 				more than once, and is still initializing... */
-			tenant.program = nullptr;
+			std::atomic_store(&tenant.program, std::shared_ptr<kvm::ProgramInstance>{});
 		}
 	}
 }
@@ -760,8 +760,11 @@ int kvm_tenant_foreach(VCL_PRIV task, foreach_function_t func, void* state)
 extern "C"
 kvm::TenantInstance* kvm_tenant_find_key(VCL_PRIV task, const char* name, const char* key)
 {
+	/* No/empty key = no live update or debugging. */
+	if (key == nullptr || key[0] == 0)
+		return nullptr;
 	auto* tenant = kvm_tenant_find(task, name);
-	if (tenant != nullptr) {
+	if (tenant != nullptr && !tenant->config.key.empty()) {
 		if (tenant->config.key == key) return tenant;
 	}
 	return nullptr;
@@ -830,6 +833,7 @@ int kvm_init_tenants_uri(VRT_CTX, VCL_PRIV task, const char* uri, int init)
 			fprintf(stderr,
 				"kvm: Exception when loading tenants from URI '%s': %s\n",
 				ftd->url, e.what());
+			throw; /* Makes kvm_curl_fetch() return failure */
 		}
 	}, &ftd);
 	return (res == 0);

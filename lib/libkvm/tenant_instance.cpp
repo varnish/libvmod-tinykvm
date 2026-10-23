@@ -73,6 +73,7 @@ void TenantInstance::begin_initialize(VRT_CTX, bool debug)
 		if (access(config.filename.c_str(), R_OK) == 0)
 		{
 			filename_accessible = true;
+			try {
 			if (!config.sha256.empty()) {
 				// If SHA256 is specified, verify the file
 				std::string hash_hex = create_sha256_from_file(config.filename);
@@ -91,6 +92,11 @@ void TenantInstance::begin_initialize(VRT_CTX, bool debug)
 					printf("Local file '%s' exists but MD5 mismatch: %s vs %s, will re-download if URI is given\n",
 						config.filename.c_str(), hash_hex.c_str(), config.md5.c_str());
 				}
+			}
+			} catch (const std::exception& e) {
+				// Treat as unverified, and re-download if URI is given
+				fprintf(stderr, "Local file '%s' could not be verified: %s\n",
+					config.filename.c_str(), e.what());
 			}
 		}
 	}
@@ -187,7 +193,7 @@ void TenantInstance::handle_exception(const TenantConfig& conf, const std::excep
 	fprintf(stderr,
 		"Exception when creating machine '%s': %s\n",
 		conf.name.c_str(), e.what());
-	this->program = nullptr;
+	std::atomic_store(&this->program, std::shared_ptr<ProgramInstance>{});
 }
 
 std::shared_ptr<ProgramInstance> TenantInstance::wait_for_initialization()
@@ -212,6 +218,11 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 	} else {
 		priv_task = VRT_priv_task(ctx, ctx->bo);
 	}
+	if (UNLIKELY(priv_task == nullptr)) {
+		VSLb(ctx->vsl, SLT_Error,
+			"VM '%s': Out of workspace for priv_task", config.name.c_str());
+		return nullptr;
+	}
 	if (!priv_task->priv)
 	{
 	#ifdef ENABLE_TIMING
@@ -228,8 +239,6 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 			Reservation resv = prog->reserve_vm(ctx, this, std::move(prog));
 			// prog is nullptr after this ^
 
-			priv_task->priv = resv.slot;
-			priv_task->len  = KVM_PROGRAM_MAGIC;
 #ifdef VARNISH_PLUS
 			priv_task->free = resv.free;
 #else
@@ -243,6 +252,8 @@ VMPoolItem* TenantInstance::vmreserve(const vrt_ctx* ctx, bool debug)
 			ptm->fini  = resv.free;
 			priv_task->methods = ptm;
 #endif
+			priv_task->priv = resv.slot;
+			priv_task->len  = KVM_PROGRAM_MAGIC;
 		} catch (std::exception& e) {
 			// It makes no sense to reserve a VM without a request w/VSL
 			VSLb(ctx->vsl, SLT_Error,
@@ -329,7 +340,7 @@ std::shared_ptr<ProgramInstance> TenantInstance::ref(const vrt_ctx *ctx, bool de
 }
 
 uint64_t TenantInstance::lookup(const char* name) const {
-	auto inst = program;
+	auto inst = std::atomic_load(&program);
 	if (inst != nullptr)
 		return inst->lookup(name);
 	return 0x0;
@@ -365,7 +376,10 @@ std::string create_sha256_from_file(const std::string& filename)
 		close(fd);
 		throw std::runtime_error("Could not stat file for SHA256: " + filename);
 	}
-	void* mapped = mmap(nullptr, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	// mmap() of zero bytes fails, but an empty file still has a hash
+	void* mapped = nullptr;
+	if (st.st_size > 0)
+		mapped = mmap(nullptr, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd); // Close immediately after mmap
 	if (mapped == MAP_FAILED) {
 		throw std::runtime_error("Could not mmap file for SHA256: " + filename);
@@ -376,7 +390,8 @@ std::string create_sha256_from_file(const std::string& filename)
 	SHA256_Init(&sha256);
 	SHA256_Update(&sha256, mapped, st.st_size);
 	SHA256_Final(hash, &sha256);
-	munmap(mapped, st.st_size);
+	if (mapped != nullptr)
+		munmap(mapped, st.st_size);
 
 	static constexpr char lut[] = "0123456789abcdef";
 	std::string hash_hex(SHA256_DIGEST_LENGTH * 2, 0);
@@ -397,7 +412,10 @@ std::string create_md5_from_file(const std::string& filename)
 		close(fd);
 		throw std::runtime_error("Could not stat file for MD5: " + filename);
 	}
-	void* mapped = mmap(nullptr, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	// mmap() of zero bytes fails, but an empty file still has a hash
+	void* mapped = nullptr;
+	if (st.st_size > 0)
+		mapped = mmap(nullptr, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd); // Close immediately after mmap
 	if (mapped == MAP_FAILED) {
 		throw std::runtime_error("Could not mmap file for MD5: " + filename);
@@ -408,7 +426,8 @@ std::string create_md5_from_file(const std::string& filename)
 	MD5_Init(&md5);
 	MD5_Update(&md5, mapped, st.st_size);
 	MD5_Final(hash, &md5);
-	munmap(mapped, st.st_size);
+	if (mapped != nullptr)
+		munmap(mapped, st.st_size);
 
 	static constexpr char lut[] = "0123456789abcdef";
 	std::string hash_hex(MD5_DIGEST_LENGTH * 2, 0);

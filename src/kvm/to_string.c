@@ -23,7 +23,7 @@
 #include "vcc_if.h"
 #include "VSC_vmod_kvm.h"
 
-extern void kvm_varnishstat_program_cpu_time(vtim_real);
+extern void kvm_varnishstat_program_cpu_time(vtim_real, vtim_real);
 extern void kvm_backend_call(VRT_CTX, KVM_SLOT,
 	const struct kvm_chain_item *, struct backend_post *, struct backend_result *);
 extern struct kvm_program_chain* kvm_chain_get_queue();
@@ -100,7 +100,7 @@ to_string(VRT_CTX, struct kvm_program_chain *chain, content_func_f content_callb
 			kvm_temporarily_reserve_machine(ctx, invocation->tenant, false, invocation->soft_reset);
 		if (slot == NULL) {
 			/* Global program cpu-time statistic. */
-			kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
+			kvm_varnishstat_program_cpu_time(VTIM_real() - t0, 0.0);
 
 			if (last_slot != NULL) {
 				kvm_free_reserved_machine(ctx, last_slot);
@@ -123,7 +123,7 @@ to_string(VRT_CTX, struct kvm_program_chain *chain, content_func_f content_callb
 			if (kvm_handle_post_to_another(ctx, post, invocation, result) < 0)
 			{
 				/* Global program cpu-time statistic. */
-				kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
+				kvm_varnishstat_program_cpu_time(VTIM_real() - t0, 0.0);
 
 				kvm_free_reserved_machine(ctx, slot);
 				kvm_free_reserved_machine(ctx, last_slot);
@@ -140,7 +140,7 @@ to_string(VRT_CTX, struct kvm_program_chain *chain, content_func_f content_callb
 
 		if (result->status >= invocation->break_status) {
 			/* Global program cpu-time statistic. */
-			kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
+			kvm_varnishstat_program_cpu_time(VTIM_real() - t0, 0.0);
 
 			kvm_free_reserved_machine(ctx, slot);
 			if (last_slot != NULL) {
@@ -156,7 +156,7 @@ to_string(VRT_CTX, struct kvm_program_chain *chain, content_func_f content_callb
 	}
 
 	/* Global program cpu-time statistic. */
-	kvm_varnishstat_program_cpu_time(VTIM_real() - t0);
+	kvm_varnishstat_program_cpu_time(VTIM_real() - t0, 0.0);
 
 	struct kvm_http_response resp;
 	resp.status     = result->status;
@@ -216,6 +216,9 @@ VCL_STRING kvm_vm_to_string(VRT_CTX, VCL_PRIV task,
 {
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	AN(task);
+	/* break_status is 16-bit, and statuses are at most 999 */
+	if (error_treshold < 0 || error_treshold > 1000)
+		error_treshold = 1000;
 
 	/* Lookup internal tenant using VCL task */
 	struct vmod_kvm_tenant *tenant =
@@ -262,6 +265,9 @@ static void to_synth_callback(const struct backend_result *result, struct kvm_ht
 	/* Copy the content type */
 	resp->ctype = result->type;
 	resp->ctype_size = result->tsize;
+	resp->content = NULL;
+	resp->content_size = result->content_length;
+	resp->writable_content = false;
 
 #ifdef VARNISH_PLUS
 	const size_t len = result->content_length;

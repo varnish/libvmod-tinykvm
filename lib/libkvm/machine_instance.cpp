@@ -318,7 +318,7 @@ void MachineInstance::initialize()
 		fprintf(stderr,
 			"Machine not initialized properly: %s\n", name().c_str());
 		fprintf(stderr,
-			"Error: %s Data: 0x%#lX\n", me.what(), me.data());
+			"Error: %s Data: 0x%lX\n", me.what(), me.data());
 		this->print_backtrace();
 		if (this->tenant().config.group.remote_debug_on_exception) {
 			this->open_debugger(2159, 120.0f);
@@ -398,7 +398,7 @@ MachineInstance::MachineInstance(
 	  m_binary_type(source.binary_type()),
 	  m_sighandler{source.m_sighandler},
 	  m_regex     {ten->config.max_regex(), "Regex handles"},
-	  m_prng(source.m_prng)
+	  m_prng(get_urandom_state()) // Forks must not share the same PRNG sequence
 {
 #ifdef ENABLE_TIMING
 	TIMING_LOCATION(t0);
@@ -455,6 +455,7 @@ void MachineInstance::tail_reset()
 	m_regex.foreach_owned(
 		[] (auto& entry) {
 			VRE_free(&entry.item);
+			entry.free();
 		});
 	if (this->is_debug()) {
 		//this->stop_debugger();
@@ -583,6 +584,7 @@ void MachineInstance::print_backtrace()
 		"[0] 0x%8lX   %s\n",
 		rip, machine().resolve(rip).c_str());
 	if (len > 0) {
+		len = std::min(len, (int)sizeof(buffer) - 1);
 		machine().print(buffer, len);
 	}
 }

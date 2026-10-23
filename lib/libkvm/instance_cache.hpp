@@ -26,6 +26,12 @@ struct Cache {
 	auto& get(size_t idx) {
 		return cache.at(idx);
 	}
+	auto& get_used(size_t idx) {
+		auto& entry = cache.at(idx);
+		if (entry.empty())
+			throw std::out_of_range("Invalid handle for: " + std::string(description));
+		return entry;
+	}
 	T item(size_t idx) {
 		return cache.at(idx).item;
 	}
