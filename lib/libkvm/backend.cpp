@@ -282,17 +282,16 @@ static void error_handling(kvm::VMPoolItem* slot,
 	try {
 		/* Check if the program is configured to open a remote GDB session on exception. */
 		if (machine.tenant().config.group.remote_debug_on_exception) {
-			auto fut = slot->tp.enqueue(
+			slot->call(
 			[&] () -> long {
 				/* Open a remote GDB session on the VM. */
 				machine.open_debugger(2159, 5 * 60.0f);
 				return 0L;
 			});
-			fut.get();
 		}
 		/* Check if the program has a backend_error callback. */
 		if (prog.entry_at(ProgramEntryIndex::BACKEND_ERROR) != 0x0) {
-		auto fut = slot->tp.enqueue(
+		slot->call(
 		[&] () -> long {
 			auto& machine = *slot->mi;
 			auto* ctx = machine.ctx();
@@ -321,7 +320,6 @@ static void error_handling(kvm::VMPoolItem* slot,
 			fetch_result(slot, machine, result);
 			return 0L;
 		});
-		fut.get();
 		return;
 		} // error callback
 	} catch (const tinykvm::MachineTimeoutException& mte) {
@@ -443,7 +441,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 	}
 
 	try {
-		auto fut = slot->tp.enqueue(
+		slot->call(
 		[slot, invoc, post, result] () -> long {
 			if constexpr (VERBOSE_BACKEND) {
 				printf("Begin backend %s %s (arg=%s)\n", invoc->inputs.method,
@@ -564,7 +562,6 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			fetch_result(slot, machine, result);
 			return 0L;
 		});
-		fut.get();
 		return;
 
 	} catch (const tinykvm::MachineTimeoutException& mte) {
@@ -623,7 +620,7 @@ static int backend_post_data(struct backend_post *post,
 		const auto call_addr = allow_stream ?
 			mi.program().entry_at(ProgramEntryIndex::BACKEND_STREAM) : 0x0;
 		if (call_addr != 0x0) {
-			auto fut = slot.tp.enqueue(
+			slot.call(
 			[&] () -> long {
 				/* Regular CPU-time. */
 				ScopedDuration cputime(mi.stats().request_cpu_time);
@@ -639,7 +636,6 @@ static int backend_post_data(struct backend_post *post,
 					(uint64_t)post->length);
 				return 0L;
 			});
-			fut.get();
 
 			/* Increment POST length *after* VM call. */
 			post->length += data_len;
@@ -712,7 +708,7 @@ ssize_t kvm_backend_streaming_delivery(
 		auto& vm = mi.machine();
 
 		/* Call the backend streaming function, if set. */
-		auto fut = slot.tp.enqueue(
+		slot.call(
 		[&] () -> long {
 			/* Regular CPU-time. */
 			ScopedDuration cputime(mi.stats().request_cpu_time);
@@ -724,7 +720,6 @@ ssize_t kvm_backend_streaming_delivery(
 				(uint64_t)result->content_length);
 			return 0L;
 		});
-		fut.get();
 
 		const auto& regs = vm.registers();
 		/* NOTE: RAX gets moved to RDI. RDX is length.

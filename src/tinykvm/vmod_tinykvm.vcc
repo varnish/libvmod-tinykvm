@@ -99,6 +99,19 @@ $Function BOOL init_self_requests(PRIV_VCL, STRING unix_socket,
 	Please note that the listener must be accessible to the varnish user in order
 	for it to work.
 
+$Function VOID direct_vmcalls(ENUM {AUTO, ON, OFF} mode = AUTO,
+	BYTES min_stack = 262144)
+
+- Controls whether Varnish worker threads call directly into leased VMs,
+  instead of handing each call to the VMs dedicated thread and waiting.
+- AUTO enables direct calls on Linux 6.13 and later, where running a vCPU
+  from a new thread no longer stalls in the kernel. Use ON for kernels
+  with the fix backported.
+- Guest system calls run on the calling thread, so threads with less stack
+  than min_stack keep using the dedicated thread. Varnish worker stacks are
+  set with the thread_pool_stack parameter, eg. -p thread_pool_stack=256k
+- Must be called from vcl_init.
+
 $Function BOOL configure(PRIV_VCL, STRING program, STRING json)
 
 - Provide a JSON configuration to override defaults to unstarted programs.

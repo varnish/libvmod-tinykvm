@@ -141,7 +141,7 @@ static int kvm_forkcall(VRT_CTX, kvm::VMPoolItem* slot,
 	auto& machine = *slot->mi;
 	machine.set_ctx(ctx);
 	try {
-		auto fut = slot->tp.enqueue(
+		return slot->call(
 		[&] () -> long {
 			auto& vm = machine.machine();
 			const auto timeout = machine.max_req_time();
@@ -153,7 +153,6 @@ static int kvm_forkcall(VRT_CTX, kvm::VMPoolItem* slot,
 			const auto& regs = vm.registers();
 			return regs.rdi;
 		});
-		return fut.get();
 
 	} catch (const tinykvm::MachineTimeoutException& mte) {
 		fprintf(stderr, "%s: KVM VM timed out (%f seconds)\n",

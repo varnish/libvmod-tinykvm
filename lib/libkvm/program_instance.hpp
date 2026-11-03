@@ -43,7 +43,33 @@ struct VMPoolItem {
 	tinykvm::ThreadTask<tinykvm::Function<long()>> tp;
 	// We can use this to avoid having to start in a serialized manner
 	std::future<long> task_future;
+
+	/* Call into the leased VM. When direct vmcalls are allowed, the
+	   function runs on the calling thread, otherwise it is executed
+	   on the VMs dedicated thread while the caller waits. */
+	template <typename Func>
+	long call(Func&& func);
+
+	/* True when the current thread may call directly into VMs. */
+	static bool direct_calls_allowed();
+	/* Kernels before 6.13 stall on KVM_RUN from a new thread. */
+	static bool kernel_supports_direct_calls();
 };
+
+template <typename Func>
+inline long VMPoolItem::call(Func&& func)
+{
+	if (direct_calls_allowed()) {
+		mi->stats().direct_calls ++;
+		return func();
+	}
+	/* The caller waits, so the function can be captured by reference. */
+	auto fut = tp.enqueue(
+	[&func] () -> long {
+		return func();
+	});
+	return fut.get();
+}
 
 struct Reservation {
 	VMPoolItem* slot;

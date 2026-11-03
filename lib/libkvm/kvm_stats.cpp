@@ -29,6 +29,7 @@ static auto gather_stats(const MachineInstance& mi, TT& taskq)
 
 	return nlohmann::json::object({
 		{"invocations", stats.invocations},
+		{"direct_calls", stats.direct_calls},
 		{"resets",      stats.resets},
 		{"resets_full", stats.full_resets},
 		{"exceptions",  stats.exceptions},
@@ -97,6 +98,7 @@ static void gather_stats(VRT_CTX,
 		machines.push_back(gather_stats(mi, prog->m_vms[i].tp));
 
 		totals.invocations += mi.stats().invocations;
+		totals.direct_calls += mi.stats().direct_calls;
 		totals.exceptions += mi.stats().exceptions + mi.stats().exception_oom + mi.stats().exception_mem;
 		totals.resets += mi.stats().resets;
 		totals.full_resets += mi.stats().full_resets;
@@ -123,6 +125,7 @@ static void gather_stats(VRT_CTX,
 	/* Cumulative totals */
 	requests.push_back({"totals", {
 		{"invocations", totals.invocations},
+		{"direct_calls", totals.direct_calls},
 		{"resets",      totals.resets},
 		{"resets_full", totals.full_resets},
 		{"exceptions",  totals.exceptions},

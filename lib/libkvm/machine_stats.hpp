@@ -5,6 +5,7 @@ namespace kvm {
 struct MachineStats
 {
 	uint64_t invocations = 0;
+	uint64_t direct_calls = 0;
 	uint64_t resets      = 0;
 	uint64_t full_resets = 0;
 	uint64_t timeouts    = 0;

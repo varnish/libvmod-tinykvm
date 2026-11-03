@@ -22,6 +22,7 @@
 #include "program_instance.hpp"
 
 #include "curl_fetch.hpp"
+#include "kvm_settings.h"
 #include "settings.hpp"
 #include "tenant_instance.hpp"
 #include "scoped_duration.hpp"
@@ -30,7 +31,9 @@
 #include <cstring>
 #include <filesystem>
 #include <tinykvm/rsp_client.hpp>
+#include <pthread.h>
 #include <sched.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 extern "C" {
 #include "vtim.h"
@@ -59,6 +62,49 @@ VMPoolItem::VMPoolItem(unsigned reqid, const MachineInstance& main_vm,
 			reqid, main_vm, ten, prog);
 		return 0;
 	});
+}
+
+static size_t current_thread_stack_size() noexcept
+{
+	pthread_attr_t attr;
+	if (pthread_getattr_np(pthread_self(), &attr) != 0)
+		return 0;
+	size_t size = 0;
+	if (pthread_attr_getstacksize(&attr, &size) != 0)
+		size = 0;
+	pthread_attr_destroy(&attr);
+	return size;
+}
+
+bool VMPoolItem::kernel_supports_direct_calls()
+{
+	/* Linux 6.13 stopped using synchronize_rcu() when a vCPU is run
+	   by a different task than last time (commit 3e7f43188ee2). */
+	static const bool supported = [] {
+		struct utsname uts;
+		int major = 0, minor = 0;
+		if (uname(&uts) != 0 || sscanf(uts.release, "%d.%d", &major, &minor) != 2)
+			return false;
+		return major > 6 || (major == 6 && minor >= 13);
+	}();
+	return supported;
+}
+
+bool VMPoolItem::direct_calls_allowed()
+{
+	switch (kvm_settings.direct_vmcalls) {
+	case 0:
+		return false;
+	case 1:
+		break;
+	default:
+		if (!kernel_supports_direct_calls())
+			return false;
+	}
+	/* Guest system calls are handled on the calling thread, and
+	   Varnish worker threads have small stacks (thread_pool_stack). */
+	static thread_local const size_t stack_size = current_thread_stack_size();
+	return stack_size >= kvm_settings.direct_vmcall_min_stack;
 }
 
 Storage::Storage(BinaryStorage storage_elf)

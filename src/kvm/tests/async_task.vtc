@@ -6,19 +6,28 @@ cat >${tmpdir}/${testname}_storage.c <<-EOF
 #include "kvm_api.h"
 int storage_counter = 0;
 
-void my_storage_task(void *arg)
+void my_storage_task(void *arg, size_t len)
 {
-	(void) arg;
+	(void) arg; (void) len;
 	__sync_fetch_and_add(&storage_counter, 1);
 }
 
-void my_disallowed_storage_task(void *arg)
+void my_disallowed_storage_task(void *arg, size_t len)
 {
+	(void) arg; (void) len;
+}
+
+/* Storage memory is only reachable through calls into storage. */
+void storage_counter_get(size_t n, struct virtbuffer buffers[n], size_t res)
+{
+	(void) buffers; (void) res;
+	storage_return(&storage_counter, sizeof(storage_counter));
 }
 
 int main()
 {
-	sys_storage_allow(my_storage_task);
+	STORAGE_ALLOW(my_storage_task);
+	STORAGE_ALLOW(storage_counter_get);
 
 	wait_for_requests();
 }
@@ -27,9 +36,9 @@ cat >${tmpdir}/${testname}.c <<-EOF
 #include <string.h>
 #include <stdio.h>
 #include "kvm_api.h"
-extern int storage_counter;
-extern void my_storage_task(void *arg);
-extern void my_disallowed_storage_task(void *arg);
+extern void my_storage_task(void *arg, size_t len);
+extern void my_disallowed_storage_task(void *arg, size_t len);
+extern void storage_counter_get(size_t n, struct virtbuffer buffers[n], size_t res);
 
 static void on_get(const char *url, const char* arg)
 {
@@ -45,9 +54,12 @@ static void on_get(const char *url, const char* arg)
 		backend_response(200, ctype, sizeof(ctype)-1, "OK", 2);
 	}
 
+	int counter = -1;
+	storage_callv(storage_counter_get, 0, NULL, &counter, sizeof(counter));
+
 	char buffer[24];
 	snprintf(buffer, sizeof(buffer),
-		"Count: %d", storage_counter);
+		"Count: %d", counter);
 
 	backend_response(200, ctype, sizeof(ctype)-1, buffer, strlen(buffer));
 }
@@ -59,7 +71,7 @@ int main()
 }
 EOF
 gcc -static -O2 -Wl,-Ttext-segment=0x44000000 ${tmpdir}/${testname}_storage.c -I${testdir} -o ${tmpdir}/${testname}_storage
-objcopy -w --extract-symbol --strip-symbol=!*storage* --strip-symbol=* ${tmpdir}/${testname}_storage ${tmpdir}/${testname}_storage.syms
+objcopy -w --extract-symbol --strip-symbol=!my_storage_task --strip-symbol=!my_disallowed_storage_task --strip-symbol=!storage_counter_get --strip-symbol=* ${tmpdir}/${testname}_storage ${tmpdir}/${testname}_storage.syms
 gcc -static -O2 -Wl,--just-symbols=${tmpdir}/${testname}_storage.syms ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
 }
 

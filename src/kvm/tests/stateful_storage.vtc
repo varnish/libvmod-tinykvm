@@ -6,6 +6,14 @@ cat >${tmpdir}/${testname}_storage.c <<-EOF
 #include "kvm_api.h"
 int storage_counter = 0;
 
+/* Storage memory is only reachable through calls into storage. */
+void storage_increment(size_t n, struct virtbuffer buffers[n], size_t res)
+{
+	(void) buffers; (void) res;
+	const int value = ++storage_counter;
+	storage_return(&value, sizeof(value));
+}
+
 int main()
 {
 	wait_for_requests();
@@ -14,12 +22,13 @@ EOF
 cat >${tmpdir}/${testname}.c <<-EOF
 #include <string.h>
 #include "kvm_api.h"
-extern int storage_counter;
+extern void storage_increment(size_t n, struct virtbuffer buffers[n], size_t res);
 
 static void my_backend(char *arg)
 {
-	__sync_fetch_and_add(&storage_counter, 1);
-	arg[11] = '0' + (storage_counter % 10);
+	int counter = 0;
+	storage_callv(storage_increment, 0, NULL, &counter, sizeof(counter));
+	arg[11] = '0' + (counter % 10);
 
 	const char ctype[] = "text/plain";
 	backend_response(200, ctype, sizeof(ctype)-1, arg, strlen(arg));
@@ -32,7 +41,7 @@ int main()
 }
 EOF
 gcc -static -O2 -Wl,-Ttext-segment=0x44000000 ${tmpdir}/${testname}_storage.c -I${testdir} -o ${tmpdir}/${testname}_storage
-objcopy -w --extract-symbol --strip-symbol=!*storage* --strip-symbol=* ${tmpdir}/${testname}_storage ${tmpdir}/${testname}_storage.syms
+objcopy -w --extract-symbol --strip-symbol=!storage_increment --strip-symbol=* ${tmpdir}/${testname}_storage ${tmpdir}/${testname}_storage.syms
 gcc -static -O2 -Wl,--just-symbols=${tmpdir}/${testname}_storage.syms ${tmpdir}/${testname}.c -I${testdir} -o ${tmpdir}/${testname}
 }
 

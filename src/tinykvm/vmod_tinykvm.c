@@ -10,6 +10,7 @@
  * 
  */
 #include "vmod_tinykvm.h"
+#include "../kvm/kvm_settings.h"
 
 #include <vsb.h>
 #include <vcl.h>
@@ -19,6 +20,7 @@
 #endif
 #include <errno.h>
 #include <stdio.h>
+#include <string.h>
 #define SEMPTY(s)			!((s) && *(s))
 
 static const int NO_INIT_PROGRAMS = 0;
@@ -59,6 +61,23 @@ VCL_BOOL vmod_init_self_requests(VRT_CTX, VCL_PRIV task,
 	}
 
 	return (kvm_set_self_request(ctx, task, unix_path, uri, max_concurrency));
+}
+
+VCL_VOID vmod_direct_vmcalls(VRT_CTX, VCL_ENUM mode, VCL_BYTES min_stack)
+{
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	if (ctx->method != VCL_MET_INIT) {
+		VRT_fail(ctx, "compute: direct_vmcalls() should only be called from vcl_init");
+		return;
+	}
+
+	if (strcmp(mode, "ON") == 0)
+		kvm_settings.direct_vmcalls = 1;
+	else if (strcmp(mode, "OFF") == 0)
+		kvm_settings.direct_vmcalls = 0;
+	else
+		kvm_settings.direct_vmcalls = -1;
+	kvm_settings.direct_vmcall_min_stack = min_stack;
 }
 
 VCL_STRING vmod_stats(VRT_CTX, VCL_PRIV task, VCL_STRING pattern, VCL_INT indent)

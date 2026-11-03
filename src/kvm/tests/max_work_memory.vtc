@@ -121,8 +121,10 @@ client c4 {
 } -repeat 100 -run
 
 client c5 {
-	# 2 MB (failure)
-	txreq -url "/2000000" -hdr "Host: tenant_failure.com"
+	# 3 MB (failure)
+	# The memory limit has 2MB granularity, and 4k pages are used here
+	# (split_hugepages), so 2MB fits within a 1MB limit rounded up.
+	txreq -url "/3000000" -hdr "Host: tenant_failure.com"
 	rxresp
 	expect resp.status >= 500
 	expect resp.bodylen <= 300
