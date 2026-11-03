@@ -163,6 +163,7 @@ static void fetch_result(kvm::VMPoolItem* slot,
 		result->tsize = tlen;
 		result->status = sanitize_status_code(status);
 		result->content_length = clen;
+		result->content_address = cvaddr;
 		result->bufcount = mi.machine().gather_buffers_from_range(
 			result->bufcount, (tinykvm::Machine::Buffer *)result->buffers, cvaddr, clen);
 	}
@@ -183,6 +184,7 @@ static void fetch_result(kvm::VMPoolItem* slot,
 		result->tsize = tlen;
 		result->status = sanitize_status_code(status);
 		result->content_length = clen;
+		result->content_address = 0;
 		result->bufcount = 0;
 		result->stream_slot = (vmod_kvm_slot *)slot;
 		result->stream_vsl  = nullptr;
@@ -246,8 +248,10 @@ static void fetch_result(kvm::VMPoolItem* slot,
 				where, header.field_ptr, header.field_len); // 1 = HDR_RESP and HDR_BERESP
 		}
 
-		/* Set the cache settings */
-		if (extra.cached) {
+		/* Set the cache settings. Only a backend fetch has an object to
+		   cache: to_string(), synth() and deliver_transform() on the client
+		   side have no busyobj, and the setters assert on it. */
+		if (extra.cached && mi.ctx() != nullptr && mi.ctx()->bo != nullptr) {
 			kvm_SetCacheable(mi.ctx(), extra.cached);
 			kvm_SetTTLs(mi.ctx(), // TTL, GRACE, KEEP
 				extra.ttl, extra.grace, extra.keep);
@@ -341,11 +345,12 @@ static void error_handling(kvm::VMPoolItem* slot,
 		machine.print_backtrace();
 	} catch (...) {}
 	/* An error result */
-	new (result) backend_result {nullptr, 0,
-		500, /* Internal server error */
-		0,
-		0, {}
-	};
+	result->type = nullptr;
+	result->tsize = 0;
+	result->status = 500; /* Internal server error */
+	result->content_length = 0;
+	result->bufcount = 0;
+	result->content_address = 0;
 	/* Record program status counter */
 	kvm_varnishstat_program_status(result->status);
 }
@@ -456,7 +461,7 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 			const auto timeout = machine.max_req_time();
 			const auto& prog = machine.program();
 			auto& vm = machine.machine();
-			if (post != nullptr) {
+			if (post != nullptr && post->address != 0) {
 				/* Try to reduce POST mmap allocation */
 				vm.mmap_relax(post->address, post->capacity, post->length);
 			}
@@ -594,9 +599,12 @@ void kvm_backend_call(VRT_CTX, kvm::VMPoolItem* slot,
 	}
 }
 
-extern "C"
-int kvm_backend_streaming_post(struct backend_post *post,
-	const void* data_ptr, ssize_t data_len)
+/* Adds a part of a request body to a reserved VM. When allow_stream is
+   set and the program has a streaming callback, the part is passed to
+   it. Otherwise the parts are gathered into one sequential buffer in the
+   VM, which the program gets as a regular POST. */
+static int backend_post_data(struct backend_post *post,
+	const void* data_ptr, ssize_t data_len, bool allow_stream)
 {
 	assert(post && post->slot);
 	auto& slot = *(kvm::VMPoolItem *)post->slot;
@@ -604,14 +612,16 @@ int kvm_backend_streaming_post(struct backend_post *post,
 	try {
 		auto& vm = mi.machine();
 
-		/* Not an overflow check, just stopping wildly large payloads. */
-		if (UNLIKELY(post->length + data_len > post->capacity)) {
+		/* Stopping wildly large payloads, and anything that does not fit
+		   the buffer that was allocated for the body. */
+		if (UNLIKELY(data_len < 0 || post->length > post->capacity
+			|| size_t(data_len) > post->capacity - post->length)) {
 			throw tinykvm::MachineException("POST request too large", post->capacity);
 		}
 
 		/* Call the backend streaming function, if set. */
-		const auto call_addr =
-			mi.program().entry_at(ProgramEntryIndex::BACKEND_STREAM);
+		const auto call_addr = allow_stream ?
+			mi.program().entry_at(ProgramEntryIndex::BACKEND_STREAM) : 0x0;
 		if (call_addr != 0x0) {
 			auto fut = slot.tp.enqueue(
 			[&] () -> long {
@@ -640,9 +650,8 @@ int kvm_backend_streaming_post(struct backend_post *post,
 		else
 		{
 			/* Regular POST, first payload: Allocate payload in VM. */
-			if (post->length == 0)
+			if (post->address == 0)
 			{
-				assert(post->address == 0);
 				post->address = mi.allocate_post_data(post->capacity);
 			}
 
@@ -681,6 +690,13 @@ int kvm_backend_streaming_post(struct backend_post *post,
 	kvm_varnishstat_program_exception();
 	/* An error result */
 	return -1;
+}
+
+extern "C"
+int kvm_backend_streaming_post(struct backend_post *post,
+	const void* data_ptr, ssize_t data_len)
+{
+	return backend_post_data(post, data_ptr, data_len, true);
 }
 
 extern "C"
@@ -744,6 +760,69 @@ ssize_t kvm_backend_streaming_delivery(
 	kvm_varnishstat_program_exception();
 	/* An error result */
 	return -1;
+}
+
+/* Copy a part of a response body into a reserved VM, for
+   deliver_transform(). Unlike kvm_backend_streaming_post(), this never
+   calls the program's streaming callback: the program gets the whole
+   body at once, as a regular POST. post->capacity must be the length
+   of the whole body, which is allocated in the VM on the first call. */
+extern "C"
+int kvm_deliver_copy_to_vm(struct backend_post *post,
+	const void* data_ptr, ssize_t data_len)
+{
+	return backend_post_data(post, data_ptr, data_len, false);
+}
+
+/* Returns a host pointer to the content of a regular response from a
+   reserved VM, when Varnish may use it in place as a synth VSB buffer.
+   Varnish writes a NUL after the body in VSB_finish(), and VCL may
+   rewrite the body in place (eg. set resp.body), so:
+   - The content and the byte after it must be one sequential host range
+     in pages this VM owns. Pages it shares with the main VM are
+     duplicated here, so that no write can reach the main VM.
+   - The byte after the content must already be a zero.
+   - The VM must be reset when it is freed, so that whatever Varnish
+     writes into the buffer is discarded instead of being seen by the
+     program in a later request.
+   Returns NULL when the content must be copied instead. */
+extern "C"
+char* kvm_synth_zero_copy(kvm::VMPoolItem* slot, const struct backend_result* result)
+{
+	if (result->bufcount == 0 || result->content_length == 0
+		|| result->content_address == 0)
+		return nullptr;
+	auto& mi = *slot->mi;
+	if (!mi.is_reset_needed())
+		return nullptr;
+	const uint64_t addr = result->content_address;
+	const size_t len = result->content_length;
+	if (UNLIKELY(addr + len + 1 < addr))
+		return nullptr;
+	/* Check what can be checked without changing the VM first, as
+	   making the pages writable duplicates the shared ones. The content
+	   must already be one host range (as gathered by fetch_result()),
+	   and the byte after it must be a zero, right after it in memory. */
+	if (result->bufcount != 1 || size_t(result->buffers[0].size) != len)
+		return nullptr;
+	try {
+		tinykvm::Machine::Buffer after;
+		if (mi.machine().gather_buffers_from_range(1, &after, addr + len, 1) != 1
+			|| after.ptr != result->buffers[0].data + len || after.ptr[0] != 0)
+			return nullptr;
+
+		std::vector<tinykvm::Machine::WrBuffer> buffers;
+		buffers.reserve(1);
+		mi.machine().writable_buffers_from_range(buffers, addr, len + 1);
+		if (buffers.size() != 1 || buffers[0].len != len + 1)
+			return nullptr;
+		char* body = buffers[0].ptr;
+		if (body[len] != 0)
+			return nullptr;
+		return body;
+	} catch (...) {
+		return nullptr;
+	}
 }
 
 namespace kvm {

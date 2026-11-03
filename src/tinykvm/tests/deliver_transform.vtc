@@ -1,0 +1,273 @@
+varnishtest "KVM: Transforming the response body in vcl_deliver"
+
+feature cmd "test -r /dev/kvm && test -w /dev/kvm"
+feature cmd "varnishd -V 2>&1 | grep -q varnish-plus"
+
+shell {
+cat >transform.c <<-EOF
+#include "kvm_api.h"
+#include <stdlib.h>
+#include <string.h>
+
+static void on_post(const char *url, const char *arg,
+	const char *ctype, const uint8_t *data, size_t len)
+{
+	if (strcmp(arg, "same") == 0) {
+		/* The response is the body, as copied into the program */
+		backend_response(200, ctype, strlen(ctype), data, len);
+	} else if (strcmp(arg, "empty") == 0) {
+		backend_response(204, "", 0, "", 0);
+	} else if (strcmp(arg, "ctype") == 0) {
+		backend_response_str(201, "application/x-ctype", ctype);
+	} else if (strcmp(arg, "url") == 0) {
+		backend_response_str(200, "text/plain", url);
+	} else if (strcmp(arg, "crash") == 0) {
+		*(volatile int *)0 = 1;
+	} else if (strcmp(arg, "double") == 0) {
+		char *out = malloc(2 * len);
+		memcpy(out, data, len);
+		memcpy(out + len, data, len);
+		backend_response(200, "text/plain", 10, out, 2 * len);
+	} else {
+		/* Upper-case the body */
+		char *out = malloc(len);
+		for (size_t i = 0; i < len; i++) {
+			const char c = data[i];
+			out[i] = (c >= 'a' && c <= 'z') ? c - 32 : c;
+		}
+		backend_response(200, "text/x-upper", 12, out, len);
+	}
+}
+
+static void on_get(const char *url, const char *arg)
+{
+	backend_response_str(200, "text/plain", "got");
+}
+
+int main(int argc, char **argv)
+{
+	set_backend_get(on_get);
+	set_backend_post(on_post);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 transform.c -I${testdir} -o transform
+}
+
+server s1 {
+	rxreq
+	expect req.url == "/hello"
+	txresp -hdr "ETag: \"abc\"" -hdr "Last-Modified: Thu, 01 Jan 2026 00:00:00 GMT" \
+		-hdr "Content-Type: text/html" -body "hello world"
+
+	rxreq
+	expect req.url == "/large"
+	txresp -bodylen 300000
+
+	rxreq
+	expect req.url == "/stream"
+	txresp -nolen -hdr "Transfer-Encoding: chunked"
+	chunked "abc"
+	delay 0.5
+	chunked "def"
+	chunkedlen 0
+
+	rxreq
+	expect req.url == "/pass"
+	txresp -body "passed"
+
+	rxreq
+	expect req.url == "/gzip"
+	txresp -hdr "Content-Encoding: gzip" -body "notreallygzip"
+} -start
+
+varnish v1 -vcl+backend {
+vcl 4.1;
+	import std;
+	import tinykvm;
+
+	sub vcl_init {
+		tinykvm.configure("transform",
+			"""{
+				"filename": "${tmpdir}/transform",
+				"concurrency": 1
+			}""");
+	}
+
+	sub vcl_recv {
+		if (req.url == "/pass") {
+			return (pass);
+		}
+	}
+
+	sub vcl_deliver {
+		if (req.http.X-Arg) {
+			if (!tinykvm.deliver_transform("transform", req.url, req.http.X-Arg,
+					max_size = std.bytes(req.http.X-Max, 1MB),
+					zero_copy = req.http.X-Zero-Copy == "1")) {
+				return (synth(503));
+			}
+		}
+		if (req.http.X-Arg2) {
+			if (!tinykvm.deliver_transform("transform", req.url, req.http.X-Arg2,
+					zero_copy = req.http.X-Zero-Copy == "1")) {
+				return (synth(503));
+			}
+		}
+		if (req.http.X-ToString) {
+			# The only VM is held by a zero-copy transform
+			set resp.http.X-TS = tinykvm.to_string("transform", "/get");
+		}
+	}
+} -start
+
+varnish v1 -cliok "param.set http_range_support on"
+
+logexpect l1 -v v1 -g raw {
+	expect * * Debug "^deliver_transform: zero-copy .11 bytes.$"
+	expect * * Debug "^deliver_transform: zero-copy .300000 bytes.$"
+} -start
+
+client c1 {
+	# No transform: the cached object, with its validators
+	txreq -url "/hello"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "hello world"
+	expect resp.http.ETag == "\"abc\""
+
+	# Copied into a new object
+	txreq -url "/hello" -hdr "X-Arg: upper"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "HELLO WORLD"
+	expect resp.http.Content-Length == 11
+	expect resp.http.Content-Type == "text/x-upper"
+	expect resp.http.ETag == <undef>
+	expect resp.http.Last-Modified == <undef>
+
+	# Delivered straight out of the program
+	txreq -url "/hello" -hdr "X-Arg: upper" -hdr "X-Zero-Copy: 1"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "HELLO WORLD"
+	expect resp.http.Content-Length == 11
+
+	# The cached object is unchanged
+	txreq -url "/hello"
+	rxresp
+	expect resp.body == "hello world"
+
+	# The response points at the copy of the body in the program
+	txreq -url "/hello" -hdr "X-Arg: same" -hdr "X-Zero-Copy: 1"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "hello world"
+	expect resp.http.Content-Type == "text/html"
+
+	# The Content-Type and URL are passed on
+	txreq -url "/hello" -hdr "X-Arg: ctype"
+	rxresp
+	expect resp.status == 201
+	expect resp.body == "text/html"
+	txreq -url "/hello" -hdr "X-Arg: url" -hdr "X-Zero-Copy: 1"
+	rxresp
+	expect resp.body == "/hello"
+
+	# An empty response keeps the Content-Type
+	txreq -url "/hello" -hdr "X-Arg: empty" -hdr "X-Zero-Copy: 1"
+	rxresp
+	expect resp.status == 204
+	expect resp.http.Content-Type == "text/html"
+
+	# HEAD, Range and conditional requests on the new response
+	txreq -req HEAD -url "/hello" -hdr "X-Arg: upper" -hdr "X-Zero-Copy: 1"
+	rxresphdrs
+	expect resp.status == 200
+	expect resp.http.Content-Length == 11
+
+	txreq -url "/hello" -hdr "X-Arg: upper" -hdr "X-Zero-Copy: 1" -hdr "Range: bytes=6-9"
+	rxresp
+	expect resp.status == 206
+	expect resp.body == "WORL"
+
+	txreq -url "/hello" -hdr "X-Arg: upper" -hdr "Range: bytes=-5"
+	rxresp
+	expect resp.status == 206
+	expect resp.body == "WORLD"
+
+	txreq -url "/hello" -hdr "X-Arg: upper" -hdr "If-None-Match: \"abc\""
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "HELLO WORLD"
+
+	# Transforming twice: the first zero-copy response holds the only
+	# instance of the program, which must be freed before the second
+	txreq -url "/hello" -hdr "X-Arg: upper" -hdr "X-Arg2: double" -hdr "X-Zero-Copy: 1"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "HELLO WORLDHELLO WORLD"
+
+	txreq -url "/hello" -hdr "X-Arg: double" -hdr "X-Arg2: upper"
+	rxresp
+	expect resp.body == "HELLO WORLDHELLO WORLD"
+
+	# The same program after a zero-copy transform: the response is
+	# copied out of the only VM first
+	txreq -url "/hello" -hdr "X-Arg: upper" -hdr "X-Zero-Copy: 1" -hdr "X-ToString: 1"
+	rxresp
+	expect resp.status == 200
+	expect resp.http.X-TS == "got"
+	expect resp.body == "HELLO WORLD"
+	expect resp.http.Content-Length == 11
+
+	# A body over many pages
+	txreq -url "/large" -hdr "X-Arg: same" -hdr "X-Zero-Copy: 1"
+	rxresp
+	expect resp.status == 200
+	expect resp.bodylen == 300000
+
+	txreq -url "/large" -hdr "X-Arg: double"
+	rxresp
+	expect resp.status == 200
+	expect resp.bodylen == 600000
+
+	# Over the limit, both ways
+	txreq -url "/large" -hdr "X-Arg: same" -hdr "X-Max: 1000"
+	rxresp
+	expect resp.status == 503
+
+	txreq -url "/hello" -hdr "X-Arg: double" -hdr "X-Max: 15"
+	rxresp
+	expect resp.status == 503
+
+	# A program crash is a failure, and nothing has been sent
+	txreq -url "/hello" -hdr "X-Arg: crash"
+	rxresp
+	expect resp.status == 503
+
+	# The program still works after the crash
+	txreq -url "/hello" -hdr "X-Arg: upper" -hdr "X-Zero-Copy: 1"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "HELLO WORLD"
+
+	# The fetch is still streaming: the whole body is read first
+	txreq -url "/stream" -hdr "X-Arg: upper" -hdr "X-Zero-Copy: 1"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "ABCDEF"
+
+	# A private (pass) object
+	txreq -url "/pass" -hdr "X-Arg: upper" -hdr "X-Zero-Copy: 1"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "PASSED"
+
+	# Encoded bodies are not supported
+	txreq -url "/gzip" -hdr "X-Arg: upper"
+	rxresp
+	expect resp.status == 503
+} -run
+
+logexpect l1 -wait

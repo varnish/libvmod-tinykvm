@@ -26,6 +26,22 @@ sub vcl_backend_error {
 
 Normalize cute cat pictures as HTTP status responses! Note that we can fetch cached images from Varnish here instead of hammering http.cat. The direct URL simplifies the example.
 
+On Varnish Enterprise, `zero_copy = true` lets Varnish use the response in place, straight out of the program's memory, instead of copying it. This is experimental. It only happens when the response is one sequential buffer followed by a zero byte, and the program is reset after each request (ephemeral, the default). The program instance then stays reserved until the end of the request, or until the request uses the same program again.
+
+## Transform a response
+
+If you want to change a response body right before it is delivered, you can use `tinykvm.deliver_transform()` in `vcl_deliver` (experimental, Varnish Enterprise only). The whole body is copied into the program, which gets it like a POST and responds as usual. The cached object is not changed:
+
+```vcl
+sub vcl_deliver {
+	if (!tinykvm.deliver_transform("minify", req.url, zero_copy = true)) {
+		return (synth(503));
+	}
+}
+```
+
+With `zero_copy = true` the response is delivered straight out of the program's memory, and the program instance stays reserved until the client has received it, or until the same program is used again in `vcl_deliver`.
+
 
 ### to_string() Benchmark
 

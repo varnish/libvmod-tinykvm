@@ -184,12 +184,59 @@ $Function STRING to_string(PRIV_VCL, STRING program, STRING url = "", STRING arg
 - A final status >= error_treshold will produce the error string.
 - NOTE: Uses extra workspace for each call. See: man varnishd.
 
-$Function INT synth(PRIV_VCL, INT status, STRING program, STRING url = "", STRING arg = "", INT soft_reset = 0)
+$Function INT synth(PRIV_VCL, INT status, STRING program, STRING url = "", STRING arg = "", INT soft_reset = 0, BOOL zero_copy = 0)
 
 - Directly delivers a synthetic response. If status is non-zero, the HTTP status will be overridden.
 - Generates a synthetic response from the given program and arguments.
 - If the synthetic response fails, the function returns 0.
 - Works the same way as to_string().
+- Must be called from vcl_synth or vcl_backend_error.
+- zero_copy (experimental, Varnish Enterprise only): Use the response in place, straight
+  out of the program's memory, instead of copying it. This only happens when the response
+  is one sequential buffer followed by a zero byte, and the program is reset after each
+  request (ephemeral, the default). Otherwise the response is copied as usual. The program
+  instance stays reserved until the end of the request, so a program with a low concurrency
+  can be busy for longer. Using the same program again in the request (eg. after a restart
+  or retry) frees it first, copying the response out of it if it is still needed.
+
+Example:
+	sub vcl_synth {
+		tinykvm.synth(0, "hello", req.url, zero_copy = true);
+		return (deliver);
+	}
+
+$Function BOOL deliver_transform(PRIV_VCL, STRING program, STRING url = "", STRING arg = "", BYTES max_size = 16777216, BOOL zero_copy = 0)
+
+- Experimental, Varnish Enterprise only.
+- Replaces the response body in vcl_deliver, before anything is sent.
+- Copies the whole body into the program (waiting for a streaming fetch to finish, before
+  the program is reserved), and then
+  calls the program as a POST with the body as data and the response Content-Type as its
+  content type. The program responds the usual way, eg. with backend_response(). That becomes
+  the status and body, and the Content-Type when one is given. ETag and Last-Modified are
+  removed, and conditional requests get the full response: a per-client response must not
+  be kept with a 304.
+- Returns false on any failure, in which case nothing has been sent and VCL can still
+  return (synth(503)).
+- The body must not be content-encoded, or ESI/edgestash processed.
+  Use beresp.do_gunzip for content that is to be transformed.
+- max_size limits both the body copied into the program and the response. It can be at
+  most 4GB.
+- zero_copy: Deliver the response straight out of the program's memory instead of copying it
+  into a new object. The program instance then stays reserved until the response has been
+  delivered to the client, so a program with a low concurrency can be busy for longer.
+  Using the same program again in vcl_deliver copies the response out first, freeing it.
+  Falls back to copying if the transient storage does not support it, or on Varnish
+  Enterprise releases other than 6.0.18r1 to r7.
+- Streamed responses from the program are not supported.
+- Not supported in ESI includes.
+
+Example:
+	sub vcl_deliver {
+		if (!tinykvm.deliver_transform("minify", req.url)) {
+			return (synth(503));
+		}
+	}
 
 $Function BACKEND live_update(PRIV_VCL, STRING program, STRING key, BYTES max_size = 52428800)
 

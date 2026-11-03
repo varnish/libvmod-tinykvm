@@ -51,6 +51,10 @@ struct backend_result {
 	/* When content length > 0 and bufcount == 0, it is a streamed response. */
 	size_t  content_length;
 	size_t  bufcount;
+	/* Guest address of the content of a regular VM response, or 0. Only
+	   meaningful for the VM that produced the result, and only while it
+	   is still reserved. Used to check if the content can be zero-copy. */
+	uint64_t content_address;
 	union {
 		/* The result is either a list of buffers. */
 		struct VMBuffer buffers[0];

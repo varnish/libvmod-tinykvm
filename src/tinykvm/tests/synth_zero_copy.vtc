@@ -1,0 +1,275 @@
+varnishtest "KVM: Zero-copy synthetic responses"
+
+feature cmd "test -r /dev/kvm && test -w /dev/kvm"
+feature cmd "varnishd -V 2>&1 | grep -q varnish-plus"
+
+shell {
+cat >synth_zc.c <<-EOF
+#include "kvm_api.h"
+#include <string.h>
+
+static char guard[16] = "0123456789ABCDE";
+static char small[32];
+static char large[20001];
+static char data[] = "static data body";
+__attribute__((aligned(4096))) static char pageend[8192];
+
+static void on_get(const char *url, const char *arg)
+{
+	if (strcmp(url, "/small") == 0) {
+		strcpy(small, "small heap body");
+		backend_response(200, "text/plain", 10, small, strlen(small));
+	} else if (strcmp(url, "/literal") == 0) {
+		backend_response_str(200, "text/plain", "literal body");
+	} else if (strcmp(url, "/data") == 0) {
+		backend_response(200, "text/plain", 10, data, sizeof(data)-1);
+	} else if (strcmp(url, "/large") == 0) {
+		for (int i = 0; i < 20000; i++)
+			large[i] = 'a' + i % 10;
+		large[20000] = 0;
+		backend_response(200, "text/plain", 10, large, 20000);
+	} else if (strcmp(url, "/pageend") == 0) {
+		/* The NUL after the body is on the next page */
+		for (int i = 0; i < 4096; i++)
+			pageend[i] = 'z';
+		pageend[4096] = 0;
+		backend_response(200, "text/plain", 10, &pageend[4096 - 100], 100);
+	} else if (strcmp(url, "/guard") == 0) {
+		/* Not followed by a zero: must be copied */
+		backend_response(200, "text/plain", 10, guard, 10);
+	} else if (strcmp(url, "/check") == 0) {
+		backend_response(200, "text/plain", 10, guard, sizeof(guard)-1);
+	} else {
+		backend_response_str(404, "text/plain", "not found");
+	}
+}
+
+int main(int argc, char **argv)
+{
+	set_backend_get(on_get);
+	wait_for_requests();
+}
+EOF
+gcc -static -O2 synth_zc.c -I${testdir} -o synth_zc
+}
+
+varnish v1 -vcl {
+vcl 4.1;
+	import tinykvm;
+	backend default none;
+
+	sub vcl_init {
+		tinykvm.configure("zc",
+			"""{
+				"filename": "${tmpdir}/synth_zc",
+				"concurrency": 1
+			}""");
+		tinykvm.configure("persistent",
+			"""{
+				"filename": "${tmpdir}/synth_zc",
+				"ephemeral": false,
+				"concurrency": 1
+			}""");
+	}
+
+	sub vcl_recv {
+		if (req.restarts > 0 && req.http.X-ToString) {
+			# The only VM is held by the zero-copy synth before the restart
+			set req.http.X-TS = tinykvm.to_string("zc", req.http.X-ToString);
+		}
+		if (req.http.X-Backend) {
+			return (pass);
+		}
+		return (synth(700));
+	}
+
+	sub vcl_backend_fetch {
+		if (bereq.retries > 0) {
+			# The only VM is held by the zero-copy synth before the retry
+			set bereq.http.X-TS = tinykvm.to_string("zc", "/check");
+		}
+	}
+
+	sub vcl_backend_error {
+		tinykvm.synth(0, "zc", bereq.url, zero_copy = true);
+		set beresp.http.X-Retries = bereq.retries;
+		if (bereq.http.X-TS) {
+			set beresp.http.X-TS = bereq.http.X-TS;
+		}
+		if (bereq.retries == 0) {
+			return (retry);
+		}
+		return (deliver);
+	}
+
+	sub vcl_synth {
+		set resp.http.X-Restarts = req.restarts;
+		if (req.http.X-Program) {
+			tinykvm.synth(0, req.http.X-Program, req.url, zero_copy = true);
+		} else {
+			tinykvm.synth(0, "zc", req.url, zero_copy = true);
+		}
+		if (req.http.X-Twice) {
+			tinykvm.synth(0, "zc", req.http.X-Twice, zero_copy = true);
+		}
+		if (req.http.X-Append) {
+			synthetic("+appended");
+		}
+		if (req.http.X-TS) {
+			set resp.http.X-TS = req.http.X-TS;
+		}
+		if (req.http.X-Same) {
+			# The body is copied out of the only VM before it is reused
+			set resp.http.X-Same = tinykvm.to_string("zc", req.http.X-Same);
+		}
+		if (req.http.X-Set) {
+			set resp.body = req.http.X-Set;
+		}
+		if (req.http.X-Restart && req.restarts == 0) {
+			return (restart);
+		}
+		return (deliver);
+	}
+} -start
+
+# /small and /data are in writable memory with a zero after them
+logexpect l1 -v v1 -g raw {
+	expect * * Debug "^KVM: synth zero-copy .15 bytes.$"
+	expect * * Debug "^KVM: synth zero-copy .16 bytes.$"
+} -start
+
+client c1 {
+	txreq -url "/small"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "small heap body"
+
+	txreq -url "/large"
+	rxresp
+	expect resp.status == 200
+	expect resp.bodylen == 20000
+	expect resp.body ~ "^(?:abcdefghij)++$"
+
+	txreq -url "/pageend"
+	rxresp
+	expect resp.status == 200
+	expect resp.bodylen == 100
+	expect resp.body ~ "^z{100}$"
+
+	txreq -url "/literal"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "literal body"
+
+	txreq -url "/guard"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "0123456789"
+
+	txreq -url "/check"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "0123456789ABCDE"
+
+	# Appending copies the body out of the VM
+	txreq -url "/small" -hdr "X-Append: 1"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "small heap body+appended"
+
+	txreq -url "/guard" -hdr "X-Append: 1"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "0123456789+appended"
+
+	txreq -url "/large" -hdr "X-Append: 1"
+	rxresp
+	expect resp.status == 200
+	expect resp.bodylen == 20009
+
+	# Changing the body never changes the VM's memory as seen by later
+	# requests: the VM is reset (set resp.body appends on this Varnish)
+	txreq -url "/data" -hdr "X-Set: XXXX"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "static data bodyXXXX"
+
+	txreq -url "/data"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "static data body"
+
+	txreq -url "/literal" -hdr "X-Set: YYYY"
+	rxresp
+	expect resp.body == "literal bodyYYYY"
+
+	txreq -url "/literal"
+	rxresp
+	expect resp.body == "literal body"
+
+	# A restart synthesizes again with the only VM, which is held
+	txreq -url "/small" -hdr "X-Restart: 1"
+	rxresp
+	expect resp.status == 200
+	expect resp.http.X-Restarts == 1
+	expect resp.body == "small heap body"
+
+	# Twice in the same vcl_synth, with the only VM
+	txreq -url "/small" -hdr "X-Twice: /check"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "0123456789ABCDE"
+
+	txreq -url "/small" -hdr "X-Twice: /check" -hdr "X-Append: 1"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "0123456789ABCDE+appended"
+
+	# The same program after a restart, outside of vcl_synth
+	txreq -url "/small" -hdr "X-Restart: 1" -hdr "X-ToString: /check"
+	rxresp
+	expect resp.status == 200
+	expect resp.http.X-Restarts == 1
+	expect resp.http.X-TS == "0123456789ABCDE"
+	expect resp.body == "small heap body"
+
+	# The same program in vcl_synth, after the zero-copy synth
+	txreq -url "/small" -hdr "X-Same: /check"
+	rxresp
+	expect resp.status == 200
+	expect resp.http.X-Same == "0123456789ABCDE"
+	expect resp.body == "small heap body"
+
+	txreq -url "/large" -hdr "X-Same: /check" -hdr "X-Append: 1"
+	rxresp
+	expect resp.status == 200
+	expect resp.http.X-Same == "0123456789ABCDE"
+	expect resp.bodylen == 20009
+
+	# The same program in vcl_backend_fetch, after a zero-copy synth in
+	# vcl_backend_error and a retry
+	txreq -url "/small" -hdr "X-Backend: 1"
+	rxresp
+	expect resp.status == 200
+	expect resp.http.X-Retries == 1
+	expect resp.http.X-TS == "0123456789ABCDE"
+	expect resp.body == "small heap body"
+
+	# A VM that is not reset is never used in place
+	txreq -url "/data" -hdr "X-Program: persistent" -hdr "X-Set: ZZZZ"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "static data bodyZZZZ"
+
+	txreq -url "/data" -hdr "X-Program: persistent"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "static data body"
+
+	txreq -url "/large" -hdr "X-Program: persistent"
+	rxresp
+	expect resp.status == 200
+	expect resp.bodylen == 20000
+} -run
+
+logexpect l1 -wait

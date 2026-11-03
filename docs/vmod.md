@@ -79,12 +79,43 @@ Add `import tinykvm;` at the top of your VCL to load the TinyKVM VMOD.
 - NOTE: Uses extra workspace for each call. See: man varnishd, workspace_backend.
 
 ---
-> `tinykvm.synth(status, program, url = "", arg = "")`
+> `tinykvm.synth(status, program, url = "", arg = "", soft_reset = 0, zero_copy = false)`
 
 - Directly delivers a synthetic response. If status is non-zero, final HTTP status will be overridden.
 - Generates a synthetic response from the given program and arguments.
 - If the synthetic response fails, the function returns 0.
 - Works the same way as to_string(), and supports chaining.
+- Must be called from vcl_synth or vcl_backend_error.
+- `zero_copy` (experimental, Varnish Enterprise only): use the response in place, straight out of the
+  program's memory. Only when the response is one sequential buffer followed by a zero byte, and the
+  program is reset after each request (ephemeral, the default). Otherwise it is copied as usual.
+  The program instance stays reserved until the end of the request, or until the request uses the
+  same program again (eg. after a restart or retry), which copies the response out first if needed.
+
+---
+> `tinykvm.deliver_transform(program, url = "", arg = "", max_size = 16MB, zero_copy = false)`
+
+- Experimental, Varnish Enterprise only.
+- Replaces the response body in vcl_deliver, before anything is sent.
+- The whole body is copied into the program, which is called like a POST with the body as data and
+  the response Content-Type as its content type. Its response becomes the new status and body, and
+  the Content-Type when one is given. ETag and Last-Modified are removed, and conditional requests
+  get the full response.
+- Returns false on any failure, in which case nothing has been sent and VCL can still `return (synth(503))`.
+- The body must not be content-encoded or ESI processed. Use `beresp.do_gunzip` for content that is to be transformed.
+- `max_size` limits both the body copied into the program and the response. It can be at most 4GB.
+- `zero_copy`: deliver the response straight out of the program's memory. The program instance then
+  stays reserved until the response has been delivered to the client, or until the same program is
+  used again in `vcl_deliver`, which copies the response out first. Falls back to copying on Varnish
+  Enterprise releases other than 6.0.18r1 to r7.
+- Example:
+```
+	sub vcl_deliver {
+		if (!tinykvm.deliver_transform("minify", req.url)) {
+			return (synth(503));
+		}
+	}
+```
 
 ---
 > `tinykvm.live_update(program, key, max_size = 50MB)`

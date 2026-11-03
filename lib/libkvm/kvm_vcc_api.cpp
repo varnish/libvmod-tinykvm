@@ -62,10 +62,18 @@ int kvm_tenant_unload(VRT_CTX, kvm::TenantInstance* tenant)
 	return true;
 }
 
+/* Frees the VMs of the given program that this task still holds for
+   a zero-copy synth() or deliver_transform() (src/kvm/to_string.c).
+   Waiting for one of those VMs would otherwise only end when the
+   reservation times out. Returns -1 if one could not be freed. */
+extern "C" int kvm_task_release_holds(const vrt_ctx *ctx, kvm::TenantInstance* tenant);
+
 extern "C"
 kvm::VMPoolItem* kvm_reserve_machine(const vrt_ctx *ctx, kvm::TenantInstance* tenant, bool debug)
 {
 	if (UNLIKELY(tenant == nullptr || ctx == nullptr))
+		return nullptr;
+	if (UNLIKELY(kvm_task_release_holds(ctx, tenant) < 0))
 		return nullptr;
 
 	/* Can block for a while until program is fetched and initialized. */
@@ -76,6 +84,8 @@ extern "C"
 kvm::VMPoolItem* kvm_temporarily_reserve_machine(const vrt_ctx *ctx, kvm::TenantInstance* tenant, bool debug, bool soft_reset)
 {
 	if (UNLIKELY(tenant == nullptr || ctx == nullptr))
+		return nullptr;
+	if (UNLIKELY(kvm_task_release_holds(ctx, tenant) < 0))
 		return nullptr;
 
 	/* Can block for a while until program is fetched and initialized. */
@@ -123,73 +133,6 @@ int kvm_is_mmap_range(kvm::VMPoolItem* slot, uint64_t address)
 	return /* Above MMAP-begin and the default stack. */
 		address >= slot->mi->machine().mmap_start()
 		&& address >= slot->mi->machine().stack_address();
-}
-
-struct vmod_kvm_synth
-{
-	struct vsb *vsb;
-	uint16_t status;
-	char ct_buf[242];
-	int  ct_len;
-};
-
-extern "C"
-int kvm_synth(VRT_CTX, kvm::MachineInstance* machine,
-	struct vmod_kvm_synth* synth)
-{
-	assert(machine && synth);
-
-	// NOTE: CTX can change between recv and synth due to waitlist
-	machine->set_ctx(ctx);
-	auto& vm = machine->machine();
-	auto regs = vm.registers();
-	auto* vsb = synth->vsb;
-
-	const uint16_t status = regs.rdi;
-	const uint64_t tvaddr = regs.rsi;
-	const uint16_t tlen   = regs.rdx;
-	const uint64_t cvaddr = regs.rcx;
-	const uint64_t clen   = regs.r8;
-
-	try {
-		/* Status code */
-		synth->status = status;
-		/* Content-Type */
-		if (tlen >= sizeof(synth->ct_buf)) {
-			VRT_fail(ctx, "Invalid synth response: Content-Type too long");
-			return (-1);
-		}
-		synth->ct_len = tlen;
-		vm.copy_from_guest(synth->ct_buf, tvaddr, tlen);
-		synth->ct_buf[tlen] = 0;
-
-		/* Gather buffers for (potentially) zero-copy content */
-		tinykvm::Machine::Buffer buffers[32];
-		size_t bufcount = sizeof(buffers) / sizeof(buffers[0]);
-
-		bufcount = vm.gather_buffers_from_range(
-			bufcount, buffers, cvaddr, clen);
-
-		if (bufcount == 1) {
-			/* we need to get rid of the old data */
-			if (vsb->s_flags & VSB_DYNAMIC) {
-				free(vsb->s_buf);
-			}
-			vsb->s_buf = (char*) buffers[0].ptr;
-			vsb->s_size = buffers[0].len + 1; /* pretend-zero */
-			vsb->s_len  = buffers[0].len;
-			vsb->s_flags = VSB_FIXEDLEN;
-		} else {
-			VSB_clear(vsb);
-			for (size_t i = 0; i < bufcount; i++) {
-				VSB_bcat(vsb, buffers[i].ptr, buffers[i].len);
-			}
-		}
-		return clen;
-	} catch (const std::exception& e) {
-		VRT_fail(ctx, "Invalid synth response: %s", e.what());
-		return -1;
-	}
 }
 
 static int kvm_forkcall(VRT_CTX, kvm::VMPoolItem* slot,

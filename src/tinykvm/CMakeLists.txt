@@ -1,5 +1,6 @@
 add_vmod(vmod_tinykvm vmod_tinykvm.vcc "High-Performance Compute VMOD"
 	../kvm/kvm_backend.c
+	../kvm/kvm_deliver.c
 	../kvm/kvm_live_update.c
 	../kvm/kvm_post.c
 	../kvm/to_string.c
@@ -16,8 +17,10 @@ add_vmod_vsc(vmod_tinykvm VSC_vmod_kvm.vsc)
 # Compute tests
 enable_testing()
 add_vmod_tests(vmod_tinykvm vmod_tinykvm
+	tests/deliver_transform.vtc
 	tests/minimal_example.vtc
 	tests/remote_archive.vtc
 	tests/synth.vtc
+	tests/synth_zero_copy.vtc
 	tests/warmup.vtc
 )
