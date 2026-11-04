@@ -18,6 +18,7 @@ add_vmod_vsc(vmod_tinykvm VSC_vmod_kvm.vsc)
 enable_testing()
 add_vmod_tests(vmod_tinykvm vmod_tinykvm
 	tests/deliver_transform.vtc
+	tests/deno.vtc
 	tests/minimal_example.vtc
 	tests/remote_archive.vtc
 	tests/synth.vtc

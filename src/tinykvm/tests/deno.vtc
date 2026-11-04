@@ -1,0 +1,168 @@
+varnishtest "TinyKVM: Simple Deno project"
+
+feature cmd "test -r /dev/kvm && test -w /dev/kvm"
+feature cmd "command -v gcc && command -v curl && command -v unzip"
+
+# The official Deno release is downloaded once and kept in a local cache,
+# so that repeated test runs do not hit the network.
+shell {
+set -e
+DENO_VERSION=v2.9.8
+DENO_CACHE=$HOME/.cache/vmod-tinykvm/deno-$DENO_VERSION
+if [ ! -x $DENO_CACHE/deno ]; then
+	mkdir -p $DENO_CACHE
+	curl -fsSL -o $DENO_CACHE/deno.zip \
+		https://github.com/denoland/deno/releases/download/$DENO_VERSION/deno-x86_64-unknown-linux-gnu.zip
+	unzip -o -q $DENO_CACHE/deno.zip -d $DENO_CACHE/unpack
+	mv $DENO_CACHE/unpack/deno $DENO_CACHE/deno
+	rm -rf $DENO_CACHE/deno.zip $DENO_CACHE/unpack
+fi
+ln -sf $DENO_CACHE/deno ${tmpdir}/deno
+
+# Native glue between Deno FFI and the TinyKVM guest API
+cat >vdeno.c <<-EOF
+#include "kvm_api.h"
+static struct kvm_request req;
+
+void vd_wait_for_requests_paused() { wait_for_requests_paused(&req); }
+const char *vd_request_method()    { return req.method; }
+const char *vd_request_url()       { return req.url; }
+const char *vd_request_argument()  { return req.arg; }
+int         vd_is_warmup()         { return IS_WARMUP_REQUEST(&req); }
+
+void vd_response(int status, const char *ctype, size_t clen,
+	const unsigned char *body, size_t blen)
+{
+	sys_backend_response(status, ctype, clen, body, blen, NULL);
+}
+EOF
+gcc -O2 -Wall -shared -fPIC -Wl,--export-dynamic vdeno.c -I${testdir} -o libvdeno.so
+
+cat >server.ts <<-EOF
+const lib = Deno.dlopen("${tmpdir}/libvdeno.so", {
+	vd_wait_for_requests_paused: { parameters: [], result: "void" },
+	vd_request_method: { parameters: [], result: "pointer" },
+	vd_request_url: { parameters: [], result: "pointer" },
+	vd_request_argument: { parameters: [], result: "pointer" },
+	vd_is_warmup: { parameters: [], result: "i32" },
+	vd_response: {
+		parameters: ["i32", "buffer", "usize", "buffer", "usize"],
+		result: "void",
+	},
+} as const);
+
+const cstr = (p: Deno.PointerValue): string =>
+	p === null ? "" : Deno.UnsafePointerView.getCString(p);
+
+export type Handler = (req: Request, argument: string) => Response | Promise<Response>;
+
+export const serve = async (handler: Handler) => {
+	const encoder = new TextEncoder();
+	while (true) {
+		lib.symbols.vd_wait_for_requests_paused();
+		const url = new URL(cstr(lib.symbols.vd_request_url()), "http://localhost");
+		const method = cstr(lib.symbols.vd_request_method());
+		const argument = cstr(lib.symbols.vd_request_argument());
+		const response = await handler(new Request(url, { method }), argument);
+		const ctype = encoder.encode(response.headers.get("Content-Type") ?? "text/plain");
+		const body = await response.bytes();
+		lib.symbols.vd_response(response.status,
+			ctype, BigInt(ctype.byteLength), body, BigInt(body.byteLength));
+	}
+};
+EOF
+
+cat >main.ts <<-EOF
+import { serve } from "./server.ts";
+
+let counter = 0;
+
+serve(async (req, argument) => {
+	counter++;
+	const path = new URL(req.url).pathname;
+	if (path === "/json") {
+		return Response.json({ path: path, argument: argument, sum: [1, 2, 3].reduce((a, b) => a + b, 0) });
+	}
+	return new Response("Hello from Deno: " + req.method + " " + path);
+});
+EOF
+}
+
+varnish v1 -arg "-p first_byte_timeout=30" -vcl+backend {
+vcl 4.1;
+	import tinykvm;
+	backend default none;
+
+	sub vcl_init {
+		tinykvm.configure("deno",
+		"""{
+			"filename": "${tmpdir}/deno",
+			"concurrency": 1,
+			"max_boot_time": 30.0,
+			"max_request_time": 10.0,
+			"address_space": 2000,
+			"max_memory": 512,
+			"max_request_memory": 256,
+			"req_mem_limit_after_reset": 128,
+			"executable_remapping": {
+				"caged_heap": ["0x1000000000", 64]
+			},
+			"remapping": {
+				"v8_cage": ["0x400000000", 256]
+			},
+			"main_arguments": [
+				"run", "--allow-all", "main.ts"
+			],
+			"environment": [
+				"DENO_V8_FLAGS=--predictable,--stress-maglev,--always-sparkplug,--optimize-on-next-call-optimizes-to-maglev,--max-old-space-size=64,--max-semi-space-size=64",
+				"DENO_DIR=${tmpdir}/.cache",
+				"DENO_NO_UPDATE_CHECK=1",
+				"MALLOC_ARENA_MAX=1",
+				"NO_COLOR=1"
+			],
+			"current_working_directory": "${tmpdir}",
+			"allowed_paths": [
+				"/dev/urandom",
+				"/etc/resolv.conf",
+				{
+					"real": "/lib/x86_64-linux-gnu",
+					"prefix": true
+				},
+				{
+					"real": "${tmpdir}",
+					"prefix": true
+				},
+				{
+					"real": "${tmpdir}/.cache",
+					"writable": true,
+					"prefix": true
+				},
+				{
+					"real": "/tmp/deno-compile-",
+					"writable": true,
+					"prefix": true
+				}
+			],
+			"warmup": {
+				"num_requests": 10
+			}
+		}""");
+	}
+
+	sub vcl_backend_fetch {
+		set bereq.backend = tinykvm.program("deno", bereq.url, "my argument");
+	}
+} -start
+
+client c1 -connect ${v1_sock} {
+	txreq -url "/hello"
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "Hello from Deno: GET /hello"
+
+	txreq -url "/json"
+	rxresp
+	expect resp.status == 200
+	expect resp.http.Content-Type ~ "application/json"
+	expect resp.body == {{"path":"/json","argument":"my argument","sum":6}}
+} -run
