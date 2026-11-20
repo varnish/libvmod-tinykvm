@@ -20,6 +20,11 @@
 #   VCP_VERSION  Varnish Enterprise upstream version to pin, e.g. 6.0.18r2.
 #                Use "latest" or leave unset to install whatever is newest.
 #   OUTDIR       where built packages are copied   (default: ./packages)
+#   ENTERPRISE_REPO   packagecloud repo to install varnish-plus from
+#                     (default: varnishplus/60-enterprise, the public prod repo;
+#                      e.g. varnishplus/60-enterprise-staging for staging)
+#   PACKAGECLOUD_TOKEN  master/read token for a private repo (e.g. staging).
+#                       Leave unset for the public production repo.
 #
 set -euo pipefail
 
@@ -29,9 +34,23 @@ cd "$REPO_ROOT"
 PKG_FAMILY=${PKG_FAMILY:?PKG_FAMILY must be set to 'deb' or 'rpm'}
 OUTDIR=${OUTDIR:-"$REPO_ROOT/packages"}
 VCP_VERSION=${VCP_VERSION:-latest}
-ENTERPRISE_REPO="varnishplus/60-enterprise"
+ENTERPRISE_REPO=${ENTERPRISE_REPO:-"varnishplus/60-enterprise"}
+PACKAGECLOUD_TOKEN=${PACKAGECLOUD_TOKEN:-}
 
 log() { echo "==> $*"; }
+
+# packagecloud install-script URL for the configured enterprise repo. A private
+# repo (e.g. staging) needs a master/read token, supplied as the HTTP basic-auth
+# username with an empty password; the install script then writes a per-repo
+# read token into the generated apt/yum config. The public prod repo needs none.
+pkgcloud_install_url() {
+	local script=$1   # script.deb.sh | script.rpm.sh
+	if [ -n "$PACKAGECLOUD_TOKEN" ]; then
+		echo "https://${PACKAGECLOUD_TOKEN}:@packagecloud.io/install/repositories/${ENTERPRISE_REPO}/${script}"
+	else
+		echo "https://packagecloud.io/install/repositories/${ENTERPRISE_REPO}/${script}"
+	fi
+}
 
 # libvmod-compute's own version, taken straight from configure.ac so we don't
 # need a generated ./configure to exist yet.
@@ -50,7 +69,7 @@ build_deb() {
 	apt-get update
 	apt-get install -y --no-install-recommends \
 		apt-transport-https ca-certificates curl gnupg
-	curl -fsSL "https://packagecloud.io/install/repositories/${ENTERPRISE_REPO}/script.deb.sh" | bash
+	curl -fsSL "$(pkgcloud_install_url script.deb.sh)" | bash
 	apt-get update
 
 	# Resolve the varnish-plus package spec. "latest" leaves it unversioned;
@@ -135,7 +154,7 @@ build_rpm() {
 	# the full curl package, so only pull it in if the binary is actually absent.
 	command -v curl >/dev/null 2>&1 || $PM install -y --allowerasing curl
 	$PM install -y ca-certificates findutils which 2>/dev/null || true
-	curl -fsSL "https://packagecloud.io/install/repositories/${ENTERPRISE_REPO}/script.rpm.sh" | bash
+	curl -fsSL "$(pkgcloud_install_url script.rpm.sh)" | bash
 
 	# EL8 hides modular-named packages (varnish-plus) behind DNF modular
 	# filtering unless the third-party repo opts out. Harmless elsewhere.

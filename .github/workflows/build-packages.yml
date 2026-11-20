@@ -5,14 +5,44 @@ name: Packages (Varnish Enterprise)
 # the enterprise sledge packages, e.g.
 #   libvmod-tinykvm_1.0~6.0.18r2-1~noble_amd64.deb
 #   libvmod-tinykvm-1.0~6.0.18r2-1.el9.x86_64.rpm
-# Packages are uploaded as CI artifacts.
-
+#
 # Manual-only: this builds against Varnish Enterprise (varnish-plus) and is not
 # meant to run on every push/PR. Trigger it from the Actions tab ("Run
-# workflow") and pick the Varnish Enterprise version to build against.
+# workflow").
+#
+# Two independent choices control the run:
+#
+#   1. Where to get the Varnish Enterprise build packages FROM
+#      ("Varnish packages source" + version). Either the public production
+#      packagecloud repo (default) or the private staging packagecloud repo
+#      (needs the "staging" environment's ENTERPRISE_REPO / PACKAGECLOUD
+#      secrets). Building from staging validates a new, not-yet-released
+#      Varnish Enterprise version -- set that version in "Custom version
+#      override".
+#
+#   2. Whether to ALSO push the packages we just built up to the staging
+#      packagecloud repo ("Upload packages to staging" checkbox). Regardless
+#      of that checkbox, every run bundles the full set of packages into a
+#      single zip and attaches it to a draft GitHub release, so there is
+#      always a backup to review, download or publish from -- including when
+#      the staging upload fails.
+#
+# These are decoupled: e.g. you can build from production and still push the
+# result to staging, or build from staging and only produce a draft.
 on:
   workflow_dispatch:
     inputs:
+      git_ref:
+        description: "Git ref (tag, branch or SHA) to build from. Leave empty to build the ref this workflow was triggered on."
+        type: string
+        default: ""
+      varnish_source:
+        description: "Varnish packages source: where to get the Varnish Enterprise build packages from"
+        type: choice
+        default: production
+        options:
+          - production
+          - staging
       vcp_version:
         description: "Varnish Enterprise version"
         type: choice
@@ -23,12 +53,16 @@ on:
           - 6.0.17r4
           - 6.0.16r13
       vcp_version_custom:
-        description: "Custom version override (e.g. 6.0.15r1). Takes precedence over the dropdown when set."
+        description: "Custom version override (e.g. 6.0.19r1). Takes precedence over the dropdown when set. The staging source usually needs this, since it targets an unreleased version."
         type: string
         default: ""
+      upload_to_staging:
+        description: "Also upload packages to the staging packagecloud repo (a draft release is created either way)"
+        type: boolean
+        default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.git_ref }}-${{ inputs.varnish_source }}-${{ inputs.upload_to_staging }}
   cancel-in-progress: true
 
 env:
@@ -40,6 +74,12 @@ jobs:
     name: ${{ matrix.target.label }} (${{ matrix.arch.name }})
     runs-on: ${{ matrix.arch.runner }}
     container: ${{ matrix.target.image }}
+    # When the Varnish source is "staging", attach the "staging" environment so
+    # ENTERPRISE_REPO / PACKAGECLOUD_TOKEN resolve to the private staging repo's
+    # credentials. For the "production" source no environment is attached and
+    # those secrets resolve to empty, so build-package.sh falls back to the
+    # public production repo.
+    environment: ${{ inputs.varnish_source == 'staging' && 'staging' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -54,6 +94,7 @@ jobs:
           # to where varnish-plus / varnish-plus-dev(el) actually ships.
           - { label: ubuntu-jammy,    family: deb, codename: jammy,    image: "ubuntu:22.04" }
           - { label: ubuntu-noble,    family: deb, codename: noble,    image: "ubuntu:24.04" }
+          - { label: ubuntu-resolute, family: deb, codename: resolute, image: "ubuntu:26.04" }
           - { label: debian-bookworm, family: deb, codename: bookworm, image: "debian:bookworm" }
           - { label: debian-trixie,   family: deb, codename: trixie,   image: "debian:trixie" }
           - { label: almalinux-8,     family: rpm, dist: el8,          image: "almalinux:8" }
@@ -82,6 +123,7 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.git_ref }}
           submodules: recursive
 
       - name: Build package
@@ -90,6 +132,9 @@ jobs:
           PKG_CODENAME: ${{ matrix.target.codename }}
           PKG_DIST: ${{ matrix.target.dist }}
           VCP_VERSION: ${{ env.VCP_VERSION }}
+          # Empty in prod (no environment attached) -> public production repo.
+          ENTERPRISE_REPO: ${{ secrets.ENTERPRISE_REPO }}
+          PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
           OUTDIR: ${{ github.workspace }}/packages
         run: packaging/ci/build-package.sh
 
@@ -100,8 +145,11 @@ jobs:
           path: packages/*
           if-no-files-found: error
 
-  # Collect every distro/arch artifact into a single draft GitHub release so the
-  # full set of .deb/.rpm packages can be reviewed and published in one place.
+  # ALWAYS: collect every distro/arch artifact into one zip and attach it to a
+  # draft GitHub release, so the full set of .deb/.rpm packages can be reviewed
+  # and published in one place. This runs on every build -- also when the
+  # staging upload is requested (and even when that upload fails), so there is
+  # always a complete backup of the built packages.
   release:
     name: Draft release
     needs: package
@@ -109,6 +157,16 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Check out the same ref we built from so the release can be targeted at
+      # the exact commit (gh release --target needs a branch or full SHA).
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_ref }}
+
+      - name: Resolve target commit
+        id: target
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Download all package artifacts
         uses: actions/download-artifact@v4
         with:
@@ -116,18 +174,70 @@ jobs:
           pattern: libvmod-tinykvm-*
           merge-multiple: true
 
-      - name: List collected packages
-        run: ls -l artifacts
+      # One zip with every .deb/.rpm, rather than one release asset per
+      # package. merge-multiple above already flattened the per-job artifacts
+      # into a single directory, and package filenames carry distro + arch, so
+      # they cannot collide.
+      - name: Bundle all packages into a single zip
+        id: bundle
+        run: |
+          ls -l artifacts
+          # VCP_VERSION can be free text ("Custom version override"), so keep
+          # only characters that are safe in a release asset filename.
+          version="$(printf '%s' "$VCP_VERSION" | tr -c 'A-Za-z0-9._-' '-')"
+          zipname="libvmod-tinykvm-packages-${version}-build${{ github.run_number }}.zip"
+          (cd artifacts && zip -j -q "../$zipname" *)
+          unzip -l "$zipname"
+          echo "zip=$zipname" >> "$GITHUB_OUTPUT"
 
       - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: packages-build-${{ github.run_number }}
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
+          ZIP: ${{ steps.bundle.outputs.zip }}
         run: |
+          cat > release-notes.md <<EOF
+          Draft release with native libvmod-tinykvm packages for all supported
+          Varnish Enterprise distros/architectures, built against Varnish
+          Enterprise \`${VCP_VERSION}\` from ${TARGET_SHA}.
+
+          Every package is bundled into a single archive: \`${ZIP}\`.
+          EOF
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --draft \
             --title "libvmod-tinykvm packages (build ${{ github.run_number }}, VE ${{ env.VCP_VERSION }})" \
-            --target "$GITHUB_SHA" \
-            --notes "Draft release with native libvmod-tinykvm packages for all supported Varnish Enterprise distros/architectures, built against Varnish Enterprise \`${{ env.VCP_VERSION }}\` from ${GITHUB_SHA}." \
-            artifacts/*
+            --target "$TARGET_SHA" \
+            --notes-file release-notes.md \
+            "$ZIP"
+
+  # OPT-IN, in addition to the draft release above: push the freshly built
+  # packages up to the staging Varnish Enterprise packagecloud repo, so the new
+  # (unreleased) version can be installed from staging for validation. Runs
+  # only when "Upload packages to staging" is checked.
+  upload:
+    name: Upload to staging
+    if: ${{ inputs.upload_to_staging }}
+    needs: package
+    runs-on: ubuntu-24.04
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_ref }}
+
+      - name: Download all package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: libvmod-tinykvm-*
+
+      - name: Push packages to staging packagecloud
+        env:
+          # ENTERPRISE_REPO doubles as the push target (the staging repo we
+          # installed from). PACKAGECLOUD_TOKEN must have push access.
+          STAGING_REPO: ${{ secrets.ENTERPRISE_REPO }}
+          PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts
+        run: packaging/ci/upload-staging.sh
