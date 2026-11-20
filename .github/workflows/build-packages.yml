@@ -8,78 +8,106 @@ name: Packages (Varnish Enterprise)
 #
 # Manual-only: this builds against Varnish Enterprise (varnish-plus) and is not
 # meant to run on every push/PR. Trigger it from the Actions tab ("Run
-# workflow").
+# workflow") or with `gh workflow run`.
 #
-# Two independent choices control the run:
+# The inputs mirror the CI workflows of the other enterprise VMODs (sledge,
+# WAF), so a release is triggered the same way: tag the release commit
+# v<vmod-version>-<VE-version> (e.g. v1.0-6.0.18r3), push the tag, and build it
+# with install-from=staging, src-commit=<tag>, pkg-revision=1 and
+# vcp-version=<VE-version>.
 #
-#   1. Where to get the Varnish Enterprise build packages FROM
-#      ("Varnish packages source" + version). Either the public production
-#      packagecloud repo (default) or the private staging packagecloud repo
-#      (needs the "staging" environment's ENTERPRISE_REPO / PACKAGECLOUD
-#      secrets). Building from staging validates a new, not-yet-released
-#      Varnish Enterprise version -- set that version in "Custom version
-#      override".
-#
-#   2. Whether to ALSO push the packages we just built up to the staging
-#      packagecloud repo ("Upload packages to staging" checkbox). Regardless
-#      of that checkbox, every run bundles the full set of packages into a
-#      single zip and attaches it to a draft GitHub release, so there is
-#      always a backup to review, download or publish from -- including when
-#      the staging upload fails.
-#
-# These are decoupled: e.g. you can build from production and still push the
-# result to staging, or build from staging and only produce a draft.
+# Every run bundles the full set of packages into a single zip and attaches it
+# to a draft GitHub release, so there is always a backup to review, download
+# or publish from. Checking upload-to-staging also pushes the packages to the
+# staging packagecloud repo.
 on:
   workflow_dispatch:
     inputs:
-      git_ref:
-        description: "Git ref (tag, branch or SHA) to build from. Leave empty to build the ref this workflow was triggered on."
+      install-from:
+        description: >-
+          Where to get varnish-plus: production or staging. (The id of a
+          varnish-cache-plus packaging run, which sledge and WAF accept, is
+          not supported here.)
+        type: string
+        default: "production"
+      src-commit:
+        description: >-
+          Branch, tag or SHA to build the packages from, e.g. the
+          v<vmod-version>-<VE-version> release tag. Empty builds the branch
+          selected above.
         type: string
         default: ""
-      varnish_source:
-        description: "Varnish packages source: where to get the Varnish Enterprise build packages from"
-        type: choice
-        default: production
-        options:
-          - production
-          - staging
-      vcp_version:
-        description: "Varnish Enterprise version"
-        type: choice
-        default: latest
-        options:
-          - latest
-          - 6.0.18r2
-          - 6.0.17r4
-          - 6.0.16r13
-      vcp_version_custom:
-        description: "Custom version override (e.g. 6.0.19r1). Takes precedence over the dropdown when set. The staging source usually needs this, since it targets an unreleased version."
+      pkg-revision:
+        description: >-
+          Package revision, e.g. 1 for a release. Empty uses a build
+          timestamp, marking the packages as a snapshot build.
         type: string
         default: ""
-      upload_to_staging:
-        description: "Also upload packages to the staging packagecloud repo (a draft release is created either way)"
+      vcp-version:
+        description: >-
+          varnish-plus version to build against, e.g. 6.0.18r3. It is
+          installed from the install-from repo and goes into the package
+          version. Empty takes the newest varnish-plus in that repo.
+        type: string
+        default: ""
+      upload-to-staging:
+        description: >-
+          Also upload the packages to the staging packagecloud repo
+          (requires pkg-revision). A draft release is created either way.
         type: boolean
         default: false
 
+# Each dispatch gets a group of its own, as in sledge/WAF, since two
+# dispatches may carry different inputs.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.git_ref }}-${{ inputs.varnish_source }}-${{ inputs.upload_to_staging }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.run_id }}
 
 env:
-  # The custom free-text field wins when non-empty, otherwise use the dropdown.
-  VCP_VERSION: ${{ inputs.vcp_version_custom != '' && inputs.vcp_version_custom || inputs.vcp_version }}
+  VCP_VERSION: ${{ inputs.vcp-version != '' && inputs.vcp-version || 'latest' }}
 
 jobs:
+  # Validate the inputs and settle the package revision once, so every package
+  # in the run carries the same one.
+  setup:
+    name: Check inputs
+    runs-on: ubuntu-24.04
+    outputs:
+      pkg-revision: ${{ steps.rev.outputs.pkg-revision }}
+    steps:
+      - name: Check inputs
+        env:
+          INSTALL_FROM: ${{ inputs.install-from }}
+          PKG_REVISION: ${{ inputs.pkg-revision }}
+          UPLOAD: ${{ inputs.upload-to-staging }}
+        run: |
+          case "$INSTALL_FROM" in
+            production|staging) ;;
+            *) echo "::error::install-from must be production or staging, got '$INSTALL_FROM'"; exit 1 ;;
+          esac
+          # A snapshot's timestamp revision sorts above a release's "1", so a
+          # snapshot in staging would shadow the release packages.
+          if [ "$UPLOAD" = true ] && [ -z "$PKG_REVISION" ]; then
+            echo "::error::upload-to-staging requires pkg-revision (e.g. 1 for a release)"
+            exit 1
+          fi
+
+      - name: Settle package revision
+        id: rev
+        env:
+          PKG_REVISION: ${{ inputs.pkg-revision }}
+        run: echo "pkg-revision=${PKG_REVISION:-$(date -u +%Y%m%d%H%M%S)}" >> "$GITHUB_OUTPUT"
+
   package:
     name: ${{ matrix.target.label }} (${{ matrix.arch.name }})
+    needs: setup
     runs-on: ${{ matrix.arch.runner }}
     container: ${{ matrix.target.image }}
-    # When the Varnish source is "staging", attach the "staging" environment so
+    # When install-from is "staging", attach the "staging" environment so
     # ENTERPRISE_REPO / PACKAGECLOUD_TOKEN resolve to the private staging repo's
-    # credentials. For the "production" source no environment is attached and
+    # credentials. For "production" no environment is attached and
     # those secrets resolve to empty, so build-package.sh falls back to the
     # public production repo.
-    environment: ${{ inputs.varnish_source == 'staging' && 'staging' || '' }}
+    environment: ${{ inputs.install-from == 'staging' && 'staging' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -123,7 +151,7 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.git_ref }}
+          ref: ${{ inputs.src-commit }}
           submodules: recursive
 
       - name: Build package
@@ -132,6 +160,7 @@ jobs:
           PKG_CODENAME: ${{ matrix.target.codename }}
           PKG_DIST: ${{ matrix.target.dist }}
           VCP_VERSION: ${{ env.VCP_VERSION }}
+          PKG_REVISION: ${{ needs.setup.outputs.pkg-revision }}
           # Empty in prod (no environment attached) -> public production repo.
           ENTERPRISE_REPO: ${{ secrets.ENTERPRISE_REPO }}
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
@@ -161,7 +190,7 @@ jobs:
       # the exact commit (gh release --target needs a branch or full SHA).
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.git_ref }}
+          ref: ${{ inputs.src-commit }}
 
       - name: Resolve target commit
         id: target
@@ -182,8 +211,8 @@ jobs:
         id: bundle
         run: |
           ls -l artifacts
-          # VCP_VERSION can be free text ("Custom version override"), so keep
-          # only characters that are safe in a release asset filename.
+          # VCP_VERSION is free text (the vcp-version input), so keep only
+          # characters that are safe in a release asset filename.
           version="$(printf '%s' "$VCP_VERSION" | tr -c 'A-Za-z0-9._-' '-')"
           zipname="libvmod-tinykvm-packages-${version}-build${{ github.run_number }}.zip"
           (cd artifacts && zip -j -q "../$zipname" *)
@@ -215,17 +244,17 @@ jobs:
   # OPT-IN, in addition to the draft release above: push the freshly built
   # packages up to the staging Varnish Enterprise packagecloud repo, so the new
   # (unreleased) version can be installed from staging for validation. Runs
-  # only when "Upload packages to staging" is checked.
+  # only when upload-to-staging is checked.
   upload:
     name: Upload to staging
-    if: ${{ inputs.upload_to_staging }}
+    if: ${{ inputs.upload-to-staging }}
     needs: package
     runs-on: ubuntu-24.04
     environment: staging
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.git_ref }}
+          ref: ${{ inputs.src-commit }}
 
       - name: Download all package artifacts
         uses: actions/download-artifact@v4
