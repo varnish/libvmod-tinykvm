@@ -19,6 +19,9 @@
 #   PKG_DIST     rpm dist tag, e.g. el9 / amzn2023 (required for rpm; informational)
 #   VCP_VERSION  Varnish Enterprise upstream version to pin, e.g. 6.0.18r2.
 #                Use "latest" or leave unset to install whatever is newest.
+#   PKG_REVISION package revision, e.g. 1 for a release (the "-1" above).
+#                Leave unset for a snapshot build, which uses a timestamp,
+#                as the other enterprise VMODs do.
 #   OUTDIR       where built packages are copied   (default: ./packages)
 #   ENTERPRISE_REPO   packagecloud repo to install varnish-plus from
 #                     (default: varnishplus/60-enterprise, the public prod repo;
@@ -34,6 +37,7 @@ cd "$REPO_ROOT"
 PKG_FAMILY=${PKG_FAMILY:?PKG_FAMILY must be set to 'deb' or 'rpm'}
 OUTDIR=${OUTDIR:-"$REPO_ROOT/packages"}
 VCP_VERSION=${VCP_VERSION:-latest}
+PKG_REVISION=${PKG_REVISION:-$(date -u +%Y%m%d%H%M%S)}
 ENTERPRISE_REPO=${ENTERPRISE_REPO:-"varnishplus/60-enterprise"}
 PACKAGECLOUD_TOKEN=${PACKAGECLOUD_TOKEN:-}
 
@@ -104,15 +108,14 @@ build_deb() {
 	fi
 
 	# Derive the enterprise version from the installed package:
-	#   6.0.18r2-1~noble  ->  upstream 6.0.18r2, release 1
-	local vcp_full vcp_nodist vcp_up vcp_rel cv srcver
+	#   6.0.18r2-1~noble  ->  upstream 6.0.18r2
+	local vcp_full vcp_nodist vcp_up cv srcver
 	vcp_full=$(dpkg-query -W -f='${Version}' varnish-plus)
 	vcp_nodist=${vcp_full%%~*}      # strip ~<codename>
 	vcp_up=${vcp_nodist%-*}         # upstream version
-	vcp_rel=${vcp_nodist##*-}       # packaging release
 	cv=$(compute_version)
 	srcver="${cv}~${vcp_up}"
-	log "Versions: compute=$cv varnish-plus=$vcp_full -> ${srcver}-${vcp_rel}~${PKG_CODENAME}"
+	log "Versions: compute=$cv varnish-plus=$vcp_full -> ${srcver}-${PKG_REVISION}~${PKG_CODENAME}"
 
 	# Bootstrap the autotools build ourselves. We deliberately do not rely on
 	# dh-autoreconf: Makefile.am's ACLOCAL_AMFLAGS references a Make-substituted
@@ -125,7 +128,7 @@ build_deb() {
 	rm -rf debian
 	cp -r packaging/debian debian
 	sed -e "s/@SRCVER@/${srcver}/g" \
-	    -e "s/@PKGVER@/${vcp_rel}/g" \
+	    -e "s/@PKGVER@/${PKG_REVISION}/g" \
 	    -e "s/@DISTVER@/${PKG_CODENAME}/g" \
 	    -e "s/UNRELEASED/${PKG_CODENAME}/g" \
 	    packaging/debian/changelog > debian/changelog
@@ -208,16 +211,13 @@ build_rpm() {
 
 	ensure_rst2man
 
-	# Derive the enterprise version from the installed package. rpm gives the
-	# dist tag separately, so RELEASE is e.g. "1.el9" -> strip the dist suffix.
-	local vcp_up vcp_rel dist cv srcver
+	# Derive the enterprise version from the installed package.
+	local vcp_up dist cv srcver
 	vcp_up=$(rpm -q --qf '%{VERSION}' varnish-plus)
-	vcp_rel=$(rpm -q --qf '%{RELEASE}' varnish-plus)
 	dist=$(rpm --eval '%{?dist}')
-	[ -n "$dist" ] && vcp_rel=${vcp_rel%"$dist"}
 	cv=$(compute_version)
 	srcver="${cv}~${vcp_up}"
-	log "Versions: compute=$cv varnish-plus=${vcp_up}-${vcp_rel}${dist} -> ${srcver}-${vcp_rel}${dist}"
+	log "Versions: compute=$cv varnish-plus=$(rpm -q --qf '%{VERSION}-%{RELEASE}' varnish-plus) -> ${srcver}-${PKG_REVISION}${dist}"
 
 	# rpmbuild needs a source tarball that already contains ./configure, so
 	# bootstrap and use the automake `make dist' tarball (top dir libvmod-compute-<cv>).
@@ -234,7 +234,7 @@ build_rpm() {
 	rpmbuild -bb \
 		--define "_topdir $rpmtop" \
 		--define "versiontag ${srcver}" \
-		--define "releasetag ${vcp_rel}" \
+		--define "releasetag ${PKG_REVISION}" \
 		--define "srcname ${srcname}" \
 		packaging/redhat/libvmod-tinykvm.spec
 
